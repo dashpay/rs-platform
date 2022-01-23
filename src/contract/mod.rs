@@ -51,15 +51,12 @@ impl Index {
     // If a sort_on value is provided it must match the last index property.
     // The number returned is the number of unused index properties
     pub fn matches(&self, index_names: &[&str], in_field_name: Option<&str>, sort_on: Option<&str>) -> Option<u16> {
-        let last_property = self.properties.last();
-        if last_property.is_none() {
-            return None;
-        }
+        let last_property = self.properties.last()?;
         let mut d = self.properties.len();
-        if sort_on.is_some() {
-            if last_property.unwrap().name.as_str() != sort_on.unwrap() {
+        if let Some(sort_on) = sort_on {
+            if last_property.name.as_str() != sort_on {
                 return None;
-            } else if !index_names.iter().any(|&a| a == sort_on.unwrap()) {
+            } else if !index_names.iter().any(|&a| a == sort_on) {
                 // we can remove the -1 here
                 // this is a case for example if we have an index on person's name and age
                 // where we say name == 'Sam' sort by age
@@ -72,17 +69,16 @@ impl Index {
         }
 
         // the in field can only be on the last or before last property
-        if in_field_name.is_some() && last_property.unwrap().name.as_str() != in_field_name.unwrap() {
-            // it can also be on the before last
-            if self.properties.len() == 1 {
-                return None;
-            }
-            let before_last_property = self.properties.get(self.properties.len() - 2);
-            if before_last_property.is_none() {
-                return None;
-            }
-            if before_last_property.unwrap().name.as_str() != in_field_name.unwrap() {
-                return None;
+        if let Some(in_field_name) = in_field_name {
+            if last_property.name.as_str() != in_field_name {
+                // it can also be on the before last
+                if self.properties.len() == 1 {
+                    return None;
+                }
+                let before_last_property = self.properties.get(self.properties.len() - 2)?;
+                if before_last_property.name.as_str() != in_field_name {
+                    return None;
+                }
             }
         }
         for search_name in index_names.iter() {
