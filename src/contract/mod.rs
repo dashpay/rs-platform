@@ -621,7 +621,7 @@ fn bytes_for_system_value_from_hash_map(
                     .collect::<Result<Vec<u8>, Error>>();
                 match bytes_result {
                     Ok(bytes) => Some(bytes),
-                    Err(e) => None,
+                    Err(_) => None,
                 }
             }
             _ => None,
