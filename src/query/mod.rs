@@ -568,14 +568,14 @@ impl<'a> DriveQuery<'a> {
         };
         let mut fields = equal_fields;
         let mut sort_on = None;
-        if range_field.is_some() {
-            fields.push(range_field.unwrap());
-            sort_on = Some(range_field.unwrap());
+        if let Some(range_field) = range_field {
+            fields.push(range_field);
+            sort_on = Some(range_field);
         }
-        if in_field.is_some() {
-            fields.push(in_field.unwrap());
+        if let Some(in_field) = in_field {
+            fields.push(in_field);
             //if there is an in_field, it always takes precedence
-            sort_on = Some(in_field.unwrap());
+            sort_on = Some(in_field);
         }
 
         let (index, difference) = self
