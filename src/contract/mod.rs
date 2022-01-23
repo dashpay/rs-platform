@@ -229,7 +229,7 @@ impl DocumentType {
 
     pub fn from_cbor_value(
         name: &str,
-        document_type_value_map: &Vec<(Value, Value)>,
+        document_type_value_map: &[(Value, Value)],
     ) -> Result<Self, Error> {
         let mut indices: Vec<Index> = Vec::new();
         let mut document_properties: HashMap<String, types::DocumentFieldType> = HashMap::new();
@@ -449,7 +449,7 @@ impl Document {
 }
 
 impl Index {
-    pub fn from_cbor_value(index_type_value_map: &Vec<(Value, Value)>) -> Result<Self, Error> {
+    pub fn from_cbor_value(index_type_value_map: &[(Value, Value)]) -> Result<Self, Error> {
         // Decouple the map
         // It contains properties and a unique key
         // If the unique key is absent, then unique is false
@@ -502,7 +502,7 @@ impl Index {
 }
 
 impl IndexProperty {
-    pub fn from_cbor_value(index_property_map: &Vec<(Value, Value)>) -> Result<Self, Error> {
+    pub fn from_cbor_value(index_property_map: &[(Value, Value)]) -> Result<Self, Error> {
         let property = index_property_map[0].clone();
 
         let key = property
@@ -541,7 +541,7 @@ fn contract_document_types(contract: &HashMap<String, CborValue>) -> Option<&Vec
         .flatten()
 }
 
-fn get_key_from_cbor_map(cbor_map: &Vec<(Value, Value)>, key: &str) -> Option<Value> {
+fn get_key_from_cbor_map(cbor_map: &[(Value, Value)], key: &str) -> Option<Value> {
     for (cbor_key, cbor_value) in cbor_map.iter() {
         if !cbor_key.is_text() {
             continue;
@@ -554,7 +554,7 @@ fn get_key_from_cbor_map(cbor_map: &Vec<(Value, Value)>, key: &str) -> Option<Va
     None
 }
 
-fn cbor_inner_array_value(document_type: &Vec<(Value, Value)>, key: &str) -> Option<Vec<Value>> {
+fn cbor_inner_array_value(document_type: &[(Value, Value)], key: &str) -> Option<Vec<Value>> {
     let key_value = get_key_from_cbor_map(document_type, key)?;
     if key_value.is_array() {
         let array_value = key_value.as_array().expect("confirmed as array");
@@ -564,7 +564,7 @@ fn cbor_inner_array_value(document_type: &Vec<(Value, Value)>, key: &str) -> Opt
 }
 
 fn cbor_inner_map_value(
-    document_type: &Vec<(Value, Value)>,
+    document_type: &[(Value, Value)],
     key: &str,
 ) -> Option<Vec<(Value, Value)>> {
     let key_value = get_key_from_cbor_map(document_type, key)?;
@@ -575,7 +575,7 @@ fn cbor_inner_map_value(
     None
 }
 
-fn cbor_inner_text_value(document_type: &Vec<(Value, Value)>, key: &str) -> Option<String> {
+fn cbor_inner_text_value(document_type: &[(Value, Value)], key: &str) -> Option<String> {
     let key_value = get_key_from_cbor_map(document_type, key)?;
     if key_value.is_text() {
         let string_value = key_value.as_text().expect("confirmed as text");
@@ -584,7 +584,7 @@ fn cbor_inner_text_value(document_type: &Vec<(Value, Value)>, key: &str) -> Opti
     None
 }
 
-fn cbor_inner_bool_value(document_type: &Vec<(Value, Value)>, key: &str) -> Option<bool> {
+fn cbor_inner_bool_value(document_type: &[(Value, Value)], key: &str) -> Option<bool> {
     let key_value = get_key_from_cbor_map(document_type, key)?;
     if key_value.is_bool() {
         let bool_value = key_value.as_bool().expect("confirmed as text");
