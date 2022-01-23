@@ -609,7 +609,7 @@ fn bytes_for_system_value_from_hash_map(
                     .iter()
                     .map(|byte| match byte {
                         Value::Integer(int) => {
-                            let value_as_u8: u8 = int.clone().try_into().map_err(|_| {
+                            let value_as_u8: u8 = (*int).try_into().map_err(|_| {
                                 Error::CorruptedData(String::from("expected u8 value"))
                             })?;
                             Ok(value_as_u8)
