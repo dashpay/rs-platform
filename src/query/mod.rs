@@ -1,6 +1,6 @@
 mod defaults;
 
-use crate::contract::{Contract, DocumentType, Index};
+use crate::contract::{Contract, DocumentType};
 use crate::query::WhereOperator::{
     Between, BetweenExcludeBounds, BetweenExcludeLeft, BetweenExcludeRight, Equal, GreaterThan,
     GreaterThanOrEquals, In, LessThan, LessThanOrEquals, StartsWith,
