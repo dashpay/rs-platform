@@ -39,11 +39,11 @@ pub fn encode_document_field_type(
 
     return match field_type {
         DocumentFieldType::String => {
-            let value_as_text = value.as_text().ok_or(get_field_type_matching_error())?;
+            let value_as_text = value.as_text().ok_or_else(get_field_type_matching_error)?;
             Ok(value_as_text.as_bytes().to_vec())
         }
         DocumentFieldType::Integer => {
-            let value_as_integer = value.as_integer().ok_or(get_field_type_matching_error())?;
+            let value_as_integer = value.as_integer().ok_or_else(get_field_type_matching_error)?;
             let value_as_i64: i64 = value_as_integer
                 .try_into()
                 .map_err(|_| Error::CorruptedData(String::from("expected integer value")))?;
@@ -51,7 +51,7 @@ pub fn encode_document_field_type(
             encode_integer(value_as_i64)
         }
         DocumentFieldType::Float => {
-            let value_as_float = value.as_float().ok_or(get_field_type_matching_error())?;
+            let value_as_float = value.as_float().ok_or_else(get_field_type_matching_error)?;
             let value_as_f64 = value_as_float
                 .try_into()
                 .map_err(|_| Error::CorruptedData(String::from("expected float value")))?;
@@ -67,12 +67,12 @@ pub fn encode_document_field_type(
                 })?;
                 Ok(value_as_bytes)
             } else {
-                let value_as_bytes = value.as_bytes().ok_or(get_field_type_matching_error())?;
+                let value_as_bytes = value.as_bytes().ok_or_else(get_field_type_matching_error)?;
                 Ok(value_as_bytes.clone())
             }
         }
         DocumentFieldType::Boolean => {
-            let value_as_boolean = value.as_bool().ok_or(get_field_type_matching_error())?;
+            let value_as_boolean = value.as_bool().ok_or_else(get_field_type_matching_error)?;
             if value_as_boolean == true {
                 Ok(vec![1])
             } else {
@@ -80,7 +80,7 @@ pub fn encode_document_field_type(
             }
         }
         DocumentFieldType::Date => {
-            let date_string = value.as_text().ok_or(get_field_type_matching_error())?;
+            let date_string = value.as_text().ok_or_else(get_field_type_matching_error)?;
             let date_as_integer: i64 = date_string
                 .parse()
                 .map_err(|_| Error::CorruptedData(String::from("invalid integer string")))?;
