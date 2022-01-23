@@ -409,7 +409,7 @@ impl Document {
 
         // first we need to deserialize the document and contract indices
         // we would need dedicated deserialization functions based on the document type
-        let mut document: HashMap<String, CborValue> =
+        let document: HashMap<String, CborValue> =
             ciborium::de::from_reader(read_document_cbor)
                 .map_err(|_| Error::CorruptedData(String::from("unable to decode contract")))?;
 
