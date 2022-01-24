@@ -63,7 +63,8 @@ pub fn setup(count: u32, seed: u64) -> (Drive, Contract) {
     for person in people {
         let value = serde_json::to_value(&person).expect("serialized person");
         let document_cbor =
-            common::value_to_cbor(value, Some(rs_drive::drive::defaults::PROTOCOL_VERSION));
+            common::value_to_cbor(value, Some(rs_drive::drive::defaults::PROTOCOL_VERSION))
+                .expect("value_to_cbor failed");
         let document = Document::from_cbor(document_cbor.as_slice(), None, None)
             .expect("document should be properly deserialized");
         drive
@@ -108,7 +109,7 @@ fn test_query_many() {
             ["firstName", "asc"]
         ]
     });
-    let where_cbor = common::value_to_cbor(query_value, None);
+    let where_cbor = common::value_to_cbor(query_value, None).expect("value_to_cbor failed");
     let person_document_type = contract
         .document_types
         .get("person")
@@ -147,7 +148,7 @@ fn test_query_many() {
             ["firstName", "asc"]
         ]
     });
-    let where_cbor = common::value_to_cbor(query_value, None);
+    let where_cbor = common::value_to_cbor(query_value, None).expect("value_to_cbor failed");
     let person_document_type = contract
         .document_types
         .get("person")
@@ -192,7 +193,7 @@ fn test_query_many() {
             ["firstName", "asc"]
         ]
     });
-    let where_cbor = common::value_to_cbor(query_value, None);
+    let where_cbor = common::value_to_cbor(query_value, None).expect("value_to_cbor failed");
     let person_document_type = contract
         .document_types
         .get("person")
@@ -233,7 +234,7 @@ fn test_query_many() {
             ["firstName", "asc"]
         ]
     });
-    let where_cbor = common::value_to_cbor(query_value, None);
+    let where_cbor = common::value_to_cbor(query_value, None).expect("value_to_cbor failed");
     let person_document_type = contract
         .document_types
         .get("person")
@@ -308,7 +309,7 @@ fn test_query_many() {
             ["firstName", "asc"]
         ]
     });
-    let where_cbor = common::value_to_cbor(query_value, None);
+    let where_cbor = common::value_to_cbor(query_value, None).expect("value_to_cbor failed");
     let person_document_type = contract
         .document_types
         .get("person")
@@ -357,7 +358,7 @@ fn test_query_many() {
             ["firstName", "asc"]
         ]
     });
-    let where_cbor = common::value_to_cbor(query_value, None);
+    let where_cbor = common::value_to_cbor(query_value, None).expect("value_to_cbor failed");
     let person_document_type = contract
         .document_types
         .get("person")
@@ -400,7 +401,7 @@ fn test_query_many() {
             ["firstName", "asc"]
         ]
     });
-    let where_cbor = common::value_to_cbor(query_value, None);
+    let where_cbor = common::value_to_cbor(query_value, None).expect("value_to_cbor failed");
     let person_document_type = contract
         .document_types
         .get("person")
@@ -441,7 +442,7 @@ fn test_query_many() {
             ["age", "desc"]
         ]
     });
-    let where_cbor = common::value_to_cbor(query_value, None);
+    let where_cbor = common::value_to_cbor(query_value, None).expect("value_to_cbor failed");
     let person_document_type = contract
         .document_types
         .get("person")
@@ -489,7 +490,7 @@ fn test_query_many() {
             ["age", "desc"]
         ]
     });
-    let where_cbor = common::value_to_cbor(query_value, None);
+    let where_cbor = common::value_to_cbor(query_value, None).expect("value_to_cbor failed");
     let person_document_type = contract
         .document_types
         .get("person")
