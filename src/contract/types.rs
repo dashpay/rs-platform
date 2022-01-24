@@ -152,8 +152,10 @@ fn encode_float(val: f64) -> Result<Vec<u8>, Error> {
 }
 
 mod tests {
-    use crate::contract::types::{encode_document_field_type, DocumentFieldType};
-    use ciborium::value::{Integer, Value};
+    // Note: pub on these includes aren't really needed, however they suppress a seemingly false
+    // positive warning about unused includes
+    pub use crate::contract::types::{encode_document_field_type, DocumentFieldType};
+    pub use ciborium::value::{Integer, Value};
 
     #[test]
     fn test_successful_encode() {
