@@ -5,6 +5,7 @@ use std::fs::File;
 use std::io;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
+use grovedb::Error;
 use tempdir::TempDir;
 
 pub fn setup(prefix: &str) -> Drive {
@@ -19,12 +20,12 @@ pub fn setup(prefix: &str) -> Drive {
     drive
 }
 
-pub fn setup_contract(prefix: &str, path: &str) -> (Drive, Contract) {
+pub fn setup_contract(prefix: &str, path: &str) -> Result<(Drive, Contract), Error> {
     let mut drive = setup(prefix);
     let contract_cbor = json_document_to_cbor(path, Some(crate::drive::defaults::PROTOCOL_VERSION));
     let contract = Contract::from_cbor(&contract_cbor).expect("contract should be deserialized");
-    drive.apply_contract(&contract_cbor, None);
-    (drive, contract)
+    drive.apply_contract(&contract_cbor, None)?;
+    Ok((drive, contract))
 }
 
 pub fn json_document_to_cbor(path: impl AsRef<Path>, protocol_version: Option<u32>) -> Vec<u8> {
@@ -37,7 +38,7 @@ pub fn json_document_to_cbor(path: impl AsRef<Path>, protocol_version: Option<u3
 pub fn value_to_cbor(value: serde_json::Value, protocol_version: Option<u32>) -> Vec<u8> {
     let mut buffer: Vec<u8> = Vec::new();
     if let Some(protocol_version) = protocol_version {
-        buffer.write_u32::<BigEndian>(protocol_version);
+        buffer.write_u32::<BigEndian>(protocol_version).expect("write_u32 failed");
     }
     ciborium::ser::into_writer(&value, &mut buffer).expect("unable to serialize into cbor");
     buffer
