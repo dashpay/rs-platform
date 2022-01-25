@@ -1,5 +1,6 @@
 mod defaults;
 
+use std::borrow::Borrow;
 use crate::contract::{
     bytes_for_system_value, Contract, Document, DocumentType, IndexProperty,
 };
@@ -9,8 +10,11 @@ use crate::query::WhereOperator::{
 };
 use ciborium::value::{Value as CborValue, Value};
 use grovedb::{Element, Error, GroveDb, PathQuery, Query, SizedQuery};
+use std::collections::{BTreeMap, HashMap};
 use indexmap::IndexMap;
-use std::collections::HashMap;
+use sqlparser::ast::{BinaryOperator, Expr, OrderByExpr, Select, SetExpr, Statement};
+use sqlparser::parser::Parser;
+use sqlparser::ast::Query as SQLQuery;
 use storage::rocksdb_storage::OptimisticTransactionDBTransaction;
 
 #[derive(Copy, Clone, Debug)]
@@ -67,6 +71,60 @@ pub struct WhereClause {
 }
 
 impl<'a> WhereClause {
+    pub fn from_unique_sql_expr(expr: &Expr) -> Result<Self, Error> {
+        todo!()
+        // match expr {
+        //     Expr::IsNull(_) => {}
+        //     Expr::IsNotNull(_) => {}
+        //     Expr::InList { .. } => {}
+        //     Expr::Between { .. } => {}
+        //     Expr::BinaryOp { .. } => {}
+        //     Expr::UnaryOp { .. } => {}
+        //     Expr::Cast { .. } => {}
+        //     Expr::TryCast { .. } => {}
+        //     Expr::Extract { .. } => {}
+        //     Expr::Substring { .. } => {}
+        //     Expr::Trim { .. } => {}
+        //     Expr::Collate { .. } => {}
+        //     Expr::Nested(_) => {}
+        //     Expr::Value(_) => {}
+        //     Expr::TypedString { .. } => {}
+        //     Expr::MapAccess { .. } => {}
+        //     Expr::Function(_) => {}
+        //     Expr::Case { .. } => {}
+        //     Expr::Exists(_) => {}
+        //     Expr::Subquery(_) => {}
+        //     Expr::ListAgg(_) => {}
+        //     Expr::GroupingSets(_) => {}
+        //     Expr::Cube(_) => {}
+        //     Expr::Rollup(_) => {}
+        // }
+    }
+
+    pub fn from_sql_expr(expr: &Expr) -> Result<Vec<Self>, Error> {
+        match expr {
+            Expr::BinaryOp { left, op, right } => {
+                match op {
+                    BinaryOperator::And => {
+                        let mut left_vec = WhereClause::from_sql_expr(left)?;
+                        let mut right_vec = WhereClause::from_sql_expr(right)?;
+                        left_vec.append(&mut right_vec);
+                        Some(left_vec)
+                    }
+                    // BinaryOperator::Gt {
+                    //     None
+                    // }
+                    _ => None
+                }
+            }
+            _ => {
+                // let where_clause = WhereClause::from_unique_sql_expr()?;
+                // Some(vec![where_clause])
+                None
+            }
+        }.ok_or_else(||Error::InvalidQuery("sql query is not valid"))
+    }
+
     pub fn from_components(clause_components: &'a [Value]) -> Result<Self, Error> {
         if clause_components.len() != 3 {
             return Err(Error::CorruptedData(String::from(
@@ -802,6 +860,161 @@ impl<'a> DriveQuery<'a> {
         })
     }
 
+    pub fn from_sql(sql_string: &str, contract: &'a Contract) -> Result<Self, Error> {
+        let dialect = sqlparser::dialect::GenericDialect {};
+
+        let statements : Vec<Statement> = Parser::parse_sql(&dialect, sql_string).map_err(|_| Error::CorruptedData(String::from(
+            "Issue parsing SQL",
+        )))?;
+
+        let boxed_query : &Box<SQLQuery> = match statements.get(0).ok_or_else(|| Error::CorruptedData(String::from(
+            "Issue parsing SQL",
+        )))? {
+            Statement::Query(query) => { Some(query)}
+            _ => {None}
+        }.ok_or_else(|| Error::CorruptedData(String::from(
+            "Issue parsing SQL",
+        )))?;
+        let query : &SQLQuery = &**boxed_query;
+        let order_by: IndexMap<String, OrderClause> = query.order_by.iter().map(|order_exp: &OrderByExpr| {
+            let ascending = order_exp.asc.is_none() || order_exp.asc.unwrap();
+            let field = order_exp.expr.to_string();
+            (field.clone(), OrderClause {
+                field,
+                ascending
+            })
+        }).collect::<IndexMap<String, OrderClause>>();
+
+        let boxed_select : &Box<Select> = match &query.body {
+            SetExpr::Select(select) => { Some(select)}
+            _ => {None}
+        }.ok_or_else(|| Error::CorruptedData(String::from(
+            "Issue parsing SQL",
+        )))?;
+
+        let select: &Select = &**boxed_select;
+
+        let mut equal_clauses : HashMap<String, WhereClause> = HashMap::new();
+
+        match &select.selection {
+            None => {}
+            Some(selection) => {
+                match selection {
+                    Expr::Identifier(_) => {
+                        let a = 5;
+                    }
+                    Expr::Wildcard => {
+                        let a = 5;
+                    }
+                    Expr::QualifiedWildcard(_) => {
+                        let a = 5;
+                    }
+                    Expr::CompoundIdentifier(_) => {
+                        let a = 5;
+                    }
+                    Expr::IsNull(_) => {
+                        let a = 5;
+                    }
+                    Expr::IsNotNull(_) => {
+                        let a = 5;
+                    }
+                    Expr::IsDistinctFrom(_, _) =>  {
+                        let a = 5;
+                    }
+                    Expr::IsNotDistinctFrom(_, _) => {
+                    let a = 5;
+                    }
+                    Expr::InList { .. } =>  {
+                        let a = 5;
+                    }
+                    Expr::InSubquery { .. } =>  {
+                        let a = 5;
+                    }
+                    Expr::Between { .. } =>  {
+                        let a = 5;
+                    }
+                    Expr::BinaryOp { left, op, right } =>  {
+                        let a = 5;
+                    }
+                    Expr::UnaryOp { .. } =>  {
+                        let a = 5;
+                    }
+                    Expr::Cast { .. } =>  {
+                        let a = 5;
+                    }
+                    Expr::TryCast { .. } =>  {
+                        let a = 5;
+                    }
+                    Expr::Extract { .. } =>  {
+                        let a = 5;
+                    }
+                    Expr::Substring { .. } =>  {
+                        let a = 5;
+                    }
+                    Expr::Trim { .. } =>  {
+                        let a = 5;
+                    }
+                    Expr::Collate { .. } =>  {
+                        let a = 5;
+                    }
+                    Expr::Nested(_) =>  {
+                        let a = 5;
+                    }
+                    Expr::Value(_) =>  {
+                        let a = 5;
+                    }
+                    Expr::TypedString { .. } =>  {
+                        let a = 5;
+                    }
+                    Expr::MapAccess { .. } =>  {
+                        let a = 5;
+                    }
+                    Expr::Function(_) =>  {
+                        let a = 5;
+                    }
+                    Expr::Case { .. } =>  {
+                        let a = 5;
+                    }
+                    Expr::Exists(_) =>  {
+                        let a = 5;
+                    }
+                    Expr::Subquery(_) =>  {
+                        let a = 5;
+                    }
+                    Expr::ListAgg(_) =>  {
+                        let a = 5;
+                    }
+                    Expr::GroupingSets(_) =>  {
+                        let a = 5;
+                    }
+                    Expr::Cube(_) =>  {
+                    let a = 5;
+                    }
+                    Expr::Rollup(_) =>  {
+                        let a = 5;
+                    }
+                }
+                let a = selection.to_string();
+                let b = 5;
+            }
+        }
+
+        let document_type = contract.document_types.get("person").ok_or_else(|| grovedb::Error::InvalidQuery("document type not found"))?;
+
+        Ok(DriveQuery{
+            contract,
+            document_type,
+            equal_clauses,
+            in_clause: None,
+            range_clause: None,
+            offset: 0,
+            limit: 0,
+            order_by,
+            start_at: None,
+            start_at_included: false
+        })
+    }
+
     pub fn execute_with_proof(
         self,
         grove: &mut GroveDb,
@@ -1060,23 +1273,20 @@ impl<'a> DriveQuery<'a> {
     }
 }
 
-// pub enum JoinType {
-//     JoinTypeIntersection,
-//     JoinTypeIntersectionExclusion,
-//     JoinTypeUnion,
-// }
-//
-// pub struct QueryGroupComponent {
-//     paths : Vec<GroveDb::PathQuery>,
-//     join : JoinType,
-// }
-//
-// impl QueryGroupComponent {
-//     fn execute(&self, mut grove: GroveDb) -> Result<vec<vec<u8>>, Error> {
-//         grove.get_query(self.paths)
-//     }
-// }
-//
-// pub struct Query {
-//     conditions : Vec<QueryGroupComponent>,
-// }
+#[cfg(test)]
+mod tests {
+    use crate::query::DriveQuery;
+    use crate::common;
+
+    #[test]
+    fn test_sql_query() {
+        let (mut drive, contract) = common::setup_contract(
+            "family",
+            "tests/supporting_files/contract/family/family-contract.json",
+        );
+        let sql_string = "Select * from person where firstName = Sam and age > 30 order by firstName ASC, age DESC";
+        let drive_query = DriveQuery::from_sql(sql_string, &contract);
+        assert!(drive_query.is_ok());
+    }
+
+}

@@ -12,9 +12,15 @@ pub fn setup(prefix: &str) -> Drive {
     let tmp_dir = TempDir::new(prefix).unwrap();
     let mut drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
 
+    let storage = drive.grove.storage();
+    let db_transaction = storage.transaction();
+    drive.grove.start_transaction();
+
     drive
-        .create_root_tree(None)
+        .create_root_tree(Some(&db_transaction))
         .expect("expected to create root tree successfully");
+
+    drive.grove.commit_transaction(db_transaction);
 
     drive
 }
@@ -23,7 +29,15 @@ pub fn setup_contract(prefix: &str, path: &str) -> (Drive, Contract) {
     let mut drive = setup(prefix);
     let contract_cbor = json_document_to_cbor(path, Some(crate::drive::defaults::PROTOCOL_VERSION));
     let contract = Contract::from_cbor(&contract_cbor).expect("contract should be deserialized");
-    drive.apply_contract(&contract_cbor, None);
+
+    let storage = drive.grove.storage();
+    let db_transaction = storage.transaction();
+    drive.grove.start_transaction();
+
+    drive.apply_contract(&contract_cbor, Some(&db_transaction));
+
+    drive.grove.commit_transaction(db_transaction);
+
     (drive, contract)
 }
 
