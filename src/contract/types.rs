@@ -1,7 +1,7 @@
 use byteorder::{BigEndian, WriteBytesExt};
-use ciborium::value::Value;
 use grovedb::Error;
 use serde::{Deserialize, Serialize};
+use crate::query::Value;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum DocumentFieldType {
@@ -33,7 +33,7 @@ fn get_field_type_matching_error() -> Error {
 // Given a field type and a value this function chooses and executes the right encoding method
 pub fn encode_document_field_type(
     field_type: &DocumentFieldType,
-    value: &Value,
+    value: &dyn Value,
 ) -> Result<Vec<u8>, Error> {
     return match field_type {
         DocumentFieldType::String => {
@@ -41,18 +41,11 @@ pub fn encode_document_field_type(
             Ok(value_as_text.as_bytes().to_vec())
         }
         DocumentFieldType::Integer => {
-            let value_as_integer = value.as_integer().ok_or_else(get_field_type_matching_error)?;
-            let value_as_i64: i64 = value_as_integer
-                .try_into()
-                .map_err(|_| Error::CorruptedData(String::from("expected integer value")))?;
-
+            let value_as_i64 = value.as_i64().ok_or_else(get_field_type_matching_error)?;
             encode_integer(value_as_i64)
         }
         DocumentFieldType::Float => {
-            let value_as_float = value.as_float().ok_or_else(get_field_type_matching_error)?;
-            let value_as_f64 = value_as_float
-                .try_into()
-                .map_err(|_| Error::CorruptedData(String::from("expected float value")))?;
+            let value_as_f64 = value.as_float().ok_or_else(get_field_type_matching_error)?;
             encode_float(value_as_f64)
         }
         DocumentFieldType::ByteArray => {
@@ -153,7 +146,8 @@ fn encode_float(val: f64) -> Result<Vec<u8>, Error> {
 
 mod tests {
     use crate::contract::types::{encode_document_field_type, DocumentFieldType};
-    use ciborium::value::{Integer, Value};
+    use ciborium::value::{Integer, Value as CborValue};
+    use crate::query::Value;
 
     #[test]
     fn test_successful_encode() {
@@ -168,45 +162,45 @@ mod tests {
         // Test relationship between positive and negative domain
 
         // Show that the domain of positive integers maintains sort order after encoding
-        let integer1 = Value::Integer(Integer::from(1));
-        let integer2 = Value::Integer(Integer::from(600));
-        let integer3 = Value::Integer(Integer::from(i64::MAX));
+        let integer1 = CborValue::Integer(Integer::from(1));
+        let integer2 = CborValue::Integer(Integer::from(600));
+        let integer3 = CborValue::Integer(Integer::from(i64::MAX));
 
-        let encoded_integer1 = encode_document_field_type(&DocumentFieldType::Integer, &integer1)
+        let encoded_integer1 = encode_document_field_type(&DocumentFieldType::Integer, &Value::CborValue(integer1))
             .expect(encode_err_msg);
-        let encoded_integer2 = encode_document_field_type(&DocumentFieldType::Integer, &integer2)
+        let encoded_integer2 = encode_document_field_type(&DocumentFieldType::Integer, &Value::CborValue(integer2))
             .expect(encode_err_msg);
-        let encoded_integer3 = encode_document_field_type(&DocumentFieldType::Integer, &integer3)
+        let encoded_integer3 = encode_document_field_type(&DocumentFieldType::Integer, &Value::CborValue(integer3))
             .expect(encode_err_msg);
 
         assert!(encoded_integer1 < encoded_integer2);
         assert!(encoded_integer2 < encoded_integer3);
 
         // Show that the domain of negative integers maintain sort order after encoding
-        let integer1 = Value::Integer(Integer::from(-1));
-        let integer2 = Value::Integer(Integer::from(-600));
-        let integer3 = Value::Integer(Integer::from(i64::MIN));
+        let integer1 = CborValue::Integer(Integer::from(-1));
+        let integer2 = CborValue::Integer(Integer::from(-600));
+        let integer3 = CborValue::Integer(Integer::from(i64::MIN));
 
-        let encoded_integer1 = encode_document_field_type(&DocumentFieldType::Integer, &integer1)
+        let encoded_integer1 = encode_document_field_type(&DocumentFieldType::Integer, &Value::CborValue(integer1))
             .expect(encode_err_msg);
-        let encoded_integer2 = encode_document_field_type(&DocumentFieldType::Integer, &integer2)
+        let encoded_integer2 = encode_document_field_type(&DocumentFieldType::Integer, &Value::CborValue(integer2))
             .expect(encode_err_msg);
-        let encoded_integer3 = encode_document_field_type(&DocumentFieldType::Integer, &integer3)
+        let encoded_integer3 = encode_document_field_type(&DocumentFieldType::Integer, &Value::CborValue(integer3))
             .expect(encode_err_msg);
 
         assert!(encoded_integer1 > encoded_integer2);
         assert!(encoded_integer2 > encoded_integer3);
 
         // Show that zero is smack in the middle
-        let integer1 = Value::Integer(Integer::from(-1));
-        let integer2 = Value::Integer(Integer::from(0));
-        let integer3 = Value::Integer(Integer::from(1));
+        let integer1 = CborValue::Integer(Integer::from(-1));
+        let integer2 = CborValue::Integer(Integer::from(0));
+        let integer3 = CborValue::Integer(Integer::from(1));
 
-        let encoded_integer1 = encode_document_field_type(&DocumentFieldType::Integer, &integer1)
+        let encoded_integer1 = encode_document_field_type(&DocumentFieldType::Integer, &Value::CborValue(integer1))
             .expect(encode_err_msg);
-        let encoded_integer2 = encode_document_field_type(&DocumentFieldType::Integer, &integer2)
+        let encoded_integer2 = encode_document_field_type(&DocumentFieldType::Integer, &Value::CborValue(integer2))
             .expect(encode_err_msg);
-        let encoded_integer3 = encode_document_field_type(&DocumentFieldType::Integer, &integer3)
+        let encoded_integer3 = encode_document_field_type(&DocumentFieldType::Integer, &Value::CborValue(integer3))
             .expect(encode_err_msg);
 
         assert!(encoded_integer2 > encoded_integer1);
@@ -227,22 +221,22 @@ mod tests {
         // Test relationship between positive and negative domain
 
         // Show that the domain of positive floats maintains sort order after encoding
-        let float1 = Value::Float(1.0);
-        let float2 = Value::Float(23.65);
-        let float3 = Value::Float(1394.584);
-        let float4 = Value::Float(f64::MAX);
-        let float5 = Value::Float(f64::INFINITY);
+        let float1 = CborValue::Float(1.0);
+        let float2 = CborValue::Float(23.65);
+        let float3 = CborValue::Float(1394.584);
+        let float4 = CborValue::Float(f64::MAX);
+        let float5 = CborValue::Float(f64::INFINITY);
 
         let encoded_float1 =
-            encode_document_field_type(&DocumentFieldType::Float, &float1).expect(encode_err_msg);
+            encode_document_field_type(&DocumentFieldType::Float, &Value::CborValue(float1)).expect(encode_err_msg);
         let encoded_float2 =
-            encode_document_field_type(&DocumentFieldType::Float, &float2).expect(encode_err_msg);
+            encode_document_field_type(&DocumentFieldType::Float, &Value::CborValue(float2)).expect(encode_err_msg);
         let encoded_float3 =
-            encode_document_field_type(&DocumentFieldType::Float, &float3).expect(encode_err_msg);
+            encode_document_field_type(&DocumentFieldType::Float, &Value::CborValue(float3)).expect(encode_err_msg);
         let encoded_float4 =
-            encode_document_field_type(&DocumentFieldType::Float, &float4).expect(encode_err_msg);
+            encode_document_field_type(&DocumentFieldType::Float, &Value::CborValue(float4)).expect(encode_err_msg);
         let encoded_float5 =
-            encode_document_field_type(&DocumentFieldType::Float, &float5).expect(encode_err_msg);
+            encode_document_field_type(&DocumentFieldType::Float, &Value::CborValue(float5)).expect(encode_err_msg);
 
         assert!(encoded_float1 < encoded_float2);
         assert!(encoded_float2 < encoded_float3);
@@ -250,22 +244,22 @@ mod tests {
         assert!(encoded_float4 < encoded_float5);
 
         // Show that the domain of negative floats maintains sort order after encoding
-        let float1 = Value::Float(-0.5);
-        let float2 = Value::Float(-23.65);
-        let float3 = Value::Float(-1394.584);
-        let float4 = Value::Float(f64::MIN);
-        let float5 = Value::Float(f64::NEG_INFINITY);
+        let float1 = CborValue::Float(-0.5);
+        let float2 = CborValue::Float(-23.65);
+        let float3 = CborValue::Float(-1394.584);
+        let float4 = CborValue::Float(f64::MIN);
+        let float5 = CborValue::Float(f64::NEG_INFINITY);
 
         let encoded_float1 =
-            encode_document_field_type(&DocumentFieldType::Float, &float1).expect(encode_err_msg);
+            encode_document_field_type(&DocumentFieldType::Float, &Value::CborValue(float1)).expect(encode_err_msg);
         let encoded_float2 =
-            encode_document_field_type(&DocumentFieldType::Float, &float2).expect(encode_err_msg);
+            encode_document_field_type(&DocumentFieldType::Float, &Value::CborValue(float2)).expect(encode_err_msg);
         let encoded_float3 =
-            encode_document_field_type(&DocumentFieldType::Float, &float3).expect(encode_err_msg);
+            encode_document_field_type(&DocumentFieldType::Float, &Value::CborValue(float3)).expect(encode_err_msg);
         let encoded_float4 =
-            encode_document_field_type(&DocumentFieldType::Float, &float4).expect(encode_err_msg);
+            encode_document_field_type(&DocumentFieldType::Float, &Value::CborValue(float4)).expect(encode_err_msg);
         let encoded_float5 =
-            encode_document_field_type(&DocumentFieldType::Float, &float5).expect(encode_err_msg);
+            encode_document_field_type(&DocumentFieldType::Float, &Value::CborValue(float5)).expect(encode_err_msg);
 
         assert!(encoded_float1 > encoded_float2);
         assert!(encoded_float2 > encoded_float3);
@@ -274,17 +268,17 @@ mod tests {
 
         // Show that 0 is in the middle
         // EPSILON: This is the difference between 1.0 and the next larger representable number.
-        let largest_negative_float = Value::Float(0.0 - f64::EPSILON);
-        let float2 = Value::Float(0.0);
-        let smallest_positive_float = Value::Float(0.0 + f64::EPSILON);
+        let largest_negative_float = CborValue::Float(0.0 - f64::EPSILON);
+        let float2 = CborValue::Float(0.0);
+        let smallest_positive_float = CborValue::Float(0.0 + f64::EPSILON);
 
         let encoded_float1 =
-            encode_document_field_type(&DocumentFieldType::Float, &largest_negative_float)
+            encode_document_field_type(&DocumentFieldType::Float, &Value::CborValue(largest_negative_float))
                 .expect(encode_err_msg);
         let encoded_float2 =
-            encode_document_field_type(&DocumentFieldType::Float, &float2).expect(encode_err_msg);
+            encode_document_field_type(&DocumentFieldType::Float, &Value::CborValue(float2)).expect(encode_err_msg);
         let encoded_float3 =
-            encode_document_field_type(&DocumentFieldType::Float, &smallest_positive_float)
+            encode_document_field_type(&DocumentFieldType::Float, &Value::CborValue(smallest_positive_float))
                 .expect(encode_err_msg);
 
         assert!(encoded_float1 < encoded_float2);

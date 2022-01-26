@@ -82,7 +82,13 @@ pub fn setup(count: u32, seed: u64) -> (Drive, Contract) {
 }
 
 #[test]
-fn test_query_many() {
+fn test_insert_many() {
+    let (mut drive, contract) = setup(100, 73509);
+
+}
+
+#[test]
+fn test_querying() {
     let (mut drive, contract) = setup(10, 73509);
     let all_names = vec![
         "Adey".to_string(),

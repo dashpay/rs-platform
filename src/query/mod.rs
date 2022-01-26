@@ -8,14 +8,118 @@ use crate::query::WhereOperator::{
     Between, BetweenExcludeBounds, BetweenExcludeLeft, BetweenExcludeRight, Equal, GreaterThan,
     GreaterThanOrEquals, In, LessThan, LessThanOrEquals, StartsWith,
 };
-use ciborium::value::{Value as CborValue, Value};
+use ciborium::value::{Integer, Value as CborValue};
 use grovedb::{Element, Error, GroveDb, PathQuery, Query, SizedQuery};
 use std::collections::{BTreeMap, HashMap};
 use indexmap::IndexMap;
 use sqlparser::ast::{BinaryOperator, Expr, OrderByExpr, Select, SetExpr, Statement};
 use sqlparser::parser::Parser;
 use sqlparser::ast::Query as SQLQuery;
+use sqlparser::ast::Value as SQLValue;
 use storage::rocksdb_storage::OptimisticTransactionDBTransaction;
+
+pub trait Value {
+    fn is_text(&self) -> bool;
+    fn as_text(&self) -> Option<String>;
+    fn as_u64(&self) -> Option<u64>;
+    fn as_i64(&self) -> Option<i64>;
+    fn as_float(&self) -> Option<f64>;
+    fn as_bytes(&self) -> Option<Vec<u8>>;
+    fn as_bool(&self) -> Option<bool>;
+}
+
+impl Value for CborValue {
+    fn is_text(&self) -> bool {
+        self.is_text()
+    }
+
+    fn as_text(&self) -> Option<String> {
+        self.as_text().map(|a| a.to_string())
+    }
+
+    fn as_u64(&self) -> Option<u64> {
+        self.as_integer().and_then(|a| {
+            let i: Option<u64> = a.try_into().ok_or(None);
+            i
+        })
+    }
+
+    fn as_i64(&self) -> Option<i64> {
+        self.as_integer().and_then(|a| {
+            let i: Option<i64> = a.try_into().ok_or(None);
+            i
+        })
+    }
+
+    fn as_float(&self) -> Option<f64> {
+        self.as_float()
+    }
+
+    fn as_bytes(&self) -> Option<Vec<u8>> {
+        self.as_bytes().map(|a| a.clone())
+    }
+
+    fn as_bool(&self) -> Option<bool> {
+        self.as_bool()
+    }
+}
+
+impl Value for SQLValue {
+    fn is_text(&self) -> bool {
+        match self {
+            SQLValue::SingleQuotedString(string) => { true }
+            SQLValue::NationalStringLiteral(string) => { true }
+            SQLValue::HexStringLiteral(string) => { true }
+            SQLValue::DoubleQuotedString(string) => { true }
+            _ => { false }
+        }
+    }
+
+    fn as_text(&self) -> Option<String> {
+        match self {
+            SQLValue::SingleQuotedString(string) => { Some((string as &String).clone()) }
+            SQLValue::NationalStringLiteral(string) => { Some((string as &String).clone()) }
+            SQLValue::HexStringLiteral(string) => { Some((string as &String).clone()) }
+            SQLValue::DoubleQuotedString(string) => { Some((string as &String).clone()) }
+            _ => { None }
+        }
+    }
+
+    fn as_u64(&self) -> Option<u64> {
+        match self {
+            SQLValue::Number(string, _) => { (string as &String).parse::<u64>().ok() }
+            _ => { None }
+        }
+    }
+
+    fn as_i64(&self) -> Option<i64> {
+        match self {
+            SQLValue::Number(string, _) => { (string as &String).parse::<i64>().ok() }
+            _ => { None }
+        }
+    }
+
+    fn as_float(&self) -> Option<f64> {
+        match self {
+            SQLValue::Number(string, _) => { (string as &String).parse::<f64>().ok() }
+            _ => { None }
+        }
+    }
+
+    fn as_bytes(&self) -> Option<Vec<u8>> {
+        match self {
+            SQLValue::HexStringLiteral(string) => { hex::decode(string).ok() }
+            _ => { None }
+        }
+    }
+
+    fn as_bool(&self) -> Option<bool> {
+        match self {
+            SQLValue::Boolean(bool) => { Some(*bool) }
+            _ => { None }
+        }
+    }
+}
 
 #[derive(Copy, Clone, Debug)]
 pub enum WhereOperator {
@@ -30,6 +134,39 @@ pub enum WhereOperator {
     BetweenExcludeRight,
     In,
     StartsWith,
+}
+
+impl WhereOperator {
+    pub fn allows_flip(&self) -> bool {
+        match self {
+            Equal => true,
+            GreaterThan => true,
+            GreaterThanOrEquals => true,
+            LessThan => true,
+            LessThanOrEquals => true,
+            Between => false,
+            BetweenExcludeBounds => false,
+            BetweenExcludeLeft => false,
+            BetweenExcludeRight => false,
+            In => false,
+            StartsWith => false,
+        }
+    }
+    pub fn flip(&self) -> Result<WhereOperator, Error> {
+        match self {
+            Equal => Ok(Equal),
+            GreaterThan => Ok(LessThan),
+            GreaterThanOrEquals => Ok(LessThanOrEquals),
+            LessThan => Ok(GreaterThan),
+            LessThanOrEquals => Ok(GreaterThanOrEquals),
+            Between => Err(Error::InvalidQuery("Between clause order invalid")),
+            BetweenExcludeBounds => Err(Error::InvalidQuery("Between clause order invalid")),
+            BetweenExcludeLeft => Err(Error::InvalidQuery("Between clause order invalid")),
+            BetweenExcludeRight => Err(Error::InvalidQuery("Between clause order invalid")),
+            In => Err(Error::InvalidQuery("In clause order invalid")),
+            StartsWith => Err(Error::InvalidQuery("StartsWith order invalid")),
+        }
+    }
 }
 
 fn operator_from_string(string: &str) -> Option<WhereOperator> {
@@ -67,38 +204,42 @@ fn operator_from_string(string: &str) -> Option<WhereOperator> {
 pub struct WhereClause {
     field: String,
     operator: WhereOperator,
-    value: Value,
+    value: dyn Value,
 }
 
 impl<'a> WhereClause {
-    pub fn from_unique_sql_expr(expr: &Expr) -> Result<Self, Error> {
-        todo!()
-        // match expr {
-        //     Expr::IsNull(_) => {}
-        //     Expr::IsNotNull(_) => {}
-        //     Expr::InList { .. } => {}
-        //     Expr::Between { .. } => {}
-        //     Expr::BinaryOp { .. } => {}
-        //     Expr::UnaryOp { .. } => {}
-        //     Expr::Cast { .. } => {}
-        //     Expr::TryCast { .. } => {}
-        //     Expr::Extract { .. } => {}
-        //     Expr::Substring { .. } => {}
-        //     Expr::Trim { .. } => {}
-        //     Expr::Collate { .. } => {}
-        //     Expr::Nested(_) => {}
-        //     Expr::Value(_) => {}
-        //     Expr::TypedString { .. } => {}
-        //     Expr::MapAccess { .. } => {}
-        //     Expr::Function(_) => {}
-        //     Expr::Case { .. } => {}
-        //     Expr::Exists(_) => {}
-        //     Expr::Subquery(_) => {}
-        //     Expr::ListAgg(_) => {}
-        //     Expr::GroupingSets(_) => {}
-        //     Expr::Cube(_) => {}
-        //     Expr::Rollup(_) => {}
-        // }
+
+    pub fn from_expressions(left_expr: &Expr, operator: WhereOperator, right_expr: &Expr)  -> Result<Self, Error> {
+        match left_expr {
+            Expr::Identifier(identifier) => {
+                match right_expr {
+                    Expr::Value(value) => {
+                        Ok(WhereClause{
+                            field: identifier.value,
+                            operator,
+                            value
+                        })
+                    }
+                    Expr::TypedString { .. } => {
+                        todo!()
+                    }
+                    _ => {
+                        Err(Error::InvalidQuery("query is not valid"))
+                    }
+                }
+            }
+            Expr::Value(_) => {
+                let flipped_operator = operator.flip()?;
+                WhereClause::from_expressions(right_expr, flipped_operator, left_expr)
+            }
+            Expr::TypedString { .. } => {
+                let flipped_operator = operator.flip()?;
+                WhereClause::from_expressions(right_expr, flipped_operator, left_expr)
+            }
+            _ => {
+                Err(Error::InvalidQuery("query is not valid"))
+            }
+        }
     }
 
     pub fn from_sql_expr(expr: &Expr) -> Result<Vec<Self>, Error> {
@@ -111,9 +252,21 @@ impl<'a> WhereClause {
                         left_vec.append(&mut right_vec);
                         Some(left_vec)
                     }
-                    // BinaryOperator::Gt {
-                    //     None
-                    // }
+                    BinaryOperator::Gt => {
+                        vec![WhereClause::from_expressions(left, WhereOperator::GreaterThan, right)]
+                    }
+                    BinaryOperator::Lt => {
+                        vec![WhereClause::from_expressions(left, WhereOperator::LessThan, right)]
+                    }
+                    BinaryOperator::GtEq => {
+                        vec![WhereClause::from_expressions(left, WhereOperator::GreaterThanOrEquals, right)]
+                    }
+                    BinaryOperator::LtEq => {
+                        vec![WhereClause::from_expressions(left, WhereOperator::LessThanOrEquals, right)]
+                    }
+                    BinaryOperator::Eq => {
+                        vec![WhereClause::from_expressions(left, WhereOperator::Equal, right)]
+                    }
                     _ => None
                 }
             }
@@ -125,7 +278,7 @@ impl<'a> WhereClause {
         }.ok_or_else(||Error::InvalidQuery("sql query is not valid"))
     }
 
-    pub fn from_components(clause_components: &'a [Value]) -> Result<Self, Error> {
+    pub fn from_components(clause_components: &'a [CborValue]) -> Result<Self, Error> {
         if clause_components.len() != 3 {
             return Err(Error::CorruptedData(String::from(
                 "where clauses should have at most 3 components",
@@ -152,7 +305,7 @@ impl<'a> WhereClause {
                     "second field of where component should be a string",
                 )))?;
 
-        let operator = operator_from_string(operator_string).ok_or_else(|| Error::CorruptedData(
+        let operator = operator_from_string(operator_string.as_str()).ok_or_else(|| Error::CorruptedData(
             String::from("second field of where component should be a known operator"),
         ))?;
 
@@ -663,7 +816,7 @@ pub struct OrderClause {
 }
 
 impl<'a> OrderClause {
-    pub fn from_components(clause_components: &'a [Value]) -> Result<Self, Error> {
+    pub fn from_components(clause_components: &'a [CborValue]) -> Result<Self, Error> {
         if clause_components.len() != 2 {
             return Err(Error::CorruptedData(String::from(
                 "order clause should have exactly 2 components",
@@ -750,7 +903,8 @@ impl<'a> DriveQuery<'a> {
                         .iter()
                         .map(|where_clause| {
                             if let CborValue::Array(clauses_components) = where_clause {
-                                WhereClause::from_components(clauses_components)
+                                let cbor_clauses_components = clauses_components.iter().map(|a| Value::CborValue(a.clone())).collect();
+                                WhereClause::from_components(cbor_clauses_components)
                             } else {
                                 Err(Error::CorruptedData(String::from(
                                     "where clause must be an array",

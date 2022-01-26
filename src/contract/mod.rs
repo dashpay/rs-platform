@@ -1,10 +1,12 @@
 mod types;
 
 use crate::drive::{Drive, RootTree};
-use ciborium::value::{Value as CborValue, Value};
+use ciborium::value::Value as CborValue;
 use grovedb::Error;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use sqlparser::ast::Expr::Value as SqlValue;
+use crate::query::Value;
 
 // contract
 // - id
@@ -246,7 +248,7 @@ impl DocumentType {
     pub fn serialize_value_for_key<'a>(
         &'a self,
         key: &str,
-        value: &Value,
+        value: &dyn Value,
     ) -> Result<Vec<u8>, Error> {
         let field_type = self
             .properties
@@ -259,7 +261,7 @@ impl DocumentType {
 
     pub fn from_cbor_value(
         name: &str,
-        document_type_value_map: &[(Value, Value)],
+        document_type_value_map: &[(CborValue, CborValue)],
     ) -> Result<Self, Error> {
         let mut indices: Vec<Index> = Vec::new();
         let mut document_properties: HashMap<String, types::DocumentFieldType> = HashMap::new();
@@ -460,10 +462,13 @@ impl Document {
         } else {
             match self.properties.get(key) {
                 None => Ok(None),
-                Some(value) => match key {
-                    "$id" => Ok(Some(self.id.clone())),
-                    "$ownerId" => Ok(Some(self.owner_id.clone())),
-                    _ => Ok(Some(document_type.serialize_value_for_key(key, value)?)),
+                Some(value) => {
+                    let value = Value::CborValue(value.clone());
+                    match key {
+                        "$id" => Ok(Some(self.id.clone())),
+                        "$ownerId" => Ok(Some(self.owner_id.clone())),
+                        _ => Ok(Some(document_type.serialize_value_for_key(key, &value as &Value)?)),
+                    }
                 },
             }
         }
@@ -489,6 +494,7 @@ impl Document {
                             .ok_or_else(|| Error::CorruptedData(String::from(
                                 "document type should exist for name",
                             )))?;
+                        let value = Value::CborValue(value.clone());
                         Ok(Some(document_type.serialize_value_for_key(key, value)?))
                     }
                 },
@@ -498,7 +504,7 @@ impl Document {
 }
 
 impl Index {
-    pub fn from_cbor_value(index_type_value_map: &[(Value, Value)]) -> Result<Self, Error> {
+    pub fn from_cbor_value(index_type_value_map: &[(CborValue, CborValue)]) -> Result<Self, Error> {
         // Decouple the map
         // It contains properties and a unique key
         // If the unique key is absent, then unique is false
@@ -551,7 +557,7 @@ impl Index {
 }
 
 impl IndexProperty {
-    pub fn from_cbor_value(index_property_map: &[(Value, Value)]) -> Result<Self, Error> {
+    pub fn from_cbor_value(index_property_map: &[(CborValue, CborValue)]) -> Result<Self, Error> {
         let property = index_property_map[0].clone();
 
         let key = property
@@ -577,7 +583,7 @@ impl IndexProperty {
 }
 
 // Helper functions
-fn contract_document_types(contract: &HashMap<String, CborValue>) -> Option<&Vec<(Value, Value)>> {
+fn contract_document_types(contract: &HashMap<String, CborValue>) -> Option<&Vec<(CborValue, CborValue)>> {
     contract
         .get("documents")
         .and_then(|id_cbor| {
@@ -589,7 +595,7 @@ fn contract_document_types(contract: &HashMap<String, CborValue>) -> Option<&Vec
         })
 }
 
-fn get_key_from_cbor_map(cbor_map: &[(Value, Value)], key: &str) -> Option<Value> {
+fn get_key_from_cbor_map(cbor_map: &[(CborValue, CborValue)], key: &str) -> Option<CborValue> {
     for (cbor_key, cbor_value) in cbor_map.iter() {
         if !cbor_key.is_text() {
             continue;
@@ -602,7 +608,7 @@ fn get_key_from_cbor_map(cbor_map: &[(Value, Value)], key: &str) -> Option<Value
     None
 }
 
-fn cbor_inner_array_value(document_type: &[(Value, Value)], key: &str) -> Option<Vec<Value>> {
+fn cbor_inner_array_value(document_type: &[(CborValue, CborValue)], key: &str) -> Option<Vec<CborValue>> {
     let key_value = get_key_from_cbor_map(document_type, key)?;
     if key_value.is_array() {
         let array_value = key_value.as_array().expect("confirmed as array");
@@ -612,9 +618,9 @@ fn cbor_inner_array_value(document_type: &[(Value, Value)], key: &str) -> Option
 }
 
 fn cbor_inner_map_value(
-    document_type: &[(Value, Value)],
+    document_type: &[(CborValue, CborValue)],
     key: &str,
-) -> Option<Vec<(Value, Value)>> {
+) -> Option<Vec<(CborValue, CborValue)>> {
     let key_value = get_key_from_cbor_map(document_type, key)?;
     if key_value.is_map() {
         let map_value = key_value.as_map().expect("confirmed as map");
@@ -623,7 +629,7 @@ fn cbor_inner_map_value(
     None
 }
 
-fn cbor_inner_text_value(document_type: &[(Value, Value)], key: &str) -> Option<String> {
+fn cbor_inner_text_value(document_type: &[(CborValue, CborValue)], key: &str) -> Option<String> {
     let key_value = get_key_from_cbor_map(document_type, key)?;
     if key_value.is_text() {
         let string_value = key_value.as_text().expect("confirmed as text");
@@ -632,7 +638,7 @@ fn cbor_inner_text_value(document_type: &[(Value, Value)], key: &str) -> Option<
     None
 }
 
-fn cbor_inner_bool_value(document_type: &[(Value, Value)], key: &str) -> Option<bool> {
+fn cbor_inner_bool_value(document_type: &[(CborValue, CborValue)], key: &str) -> Option<bool> {
     let key_value = get_key_from_cbor_map(document_type, key)?;
     if key_value.is_bool() {
         let bool_value = key_value.as_bool().expect("confirmed as text");
@@ -641,7 +647,7 @@ fn cbor_inner_bool_value(document_type: &[(Value, Value)], key: &str) -> Option<
     None
 }
 
-pub fn bytes_for_system_value(value: &Value) -> Option<Vec<u8>> {
+pub fn bytes_for_system_value(value: &CborValue) -> Option<Vec<u8>> {
     match value {
         Value::Bytes(bytes) => Some(bytes.clone()),
         Value::Text(text) => match bs58::decode(text).into_vec() {
