@@ -291,7 +291,7 @@ impl DocumentType {
                 "unable to get document properties from the contract",
             )))?;
 
-        fn insert_values(document_properties: &mut HashMap<String, types::DocumentFieldType>, prefix: Option<String>, property_key: &Value, property_value: &Value) -> Result<(), Error> {
+        fn insert_values(document_properties: &mut HashMap<String, types::DocumentFieldType>, prefix: Option<&String>, property_key: &Value, property_value: &Value) -> Result<(), Error> {
             if !property_key.is_text() {
                 return Err(Error::CorruptedData(String::from(
                     "property key should be text",
@@ -302,7 +302,7 @@ impl DocumentType {
 
             let prefixed_property_key = match prefix {
                 None => {property_key_string}
-                Some(prefix) => { vec![prefix, property_key_string].join(".")}
+                Some(prefix) => { vec![prefix.clone(), property_key_string].join(".")}
             };
 
             if !property_value.is_map() {
@@ -342,7 +342,7 @@ impl DocumentType {
                             "cannot find byteArray property for array type",
                         )))?;
                     for (object_property_key, object_property_value) in properties.iter() {
-                        insert_values(document_properties, Some(prefixed_property_key.clone()), object_property_key, object_property_value)?
+                        insert_values(document_properties, Some(&prefixed_property_key), object_property_key, object_property_value)?
                     }
                 }
                 _ => {
