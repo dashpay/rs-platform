@@ -273,9 +273,10 @@ impl Drive {
         let mut already_exists = false;
         let mut different_contract_data = false;
 
-        if let Ok(stored_element) = self
-            .grove
-            .get(&*contract_root_path(&contract.id), b"0", transaction) {
+        if let Ok(stored_element) =
+            self.grove
+                .get(&*contract_root_path(&contract.id), b"0", transaction)
+        {
             already_exists = true;
             match stored_element {
                 Element::Item(stored_contract_bytes) => {
@@ -383,13 +384,12 @@ impl Drive {
             }
         }
 
-        let document_type =
-            contract
-                .document_types
-                .get(document_type_name)
-                .ok_or_else(|| Error::CorruptedData(String::from(
-                    "can not get document type from contract",
-                )))?;
+        let document_type = contract
+            .document_types
+            .get(document_type_name)
+            .ok_or_else(|| {
+                Error::CorruptedData(String::from("can not get document type from contract"))
+            })?;
 
         // fourth we need to store a reference to the document for each index
         for index in &document_type.indices {
@@ -400,13 +400,10 @@ impl Drive {
                 .iter()
                 .map(|&x| Vec::from(x))
                 .collect();
-            let top_index_property =
-                index
-                    .properties
-                    .get(0)
-                    .ok_or_else(|| Error::CorruptedData(String::from(
-                        "invalid contract indices",
-                    )))?;
+            let top_index_property = index
+                .properties
+                .get(0)
+                .ok_or_else(|| Error::CorruptedData(String::from("invalid contract indices")))?;
             index_path.push(Vec::from(top_index_property.name.as_bytes()));
 
             // with the example of the dashpay contract's first index
@@ -418,9 +415,9 @@ impl Drive {
                     contract,
                     owner_id,
                 )?
-                .ok_or_else(|| Error::CorruptedData(String::from(
-                    "unable to get document top index field",
-                )))?;
+                .ok_or_else(|| {
+                    Error::CorruptedData(String::from("unable to get document top index field"))
+                })?;
 
             let index_path_slices: Vec<&[u8]> = index_path.iter().map(|x| x.as_slice()).collect();
 
@@ -437,13 +434,9 @@ impl Drive {
             // the index path is now something like Contracts/ContractID/Documents(1)/$ownerId/<ownerId>
 
             for i in 1..index.properties.len() {
-                let index_property =
-                    index
-                        .properties
-                        .get(i)
-                        .ok_or_else(|| Error::CorruptedData(String::from(
-                            "invalid contract indices",
-                        )))?;
+                let index_property = index.properties.get(i).ok_or_else(|| {
+                    Error::CorruptedData(String::from("invalid contract indices"))
+                })?;
 
                 let index_path_slices: Vec<&[u8]> =
                     index_path.iter().map(|x| x.as_slice()).collect();
@@ -467,9 +460,9 @@ impl Drive {
                         contract,
                         owner_id,
                     )?
-                    .ok_or_else(|| Error::CorruptedData(String::from(
-                        "unable to get document field",
-                    )))?;
+                    .ok_or_else(|| {
+                        Error::CorruptedData(String::from("unable to get document field"))
+                    })?;
 
                 let index_path_slices: Vec<&[u8]> =
                     index_path.iter().map(|x| x.as_slice()).collect();
@@ -615,13 +608,12 @@ impl Drive {
         owner_id: Option<&[u8]>,
         transaction: Option<&OptimisticTransactionDBTransaction>,
     ) -> Result<u64, Error> {
-        let document_type =
-            contract
-                .document_types
-                .get(document_type_name)
-                .ok_or_else(|| Error::CorruptedData(String::from(
-                    "can not get document type from contract",
-                )))?;
+        let document_type = contract
+            .document_types
+            .get(document_type_name)
+            .ok_or_else(|| {
+                Error::CorruptedData(String::from("can not get document type from contract"))
+            })?;
         // first we need to construct the path for documents on the contract
         // the path is
         //  * Document and Contract root tree
@@ -639,15 +631,10 @@ impl Drive {
 
         let document_bytes: Vec<u8> = match document_element {
             Element::Item(data) => data,
-            _ => todo!() // TODO: how should this be handled, possibility that document might not be in storage
+            _ => todo!(), // TODO: how should this be handled, possibility that document might not be in storage
         };
 
-        let document = Document::from_cbor(
-            document_bytes
-                .as_slice(),
-            None,
-            owner_id,
-        )?;
+        let document = Document::from_cbor(document_bytes.as_slice(), None, owner_id)?;
 
         // third we need to delete the document for it's primary key
         self.grove.delete(
@@ -669,13 +656,10 @@ impl Drive {
                 .iter()
                 .map(|&x| Vec::from(x))
                 .collect();
-            let top_index_property =
-                index
-                    .properties
-                    .get(0)
-                    .ok_or_else(|| Error::CorruptedData(String::from(
-                        "invalid contract indices",
-                    )))?;
+            let top_index_property = index
+                .properties
+                .get(0)
+                .ok_or_else(|| Error::CorruptedData(String::from("invalid contract indices")))?;
             index_path.push(Vec::from(top_index_property.name.as_bytes()));
 
             // with the example of the dashpay contract's first index
@@ -687,22 +671,20 @@ impl Drive {
                     contract,
                     owner_id,
                 )?
-                .ok_or_else(|| Error::CorruptedData(String::from(
-                    "unable to get document top index field for deletion",
-                )))?;
+                .ok_or_else(|| {
+                    Error::CorruptedData(String::from(
+                        "unable to get document top index field for deletion",
+                    ))
+                })?;
 
             // we push the actual value of the index path
             index_path.push(document_top_field);
             // the index path is now something like Contracts/ContractID/Documents(1)/$ownerId/<ownerId>
 
             for i in 1..index.properties.len() {
-                let index_property =
-                    index
-                        .properties
-                        .get(i)
-                        .ok_or_else(|| Error::CorruptedData(String::from(
-                            "invalid contract indices",
-                        )))?;
+                let index_property = index.properties.get(i).ok_or_else(|| {
+                    Error::CorruptedData(String::from("invalid contract indices"))
+                })?;
 
                 index_path.push(Vec::from(index_property.name.as_bytes()));
                 // Iteration 1. the index path is now something like Contracts/ContractID/Documents(1)/$ownerId/<ownerId>/toUserId
@@ -715,9 +697,9 @@ impl Drive {
                         contract,
                         owner_id,
                     )?
-                    .ok_or_else(|| Error::CorruptedData(String::from(
-                        "unable to get document field",
-                    )))?;
+                    .ok_or_else(|| {
+                        Error::CorruptedData(String::from("unable to get document field"))
+                    })?;
 
                 // we push the actual value of the index path
                 index_path.push(document_top_field);

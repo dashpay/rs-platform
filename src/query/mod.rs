@@ -1,8 +1,6 @@
 mod defaults;
 
-use crate::contract::{
-    bytes_for_system_value, Contract, Document, DocumentType, IndexProperty,
-};
+use crate::contract::{bytes_for_system_value, Contract, Document, DocumentType, IndexProperty};
 use crate::query::WhereOperator::{
     Between, BetweenExcludeBounds, BetweenExcludeLeft, BetweenExcludeRight, Equal, GreaterThan,
     GreaterThanOrEquals, In, LessThan, LessThanOrEquals, StartsWith,
@@ -77,32 +75,33 @@ impl<'a> WhereClause {
         let field_value = clause_components
             .get(0)
             .expect("check above enforces it exists");
-        let field_ref = field_value
-            .as_text()
-            .ok_or_else(|| Error::CorruptedData(String::from(
+        let field_ref = field_value.as_text().ok_or_else(|| {
+            Error::CorruptedData(String::from(
                 "first field of where component should be a string",
-            )))?;
+            ))
+        })?;
         let field = String::from(field_ref);
 
         let operator_value = clause_components
             .get(1)
             .expect("check above enforces it exists");
-        let operator_string =
-            operator_value
-                .as_text()
-                .ok_or_else(|| Error::CorruptedData(String::from(
-                    "second field of where component should be a string",
-                )))?;
+        let operator_string = operator_value.as_text().ok_or_else(|| {
+            Error::CorruptedData(String::from(
+                "second field of where component should be a string",
+            ))
+        })?;
 
-        let operator = operator_from_string(operator_string).ok_or_else(|| Error::CorruptedData(
-            String::from("second field of where component should be a known operator"),
-        ))?;
+        let operator = operator_from_string(operator_string).ok_or_else(|| {
+            Error::CorruptedData(String::from(
+                "second field of where component should be a known operator",
+            ))
+        })?;
 
         let value = clause_components
             .get(2)
-            .ok_or_else(|| Error::CorruptedData(String::from(
-                "third field of where component should exist",
-            )))?
+            .ok_or_else(|| {
+                Error::CorruptedData(String::from("third field of where component should exist"))
+            })?
             .clone();
 
         Ok(WhereClause {
@@ -115,7 +114,9 @@ impl<'a> WhereClause {
     fn lower_bound_clause(where_clauses: &'a [&WhereClause]) -> Result<Option<&'a Self>, Error> {
         let lower_range_clauses: Vec<&&WhereClause> = where_clauses
             .iter()
-            .filter(|&where_clause| matches!(where_clause.operator, GreaterThan | GreaterThanOrEquals))
+            .filter(|&where_clause| {
+                matches!(where_clause.operator, GreaterThan | GreaterThanOrEquals)
+            })
             .collect::<Vec<&&WhereClause>>();
         match lower_range_clauses.len() {
             0 => Ok(None),
@@ -194,21 +195,21 @@ impl<'a> WhereClause {
                     "all ranges must be on same field",
                 )));
             } else {
-
-                let lower_upper_error = || Error::CorruptedData(String::from(
-                    "lower and upper bounds must be passed if providing 2 ranges",
-                ));
+                let lower_upper_error = || {
+                    Error::CorruptedData(String::from(
+                        "lower and upper bounds must be passed if providing 2 ranges",
+                    ))
+                };
 
                 // we need to find the bounds of the clauses
                 let lower_bounds_clause =
-                    WhereClause::lower_bound_clause(groupable_range_clauses.as_slice())?.ok_or_else(lower_upper_error)?;
+                    WhereClause::lower_bound_clause(groupable_range_clauses.as_slice())?
+                        .ok_or_else(lower_upper_error)?;
                 let upper_bounds_clause =
-                    WhereClause::upper_bound_clause(groupable_range_clauses.as_slice())?.ok_or_else(lower_upper_error)?;
+                    WhereClause::upper_bound_clause(groupable_range_clauses.as_slice())?
+                        .ok_or_else(lower_upper_error)?;
 
-                let operator = match (
-                    lower_bounds_clause.operator,
-                    upper_bounds_clause.operator,
-                ) {
+                let operator = match (lower_bounds_clause.operator, upper_bounds_clause.operator) {
                     (GreaterThanOrEquals, LessThanOrEquals) => Some(Between),
                     (GreaterThanOrEquals, LessThan) => Some(BetweenExcludeRight),
                     (GreaterThan, LessThanOrEquals) => Some(BetweenExcludeLeft),
@@ -234,7 +235,7 @@ impl<'a> WhereClause {
             Err(Error::CorruptedData(String::from(
                 "there can not be more than 1 non groupable range clause",
             )))
-        }
+        };
     }
 
     fn split_value_for_between(
@@ -245,9 +246,11 @@ impl<'a> WhereClause {
             Value::Array(array) => Some(array),
             _ => None,
         }
-        .ok_or_else(|| Error::CorruptedData(String::from(
-            "when using between operator you must provide a tuple array of values",
-        )))?;
+        .ok_or_else(|| {
+            Error::CorruptedData(String::from(
+                "when using between operator you must provide a tuple array of values",
+            ))
+        })?;
         if in_values.len() != 2 {
             return Err(Error::CorruptedData(String::from(
                 "when using between operator you must provide an array of exactly two values",
@@ -276,7 +279,8 @@ impl<'a> WhereClause {
             None => None,
             Some((document, included)) => {
                 // if the key doesn't exist then we should ignore the starts at key
-                document.get_raw_for_document_type(self.field.as_str(), document_type, None)?
+                document
+                    .get_raw_for_document_type(self.field.as_str(), document_type, None)?
                     .map(|raw_value_option| (raw_value_option, *included))
             }
         };
@@ -291,11 +295,12 @@ impl<'a> WhereClause {
                         query.insert_key(key);
                     }
                     Some((starts_at_key, included)) => {
-                        if  ( left_to_right && starts_at_key < key) ||
-                            (!left_to_right && starts_at_key > key) ||
-                            (included && starts_at_key == key) {
-                                query.insert_key(key);
-                            }
+                        if (left_to_right && starts_at_key < key)
+                            || (!left_to_right && starts_at_key > key)
+                            || (included && starts_at_key == key)
+                        {
+                            query.insert_key(key);
+                        }
                     }
                 }
             }
@@ -303,8 +308,8 @@ impl<'a> WhereClause {
                 let in_values = match &self.value {
                     Value::Array(array) => Ok(array),
                     _ => Err(Error::CorruptedData(String::from(
-                    "when using in operator you must provide an array of values",
-                ))),
+                        "when using in operator you must provide an array of values",
+                    ))),
                 }?;
                 match starts_at_key_option {
                     None => {
@@ -319,9 +324,10 @@ impl<'a> WhereClause {
                             let key = document_type
                                 .serialize_value_for_key(self.field.as_str(), value)?;
 
-                            if  ( left_to_right && starts_at_key < key) ||
-                                (!left_to_right && starts_at_key > key) ||
-                                (included && starts_at_key == key) {
+                            if (left_to_right && starts_at_key < key)
+                                || (!left_to_right && starts_at_key > key)
+                                || (included && starts_at_key == key)
+                            {
                                 query.insert_key(key);
                             }
                         }
@@ -448,8 +454,10 @@ impl<'a> WhereClause {
                             } else if starts_at_key == right_key && included {
                                 query.insert_key(right_key);
                             }
-                        } else if starts_at_key > right_key || (included && starts_at_key == right_key)
-                            {query.insert_range_inclusive(left_key..=right_key)
+                        } else if starts_at_key > right_key
+                            || (included && starts_at_key == right_key)
+                        {
+                            query.insert_range_inclusive(left_key..=right_key)
                         } else if starts_at_key == right_key {
                             query.insert_range(left_key..right_key)
                         } else if starts_at_key > left_key && starts_at_key < right_key {
@@ -511,8 +519,10 @@ impl<'a> WhereClause {
                             } else if starts_at_key == right_key && included {
                                 query.insert_key(right_key);
                             }
-                        } else if starts_at_key > right_key || (included && starts_at_key == right_key)
-                            {query.insert_range_after_to_inclusive(left_key..=right_key)
+                        } else if starts_at_key > right_key
+                            || (included && starts_at_key == right_key)
+                        {
+                            query.insert_range_after_to_inclusive(left_key..=right_key)
                         } else if starts_at_key > left_key && starts_at_key < right_key {
                             if included {
                                 query.insert_range_inclusive(left_key..=starts_at_key);
@@ -558,11 +568,11 @@ impl<'a> WhereClause {
                 let left_key =
                     document_type.serialize_value_for_key(self.field.as_str(), &self.value)?;
                 let mut right_key = left_key.clone();
-                let last_char = right_key
-                    .last_mut()
-                    .ok_or_else(|| Error::CorruptedData(String::from(
+                let last_char = right_key.last_mut().ok_or_else(|| {
+                    Error::CorruptedData(String::from(
                         "starts with must have at least one character",
-                    )))?;
+                    ))
+                })?;
                 *last_char += 1;
                 match starts_at_key_option {
                     None => query.insert_range(left_key..right_key),
@@ -615,11 +625,11 @@ impl<'a> OrderClause {
         let field_value = clause_components
             .get(0)
             .expect("check above enforces it exists");
-        let field_ref = field_value
-            .as_text()
-            .ok_or_else(|| Error::CorruptedData(String::from(
+        let field_ref = field_value.as_text().ok_or_else(|| {
+            Error::CorruptedData(String::from(
                 "first field of where component should be a string",
-            )))?;
+            ))
+        })?;
         let field = String::from(field_ref);
 
         let asc_string_value = clause_components.get(1).unwrap();
@@ -627,9 +637,9 @@ impl<'a> OrderClause {
             Value::Text(asc_string) => Some(asc_string.as_str()),
             _ => None,
         }
-        .ok_or_else(|| Error::CorruptedData(String::from(
-            "orderBy right component must be a string",
-        )))?;
+        .ok_or_else(|| {
+            Error::CorruptedData(String::from("orderBy right component must be a string"))
+        })?;
         let ascending = match asc_string {
             "asc" => true,
             "desc" => false,
@@ -665,12 +675,7 @@ impl<'a> DriveQuery<'a> {
         document_type: &'a DocumentType,
     ) -> Result<Self, Error> {
         let query_document: HashMap<String, CborValue> = ciborium::de::from_reader(query_cbor)
-            .map_err(|err| {
-                Error::CorruptedData(format!(
-                    "unable to decode query: {}",
-                    err
-                ))
-            })?;
+            .map_err(|err| Error::CorruptedData(format!("unable to decode query: {}", err)))?;
 
         let limit: u16 = query_document
             .get("limit")
@@ -681,9 +686,9 @@ impl<'a> DriveQuery<'a> {
                     None
                 }
             })
-            .ok_or_else(|| Error::CorruptedData(String::from(
-                "limit should be a integer from 1 to 100",
-            )))?;
+            .ok_or_else(|| {
+                Error::CorruptedData(String::from("limit should be a integer from 1 to 100"))
+            })?;
 
         let all_where_clauses: Vec<WhereClause> =
             query_document.get("where").map_or(Ok(vec![]), |id_cbor| {
@@ -763,8 +768,7 @@ impl<'a> DriveQuery<'a> {
             start_at_included = true;
         }
 
-        let start_at: Option<Vec<u8>> =
-            start_option.and_then(bytes_for_system_value);
+        let start_at: Option<Vec<u8>> = start_option.and_then(bytes_for_system_value);
 
         let order_by: IndexMap<String, OrderClause> = query_document
             .get("orderBy")
@@ -850,8 +854,14 @@ impl<'a> DriveQuery<'a> {
             .keys()
             .map(|s| s.as_str())
             .collect::<Vec<&str>>();
-        let in_field = self.in_clause.as_ref().map(|in_clause| in_clause.field.as_str());
-        let range_field = self.range_clause.as_ref().map(|range_clause| range_clause.field.as_str());
+        let in_field = self
+            .in_clause
+            .as_ref()
+            .map(|in_clause| in_clause.field.as_str());
+        let range_field = self
+            .range_clause
+            .as_ref()
+            .map(|range_clause| range_clause.field.as_str());
         let mut fields = equal_fields;
         if let Some(range_field) = range_field {
             fields.push(range_field);
@@ -1032,11 +1042,9 @@ impl<'a> DriveQuery<'a> {
 
         // Now we should construct the path
 
-        let last_index = last_indexes
-            .first()
-            .ok_or_else(|| Error::CorruptedData(String::from(
-                "document query has no index with fields",
-            )))?;
+        let last_index = last_indexes.first().ok_or_else(|| {
+            Error::CorruptedData(String::from("document query has no index with fields"))
+        })?;
 
         let mut path = document_type_path;
 
@@ -1048,7 +1056,6 @@ impl<'a> DriveQuery<'a> {
         }
 
         path.push(last_index.name.as_bytes().to_vec());
-
 
         let path_query = PathQuery::new(
             path,
