@@ -1049,10 +1049,9 @@ impl<'a> DriveQuery<'a> {
 
         path.push(last_index.name.as_bytes().to_vec());
 
-        let path_slices = path.iter().map(|a| a.as_slice()).collect::<Vec<&[u8]>>();
 
         let path_query = PathQuery::new(
-            path_slices.as_slice(),
+            path,
             SizedQuery::new(final_query, Some(self.limit), Some(self.offset)),
         );
 
