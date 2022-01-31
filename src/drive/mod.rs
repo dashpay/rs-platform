@@ -116,25 +116,25 @@ impl Drive {
         transaction: Option<&OptimisticTransactionDBTransaction>,
     ) -> Result<(), Error> {
         self.grove.insert(
-            &[],
+            [],
             RootTree::Identities.into(),
             Element::empty_tree(),
             transaction,
         )?;
         self.grove.insert(
-            &[],
+            [],
             RootTree::ContractDocuments.into(),
             Element::empty_tree(),
             transaction,
         )?;
         self.grove.insert(
-            &[],
+            [],
             RootTree::PublicKeyHashesToIdentities.into(),
             Element::empty_tree(),
             transaction,
         )?;
         self.grove.insert(
-            &[],
+            [],
             RootTree::Misc.into(),
             Element::empty_tree(),
             transaction,
@@ -151,8 +151,8 @@ impl Drive {
         let contract_root_path = contract_root_path(&contract.id);
 
         self.grove.insert(
-            &[RootTree::ContractDocuments.into()],
-            contract.id.clone(),
+            [RootTree::ContractDocuments.into()],
+            &contract.id,
             Element::empty_tree(),
             transaction,
         )?;
@@ -166,19 +166,15 @@ impl Drive {
 
         // the contract
         self.grove.insert(
-            &contract_root_path,
-            b"0".to_vec(),
+            contract_root_path.iter().map(|x| *x),
+            b"0",
             contract_bytes,
             transaction,
         )?;
 
         // the documents
-        self.grove.insert(
-            &contract_root_path,
-            b"1".to_vec(),
-            Element::empty_tree(),
-            transaction,
-        )?;
+        self.grove
+            .insert(contract_root_path, b"1", Element::empty_tree(), transaction)?;
 
         // next we should store each document type
         // right now we are referring them by name
@@ -187,8 +183,8 @@ impl Drive {
 
         for (type_key, document_type) in &contract.document_types {
             self.grove.insert(
-                &contract_documents_path,
-                type_key.as_bytes().to_vec(),
+                contract_documents_path.iter().map(|x| *x),
+                type_key.as_bytes(),
                 Element::empty_tree(),
                 transaction,
             )?;
@@ -198,8 +194,8 @@ impl Drive {
 
             // primary key tree
             self.grove.insert(
-                &type_path,
-                b"0".to_vec(),
+                type_path.iter().map(|x| *x),
+                b"0",
                 Element::empty_tree(),
                 transaction,
             )?;
@@ -208,8 +204,8 @@ impl Drive {
             for index in document_type.top_level_indices()? {
                 // toDo: change this to be a reference by index
                 self.grove.insert(
-                    &type_path,
-                    Vec::from(index.name.as_bytes()),
+                    type_path.iter().map(|x| *x),
+                    index.name.as_bytes(),
                     Element::empty_tree(),
                     transaction,
                 )?;
@@ -231,12 +227,8 @@ impl Drive {
         let cost: u64 = 0;
 
         // this will override the previous contract
-        self.grove.insert(
-            &contract_root_path,
-            b"0".to_vec(),
-            contract_bytes,
-            transaction,
-        )?;
+        self.grove
+            .insert(contract_root_path, b"0", contract_bytes, transaction)?;
 
         let contract_documents_path = contract_documents_path(&contract.id);
         for (type_key, document_type) in &contract.document_types {
@@ -247,8 +239,8 @@ impl Drive {
             for index in document_type.top_level_indices()? {
                 // toDo: change this to be a reference by index
                 self.grove.insert_if_not_exists(
-                    &type_path,
-                    Vec::from(index.name.as_bytes()),
+                    type_path.iter().map(|x| *x),
+                    index.name.as_bytes(),
                     Element::empty_tree(),
                     transaction,
                 )?;
@@ -273,9 +265,10 @@ impl Drive {
         let mut already_exists = false;
         let mut different_contract_data = false;
 
-        if let Ok(stored_element) = self
-            .grove
-            .get(&*contract_root_path(&contract.id), b"0", transaction) {
+        if let Ok(stored_element) =
+            self.grove
+                .get(contract_root_path(&contract.id), b"0", transaction)
+        {
             already_exists = true;
             match stored_element {
                 Element::Item(stored_contract_bytes) => {
@@ -349,11 +342,12 @@ impl Drive {
         // third we need to store the document for it's primary key
         let primary_key_path =
             contract_documents_primary_key_path(&contract.id, document_type_name);
+        let primary_key_path_iter = primary_key_path.iter().map(|x| *x);
         let document_element = Element::Item(Vec::from(document_cbor));
         if override_document {
             if self
                 .grove
-                .get(&primary_key_path, &document.id.clone(), transaction)
+                .get(primary_key_path_iter.clone(), &document.id, transaction)
                 .is_ok()
             {
                 return self.update_document_for_contract(
@@ -366,15 +360,15 @@ impl Drive {
                 );
             }
             self.grove.insert(
-                &primary_key_path,
-                document.id.clone(),
+                primary_key_path_iter.clone(),
+                &document.id,
                 document_element,
                 transaction,
             )?;
         } else {
             let inserted = self.grove.insert_if_not_exists(
-                &primary_key_path,
-                document.id.clone(),
+                primary_key_path_iter,
+                &document.id,
                 document_element,
                 transaction,
             )?;
@@ -383,13 +377,12 @@ impl Drive {
             }
         }
 
-        let document_type =
-            contract
-                .document_types
-                .get(document_type_name)
-                .ok_or_else(|| Error::CorruptedData(String::from(
-                    "can not get document type from contract",
-                )))?;
+        let document_type = contract
+            .document_types
+            .get(document_type_name)
+            .ok_or_else(|| {
+                Error::CorruptedData(String::from("can not get document type from contract"))
+            })?;
 
         // fourth we need to store a reference to the document for each index
         for index in &document_type.indices {
@@ -400,13 +393,10 @@ impl Drive {
                 .iter()
                 .map(|&x| Vec::from(x))
                 .collect();
-            let top_index_property =
-                index
-                    .properties
-                    .get(0)
-                    .ok_or_else(|| Error::CorruptedData(String::from(
-                        "invalid contract indices",
-                    )))?;
+            let top_index_property = index
+                .properties
+                .get(0)
+                .ok_or_else(|| Error::CorruptedData(String::from("invalid contract indices")))?;
             index_path.push(Vec::from(top_index_property.name.as_bytes()));
 
             // with the example of the dashpay contract's first index
@@ -418,16 +408,16 @@ impl Drive {
                     contract,
                     owner_id,
                 )?
-                .ok_or_else(|| Error::CorruptedData(String::from(
-                    "unable to get document top index field",
-                )))?;
+                .ok_or_else(|| {
+                    Error::CorruptedData(String::from("unable to get document top index field"))
+                })?;
 
             let index_path_slices: Vec<&[u8]> = index_path.iter().map(|x| x.as_slice()).collect();
 
             // here we are inserting an empty tree that will have a subtree of all other index properties
             self.grove.insert_if_not_exists(
-                &index_path_slices,
-                document_top_field.clone(),
+                index_path_slices,
+                &document_top_field,
                 Element::empty_tree(),
                 transaction,
             )?;
@@ -437,21 +427,17 @@ impl Drive {
             // the index path is now something like Contracts/ContractID/Documents(1)/$ownerId/<ownerId>
 
             for i in 1..index.properties.len() {
-                let index_property =
-                    index
-                        .properties
-                        .get(i)
-                        .ok_or_else(|| Error::CorruptedData(String::from(
-                            "invalid contract indices",
-                        )))?;
+                let index_property = index.properties.get(i).ok_or_else(|| {
+                    Error::CorruptedData(String::from("invalid contract indices"))
+                })?;
 
                 let index_path_slices: Vec<&[u8]> =
                     index_path.iter().map(|x| x.as_slice()).collect();
 
                 // here we are inserting an empty tree that will have a subtree of all other index properties
                 self.grove.insert_if_not_exists(
-                    &index_path_slices,
-                    index_property.name.as_bytes().to_vec(),
+                    index_path_slices,
+                    index_property.name.as_bytes(),
                     Element::empty_tree(),
                     transaction,
                 )?;
@@ -467,17 +453,17 @@ impl Drive {
                         contract,
                         owner_id,
                     )?
-                    .ok_or_else(|| Error::CorruptedData(String::from(
-                        "unable to get document field",
-                    )))?;
+                    .ok_or_else(|| {
+                        Error::CorruptedData(String::from("unable to get document field"))
+                    })?;
 
                 let index_path_slices: Vec<&[u8]> =
                     index_path.iter().map(|x| x.as_slice()).collect();
 
                 // here we are inserting an empty tree that will have a subtree of all other index properties
                 self.grove.insert_if_not_exists(
-                    &index_path_slices,
-                    document_index_field.clone(),
+                    index_path_slices,
+                    &document_index_field,
                     Element::empty_tree(),
                     transaction,
                 )?;
@@ -503,8 +489,8 @@ impl Drive {
             if !index.unique {
                 // here we are inserting an empty tree that will have a subtree of all other index properties
                 self.grove.insert_if_not_exists(
-                    &index_path_slices,
-                    b"0".to_vec(),
+                    index_path_slices,
+                    b"0",
                     Element::empty_tree(),
                     transaction,
                 )?;
@@ -515,8 +501,8 @@ impl Drive {
 
                 // here we should return an error if the element already exists
                 self.grove.insert(
-                    &index_path_slices,
-                    document.id.clone(),
+                    index_path_slices,
+                    &document.id,
                     document_reference,
                     transaction,
                 )?;
@@ -526,8 +512,8 @@ impl Drive {
 
                 // here we should return an error if the element already exists
                 let inserted = self.grove.insert_if_not_exists(
-                    &index_path_slices,
-                    b"0".to_vec(),
+                    index_path_slices,
+                    b"0",
                     document_reference,
                     transaction,
                 )?;
@@ -615,13 +601,12 @@ impl Drive {
         owner_id: Option<&[u8]>,
         transaction: Option<&OptimisticTransactionDBTransaction>,
     ) -> Result<u64, Error> {
-        let document_type =
-            contract
-                .document_types
-                .get(document_type_name)
-                .ok_or_else(|| Error::CorruptedData(String::from(
-                    "can not get document type from contract",
-                )))?;
+        let document_type = contract
+            .document_types
+            .get(document_type_name)
+            .ok_or_else(|| {
+                Error::CorruptedData(String::from("can not get document type from contract"))
+            })?;
         // first we need to construct the path for documents on the contract
         // the path is
         //  * Document and Contract root tree
@@ -632,27 +617,22 @@ impl Drive {
 
         // next we need to get the document from storage
         let document_element: Element = self.grove.get(
-            &contract_documents_primary_key_path,
+            contract_documents_primary_key_path.iter().map(|x| *x),
             document_id,
             transaction,
         )?;
 
         let document_bytes: Vec<u8> = match document_element {
             Element::Item(data) => data,
-            _ => todo!() // TODO: how should this be handled, possibility that document might not be in storage
+            _ => todo!(), // TODO: how should this be handled, possibility that document might not be in storage
         };
 
-        let document = Document::from_cbor(
-            document_bytes
-                .as_slice(),
-            None,
-            owner_id,
-        )?;
+        let document = Document::from_cbor(document_bytes.as_slice(), None, owner_id)?;
 
         // third we need to delete the document for it's primary key
         self.grove.delete(
-            &contract_documents_primary_key_path,
-            Vec::from(document_id),
+            contract_documents_primary_key_path,
+            document_id,
             transaction,
         )?;
 
@@ -669,13 +649,10 @@ impl Drive {
                 .iter()
                 .map(|&x| Vec::from(x))
                 .collect();
-            let top_index_property =
-                index
-                    .properties
-                    .get(0)
-                    .ok_or_else(|| Error::CorruptedData(String::from(
-                        "invalid contract indices",
-                    )))?;
+            let top_index_property = index
+                .properties
+                .get(0)
+                .ok_or_else(|| Error::CorruptedData(String::from("invalid contract indices")))?;
             index_path.push(Vec::from(top_index_property.name.as_bytes()));
 
             // with the example of the dashpay contract's first index
@@ -687,22 +664,20 @@ impl Drive {
                     contract,
                     owner_id,
                 )?
-                .ok_or_else(|| Error::CorruptedData(String::from(
-                    "unable to get document top index field for deletion",
-                )))?;
+                .ok_or_else(|| {
+                    Error::CorruptedData(String::from(
+                        "unable to get document top index field for deletion",
+                    ))
+                })?;
 
             // we push the actual value of the index path
             index_path.push(document_top_field);
             // the index path is now something like Contracts/ContractID/Documents(1)/$ownerId/<ownerId>
 
             for i in 1..index.properties.len() {
-                let index_property =
-                    index
-                        .properties
-                        .get(i)
-                        .ok_or_else(|| Error::CorruptedData(String::from(
-                            "invalid contract indices",
-                        )))?;
+                let index_property = index.properties.get(i).ok_or_else(|| {
+                    Error::CorruptedData(String::from("invalid contract indices"))
+                })?;
 
                 index_path.push(Vec::from(index_property.name.as_bytes()));
                 // Iteration 1. the index path is now something like Contracts/ContractID/Documents(1)/$ownerId/<ownerId>/toUserId
@@ -715,9 +690,9 @@ impl Drive {
                         contract,
                         owner_id,
                     )?
-                    .ok_or_else(|| Error::CorruptedData(String::from(
-                        "unable to get document field",
-                    )))?;
+                    .ok_or_else(|| {
+                        Error::CorruptedData(String::from("unable to get document field"))
+                    })?;
 
                 // we push the actual value of the index path
                 index_path.push(document_top_field);
@@ -735,14 +710,13 @@ impl Drive {
 
                 // here we should return an error if the element already exists
                 self.grove
-                    .delete(&index_path_slices, Vec::from(document_id), transaction)?;
+                    .delete(index_path_slices, document_id, transaction)?;
             } else {
                 let index_path_slices: Vec<&[u8]> =
                     index_path.iter().map(|x| x.as_slice()).collect();
 
                 // here we should return an error if the element already exists
-                self.grove
-                    .delete(&index_path_slices, b"0".to_vec(), transaction)?;
+                self.grove.delete(index_path_slices, b"0", transaction)?;
             }
         }
         Ok(0)

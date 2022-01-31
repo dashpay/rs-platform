@@ -52,11 +52,14 @@ pub fn setup(count: u32, seed: u64) -> (Drive, Contract) {
     let (mut drive, contract) = common::setup_contract(
         "family",
         "tests/supporting_files/contract/family/family-contract.json",
-    ).expect("setup_contract should not fail");
+    )
+    .expect("setup_contract should not fail");
 
     let storage = drive.grove.storage();
     let db_transaction = storage.transaction();
-    drive.grove.start_transaction()
+    drive
+        .grove
+        .start_transaction()
         .expect("start_transaction should not fail");
 
     let people = Person::random_people(count, seed);
@@ -79,7 +82,10 @@ pub fn setup(count: u32, seed: u64) -> (Drive, Contract) {
             )
             .expect("document should be inserted");
     }
-    drive.grove.commit_transaction(db_transaction).expect("commit_transaction shuldn't fail");
+    drive
+        .grove
+        .commit_transaction(db_transaction)
+        .expect("commit_transaction shuldn't fail");
     (drive, contract)
 }
 
