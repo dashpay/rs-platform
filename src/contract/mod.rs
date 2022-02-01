@@ -144,18 +144,12 @@ impl Contract {
         let contract_id = bytes_for_system_value_from_hash_map(&contract, "$id")
             .ok_or_else(|| Error::CorruptedData(String::from("unable to get contract id")))?;
 
-        let documents_cbor_value =
-            contract
-                .get("documents")
-                .ok_or_else(|| Error::CorruptedData(String::from(
-                    "unable to get documents",
-                )))?;
-        let contract_document_types_raw =
-            documents_cbor_value
-                .as_map()
-                .ok_or_else(|| Error::CorruptedData(String::from(
-                    "unable to get documents",
-                )))?;
+        let documents_cbor_value = contract
+            .get("documents")
+            .ok_or_else(|| Error::CorruptedData(String::from("unable to get documents")))?;
+        let contract_document_types_raw = documents_cbor_value
+            .as_map()
+            .ok_or_else(|| Error::CorruptedData(String::from("unable to get documents")))?;
 
         let mut contract_document_types: HashMap<String, DocumentType> = HashMap::new();
 
@@ -193,7 +187,7 @@ impl Contract {
     pub fn root_path(&self) -> [&[u8]; 2] {
         [
             Into::<&[u8; 1]>::into(RootTree::ContractDocuments),
-            &self.id
+            &self.id,
         ]
     }
 
@@ -201,7 +195,7 @@ impl Contract {
         [
             Into::<&[u8; 1]>::into(RootTree::ContractDocuments),
             &self.id,
-            &[1]
+            &[1],
         ]
     }
 
@@ -220,7 +214,7 @@ impl Contract {
             &self.id,
             &[1],
             document_type_name.as_bytes(),
-            &[0]
+            &[0],
         ]
     }
 }
@@ -258,9 +252,7 @@ impl DocumentType {
         let field_type = self
             .properties
             .get(key)
-            .ok_or_else(|| Error::CorruptedData(String::from(
-                "expected document to have field",
-            )))?;
+            .ok_or_else(|| Error::CorruptedData(String::from("expected document to have field")))?;
         types::encode_document_field_type(field_type, value)
     }
 
@@ -271,9 +263,10 @@ impl DocumentType {
         let mut indices: Vec<Index> = Vec::new();
         let mut document_properties: HashMap<String, types::DocumentFieldType> = HashMap::new();
 
-        let index_values = cbor_inner_array_value(document_type_value_map, "indices")
-            .ok_or_else(|| Error::CorruptedData(String::from("unable to get indices from the contract"))
-        )?;
+        let index_values =
+            cbor_inner_array_value(document_type_value_map, "indices").ok_or_else(|| {
+                Error::CorruptedData(String::from("unable to get indices from the contract"))
+            })?;
 
         for index_value in index_values {
             if !index_value.is_map() {
@@ -287,9 +280,11 @@ impl DocumentType {
 
         // Extract the properties
         let property_values = cbor_inner_map_value(document_type_value_map, "properties")
-            .ok_or_else(|| Error::CorruptedData(String::from(
-                "unable to get document properties from the contract",
-            )))?;
+            .ok_or_else(|| {
+                Error::CorruptedData(String::from(
+                    "unable to get document properties from the contract",
+                ))
+            })?;
 
         // Based on the property name, determine the type
         for (property_key, property_value) in property_values {
@@ -307,8 +302,7 @@ impl DocumentType {
 
             let property_values = property_value.as_map().expect("confirmed as map");
             let type_value = cbor_inner_text_value(property_values, "type")
-                .ok_or_else(|| Error::CorruptedData(String::from("cannot find type property")),
-            )?;
+                .ok_or_else(|| Error::CorruptedData(String::from("cannot find type property")))?;
 
             let field_type: types::DocumentFieldType;
 
@@ -316,9 +310,11 @@ impl DocumentType {
                 // Only handling bytearrays for v1
                 // Return an error if it is not a byte array
                 let is_byte_array_value = cbor_inner_bool_value(property_values, "byteArray")
-                    .ok_or_else(|| Error::CorruptedData(String::from(
-                        "cannot find byteArray property for array type",
-                    )))?;
+                    .ok_or_else(|| {
+                        Error::CorruptedData(String::from(
+                            "cannot find byteArray property for array type",
+                        ))
+                    })?;
                 if is_byte_array_value {
                     field_type = types::DocumentFieldType::ByteArray;
                 } else {
@@ -381,9 +377,9 @@ impl Document {
         let owner_id = match owner_id {
             None => {
                 let owner_id: Vec<u8> = bytes_for_system_value_from_hash_map(&document, "$ownerId")
-                    .ok_or_else(|| Error::CorruptedData(String::from(
-                        "unable to get document $ownerId",
-                    )))?;
+                    .ok_or_else(|| {
+                        Error::CorruptedData(String::from("unable to get document $ownerId"))
+                    })?;
                 document.remove("$ownerId");
                 owner_id
             }
@@ -399,9 +395,9 @@ impl Document {
         let id = match document_id {
             None => {
                 let document_id: Vec<u8> = bytes_for_system_value_from_hash_map(&document, "$id")
-                    .ok_or_else(|| Error::CorruptedData(String::from(
-                    "unable to get document $id",
-                )))?;
+                    .ok_or_else(|| {
+                    Error::CorruptedData(String::from("unable to get document $id"))
+                })?;
                 document.remove("$id");
                 document_id
             }
@@ -492,10 +488,14 @@ impl Document {
                     "$id" => Ok(Some(self.id.clone())),
                     "$ownerId" => Ok(Some(self.owner_id.clone())),
                     _ => {
-                        let document_type = contract.document_types.get(document_type_name)
-                            .ok_or_else(|| Error::CorruptedData(String::from(
-                                "document type should exist for name",
-                            )))?;
+                        let document_type = contract
+                            .document_types
+                            .get(document_type_name)
+                            .ok_or_else(|| {
+                                Error::CorruptedData(String::from(
+                                    "document type should exist for name",
+                                ))
+                            })?;
                         Ok(Some(document_type.serialize_value_for_key(key, value)?))
                     }
                 },
@@ -518,21 +518,16 @@ impl Index {
         for (key_value, value_value) in index_type_value_map {
             let key = key_value
                 .as_text()
-                .ok_or_else(|| Error::CorruptedData(String::from(
-                    "key should be of type text",
-                )))?;
+                .ok_or_else(|| Error::CorruptedData(String::from("key should be of type text")))?;
 
             if key == "unique" {
                 if value_value.is_bool() {
                     unique = value_value.as_bool().expect("confirmed as bool");
                 }
             } else if key == "properties" {
-                let properties =
-                    value_value
-                        .as_array()
-                        .ok_or_else(|| Error::CorruptedData(String::from(
-                            "property value should be an array",
-                        )))?;
+                let properties = value_value.as_array().ok_or_else(|| {
+                    Error::CorruptedData(String::from("property value should be an array"))
+                })?;
 
                 // Iterate over this and get the index properties
                 for property in properties {
@@ -564,15 +559,11 @@ impl IndexProperty {
         let key = property
             .0 // key
             .as_text()
-            .ok_or_else(|| Error::CorruptedData(String::from(
-                "key should be of type string",
-            )))?;
+            .ok_or_else(|| Error::CorruptedData(String::from("key should be of type string")))?;
         let value = property
             .1 // value
             .as_text()
-            .ok_or_else(|| Error::CorruptedData(String::from(
-                "value should be of type string",
-            )))?;
+            .ok_or_else(|| Error::CorruptedData(String::from("value should be of type string")))?;
 
         let ascending = value == "asc";
 
@@ -585,15 +576,13 @@ impl IndexProperty {
 
 // Helper functions
 fn contract_document_types(contract: &HashMap<String, CborValue>) -> Option<&Vec<(Value, Value)>> {
-    contract
-        .get("documents")
-        .and_then(|id_cbor| {
-            if let CborValue::Map(documents) = id_cbor {
-                Some(documents)
-            } else {
-                None
-            }
-        })
+    contract.get("documents").and_then(|id_cbor| {
+        if let CborValue::Map(documents) = id_cbor {
+            Some(documents)
+        } else {
+            None
+        }
+    })
 }
 
 fn get_key_from_cbor_map(cbor_map: &[(Value, Value)], key: &str) -> Option<Value> {
@@ -683,9 +672,7 @@ fn bytes_for_system_value_from_hash_map(
     document: &HashMap<String, CborValue>,
     key: &str,
 ) -> Option<Vec<u8>> {
-    document
-        .get(key)
-        .and_then(bytes_for_system_value)
+    document.get(key).and_then(bytes_for_system_value)
 }
 
 #[cfg(test)]

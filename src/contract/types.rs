@@ -41,7 +41,9 @@ pub fn encode_document_field_type(
             Ok(value_as_text.as_bytes().to_vec())
         }
         DocumentFieldType::Integer => {
-            let value_as_integer = value.as_integer().ok_or_else(get_field_type_matching_error)?;
+            let value_as_integer = value
+                .as_integer()
+                .ok_or_else(get_field_type_matching_error)?;
             let value_as_i64: i64 = value_as_integer
                 .try_into()
                 .map_err(|_| Error::CorruptedData(String::from("expected integer value")))?;
