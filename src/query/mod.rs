@@ -63,6 +63,18 @@ fn operator_from_string(string: &str) -> Option<WhereOperator> {
     }
 }
 
+fn where_operator_from_sql_operator(sql_operator: ast::BinaryOperator) -> Option<WhereOperator> {
+    match sql_operator {
+        ast::BinaryOperator::Eq => Some(WhereOperator::Equal),
+        ast::BinaryOperator::Gt => Some(WhereOperator::GreaterThan),
+        ast::BinaryOperator::GtEq => Some(WhereOperator::GreaterThanOrEquals),
+        ast::BinaryOperator::Lt => Some(WhereOperator::LessThan),
+        ast::BinaryOperator::LtEq => Some(WhereOperator::GreaterThan),
+        ast::BinaryOperator::Like => Some(WhereOperator::StartsWith),
+        _ => None
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct WhereClause {
     field: String,
