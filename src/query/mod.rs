@@ -11,6 +11,11 @@ use ciborium::value::{Value as CborValue, Value};
 use grovedb::{Element, Error, GroveDb, PathQuery, Query, SizedQuery};
 use indexmap::IndexMap;
 use std::collections::HashMap;
+use sqlparser::ast;
+use sqlparser::ast::Statement;
+use sqlparser::ast::Value::Number;
+use sqlparser::dialect::GenericDialect;
+use sqlparser::parser::Parser;
 use storage::rocksdb_storage::OptimisticTransactionDBTransaction;
 
 #[derive(Copy, Clone, Debug)]
@@ -802,6 +807,33 @@ impl<'a> DriveQuery<'a> {
         })
     }
 
+    pub fn from_sql_expr(sql_string: &str, contract: &'a Contract) -> Result<String, Error>{
+        let dialect: GenericDialect = sqlparser::dialect::GenericDialect{};
+        let statements: Vec<Statement> = Parser::parse_sql(&dialect, sql_string).map_err(|_| Error::CorruptedData(String::from("Issue parsing sql")))?;
+        // Should ideally iterate over each statement
+        let first_statement = statements.get(0).ok_or_else(|| Error::CorruptedData(String::from("Issue parsing SQL")))?;
+        // Statement is an enum, has a Query(Box<Query)) where second query is an unbounded struct
+        // Box<Query> allocates the query to the heap and returns the reference
+        let query: &ast::Query= match first_statement {
+            ast::Statement::Query(query_struct) => Some(query_struct),
+            _ => None,
+        }.ok_or_else(|| Error::CorruptedData(String::from("Issue parsing sql")))?;
+        // Now we can access the shit
+
+        let limit: u16 = if let Some(limit_expr) = &query.limit {
+            match limit_expr {
+                ast::Expr::Value(Number(num_string, _)) => num_string.parse::<u16>().ok(),
+                _ => None
+            }.ok_or_else(|| Error::CorruptedData(String::from("Issue parsing sql: invalid limit value")))?
+        } else {
+            defaults::DEFAULT_QUERY_LIMIT
+        };
+
+        dbg!(limit);
+
+        Ok(String::from("okay"))
+    }
+
     pub fn execute_with_proof(
         self,
         grove: &mut GroveDb,
@@ -1078,3 +1110,19 @@ impl<'a> DriveQuery<'a> {
 // pub struct Query {
 //     conditions : Vec<QueryGroupComponent>,
 // }
+
+#[cfg(test)]
+mod tests {
+    use crate::query::DriveQuery;
+    use crate::common;
+
+    #[test]
+    fn test_sql_query() {
+        let (mut drive, contract) = common::setup_contract(
+            "family",
+            "tests/supporting_files/contract/family/family-contract.json",
+        );
+        let sql_string = "select * from person where firstname = Sam and age > 30 order by firstname ASC, age DESC limit 30";
+        let drive_query = DriveQuery::from_sql_expr(sql_string, &contract);
+    }
+}
