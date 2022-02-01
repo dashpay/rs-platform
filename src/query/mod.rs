@@ -808,7 +808,7 @@ impl<'a> DriveQuery<'a> {
         })
     }
 
-    pub fn from_sql_expr(sql_string: &str, contract: &'a Contract) -> Result<String, Error>{
+    pub fn from_sql_expr(sql_string: &str, contract: &'a Contract) -> Result<Self, Error>{
         let dialect: GenericDialect = sqlparser::dialect::GenericDialect{};
         let statements: Vec<Statement> = Parser::parse_sql(&dialect, sql_string).map_err(|_| Error::CorruptedData(String::from("Issue parsing sql")))?;
         // Should ideally iterate over each statement
@@ -841,7 +841,7 @@ impl<'a> DriveQuery<'a> {
             })
         }).collect::<IndexMap<String, OrderClause>>();
 
-        dbg!(order_by);
+        dbg!(&order_by);
 
         // document type
         // This will be part of the select section
@@ -867,7 +867,7 @@ impl<'a> DriveQuery<'a> {
         dbg!(document_type_name);
 
         let document_type = contract.document_types.get(document_type_name).ok_or_else(|| Error::InvalidQuery("document type not found in contract"))?;
-        dbg!(document_type);
+        dbg!(&document_type);
 
         // Where clauses
         // This is under selection, not an array but a tree
@@ -891,7 +891,7 @@ impl<'a> DriveQuery<'a> {
         // Recursive function
         // base case op is not and, build where clause
         // op is and run function for left and right
-        let mut where_clauses: Vec<WhereClause> = Vec::new();
+        let mut all_where_clauses: Vec<WhereClause> = Vec::new();
         let selection_tree = select.selection.as_ref().ok_or_else(|| Error::InvalidQuery("No selection clause"))?;
 
         fn build_where_clause(binary_operation: &ast::Expr, where_clauses: &mut Vec<WhereClause>) -> Result<(), Error>{
@@ -927,18 +927,69 @@ impl<'a> DriveQuery<'a> {
                 _ => Err(Error::CorruptedData(String::from("Issue parsing sql: invalid selection format")))
             }
         }
-        build_where_clause(selection_tree, &mut where_clauses);
-        dbg!(where_clauses);
-        // match selection_tree {
-        //     ast::Expr::BinaryOp {left, op, right} => {
-        //        // if op != and
-        //     },
-        //     _ => None
-        // }
+        build_where_clause(selection_tree, &mut all_where_clauses);
+        dbg!(&all_where_clauses);
 
+        let range_clause = WhereClause::group_range_clauses(&all_where_clauses)?;
 
+        let equal_clauses_array = all_where_clauses
+            .iter()
+            .filter_map(|where_clause| match where_clause.operator {
+                Equal => Some(where_clause.clone()),
+                _ => None,
+            })
+            .collect::<Vec<WhereClause>>();
 
-        Ok(String::from("okay"))
+        let in_clauses_array = all_where_clauses
+            .iter()
+            .filter_map(|where_clause| match where_clause.operator {
+                In => Some(where_clause.clone()),
+                _ => None,
+            })
+            .collect::<Vec<WhereClause>>();
+
+        let in_clause = match in_clauses_array.len() {
+            0 => Ok(None),
+            1 => Ok(Some(
+                in_clauses_array
+                    .get(0)
+                    .expect("there must be a value")
+                    .clone(),
+            )),
+            _ => Err(Error::CorruptedData(String::from(
+                "There should only be one in clause",
+            ))),
+        }?;
+
+        dbg!(&in_clause);
+
+        let equal_clauses: HashMap<String, WhereClause> = equal_clauses_array
+            .into_iter()
+            .map(|where_clause| (where_clause.field.clone(), where_clause))
+            .collect();
+
+        dbg!(&equal_clauses);
+
+        let start_at_option = None;
+        let start_at_included = false;
+        let start_at: Option<Vec<u8>> = start_at_option.and_then(bytes_for_system_value);
+
+        let dquery = DriveQuery{
+            contract,
+            document_type,
+            equal_clauses,
+            in_clause,
+            range_clause,
+            offset: 0,
+            limit,
+            order_by,
+            start_at,
+            start_at_included,
+        };
+
+        dbg!(&dquery);
+
+        Ok(dquery)
     }
 
     pub fn execute_with_proof(
