@@ -286,8 +286,6 @@ impl Drive {
         // first we need to deserialize the contract
         let contract = Contract::from_cbor(&contract_cbor)?;
 
-        // let contract_bytes = Vec::from(contract_cbor);
-
         // overlying structure
         let mut already_exists = false;
         let mut different_contract_data = false;
@@ -298,7 +296,7 @@ impl Drive {
             already_exists = true;
             match stored_element {
                 Element::Item(stored_contract_bytes) => {
-                    if contract_cbor != stored_contract_bytes.as_slice() {
+                    if contract_cbor != stored_contract_bytes {
                         different_contract_data = true;
                     }
                 }
