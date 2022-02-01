@@ -12,7 +12,8 @@ use grovedb::{Element, Error, GroveDb, PathQuery, Query, SizedQuery};
 use indexmap::IndexMap;
 use std::collections::HashMap;
 use sqlparser::ast;
-use sqlparser::ast::{OrderByExpr, Statement};
+use sqlparser::ast::{OrderByExpr, Select, Statement};
+use sqlparser::ast::TableFactor::Table;
 use sqlparser::ast::Value::Number;
 use sqlparser::dialect::GenericDialect;
 use sqlparser::parser::Parser;
@@ -831,10 +832,6 @@ impl<'a> DriveQuery<'a> {
 
         dbg!(limit);
 
-        // Extract order by
-        // query.orderby is a vec of OrderByExpr
-        // OrderByExpr contains an Expr and an optional bool that signifies if ascending
-        // why optional??
         let order_by: IndexMap<String, OrderClause> = query.order_by.iter().map(|order_exp: &OrderByExpr| {
             let ascending = order_exp.asc.is_none() || order_exp.asc.unwrap();
             let field = order_exp.expr.to_string();
@@ -845,6 +842,30 @@ impl<'a> DriveQuery<'a> {
         }).collect::<IndexMap<String, OrderClause>>();
 
         dbg!(order_by);
+
+        // Where clauses + document type
+        // This will be part of the select section
+        // Query has body which is of type SetExpr
+        // SetExpr contains Select(Box<Select>), Query(Box<Query>)
+        let select: &Select = match &query.body {
+            ast::SetExpr::Select(select) => Some(select),
+            _ => None,
+        }.ok_or_else(|| Error::CorruptedData(String::from("Issue parsing sql")))?;
+        // Not sure we care about projection for now
+        // Get the document type from the 'from' section
+        // TODO: use get rather than indexing
+        let document_type_name = match &select.from[0].relation{
+            Table { name, alias, args, with_hints} => {
+                if let Some(identifier) = &name.0.get(0) {
+                    Some(&identifier.value)
+                } else {
+                    None
+                }
+            },
+            _ => None,
+        }.ok_or_else(|| Error::CorruptedData(String::from("Issue parsing sql: invalid from value")))?;
+        dbg!(document_type_name);
+
 
         Ok(String::from("okay"))
     }
