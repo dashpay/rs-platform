@@ -921,6 +921,48 @@ impl<'a> DriveQuery<'a> {
                             },
                             _ => panic!()
                         }
+                    } else if *op == ast::BinaryOperator::Gt {
+                        let left_expr = &**left;
+                        let right_expr = &**right;
+                        dbg!(left_expr);
+                        dbg!(right_expr);
+                        match left_expr {
+                            ast::Expr::Identifier(ident) => {
+                                match right_expr {
+                                    ast::Expr::Value(value) => {
+                                        where_clauses.push(WhereClause{
+                                            field: ident.value.clone(),
+                                            operator: WhereOperator::GreaterThan,
+                                            // value: Value::Text(String::from("nice")),
+                                            value: Value::Text(value.to_string()),
+                                        })
+                                    },
+                                    _ => panic!()
+                                }
+                            },
+                            _ => panic!()
+                        }
+                    } else if *op == ast::BinaryOperator::Lt {
+                        let left_expr = &**left;
+                        let right_expr = &**right;
+                        dbg!(left_expr);
+                        dbg!(right_expr);
+                        match left_expr {
+                            ast::Expr::Identifier(ident) => {
+                                match right_expr {
+                                    ast::Expr::Value(value) => {
+                                        where_clauses.push(WhereClause{
+                                            field: ident.value.clone(),
+                                            operator: WhereOperator::LessThan,
+                                            // value: Value::Text(String::from("nice")),
+                                            value: Value::Text(value.to_string().replace("'", "")),
+                                        })
+                                    },
+                                    _ => panic!()
+                                }
+                            },
+                            _ => panic!()
+                        }
                     }
                     Ok(())
                 },
@@ -1269,19 +1311,19 @@ impl<'a> DriveQuery<'a> {
 //     conditions : Vec<QueryGroupComponent>,
 // }
 
-#[cfg(test)]
-mod tests {
-    use crate::query::DriveQuery;
-    use crate::common;
-
-    #[test]
-    fn test_sql_query() {
-        let (mut drive, contract) = common::setup_contract(
-            "family",
-            "tests/supporting_files/contract/family/family-contract.json",
-        );
-        // let sql_string = "select * from person where firstname = Sam and age > 30 order by firstname ASC, age DESC limit 30";
-        let sql_string = "select * from person where firstname = 'Sam' order by firstname ASC, age DESC limit 30";
-        let drive_query = DriveQuery::from_sql_expr(sql_string, &contract);
-    }
-}
+// #[cfg(test)]
+// mod tests {
+//     use crate::query::DriveQuery;
+//     use crate::common;
+//
+//     #[test]
+//     fn test_sql_query() {
+//         let (mut drive, contract) = common::setup_contract(
+//             "family",
+//             "tests/supporting_files/contract/family/family-contract.json",
+//         );
+//         // let sql_string = "select * from person where firstname = Sam and age > 30 order by firstname ASC, age DESC limit 30";
+//         let sql_string = "select * from person where firstname = 'Sam' order by firstname ASC, age DESC limit 30";
+//         let drive_query = DriveQuery::from_sql_expr(sql_string, &contract);
+//     }
+// }

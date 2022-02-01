@@ -553,3 +553,12 @@ fn test_query_many() {
 
     assert_eq!(*meta_age, 59)
 }
+
+#[test]
+fn test_sql_query() {
+    let (mut drive, contract) = setup(10, 73509);
+    let sql_string = "select * from person where firstName < 'Chris' order by firstName ASC";
+    let drive_query = DriveQuery::from_sql_expr(sql_string, &contract).unwrap();
+    let (results, _) = drive_query.execute_no_proof(&mut drive.grove, None).unwrap();
+    dbg!(results.len());
+}
