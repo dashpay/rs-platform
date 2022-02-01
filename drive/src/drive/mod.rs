@@ -5,6 +5,7 @@ use crate::query::DriveQuery;
 use grovedb::{Element, Error, GroveDb};
 use std::path::Path;
 use storage::rocksdb_storage::OptimisticTransactionDBTransaction;
+use crate::drive::defaults::CONTRACT_DOCUMENTS_PATH_HEIGHT;
 
 pub struct Drive {
     pub grove: GroveDb,
@@ -323,6 +324,28 @@ impl Drive {
             &document,
             document_cbor,
             &contract,
+            document_type_name,
+            owner_id,
+            override_document,
+            transaction,
+        )
+    }
+
+    pub fn add_document_cbor_for_contract(
+        &mut self,
+        document_cbor: &[u8],
+        contract: &Contract,
+        document_type_name: &str,
+        owner_id: Option<&[u8]>,
+        override_document: bool,
+        transaction: Option<&OptimisticTransactionDBTransaction>,
+    ) -> Result<u64, Error> {
+        let document = Document::from_cbor(document_cbor, None, owner_id)?;
+
+        self.add_document_for_contract(
+            &document,
+            document_cbor,
+            contract,
             document_type_name,
             owner_id,
             override_document,
@@ -718,13 +741,14 @@ impl Drive {
 
                 // here we should return an error if the element already exists
                 self.grove
-                    .delete(index_path_slices, document_id, transaction)?;
+                    .delete_up_tree_while_empty(index_path_slices, document_id, Some(CONTRACT_DOCUMENTS_PATH_HEIGHT), transaction)?;
             } else {
                 let index_path_slices: Vec<&[u8]> =
                     index_path.iter().map(|x| x.as_slice()).collect();
 
                 // here we should return an error if the element already exists
-                self.grove.delete(index_path_slices, &[0], transaction)?;
+                self.grove
+                    .delete_up_tree_while_empty(index_path_slices, &[0], Some(CONTRACT_DOCUMENTS_PATH_HEIGHT), transaction)?;
             }
         }
         Ok(0)
@@ -828,6 +852,84 @@ mod tests {
                 None,
             )
             .expect("expected to override a document successfully");
+    }
+
+    #[test]
+    fn test_delete_dashpay_documents_no_transaction() {
+        let (mut drive, dashpay_cbor) = setup_dashpay("delete");
+
+        let dashpay_cr_document_cbor =
+            json_document_to_cbor("tests/supporting_files/contract/dashpay/contact-request0.json", Some(1));
+
+        let random_owner_id = rand::thread_rng().gen::<[u8; 32]>();
+        drive
+            .add_document_for_contract_cbor(
+                &dashpay_cr_document_cbor,
+                &dashpay_cbor,
+                "contactRequest",
+                Some(&random_owner_id),
+                false,
+                None,
+            )
+            .expect("expected to insert a document successfully");
+
+        let document_id = bs58::decode("AYjYxDqLy2hvGQADqE6FAkBnQEpJSzNd3CRw1tpS6vZ7").into_vec().expect("this should decode");
+
+        drive
+            .delete_document_for_contract_cbor(
+                &document_id,
+                &dashpay_cbor,
+                "contactRequest",
+                Some(&random_owner_id),
+                None,
+            )
+            .expect("expected to be able to delete the document");
+    }
+
+    #[test]
+    fn test_delete_dashpay_documents() {
+        let tmp_dir = TempDir::new("delete").unwrap();
+        let mut drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+
+        let storage = drive.grove.storage();
+        let db_transaction = storage.transaction();
+
+        drive
+            .create_root_tree(Some(&db_transaction))
+            .expect("expected to create root tree successfully");
+
+        let contract = setup_contract(
+            &mut drive,
+            "tests/supporting_files/contract/dashpay/dashpay-contract.json",
+            Some(&db_transaction),
+        );
+
+        let dashpay_cr_document_cbor =
+            json_document_to_cbor("tests/supporting_files/contract/dashpay/contact-request0.json", Some(1));
+
+        let random_owner_id = rand::thread_rng().gen::<[u8; 32]>();
+        drive
+            .add_document_cbor_for_contract(
+                &dashpay_cr_document_cbor,
+                &contract,
+                "contactRequest",
+                Some(&random_owner_id),
+                false,
+                Some(&db_transaction),
+            )
+            .expect("expected to insert a document successfully");
+
+        let document_id = bs58::decode("AYjYxDqLy2hvGQADqE6FAkBnQEpJSzNd3CRw1tpS6vZ7").into_vec().expect("this should decode");
+
+        drive
+            .delete_document_for_contract(
+                &document_id,
+                &contract,
+                "contactRequest",
+                Some(&random_owner_id),
+                Some(&db_transaction),
+            )
+            .expect("expected to be able to delete the document");
     }
 
     #[test]
