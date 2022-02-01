@@ -709,13 +709,14 @@ impl<'a> DriveQuery<'a> {
 
         let range_clause = WhereClause::group_range_clauses(&all_where_clauses)?;
 
-        let equal_clauses_array = all_where_clauses
+        let equal_clauses = all_where_clauses
             .iter()
             .filter_map(|where_clause| match where_clause.operator {
                 Equal => Some(where_clause.clone()),
                 _ => None,
             })
-            .collect::<Vec<WhereClause>>();
+            .map(|where_clause| (where_clause.field.clone(), where_clause))
+            .collect();
 
         let in_clauses_array = all_where_clauses
             .iter()
@@ -737,11 +738,6 @@ impl<'a> DriveQuery<'a> {
                 "There should only be one in clause",
             ))),
         }?;
-
-        let equal_clauses = equal_clauses_array
-            .into_iter()
-            .map(|where_clause| (where_clause.field.clone(), where_clause))
-            .collect();
 
         let start_at_option = query_document.get("startAt");
         let start_after_option = query_document.get("startAfter");
@@ -819,7 +815,7 @@ impl<'a> DriveQuery<'a> {
         let document_type_path = self
             .contract
             .document_type_path(self.document_type.name.as_str())
-            .into_iter()
+            .iter()
             .map(|a| a.to_vec())
             .collect::<Vec<Vec<u8>>>();
 

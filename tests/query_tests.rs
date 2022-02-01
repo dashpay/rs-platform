@@ -118,7 +118,7 @@ fn test_query_many() {
         .execute_no_proof(&mut drive.grove, None)
         .expect("proof should be executed");
     let names: Vec<String> = results
-        .into_iter()
+        .iter()
         .map(|result| {
             let document = Document::from_cbor(result.as_slice(), None, None)
                 .expect("we should be able to deserialize the cbor");
@@ -157,7 +157,7 @@ fn test_query_many() {
         .execute_no_proof(&mut drive.grove, None)
         .expect("proof should be executed");
     let names: Vec<String> = results
-        .into_iter()
+        .iter()
         .map(|result| {
             let document = Document::from_cbor(result.as_slice(), None, None)
                 .expect("we should be able to deserialize the cbor");
@@ -202,7 +202,7 @@ fn test_query_many() {
         .execute_no_proof(&mut drive.grove, None)
         .expect("proof should be executed");
     let names: Vec<String> = results
-        .into_iter()
+        .iter()
         .map(|result| {
             let document = Document::from_cbor(result.as_slice(), None, None)
                 .expect("we should be able to deserialize the cbor");
@@ -275,7 +275,7 @@ fn test_query_many() {
 
     // Let's first get the ID of Kevina
     let ids: HashMap<String, Vec<u8>> = results
-        .into_iter()
+        .iter()
         .map(|result| {
             let document = Document::from_cbor(result.as_slice(), None, None)
                 .expect("we should be able to deserialize the cbor");
@@ -320,7 +320,7 @@ fn test_query_many() {
     assert_eq!(results.len(), 3);
 
     let reduced_names_after: Vec<String> = results
-        .into_iter()
+        .iter()
         .map(|result| {
             let document = Document::from_cbor(result.as_slice(), None, None)
                 .expect("we should be able to deserialize the cbor");
@@ -369,7 +369,7 @@ fn test_query_many() {
     assert_eq!(results.len(), 2);
 
     let reduced_names_after: Vec<String> = results
-        .into_iter()
+        .iter()
         .map(|result| {
             let document = Document::from_cbor(result.as_slice(), None, None)
                 .expect("we should be able to deserialize the cbor");
@@ -410,7 +410,7 @@ fn test_query_many() {
         .execute_no_proof(&mut drive.grove, None)
         .expect("proof should be executed");
     let names: Vec<String> = results
-        .into_iter()
+        .iter()
         .map(|result| {
             let document = Document::from_cbor(result.as_slice(), None, None)
                 .expect("we should be able to deserialize the cbor");
@@ -525,7 +525,7 @@ fn test_query_many() {
     assert_eq!(names, expected_names_over_48);
 
     let ages: HashMap<String, u8> = results
-        .into_iter()
+        .iter()
         .map(|result| {
             let document = Document::from_cbor(result.as_slice(), None, None)
                 .expect("we should be able to deserialize the cbor");

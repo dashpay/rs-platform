@@ -46,5 +46,5 @@ pub fn value_to_cbor(value: serde_json::Value, protocol_version: Option<u32>) ->
 pub fn text_file_strings(path: impl AsRef<Path>) -> Vec<String> {
     let file = File::open(path).expect("file not found");
     let reader = io::BufReader::new(file).lines();
-    reader.into_iter().map(|a| a.unwrap()).collect()
+    reader.map(|a| a.unwrap()).collect()
 }
