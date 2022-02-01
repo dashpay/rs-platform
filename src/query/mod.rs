@@ -843,7 +843,7 @@ impl<'a> DriveQuery<'a> {
 
         dbg!(order_by);
 
-        // Where clauses + document type
+        // document type
         // This will be part of the select section
         // Query has body which is of type SetExpr
         // SetExpr contains Select(Box<Select>), Query(Box<Query>)
@@ -868,6 +868,74 @@ impl<'a> DriveQuery<'a> {
 
         let document_type = contract.document_types.get(document_type_name).ok_or_else(|| Error::InvalidQuery("document type not found in contract"))?;
         dbg!(document_type);
+
+        // Where clauses
+        // This is under selection, not an array but a tree
+        // it's a single binaryOp which is an expression
+        // a binaryOp contains left (expr), op (binaryOperator) and right expr
+        // expr can be another binaryOp or the other sets of variants...
+        // where clauses are arrays, we need to go from a tree to an array
+        // top level and mean new where clauses
+
+        // Restrictions
+        // where clauses we currently support are binary operations
+        // i.e. [<fieldname>, <operator>, <value>]
+        // [and] is used to separate where clauses
+        // hence once [and] is encountered [left] and [right] must be binary operations
+        // e.g. firstname = wisdom and lastname = ogwu
+        // if op is not [and] then [left] or [right] must not be a binary operation
+
+        // if binary operation, check if op is and
+        // if op is and, then left and right must be binary operations also
+        // TODO: Initialize with capacity
+        // Recursive function
+        // base case op is not and, build where clause
+        // op is and run function for left and right
+        let mut where_clauses: Vec<WhereClause> = Vec::new();
+        let selection_tree = select.selection.as_ref().ok_or_else(|| Error::InvalidQuery("No selection clause"))?;
+
+        fn build_where_clause(binary_operation: &ast::Expr, where_clauses: &mut Vec<WhereClause>) -> Result<(), Error>{
+            match &binary_operation{
+                ast::Expr::BinaryOp {left, op, right} => {
+                    if *op == ast::BinaryOperator::And {
+                        build_where_clause(&*left, where_clauses)?;
+                        build_where_clause(&*right, where_clauses)?;
+                    } else if *op == ast::BinaryOperator::Eq {
+                        let left_expr = &**left;
+                        let right_expr = &**right;
+                        dbg!(left_expr);
+                        dbg!(right_expr);
+                        match left_expr {
+                            ast::Expr::Identifier(ident) => {
+                                match right_expr {
+                                    ast::Expr::Value(value) => {
+                                        where_clauses.push(WhereClause{
+                                            field: ident.value.clone(),
+                                            operator: WhereOperator::Equal,
+                                            // value: Value::Text(String::from("nice")),
+                                            value: Value::Text(value.to_string()),
+                                        })
+                                    },
+                                    _ => panic!()
+                                }
+                            },
+                            _ => panic!()
+                        }
+                    }
+                    Ok(())
+                },
+                _ => Err(Error::CorruptedData(String::from("Issue parsing sql: invalid selection format")))
+            }
+        }
+        build_where_clause(selection_tree, &mut where_clauses);
+        dbg!(where_clauses);
+        // match selection_tree {
+        //     ast::Expr::BinaryOp {left, op, right} => {
+        //        // if op != and
+        //     },
+        //     _ => None
+        // }
+
 
 
         Ok(String::from("okay"))
@@ -1161,7 +1229,8 @@ mod tests {
             "family",
             "tests/supporting_files/contract/family/family-contract.json",
         );
-        let sql_string = "select * from person where firstname = Sam and age > 30 order by firstname ASC, age DESC limit 30";
+        // let sql_string = "select * from person where firstname = Sam and age > 30 order by firstname ASC, age DESC limit 30";
+        let sql_string = "select * from person where firstname = 'Sam' order by firstname ASC, age DESC limit 30";
         let drive_query = DriveQuery::from_sql_expr(sql_string, &contract);
     }
 }
