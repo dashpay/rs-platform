@@ -866,6 +866,9 @@ impl<'a> DriveQuery<'a> {
         }.ok_or_else(|| Error::CorruptedData(String::from("Issue parsing sql: invalid from value")))?;
         dbg!(document_type_name);
 
+        let document_type = contract.document_types.get(document_type_name).ok_or_else(|| Error::InvalidQuery("document type not found in contract"))?;
+        dbg!(document_type);
+
 
         Ok(String::from("okay"))
     }
