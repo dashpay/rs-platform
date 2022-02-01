@@ -56,7 +56,7 @@ pub fn setup(count: u32, seed: u64) -> (Drive, Contract) {
 
     let storage = drive.grove.storage();
     let db_transaction = storage.transaction();
-    drive.grove.start_transaction();
+    drive.grove.start_transaction().expect("start_transaction shouldn't fail");
 
     let people = Person::random_people(count, seed);
     for person in people {
@@ -77,7 +77,7 @@ pub fn setup(count: u32, seed: u64) -> (Drive, Contract) {
             )
             .expect("document should be inserted");
     }
-    drive.grove.commit_transaction(db_transaction);
+    drive.grove.commit_transaction(db_transaction).expect("commit_transaction shouldn't fail");
     (drive, contract)
 }
 
