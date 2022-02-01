@@ -12,7 +12,7 @@ use grovedb::{Element, Error, GroveDb, PathQuery, Query, SizedQuery};
 use indexmap::IndexMap;
 use std::collections::HashMap;
 use sqlparser::ast;
-use sqlparser::ast::Statement;
+use sqlparser::ast::{OrderByExpr, Statement};
 use sqlparser::ast::Value::Number;
 use sqlparser::dialect::GenericDialect;
 use sqlparser::parser::Parser;
@@ -820,7 +820,7 @@ impl<'a> DriveQuery<'a> {
         }.ok_or_else(|| Error::CorruptedData(String::from("Issue parsing sql")))?;
         // Now we can access the shit
 
-        let limit: u16 = if let Some(limit_expr) = &query.limit {
+        let limit= if let Some(limit_expr) = &query.limit {
             match limit_expr {
                 ast::Expr::Value(Number(num_string, _)) => num_string.parse::<u16>().ok(),
                 _ => None
@@ -830,6 +830,21 @@ impl<'a> DriveQuery<'a> {
         };
 
         dbg!(limit);
+
+        // Extract order by
+        // query.orderby is a vec of OrderByExpr
+        // OrderByExpr contains an Expr and an optional bool that signifies if ascending
+        // why optional??
+        let order_by: IndexMap<String, OrderClause> = query.order_by.iter().map(|order_exp: &OrderByExpr| {
+            let ascending = order_exp.asc.is_none() || order_exp.asc.unwrap();
+            let field = order_exp.expr.to_string();
+            (field.clone(), OrderClause{
+                field,
+                ascending
+            })
+        }).collect::<IndexMap<String, OrderClause>>();
+
+        dbg!(order_by);
 
         Ok(String::from("okay"))
     }
