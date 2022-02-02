@@ -883,8 +883,6 @@ impl<'a> DriveQuery<'a> {
             defaults::DEFAULT_QUERY_LIMIT
         };
 
-        dbg!(limit);
-
         let order_by: IndexMap<String, OrderClause> = query
             .order_by
             .iter()
@@ -894,8 +892,6 @@ impl<'a> DriveQuery<'a> {
                 (field.clone(), OrderClause { field, ascending })
             })
             .collect::<IndexMap<String, OrderClause>>();
-
-        dbg!(&order_by);
 
         // Grab the select section of the query
         let select: &Select = match &query.body {
@@ -928,13 +924,11 @@ impl<'a> DriveQuery<'a> {
         .ok_or_else(|| {
             Error::CorruptedData(String::from("Issue parsing sql: invalid from value"))
         })?;
-        dbg!(document_type_name);
 
         let document_type = contract
             .document_types
             .get(document_type_name)
             .ok_or_else(|| Error::InvalidQuery("document type not found in contract"))?;
-        dbg!(&document_type);
 
         // Restrictions
         // only binary where clauses are supported
@@ -1032,7 +1026,6 @@ impl<'a> DriveQuery<'a> {
         if let Some(selection_tree) = selection_tree {
             build_where_clause(selection_tree, &mut all_where_clauses)?;
         }
-        dbg!(&all_where_clauses);
 
         let (range_clause, in_clause, equal_clauses) = Self::extract_clauses(all_where_clauses)?;
 
@@ -1040,7 +1033,7 @@ impl<'a> DriveQuery<'a> {
         let start_at_included = false;
         let start_at: Option<Vec<u8>> = start_at_option.and_then(bytes_for_system_value);
 
-        let dquery = DriveQuery {
+        Ok(DriveQuery {
             contract,
             document_type,
             equal_clauses,
@@ -1051,11 +1044,7 @@ impl<'a> DriveQuery<'a> {
             order_by,
             start_at,
             start_at_included,
-        };
-
-        dbg!(&dquery);
-
-        Ok(dquery)
+        })
     }
 
     fn extract_clauses(
