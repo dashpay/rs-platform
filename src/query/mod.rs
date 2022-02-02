@@ -1013,7 +1013,16 @@ impl<'a> DriveQuery<'a> {
         Ok(dquery)
     }
 
-    fn extract_clauses(all_where_clauses: Vec<WhereClause>) -> Result<(Option<WhereClause>, Option<WhereClause>, HashMap<String, WhereClause>), Error> {
+    fn extract_clauses(
+        all_where_clauses: Vec<WhereClause>,
+    ) -> Result<
+        (
+            Option<WhereClause>,
+            Option<WhereClause>,
+            HashMap<String, WhereClause>,
+        ),
+        Error,
+    > {
         let range_clause = WhereClause::group_range_clauses(&all_where_clauses)?;
 
         let equal_clauses_array = all_where_clauses
