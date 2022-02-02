@@ -131,7 +131,7 @@ fn sql_value_to_cbor(sql_value: ast::Value) -> Option<CborValue> {
                     None
                 }
             }
-        },
+        }
         ast::Value::DoubleQuotedString(s) => Some(CborValue::Text(s)),
         ast::Value::SingleQuotedString(s) => Some(CborValue::Text(s)),
         ast::Value::HexStringLiteral(s) => Some(CborValue::Text(s)),
@@ -906,7 +906,12 @@ impl<'a> DriveQuery<'a> {
         // Not sure we care about projection for now
         // Get the document type from the 'from' section
         // TODO: use get rather than indexing
-        let document_type_name = match &select.from.get(0).ok_or_else(|| Error::InvalidQuery("Invalid query: missing from section"))?.relation {
+        let document_type_name = match &select
+            .from
+            .get(0)
+            .ok_or_else(|| Error::InvalidQuery("Invalid query: missing from section"))?
+            .relation
+        {
             Table {
                 name,
                 alias,
@@ -974,7 +979,9 @@ impl<'a> DriveQuery<'a> {
                                 ast::Expr::Value(value) => where_clauses.push(WhereClause {
                                     field: ident.value.clone(),
                                     operator: where_operator,
-                                    value: sql_value_to_cbor(value.clone()).ok_or_else(|| Error::InvalidQuery("Invalid query: unexpected value type"))?,
+                                    value: sql_value_to_cbor(value.clone()).ok_or_else(|| {
+                                        Error::InvalidQuery("Invalid query: unexpected value type")
+                                    })?,
                                 }),
                                 _ => return Err(Error::InvalidQuery(
                                     "Invalid query: where clause should have field name and value",
