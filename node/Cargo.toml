@@ -13,12 +13,14 @@ crate-type = ["cdylib"]
 rs-drive = { path = "../drive" }
 
 [dependencies.grovedb]
-git = "https://github.com/dashevo/grovedb"
-branch = "master"
+# git = "https://github.com/dashevo/grovedb"
+# branch = "master"
+path = "../../grovedb/grovedb"
 
-[dependencies.node-grove]
-git = "https://github.com/dashevo/grovedb"
-branch = "master"
+[dependencies.node-grove-common]
+path = "../../grovedb/node-grove-common"
+# git = "https://github.com/dashevo/grovedb"
+# branch = "master"
 
 [dependencies.neon]
 version = "0.9"

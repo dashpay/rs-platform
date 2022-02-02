@@ -1,8 +1,9 @@
 mod converter;
 
-use std::{option::Option::None, path::Path, sync::mpsc, thread};
+use std::{option::Option::None, path::Path, sync::{Arc, RwLock, mpsc}, thread};
 
-use grovedb::{PrefixedRocksDbStorage, Storage};
+use node_grove_common::GroveDbWrapper;
+use grovedb::{GroveDb, PrefixedRocksDbStorage, Storage};
 use neon::prelude::*;
 use rs_drive::drive::Drive;
 
@@ -25,6 +26,7 @@ enum DriveMessage {
 
 struct DriveWrapper {
     tx: mpsc::Sender<DriveMessage>,
+    grove_db: Arc<RwLock<GroveDb>>,
 }
 
 // Internal wrapper logic. Needed to avoid issues with passing threads to
@@ -49,14 +51,15 @@ impl DriveWrapper {
         // dropped.
         let channel = cx.channel();
 
+        let grove_db = Arc::new(RwLock::new(GroveDb::open(path_string).unwrap()));
+        let grove_db_cloned = grove_db.clone();
         // Spawn a thread for processing database queries
         // This will not block the JavaScript main thread and will continue executing
         // concurrently.
         thread::spawn(move || {
-            let path = Path::new(&path_string);
             // Open a connection to groveDb, this will be moved to a separate thread
             // TODO: think how to pass this error to JS
-            let mut drive = Drive::open(path).unwrap();
+            let mut drive = Drive::open_with_grove_db(grove_db_cloned);
 
             let mut transaction: Option<<PrefixedRocksDbStorage as Storage>::DBTransaction<'_>> =
                 None;
@@ -84,7 +87,7 @@ impl DriveWrapper {
             }
         });
 
-        Ok(Self { tx })
+        Ok(Self { tx, grove_db })
     }
 
     // Idiomatic rust would take an owned `self` to prevent use after close
@@ -123,6 +126,14 @@ impl DriveWrapper {
             DriveWrapper::new(&mut cx).or_else(|err| cx.throw_error(err.to_string()))?;
 
         Ok(cx.boxed(drive_wrapper))
+    }
+
+    fn js_get_grove_db(mut cx: FunctionContext) -> JsResult<JsBox<GroveDbWrapper>> {
+        let drive = cx
+            .this()
+            .downcast_or_throw::<JsBox<DriveWrapper>, _>(&mut cx)?;
+        let grovedb_wrapper = GroveDbWrapper::new_open_existing(&mut cx, drive.grove_db.clone())?;
+        Ok(cx.boxed(grovedb_wrapper))
     }
 
     /// Sends a message to the DB thread to stop the thread and dispose the
@@ -394,6 +405,6 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("driveCreateDocument", DriveWrapper::js_add_document_for_contract_cbor)?;
     cx.export_function("driveUpdateDocument", DriveWrapper::js_update_document_for_contract_cbor)?;
     cx.export_function("driveDeleteDocument", DriveWrapper::js_delete_document_for_contract_cbor)?;
-
+    cx.export_function("driveGetGroveDb", DriveWrapper::js_get_grove_db)?;
     Ok(())
 }

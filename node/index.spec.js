@@ -16,7 +16,7 @@ describe('Drive', () => {
 
   beforeEach(() => {
     drive = new Drive(TEST_DATA_PATH);
-
+    console.log("DRIVE", drive.drive);
     dataContract = getDataContractFixture();
     documents = getDocumentsFixture(dataContract);
   });
@@ -25,6 +25,35 @@ describe('Drive', () => {
     await drive.close();
 
     fs.rmSync(TEST_DATA_PATH, { recursive: true });
+  });
+
+
+  it('should be able to use GroveDb bindings', async () => {
+    const groveDb = drive.getGroveDB();
+    console.log(groveDb.db);
+    const treeKey = Buffer.from('test_tree');
+    const itemKey = Buffer.from('test_key');
+    const itemValue = Buffer.from('very nice test value');
+    const rootTreePath = [];
+    const itemTreePath = [treeKey];
+
+    await groveDb.insert(
+      rootTreePath,
+      treeKey,
+      { type: 'tree', value: Buffer.alloc(32) },
+    );
+
+    // Inserting an item into the subtree
+    await groveDb.insert(
+      itemTreePath,
+      itemKey,
+      { type: 'item', value: itemValue },
+    );
+
+    const element = await groveDb.get(itemTreePath, itemKey);
+
+    expect(element.type).to.be.equal('item');
+    expect(element.value).to.deep.equal(itemValue);
   });
 
   describe('#createRootTree', () => {
@@ -135,7 +164,6 @@ describe('Drive', () => {
         expect(result).to.equals(0);
       });
     });
-
     context('with indices', () => {
       it('should create a document', async () => {
         const documentWithIndices = documents[3];

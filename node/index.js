@@ -1,6 +1,6 @@
 const { promisify } = require('util');
 const { join: pathJoin } = require('path');
-// const GroveDB = require('@dashevo/grovedb');
+const GroveDB = require('@dashevo/grovedb');
 
 // This file is crated when run `npm run build`. The actual source file that
 // exports those functions is ./src/lib.rs
@@ -12,15 +12,16 @@ const {
   driveCreateDocument,
   driveUpdateDocument,
   driveDeleteDocument,
+  driveGetGroveDb,
 } = require('neon-load-or-build')({
   dir: pathJoin(__dirname, '..'),
 });
 
-// function GroveDBFromDrive(groveDB) {
-//   this.db = groveDB;
-// }
-//
-// GroveDBFromDrive.prototype = GroveDB.prototype;
+function GroveDBFromDrive(groveDB) {
+  this.db = groveDB;
+}
+
+GroveDBFromDrive.prototype = GroveDB.prototype;
 
 // Convert the Drive methods from using callbacks to returning promises
 const driveCloseAsync = promisify(driveClose);
@@ -39,14 +40,18 @@ class Drive {
     this.drive = driveOpen(dbPath);
   }
 
-  // /**
-  //  * @returns {GroveDB|GroveDBFromDrive}
-  //  */
-  // getGroveDB() {
-  //   const groveDBWrapper = driveGetGroveDB.call(this.drive);
-  //
-  //   return new GroveDBFromDrive(groveDBWrapper);
+  // getGroveDb() {
+  //   return GroveDB.withExisting(driveGetGroveDb.call(this.drive));
   // }
+
+  /**
+   * @returns {GroveDB|GroveDBFromDrive}
+   */
+  getGroveDB() {
+    const groveDBWrapper = driveGetGroveDb.call(this.drive);
+
+    return new GroveDBFromDrive(groveDBWrapper);
+  }
 
   /**
    * @returns {Promise<void>}
