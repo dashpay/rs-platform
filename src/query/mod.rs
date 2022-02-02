@@ -17,7 +17,7 @@ use sqlparser::parser::Parser;
 use std::collections::HashMap;
 use storage::rocksdb_storage::OptimisticTransactionDBTransaction;
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum WhereOperator {
     Equal,
     GreaterThan,
@@ -903,9 +903,8 @@ impl<'a> DriveQuery<'a> {
             _ => None,
         }
         .ok_or_else(|| Error::CorruptedData(String::from("Issue parsing sql")))?;
-        // Not sure we care about projection for now
+
         // Get the document type from the 'from' section
-        // TODO: use get rather than indexing
         let document_type_name = match &select
             .from
             .get(0)
@@ -937,14 +936,6 @@ impl<'a> DriveQuery<'a> {
             .ok_or_else(|| Error::InvalidQuery("document type not found in contract"))?;
         dbg!(&document_type);
 
-        // Where clauses
-        // This is under selection, not an array but a tree
-        // it's a single binaryOp which is an expression
-        // a binaryOp contains left (expr), op (binaryOperator) and right expr
-        // expr can be another binaryOp or the other sets of variants...
-        // where clauses are arrays, we need to go from a tree to an array
-        // top level and mean new where clauses
-
         // Restrictions
         // where clauses we currently support are binary operations
         // i.e. [<fieldname>, <operator>, <value>]
@@ -953,12 +944,6 @@ impl<'a> DriveQuery<'a> {
         // e.g. firstname = wisdom and lastname = ogwu
         // if op is not [and] then [left] or [right] must not be a binary operation
 
-        // if binary operation, check if op is and
-        // if op is and, then left and right must be binary operations also
-        // TODO: Initialize with capacity
-        // Recursive function
-        // base case op is not and, build where clause
-        // op is and run function for left and right
         let mut all_where_clauses: Vec<WhereClause> = Vec::new();
         let selection_tree = select.selection.as_ref();
 
@@ -972,42 +957,102 @@ impl<'a> DriveQuery<'a> {
                         build_where_clause(&*left, where_clauses)?;
                         build_where_clause(&*right, where_clauses)?;
                     } else {
-                        let where_operator = where_operator_from_sql_operator(op.clone())
+                        let mut where_operator = where_operator_from_sql_operator(op.clone())
                             .ok_or(Error::InvalidQuery("Unknown operator"))?;
-                        match &**left {
-                            ast::Expr::Identifier(ident) => match &**right {
-                                ast::Expr::Value(value) => where_clauses.push(WhereClause {
-                                    field: ident.value.clone(),
-                                    operator: where_operator,
-                                    value: sql_value_to_cbor(value.clone()).ok_or_else(|| {
-                                        Error::InvalidQuery("Invalid query: unexpected value type")
-                                    })?,
-                                }),
-                                _ => return Err(Error::InvalidQuery(
-                                    "Invalid query: where clause should have field name and value",
-                                )),
-                            },
-                            ast::Expr::Value(value) => {
-                                match &**right {
-                                    ast::Expr::Identifier(ident) => {
-                                        // check if the operator can be flipped
-                                        let flipped_operator = where_operator.flip()?;
-                                        where_clauses.push(WhereClause{
-                                            field: ident.value.clone(),
-                                            operator: flipped_operator,
-                                            // value: Value::Text(value.to_string().replace("'", "")),
-                                            value: sql_value_to_cbor(value.clone()).ok_or_else(|| Error::InvalidQuery("Invalid query: unexpected value type"))?,
-                                        })
-                                    }
-                                    _ => return Err(Error::InvalidQuery("Invalid query: where clause should have field name and value"))
-                                }
-                            }
-                            _ => {
-                                return Err(Error::InvalidQuery(
-                                    "Invalid query: where clause should have field name and value",
-                                ))
-                            }
+
+                        let mut identifier;
+                        let mut value_expr;
+
+                        if matches!(&**left, ast::Expr::Identifier(_))
+                            && matches!(&**right, ast::Expr::Value(_))
+                        {
+                            identifier = &**left;
+                            value_expr = &**right;
+                        } else if matches!(&**right, ast::Expr::Identifier(_))
+                            && matches!(&**left, ast::Expr::Value(_))
+                        {
+                            identifier = &**right;
+                            value_expr = &**left;
+                            where_operator = where_operator.flip()?;
+                        } else {
+                            return Err(Error::InvalidQuery(
+                                "Invalid query: where clause should have field name and value",
+                            ));
                         }
+
+                        let field_name = if let ast::Expr::Identifier(ident) = identifier {
+                            ident.value.clone()
+                        } else {
+                            panic!("unreachable: confirmed it's identifier variant");
+                        };
+
+                        let value = if let ast::Expr::Value(value) = value_expr {
+                            let cbor_val = sql_value_to_cbor(value.clone()).ok_or_else(|| {
+                                Error::InvalidQuery("Invalid query: unexpected value type")
+                            })?;
+                            if where_operator == StartsWith {
+                                // make sure the value is of the right format
+                                let inner_text = cbor_val.as_text().ok_or_else(|| {
+                                    Error::InvalidQuery("Invalid query: startsWith takes text")
+                                })?;
+                                let match_locations: Vec<_> =
+                                    inner_text.match_indices("%").collect();
+                                if match_locations.len() == 1
+                                    && match_locations[0].0 == inner_text.len() - 1
+                                {
+                                    CborValue::Text(String::from(
+                                        &inner_text[..(inner_text.len() - 1)],
+                                    ))
+                                } else {
+                                    return Err(Error::InvalidQuery("Invalid query: like can only be used to represent startswith"));
+                                }
+                            } else {
+                                cbor_val
+                            }
+                        } else {
+                            panic!("unreachable: confirmed it's value variant");
+                        };
+
+                        where_clauses.push(WhereClause {
+                            field: field_name,
+                            operator: where_operator,
+                            value,
+                        });
+
+                        // match &**left {
+                        //     ast::Expr::Identifier(ident) => match &**right {
+                        //         ast::Expr::Value(value) => where_clauses.push(WhereClause {
+                        //             field: ident.value.clone(),
+                        //             operator: where_operator,
+                        //             value: sql_value_to_cbor(value.clone()).ok_or_else(|| {
+                        //                 Error::InvalidQuery("Invalid query: unexpected value type")
+                        //             })?,
+                        //         }),
+                        //         _ => return Err(Error::InvalidQuery(
+                        //             "Invalid query: where clause should have field name and value",
+                        //         )),
+                        //     },
+                        //     ast::Expr::Value(value) => {
+                        //         match &**right {
+                        //             ast::Expr::Identifier(ident) => {
+                        //                 // check if the operator can be flipped
+                        //                 let flipped_operator = where_operator.flip()?;
+                        //                 where_clauses.push(WhereClause{
+                        //                     field: ident.value.clone(),
+                        //                     operator: flipped_operator,
+                        //                     // value: Value::Text(value.to_string().replace("'", "")),
+                        //                     value: sql_value_to_cbor(value.clone()).ok_or_else(|| Error::InvalidQuery("Invalid query: unexpected value type"))?,
+                        //                 })
+                        //             }
+                        //             _ => return Err(Error::InvalidQuery("Invalid query: where clause should have field name and value"))
+                        //         }
+                        //     }
+                        //     _ => {
+                        //         return Err(Error::InvalidQuery(
+                        //             "Invalid query: where clause should have field name and value",
+                        //         ))
+                        //     }
+                        // }
                     }
                     Ok(())
                 }
