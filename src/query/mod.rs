@@ -5,7 +5,7 @@ use crate::query::WhereOperator::{
     Between, BetweenExcludeBounds, BetweenExcludeLeft, BetweenExcludeRight, Equal, GreaterThan,
     GreaterThanOrEquals, In, LessThan, LessThanOrEquals, StartsWith,
 };
-use ciborium::value::{Value as CborValue, Value};
+use ciborium::value::{Integer, Value as CborValue, Value};
 use grovedb::{Element, Error, GroveDb, PathQuery, Query, SizedQuery};
 use indexmap::IndexMap;
 use sqlparser::ast;
@@ -105,6 +105,37 @@ fn where_operator_from_sql_operator(sql_operator: ast::BinaryOperator) -> Option
         ast::BinaryOperator::Lt => Some(WhereOperator::LessThan),
         ast::BinaryOperator::LtEq => Some(WhereOperator::LessThanOrEquals),
         ast::BinaryOperator::Like => Some(WhereOperator::StartsWith),
+        _ => None,
+    }
+}
+
+fn sql_value_to_cbor(sql_value: ast::Value) -> Option<CborValue> {
+    match sql_value {
+        ast::Value::Boolean(bool) => Some(CborValue::Bool(bool)),
+        ast::Value::Number(num, _) => {
+            let number_as_string = num as String;
+            if number_as_string.contains(".") {
+                // Float
+                let num_as_float = number_as_string.parse::<f64>().ok();
+                if let Some(num) = num_as_float {
+                    Some(CborValue::Float(num))
+                } else {
+                    None
+                }
+            } else {
+                // Integer
+                let num_as_int = number_as_string.parse::<i64>().ok();
+                if let Some(num) = num_as_int {
+                    Some(CborValue::Integer(Integer::from(num)))
+                } else {
+                    None
+                }
+            }
+        },
+        ast::Value::DoubleQuotedString(s) => Some(CborValue::Text(s)),
+        ast::Value::SingleQuotedString(s) => Some(CborValue::Text(s)),
+        ast::Value::HexStringLiteral(s) => Some(CborValue::Text(s)),
+        ast::Value::NationalStringLiteral(s) => Some(CborValue::Text(s)),
         _ => None,
     }
 }
@@ -828,18 +859,17 @@ impl<'a> DriveQuery<'a> {
         let dialect: GenericDialect = sqlparser::dialect::GenericDialect {};
         let statements: Vec<Statement> = Parser::parse_sql(&dialect, sql_string)
             .map_err(|_| Error::CorruptedData(String::from("Issue parsing sql")))?;
+
         // Should ideally iterate over each statement
         let first_statement = statements
             .get(0)
             .ok_or_else(|| Error::CorruptedData(String::from("Issue parsing SQL")))?;
-        // Statement is an enum, has a Query(Box<Query)) where second query is an unbounded struct
-        // Box<Query> allocates the query to the heap and returns the reference
+
         let query: &ast::Query = match first_statement {
             ast::Statement::Query(query_struct) => Some(query_struct),
             _ => None,
         }
         .ok_or_else(|| Error::CorruptedData(String::from("Issue parsing sql")))?;
-        // Now we can access the shit
 
         let limit = if let Some(limit_expr) = &query.limit {
             match limit_expr {
@@ -867,10 +897,7 @@ impl<'a> DriveQuery<'a> {
 
         dbg!(&order_by);
 
-        // document type
-        // This will be part of the select section
-        // Query has body which is of type SetExpr
-        // SetExpr contains Select(Box<Select>), Query(Box<Query>)
+        // Grab the select section of the query
         let select: &Select = match &query.body {
             ast::SetExpr::Select(select) => Some(select),
             _ => None,
@@ -879,7 +906,7 @@ impl<'a> DriveQuery<'a> {
         // Not sure we care about projection for now
         // Get the document type from the 'from' section
         // TODO: use get rather than indexing
-        let document_type_name = match &select.from[0].relation {
+        let document_type_name = match &select.from.get(0).ok_or_else(|| Error::InvalidQuery("Invalid query: missing from section"))?.relation {
             Table {
                 name,
                 alias,
@@ -929,7 +956,6 @@ impl<'a> DriveQuery<'a> {
         // op is and run function for left and right
         let mut all_where_clauses: Vec<WhereClause> = Vec::new();
         let selection_tree = select.selection.as_ref();
-        // .ok_or_else(|| Error::InvalidQuery("No selection clause"))?;
 
         fn build_where_clause(
             binary_operation: &ast::Expr,
@@ -948,7 +974,7 @@ impl<'a> DriveQuery<'a> {
                                 ast::Expr::Value(value) => where_clauses.push(WhereClause {
                                     field: ident.value.clone(),
                                     operator: where_operator,
-                                    value: Value::Text(value.to_string().replace("'", "")),
+                                    value: sql_value_to_cbor(value.clone()).ok_or_else(|| Error::InvalidQuery("Invalid query: unexpected value type"))?,
                                 }),
                                 _ => return Err(Error::InvalidQuery(
                                     "Invalid query: where clause should have field name and value",
@@ -962,7 +988,8 @@ impl<'a> DriveQuery<'a> {
                                         where_clauses.push(WhereClause{
                                             field: ident.value.clone(),
                                             operator: flipped_operator,
-                                            value: Value::Text(value.to_string().replace("'", "")),
+                                            // value: Value::Text(value.to_string().replace("'", "")),
+                                            value: sql_value_to_cbor(value.clone()).ok_or_else(|| Error::InvalidQuery("Invalid query: unexpected value type"))?,
                                         })
                                     }
                                     _ => return Err(Error::InvalidQuery("Invalid query: where clause should have field name and value"))

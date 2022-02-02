@@ -559,9 +559,10 @@ fn test_sql_query() {
     let (mut drive, contract) = setup(10, 73509);
     // let sql_string = "select * from person where firstName > 'Chris' and firstName <= 'Noellyn'  order by firstName ASC";
     // let sql_string = "select * from person where 'Chris' <= firstName order by firstName ASC";
-    let sql_string =
-        "select * from person where firstName >= 'Chris' order by firstName ASC limit 2";
+    // let sql_string =
+        // "select * from person where firstName >= 'Chris' order by firstName ASC limit 2";
     // let sql_string = "select * from person";
+    let sql_string = "select * from person where age > 50 order by age asc";
     let drive_query = DriveQuery::from_sql_expr(sql_string, &contract).unwrap();
     let (results, _) = drive_query
         .execute_no_proof(&mut drive.grove, None)
