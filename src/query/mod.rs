@@ -990,7 +990,7 @@ impl<'a> DriveQuery<'a> {
                                             value: Value::Text(value.to_string().replace("'", "")),
                                         })
                                     }
-                                    _ => panic!()
+                                    _ => return Err(Error::InvalidQuery("Invalid query: where clause should have field name and value"))
                                 }
                             },
                             ast::Expr::Value(value) => {
@@ -1004,10 +1004,10 @@ impl<'a> DriveQuery<'a> {
                                             value: Value::Text(value.to_string().replace("'", "")),
                                         })
                                     }
-                                    _ => panic!()
+                                    _ => return Err(Error::InvalidQuery("Invalid query: where clause should have field name and value"))
                                 }
                             }
-                            _ => panic!()
+                            _ => return Err(Error::InvalidQuery("Invalid query: where clause should have field name and value"))
                         }
                     }
                     Ok(())
