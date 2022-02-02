@@ -964,8 +964,8 @@ impl<'a> DriveQuery<'a> {
         let mut all_where_clauses: Vec<WhereClause> = Vec::new();
         let selection_tree = select
             .selection
-            .as_ref()
-            .ok_or_else(|| Error::InvalidQuery("No selection clause"))?;
+            .as_ref();
+            // .ok_or_else(|| Error::InvalidQuery("No selection clause"))?;
 
         fn build_where_clause(
             binary_operation: &ast::Expr,
@@ -977,6 +977,8 @@ impl<'a> DriveQuery<'a> {
                         build_where_clause(&*left, where_clauses)?;
                         build_where_clause(&*right, where_clauses)?;
                     } else {
+                        // At this point it should be only identifiers and values
+                        //
                         let where_operator = where_operator_from_sql_operator(op.clone()).ok_or(Error::InvalidQuery("Unknown operator"))?;
                         match &**left {
                             ast::Expr::Identifier(ident) => {
@@ -1015,7 +1017,9 @@ impl<'a> DriveQuery<'a> {
                 ))),
             }
         }
-        build_where_clause(selection_tree, &mut all_where_clauses)?;
+        if let Some(selection_tree) = selection_tree {
+            build_where_clause(selection_tree, &mut all_where_clauses)?;
+        }
         dbg!(&all_where_clauses);
 
         let range_clause = WhereClause::group_range_clauses(&all_where_clauses)?;
