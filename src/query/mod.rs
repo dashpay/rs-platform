@@ -32,6 +32,40 @@ pub enum WhereOperator {
     StartsWith,
 }
 
+impl WhereOperator {
+    pub fn allows_flip(&self) -> bool {
+        match self {
+            Equal => true,
+            GreaterThan => true,
+            GreaterThanOrEquals => true,
+            LessThan => true,
+            LessThanOrEquals => true,
+            Between => false,
+            BetweenExcludeBounds => false,
+            BetweenExcludeLeft => false,
+            BetweenExcludeRight => false,
+            In => false,
+            StartsWith => false,
+        }
+    }
+
+    pub fn flip(&self) -> Result<WhereOperator, Error> {
+        match self {
+            Equal => Ok(Equal),
+            GreaterThan => Ok(LessThan),
+            GreaterThanOrEquals => Ok(LessThanOrEquals),
+            LessThan => Ok(GreaterThan),
+            LessThanOrEquals => Ok(GreaterThanOrEquals),
+            Between => Err(Error::InvalidQuery("Between clause order invalid")),
+            BetweenExcludeBounds => Err(Error::InvalidQuery("Between clause order invalid")),
+            BetweenExcludeLeft => Err(Error::InvalidQuery("Between clause order invalid")),
+            BetweenExcludeRight => Err(Error::InvalidQuery("Between clause order invalid")),
+            In => Err(Error::InvalidQuery("In clause order invalid")),
+            StartsWith => Err(Error::InvalidQuery("Startswith order invalid")),
+        }
+    }
+}
+
 fn operator_from_string(string: &str) -> Option<WhereOperator> {
     match string {
         "=" => Some(Equal),
@@ -943,13 +977,28 @@ impl<'a> DriveQuery<'a> {
                         build_where_clause(&*left, where_clauses)?;
                         build_where_clause(&*right, where_clauses)?;
                     } else {
+                        let where_operator = where_operator_from_sql_operator(op.clone()).ok_or(Error::InvalidQuery("Unknown operator"))?;
                         match &**left {
                             ast::Expr::Identifier(ident) => {
                                 match &**right {
                                     ast::Expr::Value(value) => {
                                         where_clauses.push(WhereClause{
                                             field: ident.value.clone(),
-                                            operator: where_operator_from_sql_operator(op.clone()).unwrap(),
+                                            operator: where_operator,
+                                            value: Value::Text(value.to_string().replace("'", "")),
+                                        })
+                                    }
+                                    _ => panic!()
+                                }
+                            },
+                            ast::Expr::Value(value) => {
+                                match &**right {
+                                    ast::Expr::Identifier(ident) => {
+                                        // check if the operator can be flipped
+                                        let flipped_operator = where_operator.flip()?;
+                                        where_clauses.push(WhereClause{
+                                            field: ident.value.clone(),
+                                            operator: flipped_operator,
                                             value: Value::Text(value.to_string().replace("'", "")),
                                         })
                                     }
@@ -966,7 +1015,7 @@ impl<'a> DriveQuery<'a> {
                 ))),
             }
         }
-        build_where_clause(selection_tree, &mut all_where_clauses);
+        build_where_clause(selection_tree, &mut all_where_clauses)?;
         dbg!(&all_where_clauses);
 
         let range_clause = WhereClause::group_range_clauses(&all_where_clauses)?;
