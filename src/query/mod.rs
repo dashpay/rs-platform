@@ -764,41 +764,7 @@ impl<'a> DriveQuery<'a> {
                 }
             })?;
 
-        let range_clause = WhereClause::group_range_clauses(&all_where_clauses)?;
-
-        let equal_clauses_array = all_where_clauses
-            .iter()
-            .filter_map(|where_clause| match where_clause.operator {
-                Equal => Some(where_clause.clone()),
-                _ => None,
-            })
-            .collect::<Vec<WhereClause>>();
-
-        let in_clauses_array = all_where_clauses
-            .iter()
-            .filter_map(|where_clause| match where_clause.operator {
-                In => Some(where_clause.clone()),
-                _ => None,
-            })
-            .collect::<Vec<WhereClause>>();
-
-        let in_clause = match in_clauses_array.len() {
-            0 => Ok(None),
-            1 => Ok(Some(
-                in_clauses_array
-                    .get(0)
-                    .expect("there must be a value")
-                    .clone(),
-            )),
-            _ => Err(Error::CorruptedData(String::from(
-                "There should only be one in clause",
-            ))),
-        }?;
-
-        let equal_clauses = equal_clauses_array
-            .into_iter()
-            .map(|where_clause| (where_clause.field.clone(), where_clause))
-            .collect();
+        let (range_clause, in_clause, equal_clauses) = Self::extract_clauses(all_where_clauses)?;
 
         let start_at_option = query_document.get("startAt");
         let start_after_option = query_document.get("startAfter");
@@ -975,8 +941,6 @@ impl<'a> DriveQuery<'a> {
                         build_where_clause(&*left, where_clauses)?;
                         build_where_clause(&*right, where_clauses)?;
                     } else {
-                        // At this point it should be only identifiers and values
-                        //
                         let where_operator = where_operator_from_sql_operator(op.clone())
                             .ok_or(Error::InvalidQuery("Unknown operator"))?;
                         match &**left {
@@ -1018,11 +982,38 @@ impl<'a> DriveQuery<'a> {
                 ))),
             }
         }
+
+        // Where clauses are optional
         if let Some(selection_tree) = selection_tree {
             build_where_clause(selection_tree, &mut all_where_clauses)?;
         }
         dbg!(&all_where_clauses);
 
+        let (range_clause, in_clause, equal_clauses) = Self::extract_clauses(all_where_clauses)?;
+
+        let start_at_option = None;
+        let start_at_included = false;
+        let start_at: Option<Vec<u8>> = start_at_option.and_then(bytes_for_system_value);
+
+        let dquery = DriveQuery {
+            contract,
+            document_type,
+            equal_clauses,
+            in_clause,
+            range_clause,
+            offset: 0,
+            limit,
+            order_by,
+            start_at,
+            start_at_included,
+        };
+
+        dbg!(&dquery);
+
+        Ok(dquery)
+    }
+
+    fn extract_clauses(all_where_clauses: Vec<WhereClause>) -> Result<(Option<WhereClause>, Option<WhereClause>, HashMap<String, WhereClause>), Error> {
         let range_clause = WhereClause::group_range_clauses(&all_where_clauses)?;
 
         let equal_clauses_array = all_where_clauses
@@ -1063,26 +1054,7 @@ impl<'a> DriveQuery<'a> {
 
         dbg!(&equal_clauses);
 
-        let start_at_option = None;
-        let start_at_included = false;
-        let start_at: Option<Vec<u8>> = start_at_option.and_then(bytes_for_system_value);
-
-        let dquery = DriveQuery {
-            contract,
-            document_type,
-            equal_clauses,
-            in_clause,
-            range_clause,
-            offset: 0,
-            limit,
-            order_by,
-            start_at,
-            start_at_included,
-        };
-
-        dbg!(&dquery);
-
-        Ok(dquery)
+        Ok((range_clause, in_clause, equal_clauses))
     }
 
     pub fn execute_with_proof(
