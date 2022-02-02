@@ -105,7 +105,7 @@ fn where_operator_from_sql_operator(sql_operator: ast::BinaryOperator) -> Option
         ast::BinaryOperator::Lt => Some(WhereOperator::LessThan),
         ast::BinaryOperator::LtEq => Some(WhereOperator::LessThanOrEquals),
         ast::BinaryOperator::Like => Some(WhereOperator::StartsWith),
-        _ => None
+        _ => None,
     }
 }
 
@@ -962,10 +962,8 @@ impl<'a> DriveQuery<'a> {
         // base case op is not and, build where clause
         // op is and run function for left and right
         let mut all_where_clauses: Vec<WhereClause> = Vec::new();
-        let selection_tree = select
-            .selection
-            .as_ref();
-            // .ok_or_else(|| Error::InvalidQuery("No selection clause"))?;
+        let selection_tree = select.selection.as_ref();
+        // .ok_or_else(|| Error::InvalidQuery("No selection clause"))?;
 
         fn build_where_clause(
             binary_operation: &ast::Expr,
@@ -979,19 +977,18 @@ impl<'a> DriveQuery<'a> {
                     } else {
                         // At this point it should be only identifiers and values
                         //
-                        let where_operator = where_operator_from_sql_operator(op.clone()).ok_or(Error::InvalidQuery("Unknown operator"))?;
+                        let where_operator = where_operator_from_sql_operator(op.clone())
+                            .ok_or(Error::InvalidQuery("Unknown operator"))?;
                         match &**left {
-                            ast::Expr::Identifier(ident) => {
-                                match &**right {
-                                    ast::Expr::Value(value) => {
-                                        where_clauses.push(WhereClause{
-                                            field: ident.value.clone(),
-                                            operator: where_operator,
-                                            value: Value::Text(value.to_string().replace("'", "")),
-                                        })
-                                    }
-                                    _ => return Err(Error::InvalidQuery("Invalid query: where clause should have field name and value"))
-                                }
+                            ast::Expr::Identifier(ident) => match &**right {
+                                ast::Expr::Value(value) => where_clauses.push(WhereClause {
+                                    field: ident.value.clone(),
+                                    operator: where_operator,
+                                    value: Value::Text(value.to_string().replace("'", "")),
+                                }),
+                                _ => return Err(Error::InvalidQuery(
+                                    "Invalid query: where clause should have field name and value",
+                                )),
                             },
                             ast::Expr::Value(value) => {
                                 match &**right {
@@ -1007,7 +1004,11 @@ impl<'a> DriveQuery<'a> {
                                     _ => return Err(Error::InvalidQuery("Invalid query: where clause should have field name and value"))
                                 }
                             }
-                            _ => return Err(Error::InvalidQuery("Invalid query: where clause should have field name and value"))
+                            _ => {
+                                return Err(Error::InvalidQuery(
+                                    "Invalid query: where clause should have field name and value",
+                                ))
+                            }
                         }
                     }
                     Ok(())
