@@ -69,7 +69,7 @@ fn where_operator_from_sql_operator(sql_operator: ast::BinaryOperator) -> Option
         ast::BinaryOperator::Gt => Some(WhereOperator::GreaterThan),
         ast::BinaryOperator::GtEq => Some(WhereOperator::GreaterThanOrEquals),
         ast::BinaryOperator::Lt => Some(WhereOperator::LessThan),
-        ast::BinaryOperator::LtEq => Some(WhereOperator::GreaterThan),
+        ast::BinaryOperator::LtEq => Some(WhereOperator::LessThanOrEquals),
         ast::BinaryOperator::Like => Some(WhereOperator::StartsWith),
         _ => None
     }
@@ -942,68 +942,21 @@ impl<'a> DriveQuery<'a> {
                     if *op == ast::BinaryOperator::And {
                         build_where_clause(&*left, where_clauses)?;
                         build_where_clause(&*right, where_clauses)?;
-                    } else if *op == ast::BinaryOperator::Eq {
-                        let left_expr = &**left;
-                        let right_expr = &**right;
-                        dbg!(left_expr);
-                        dbg!(right_expr);
-                        match left_expr {
+                    } else {
+                        match &**left {
                             ast::Expr::Identifier(ident) => {
-                                match right_expr {
+                                match &**right {
                                     ast::Expr::Value(value) => {
-                                        where_clauses.push(WhereClause {
+                                        where_clauses.push(WhereClause{
                                             field: ident.value.clone(),
-                                            operator: WhereOperator::Equal,
-                                            // value: Value::Text(String::from("nice")),
-                                            value: Value::Text(value.to_string()),
-                                        })
-                                    }
-                                    _ => panic!(),
-                                }
-                            }
-                            _ => panic!(),
-                        }
-                    } else if *op == ast::BinaryOperator::Gt {
-                        let left_expr = &**left;
-                        let right_expr = &**right;
-                        dbg!(left_expr);
-                        dbg!(right_expr);
-                        match left_expr {
-                            ast::Expr::Identifier(ident) => {
-                                match right_expr {
-                                    ast::Expr::Value(value) => {
-                                        where_clauses.push(WhereClause {
-                                            field: ident.value.clone(),
-                                            operator: WhereOperator::GreaterThan,
-                                            // value: Value::Text(String::from("nice")),
-                                            value: Value::Text(value.to_string()),
-                                        })
-                                    }
-                                    _ => panic!(),
-                                }
-                            }
-                            _ => panic!(),
-                        }
-                    } else if *op == ast::BinaryOperator::Lt {
-                        let left_expr = &**left;
-                        let right_expr = &**right;
-                        dbg!(left_expr);
-                        dbg!(right_expr);
-                        match left_expr {
-                            ast::Expr::Identifier(ident) => {
-                                match right_expr {
-                                    ast::Expr::Value(value) => {
-                                        where_clauses.push(WhereClause {
-                                            field: ident.value.clone(),
-                                            operator: WhereOperator::LessThan,
-                                            // value: Value::Text(String::from("nice")),
+                                            operator: where_operator_from_sql_operator(op.clone()).unwrap(),
                                             value: Value::Text(value.to_string().replace("'", "")),
                                         })
                                     }
-                                    _ => panic!(),
+                                    _ => panic!()
                                 }
                             }
-                            _ => panic!(),
+                            _ => panic!()
                         }
                     }
                     Ok(())
