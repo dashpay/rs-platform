@@ -65,8 +65,8 @@ impl Index {
         // Here we are trying to figure out if the Index matches the order by
         // To do so we take the index and go backwards as we need the order by clauses to be
         // continuous, but they do not need to be at the end.
-        let mut reduced_properties = self.properties.clone();
-        let mut should_ignore: Vec<String> = order_by.iter().map(|&str| str.to_string()).collect();
+        let mut reduced_properties = self.properties.as_slice();
+        // let mut should_ignore: Vec<String> = order_by.iter().map(|&str| str.to_string()).collect();
         if !order_by.is_empty() {
             for _ in 0..self.properties.len() {
                 if reduced_properties.len() < order_by.len() {
@@ -81,8 +81,8 @@ impl Index {
                     break;
                 }
                 if let Some((last, elements)) = reduced_properties.split_last() {
-                    should_ignore.push(last.name.clone());
-                    reduced_properties = elements.to_vec();
+                    // should_ignore.push(last.name.clone());
+                    reduced_properties = elements;
                 } else {
                     return None;
                 }
@@ -260,7 +260,6 @@ impl DocumentType {
         name: &str,
         document_type_value_map: &[(Value, Value)],
     ) -> Result<Self, Error> {
-        let mut indices: Vec<Index> = Vec::new();
         let mut document_properties: HashMap<String, types::DocumentFieldType> = HashMap::new();
 
         let index_values =
@@ -268,6 +267,7 @@ impl DocumentType {
                 Error::CorruptedData(String::from("unable to get indices from the contract"))
             })?;
 
+        let mut indices: Vec<Index> = Vec::with_capacity(index_values.len());
         for index_value in index_values {
             if !index_value.is_map() {
                 return Err(Error::CorruptedData(String::from(
@@ -286,13 +286,19 @@ impl DocumentType {
                 ))
             })?;
 
-        // Based on the property name, determine the type
-        for (property_key, property_value) in property_values {
+        fn insert_values(document_properties: &mut HashMap<String, types::DocumentFieldType>, prefix: Option<&str>, property_key: &Value, property_value: &Value) -> Result<(), Error> {
             if !property_key.is_text() {
                 return Err(Error::CorruptedData(String::from(
                     "property key should be text",
                 )));
             }
+
+            let property_key_string = property_key.as_text().expect("confirmed as text").to_string();
+
+            let prefixed_property_key = match prefix {
+                None => {property_key_string}
+                Some(prefix) => { [prefix, property_key_string.as_str()].join(".") }
+            };
 
             if !property_value.is_map() {
                 return Err(Error::CorruptedData(String::from(
@@ -300,38 +306,55 @@ impl DocumentType {
                 )));
             }
 
-            let property_values = property_value.as_map().expect("confirmed as map");
-            let type_value = cbor_inner_text_value(property_values, "type")
-                .ok_or_else(|| Error::CorruptedData(String::from("cannot find type property")))?;
+            let inner_property_values = property_value.as_map().expect("confirmed as map");
+            let type_value = cbor_inner_text_value(inner_property_values, "type")
+                .ok_or_else(|| Error::CorruptedData(String::from("cannot find type property")),
+                )?;
 
             let field_type: types::DocumentFieldType;
 
-            if type_value == "array" {
-                // Only handling bytearrays for v1
-                // Return an error if it is not a byte array
-                let is_byte_array_value = cbor_inner_bool_value(property_values, "byteArray")
-                    .ok_or_else(|| {
-                        Error::CorruptedData(String::from(
+            match type_value {
+                "array" => {
+                    // Only handling bytearrays for v1
+                    // Return an error if it is not a byte array
+                    let is_byte_array_value = cbor_inner_bool_value(inner_property_values, "byteArray")
+                        .ok_or_else(|| Error::CorruptedData(String::from(
                             "cannot find byteArray property for array type",
-                        ))
-                    })?;
-                if is_byte_array_value {
-                    field_type = types::DocumentFieldType::ByteArray;
-                } else {
-                    return Err(Error::CorruptedData(String::from("invalid type")));
+                        )))?;
+                    if is_byte_array_value {
+                        field_type = types::DocumentFieldType::ByteArray;
+                    } else {
+                        return Err(Error::CorruptedData(String::from("invalid type")));
+                    }
+                    document_properties.insert(
+                        prefixed_property_key,
+                        field_type,
+                    );
                 }
-            } else {
-                field_type = types::string_to_field_type(type_value)
-                    .ok_or_else(|| Error::CorruptedData(String::from("invalid type")))?;
+                "object" => {
+                    let properties = cbor_inner_map_value(inner_property_values, "properties")
+                        .ok_or_else(|| Error::CorruptedData(String::from(
+                            "cannot find byteArray property for array type",
+                        )))?;
+                    for (object_property_key, object_property_value) in properties.iter() {
+                        insert_values(document_properties, Some(&prefixed_property_key), object_property_key, object_property_value)?
+                    }
+                }
+                _ => {
+                    field_type = types::string_to_field_type(type_value)
+                        .ok_or_else(|| Error::CorruptedData(String::from("invalid type")))?;
+                    document_properties.insert(
+                        prefixed_property_key,
+                        field_type,
+                    );
+                }
             }
+            Ok(())
+        }
 
-            document_properties.insert(
-                property_key
-                    .as_text()
-                    .expect("confirmed as text")
-                    .to_string(),
-                field_type,
-            );
+        // Based on the property name, determine the type
+        for (property_key, property_value) in property_values {
+            insert_values(&mut document_properties, None, &property_key, &property_value)?;
         }
 
         // Add system properties
@@ -345,11 +368,11 @@ impl DocumentType {
         })
     }
 
-    pub fn top_level_indices(&self) -> Result<Vec<IndexProperty>, Error> {
-        let mut index_properties: Vec<IndexProperty> = Vec::new();
+    pub fn top_level_indices(&self) -> Result<Vec<&IndexProperty>, Error> {
+        let mut index_properties: Vec<&IndexProperty> = Vec::with_capacity(self.indices.len());
         for index in &self.indices {
             if let Some(property) = index.properties.get(0) {
-                index_properties.push(property.clone());
+                index_properties.push(property);
             }
         }
         Ok(index_properties)
@@ -454,19 +477,53 @@ impl Document {
 
     pub fn get_raw_for_document_type<'a>(
         &'a self,
-        key: &str,
+        key_path: &str,
         document_type: &DocumentType,
         owner_id: Option<&[u8]>,
     ) -> Result<Option<Vec<u8>>, Error> {
-        if key == "$ownerId" && owner_id.is_some() {
+        if key_path == "$ownerId" && owner_id.is_some() {
             Ok(Some(Vec::from(owner_id.unwrap())))
         } else {
-            match self.properties.get(key) {
+            match key_path {
+                "$id" => return Ok(Some(self.id.clone())),
+                "$ownerId" => return Ok(Some(self.owner_id.clone())),
+                _ => {}
+            }
+            let key_paths: Vec<&str> = key_path.split('.').collect::<Vec<&str>>();
+            let (key, rest_key_paths) = key_paths.split_first().ok_or_else(|| Error::CorruptedData(String::from(
+                "key must not be null when getting from document",
+            )))?;
+
+            fn get_value_at_path<'a>(value: &'a Value, key_paths: &'a [&str]) -> Result<Option<&'a Value>, Error> {
+                if key_paths.is_empty() {
+                    Ok(Some(value))
+                } else {
+                    let (key, rest_key_paths) = key_paths.split_first().ok_or_else(|| Error::CorruptedData(String::from(
+                        "key must not be null when getting from document",
+                    )))?;
+                    let map_values = value.as_map().ok_or_else(|| Error::CorruptedData(String::from(
+                        "inner key must refer to a value map",
+                    )))?;
+                    match get_key_from_cbor_map(map_values, key) {
+                        None => {
+                            Ok(None)
+                        }
+                        Some(value) => {
+                            get_value_at_path(value, rest_key_paths)
+                        }
+                    }
+                }
+            }
+
+            match self.properties.get(*key) {
                 None => Ok(None),
-                Some(value) => match key {
-                    "$id" => Ok(Some(self.id.clone())),
-                    "$ownerId" => Ok(Some(self.owner_id.clone())),
-                    _ => Ok(Some(document_type.serialize_value_for_key(key, value)?)),
+                Some(value) => {
+                    match get_value_at_path(value, rest_key_paths)? {
+                        None => Ok(None),
+                        Some(path_value) => {
+                            Ok(Some(document_type.serialize_value_for_key(key_path, path_value)?))
+                        }
+                    }
                 },
             }
         }
@@ -479,28 +536,11 @@ impl Document {
         contract: &Contract,
         owner_id: Option<&[u8]>,
     ) -> Result<Option<Vec<u8>>, Error> {
-        if key == "$ownerId" && owner_id.is_some() {
-            Ok(Some(Vec::from(owner_id.unwrap())))
-        } else {
-            match self.properties.get(key) {
-                None => Ok(None),
-                Some(value) => match key {
-                    "$id" => Ok(Some(self.id.clone())),
-                    "$ownerId" => Ok(Some(self.owner_id.clone())),
-                    _ => {
-                        let document_type = contract
-                            .document_types
-                            .get(document_type_name)
-                            .ok_or_else(|| {
-                                Error::CorruptedData(String::from(
-                                    "document type should exist for name",
-                                ))
-                            })?;
-                        Ok(Some(document_type.serialize_value_for_key(key, value)?))
-                    }
-                },
-            }
-        }
+        let document_type = contract.document_types.get(document_type_name)
+            .ok_or_else(|| Error::CorruptedData(String::from(
+                "document type should exist for name",
+            )))?;
+        self.get_raw_for_document_type(key, document_type, owner_id)
     }
 }
 
@@ -554,7 +594,7 @@ impl Index {
 
 impl IndexProperty {
     pub fn from_cbor_value(index_property_map: &[(Value, Value)]) -> Result<Self, Error> {
-        let property = index_property_map[0].clone();
+        let property = &index_property_map[0];
 
         let key = property
             .0 // key
@@ -585,54 +625,50 @@ fn contract_document_types(contract: &HashMap<String, CborValue>) -> Option<&Vec
     })
 }
 
-fn get_key_from_cbor_map(cbor_map: &[(Value, Value)], key: &str) -> Option<Value> {
+fn get_key_from_cbor_map<'a>(cbor_map: &'a [(Value, Value)], key: &'a str) -> Option<&'a Value> {
     for (cbor_key, cbor_value) in cbor_map.iter() {
         if !cbor_key.is_text() {
             continue;
         }
 
         if cbor_key.as_text().expect("confirmed as text") == key {
-            return Some(cbor_value.clone());
+            return Some(cbor_value);
         }
     }
     None
 }
 
-fn cbor_inner_array_value(document_type: &[(Value, Value)], key: &str) -> Option<Vec<Value>> {
+fn cbor_inner_array_value<'a>(document_type: &'a [(Value, Value)], key: &'a str) -> Option<&'a Vec<Value>> {
     let key_value = get_key_from_cbor_map(document_type, key)?;
-    if key_value.is_array() {
-        let array_value = key_value.as_array().expect("confirmed as array");
-        return Some(array_value.clone());
+    if let Value::Array(key_value) = key_value {
+        return Some(key_value);
     }
     None
 }
 
-fn cbor_inner_map_value(
-    document_type: &[(Value, Value)],
-    key: &str,
-) -> Option<Vec<(Value, Value)>> {
+fn cbor_inner_map_value<'a>(
+    document_type: &'a [(Value, Value)],
+    key: &'a str,
+) -> Option<&'a Vec<(Value, Value)>> {
     let key_value = get_key_from_cbor_map(document_type, key)?;
-    if key_value.is_map() {
-        let map_value = key_value.as_map().expect("confirmed as map");
-        return Some(map_value.clone());
+    if let Value::Map(map_value) = key_value {
+        return Some(map_value);
     }
     None
 }
 
-fn cbor_inner_text_value(document_type: &[(Value, Value)], key: &str) -> Option<String> {
+fn cbor_inner_text_value<'a>(document_type: &'a [(Value, Value)], key: &'a str) -> Option<&'a str> {
     let key_value = get_key_from_cbor_map(document_type, key)?;
-    if key_value.is_text() {
-        let string_value = key_value.as_text().expect("confirmed as text");
-        return Some(string_value.to_string());
+    if let Value::Text(string_value) = key_value {
+        return Some(string_value);
     }
     None
 }
 
 fn cbor_inner_bool_value(document_type: &[(Value, Value)], key: &str) -> Option<bool> {
     let key_value = get_key_from_cbor_map(document_type, key)?;
-    if key_value.is_bool() {
-        let bool_value = key_value.as_bool().expect("confirmed as text");
-        return Some(bool_value);
+    if let Value::Bool(bool_value) = key_value {
+        return Some(*bool_value);
     }
     None
 }
@@ -680,20 +716,11 @@ mod tests {
     use crate::contract::Contract;
     use crate::drive::Drive;
     use std::{collections::HashMap, fs::File, io::BufReader, path::Path};
-
-    fn json_document_to_cbor(path: impl AsRef<Path>) -> Vec<u8> {
-        let file = File::open(path).expect("file not found");
-        let reader = BufReader::new(file);
-        let json: serde_json::Value =
-            serde_json::from_reader(reader).expect("expected a valid json");
-        let mut buffer: Vec<u8> = vec![0, 0, 0, 1];
-        ciborium::ser::into_writer(&json, &mut buffer).expect("unable to serialize into cbor");
-        buffer
-    }
+    use crate::common::json_document_to_cbor;
 
     #[test]
     fn test_cbor_deserialization() {
-        let document_cbor = json_document_to_cbor("simple.json");
+        let document_cbor = json_document_to_cbor("simple.json", Some(1));
         let (version, read_document_cbor) = document_cbor.split_at(4);
         assert!(Drive::check_protocol_version_bytes(version));
         let document: HashMap<String, ciborium::value::Value> =
@@ -704,7 +731,7 @@ mod tests {
     #[test]
     fn test_import_contract() {
         let dashpay_cbor =
-            json_document_to_cbor("tests/supporting_files/contract/dashpay/dashpay-contract.json");
+            json_document_to_cbor("tests/supporting_files/contract/dashpay/dashpay-contract.json", Some(1));
         let contract = Contract::from_cbor(&dashpay_cbor).unwrap();
 
         assert_eq!(contract.document_types.len(), 3);

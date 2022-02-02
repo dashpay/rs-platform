@@ -260,14 +260,11 @@ impl Drive {
 
     pub fn apply_contract(
         &mut self,
-        contract_cbor: &[u8],
+        contract_cbor: Vec<u8>,
         transaction: Option<&OptimisticTransactionDBTransaction>,
     ) -> Result<u64, Error> {
         // first we need to deserialize the contract
-        let contract = Contract::from_cbor(contract_cbor)?;
-
-        let contract_bytes = Vec::from(contract_cbor);
-        let contract_element = Element::Item(contract_bytes.clone());
+        let contract = Contract::from_cbor(&contract_cbor)?;
 
         // overlying structure
         let mut already_exists = false;
@@ -280,7 +277,7 @@ impl Drive {
             already_exists = true;
             match stored_element {
                 Element::Item(stored_contract_bytes) => {
-                    if contract_bytes != stored_contract_bytes {
+                    if contract_cbor != stored_contract_bytes {
                         different_contract_data = true;
                     }
                 }
@@ -289,6 +286,8 @@ impl Drive {
                 }
             }
         };
+
+        let contract_element = Element::Item(contract_cbor);
 
         if already_exists {
             if different_contract_data {
@@ -414,10 +413,7 @@ impl Drive {
                     document_type_name,
                     contract,
                     owner_id,
-                )?
-                .ok_or_else(|| {
-                    Error::CorruptedData(String::from("unable to get document top index field"))
-                })?;
+                )?.unwrap_or_else(|| vec![0]);
 
             let index_path_slices: Vec<&[u8]> = index_path.iter().map(|x| x.as_slice()).collect();
 
@@ -476,7 +472,7 @@ impl Drive {
                 )?;
 
                 // we push the actual value of the index path
-                index_path.push(document_index_field.clone());
+                index_path.push(document_index_field);
                 // Iteration 1. the index path is now something like Contracts/ContractID/Documents(1)/$ownerId/<ownerId>/toUserId/<ToUserId>/
                 // Iteration 2. the index path is now something like Contracts/ContractID/Documents(1)/$ownerId/<ownerId>/toUserId/<ToUserId>/accountReference/<accountReference>
             }
@@ -736,16 +732,8 @@ mod tests {
     use rand::Rng;
     use std::{collections::HashMap, fs::File, io::BufReader, path::Path};
     use tempdir::TempDir;
-
-    fn json_document_to_cbor(path: impl AsRef<Path>) -> Vec<u8> {
-        let file = File::open(path).expect("file not found");
-        let reader = BufReader::new(file);
-        let json: serde_json::Value =
-            serde_json::from_reader(reader).expect("expected a valid json");
-        let mut buffer: Vec<u8> = vec![0, 0, 0, 1];
-        ciborium::ser::into_writer(&json, &mut buffer).expect("unable to serialize into cbor");
-        buffer
-    }
+    use crate::common::{json_document_to_cbor, setup_contract};
+    use crate::contract::Document;
 
     fn setup_dashpay(prefix: &str) -> (Drive, Vec<u8>) {
         let tmp_dir = TempDir::new(prefix).unwrap();
@@ -757,9 +745,9 @@ mod tests {
 
         // let's construct the grovedb structure for the dashpay data contract
         let dashpay_cbor =
-            json_document_to_cbor("tests/supporting_files/contract/dashpay/dashpay-contract.json");
+            json_document_to_cbor("tests/supporting_files/contract/dashpay/dashpay-contract.json", Some(1));
         drive
-            .apply_contract(&dashpay_cbor, None)
+            .apply_contract(dashpay_cbor.clone(), None)
             .expect("expected to apply contract successfully");
 
         (drive, dashpay_cbor)
@@ -770,7 +758,7 @@ mod tests {
         let (mut drive, dashpay_cbor) = setup_dashpay("add");
 
         let dashpay_cr_document_cbor =
-            json_document_to_cbor("tests/supporting_files/contract/dashpay/contact-request0.json");
+            json_document_to_cbor("tests/supporting_files/contract/dashpay/contact-request0.json", Some(1));
 
         let random_owner_id = rand::thread_rng().gen::<[u8; 32]>();
         drive
@@ -808,17 +796,33 @@ mod tests {
     }
 
     #[test]
+    fn test_add_dpns_documents() {
+        let (mut drive, contract) = setup_contract("dpns", "tests/supporting_files/contract/dpns/dpns-contract.json");
+
+        let dpns_domain_document_cbor =
+            json_document_to_cbor("tests/supporting_files/contract/dpns/domain0.json", Some(1));
+
+        let random_owner_id = rand::thread_rng().gen::<[u8; 32]>();
+
+        let document = Document::from_cbor(&dpns_domain_document_cbor, None, Some(&random_owner_id)).expect("expected to deserialize the document");
+
+        drive
+            .add_document_for_contract(&document, &dpns_domain_document_cbor, &contract, "domain", None, false, None)
+            .expect("expected to insert a document successfully");
+    }
+
+    #[test]
     fn test_add_dashpay_many_non_conflicting_documents() {
         let (mut drive, dashpay_cbor) = setup_dashpay("add_no_conflict");
 
         let dashpay_cr_document_cbor_0 =
-            json_document_to_cbor("tests/supporting_files/contract/dashpay/contact-request0.json");
+            json_document_to_cbor("tests/supporting_files/contract/dashpay/contact-request0.json", Some(1));
 
         let dashpay_cr_document_cbor_1 =
-            json_document_to_cbor("tests/supporting_files/contract/dashpay/contact-request1.json");
+            json_document_to_cbor("tests/supporting_files/contract/dashpay/contact-request1.json", Some(1));
 
         let dashpay_cr_document_cbor_2 =
-            json_document_to_cbor("tests/supporting_files/contract/dashpay/contact-request2.json");
+            json_document_to_cbor("tests/supporting_files/contract/dashpay/contact-request2.json", Some(1));
 
         let random_owner_id = rand::thread_rng().gen::<[u8; 32]>();
         drive
@@ -858,10 +862,10 @@ mod tests {
         let (mut drive, dashpay_cbor) = setup_dashpay("add_conflict");
 
         let dashpay_cr_document_cbor_0 =
-            json_document_to_cbor("tests/supporting_files/contract/dashpay/contact-request0.json");
+            json_document_to_cbor("tests/supporting_files/contract/dashpay/contact-request0.json", Some(1));
 
         let dashpay_cr_document_cbor_0_dup = json_document_to_cbor(
-            "tests/supporting_files/contract/dashpay/contact-request0-dup-unique-index.json",
+            "tests/supporting_files/contract/dashpay/contact-request0-dup-unique-index.json", Some(1)
         );
 
         let random_owner_id = rand::thread_rng().gen::<[u8; 32]>();
@@ -897,7 +901,7 @@ mod tests {
 
     #[test]
     fn test_cbor_deserialization() {
-        let document_cbor = json_document_to_cbor("simple.json");
+        let document_cbor = json_document_to_cbor("simple.json", Some(1));
         let (version, read_document_cbor) = document_cbor.split_at(4);
         assert!(Drive::check_protocol_version_bytes(version));
         let document: HashMap<String, ciborium::value::Value> =

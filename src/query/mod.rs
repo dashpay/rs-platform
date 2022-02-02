@@ -311,8 +311,8 @@ impl<'a> WhereClause {
                 }))
             }
         } else if non_groupable_range_clauses.len() == 1 {
-            let where_clause = non_groupable_range_clauses.get(0).unwrap();
-            Ok(Some((*where_clause).clone()))
+            let where_clause = *non_groupable_range_clauses.get(0).unwrap();
+            Ok(Some(where_clause.clone()))
         } else {
             // if non_groupable_range_clauses.len() > 1
             Err(Error::CorruptedData(String::from(
