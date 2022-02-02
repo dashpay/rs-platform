@@ -937,13 +937,13 @@ impl<'a> DriveQuery<'a> {
         dbg!(&document_type);
 
         // Restrictions
-        // where clauses we currently support are binary operations
+        // only binary where clauses are supported
         // i.e. [<fieldname>, <operator>, <value>]
         // [and] is used to separate where clauses
         // hence once [and] is encountered [left] and [right] must be binary operations
+        // i.e other where clauses
         // e.g. firstname = wisdom and lastname = ogwu
         // if op is not [and] then [left] or [right] must not be a binary operation
-
         let mut all_where_clauses: Vec<WhereClause> = Vec::new();
         let selection_tree = select.selection.as_ref();
 
@@ -991,7 +991,7 @@ impl<'a> DriveQuery<'a> {
                                 Error::InvalidQuery("Invalid query: unexpected value type")
                             })?;
                             if where_operator == StartsWith {
-                                // make sure the value is of the right format
+                                // make sure the value is of the right format i.e prefix%
                                 let inner_text = cbor_val.as_text().ok_or_else(|| {
                                     Error::InvalidQuery("Invalid query: startsWith takes text")
                                 })?;
@@ -1019,40 +1019,6 @@ impl<'a> DriveQuery<'a> {
                             value,
                         });
 
-                        // match &**left {
-                        //     ast::Expr::Identifier(ident) => match &**right {
-                        //         ast::Expr::Value(value) => where_clauses.push(WhereClause {
-                        //             field: ident.value.clone(),
-                        //             operator: where_operator,
-                        //             value: sql_value_to_cbor(value.clone()).ok_or_else(|| {
-                        //                 Error::InvalidQuery("Invalid query: unexpected value type")
-                        //             })?,
-                        //         }),
-                        //         _ => return Err(Error::InvalidQuery(
-                        //             "Invalid query: where clause should have field name and value",
-                        //         )),
-                        //     },
-                        //     ast::Expr::Value(value) => {
-                        //         match &**right {
-                        //             ast::Expr::Identifier(ident) => {
-                        //                 // check if the operator can be flipped
-                        //                 let flipped_operator = where_operator.flip()?;
-                        //                 where_clauses.push(WhereClause{
-                        //                     field: ident.value.clone(),
-                        //                     operator: flipped_operator,
-                        //                     // value: Value::Text(value.to_string().replace("'", "")),
-                        //                     value: sql_value_to_cbor(value.clone()).ok_or_else(|| Error::InvalidQuery("Invalid query: unexpected value type"))?,
-                        //                 })
-                        //             }
-                        //             _ => return Err(Error::InvalidQuery("Invalid query: where clause should have field name and value"))
-                        //         }
-                        //     }
-                        //     _ => {
-                        //         return Err(Error::InvalidQuery(
-                        //             "Invalid query: where clause should have field name and value",
-                        //         ))
-                        //     }
-                        // }
                     }
                     Ok(())
                 }
