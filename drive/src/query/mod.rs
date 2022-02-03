@@ -1019,7 +1019,6 @@ impl<'a> DriveQuery<'a> {
                             operator: where_operator,
                             value,
                         });
-
                     }
                     Ok(())
                 }
