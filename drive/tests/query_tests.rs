@@ -603,44 +603,114 @@ fn test_query() {
 
 #[test]
 fn test_sql_query() {
-    let (mut drive, contract) = setup(10, 73509);
-    // let sql_string = "select * from person where firstName > 'Chris' and firstName <= 'Noellyn'  order by firstName ASC";
-    // let sql_string = "select * from person where 'Chris' <= firstName order by firstName ASC";
-    // let sql_string =  "select * from person where firstName >= 'Chris' order by firstName ASC limit 2";
-    // let sql_string = "select * from person";
-    // let sql_string = "select * from person where age > 50 order by age asc";
-    let sql_string = "select * from person order by firstName asc limit 100";
-    // "Adey".to_string(),
-    // "Briney".to_string(),
-    // "Cammi".to_string(),
-    // "Celinda".to_string(),
-    // "Dalia".to_string(),
-    // "Gilligan".to_string(),
-    // "Kevina".to_string(),
-    // "Meta".to_string(),
-    // "Noellyn".to_string(),
-    // "Prissie".to_string(),
-    let drive_query = DriveQuery::from_sql_expr(sql_string, &contract).unwrap();
-    // dbg!(drive_query);
-
-    let query_value = json!({
-        "where": [
-        ],
-        "limit": 100,
-        "orderBy": [
-            ["firstName", "asc"]
-        ]
-    });
-    let where_cbor = common::value_to_cbor(query_value, None);
+    // These tests confirm that sql statements produce the same drive query
+    // as their json counterparts, tests above confirm that the json queries
+    // produce the correct result set
+    let (_, contract) = setup(10, 73509);
     let person_document_type = contract
         .document_types
         .get("person")
         .expect("contract should have a person document type");
-    let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &person_document_type)
-        .expect("query should be built");
-    // dbg!(query);
 
-    assert!(drive_query == query);
+    // Empty where clause
+    let query_cbor = common::value_to_cbor(
+        json!({
+            "where": [],
+            "limit": 100,
+            "orderBy": [
+                ["firstName", "asc"]
+            ]
+        }),
+        None,
+    );
+    let query1 = DriveQuery::from_cbor(query_cbor.as_slice(), &contract, &person_document_type)
+        .expect("should build query");
 
-    // dbg!(results.len());
+    let sql_string = "select * from person order by firstName asc limit 100";
+    let query2 = DriveQuery::from_sql_expr(sql_string, &contract).expect("should build query");
+
+    assert_eq!(query1, query2);
+
+    // Equality clause
+    let query_cbor = common::value_to_cbor(
+        json!({
+            "where": [
+                ["firstName", "==", "Chris"]
+            ]
+        }),
+        None,
+    );
+    let query1 = DriveQuery::from_cbor(query_cbor.as_slice(), &contract, &person_document_type)
+        .expect("should build query");
+
+    let sql_string = "select * from person where firstName = 'Chris'";
+    let query2 = DriveQuery::from_sql_expr(sql_string, &contract).expect("should build query");
+
+    assert_eq!(query1, query2);
+
+    // Less than
+    let query_cbor = common::value_to_cbor(
+        json!({
+            "where": [
+                ["firstName", "<", "Chris"]
+            ],
+            "limit": 100,
+            "orderBy": [
+                ["firstName", "asc"]
+            ]
+        }),
+        None,
+    );
+    let query1 = DriveQuery::from_cbor(query_cbor.as_slice(), &contract, &person_document_type)
+        .expect("should build query");
+
+    let sql_string =
+        "select * from person where firstName < 'Chris' order by firstName asc limit 100";
+    let query2 = DriveQuery::from_sql_expr(sql_string, &contract).expect("should build query");
+
+    assert_eq!(query1, query2);
+
+    // Starts with
+    let query_cbor = common::value_to_cbor(
+        json!({
+            "where": [
+                ["firstName", "StartsWith", "C"]
+            ],
+            "limit": 100,
+            "orderBy": [
+                ["firstName", "asc"]
+            ]
+        }),
+        None,
+    );
+    let query1 = DriveQuery::from_cbor(query_cbor.as_slice(), &contract, &person_document_type)
+        .expect("should build query");
+
+    let sql_string =
+        "select * from person where firstName like 'C%' order by firstName asc limit 100";
+    let query2 = DriveQuery::from_sql_expr(sql_string, &contract).expect("should build query");
+
+    assert_eq!(query1, query2);
+
+    // Range combination
+    let query_cbor = common::value_to_cbor(
+        json!({
+            "where": [
+                ["firstName", ">", "Chris"],
+                ["firstName", "<=", "Noellyn"]
+            ],
+            "limit": 100,
+            "orderBy": [
+                ["firstName", "asc"]
+            ]
+        }),
+        None,
+    );
+    let query1 = DriveQuery::from_cbor(query_cbor.as_slice(), &contract, &person_document_type)
+        .expect("should build query");
+
+    let sql_string = "select * from person where firstName > 'Chris' and firstName <= 'Noellyn' order by firstName asc limit 100";
+    let query2 = DriveQuery::from_sql_expr(sql_string, &contract).expect("should build query");
+
+    assert_eq!(query1, query2);
 }

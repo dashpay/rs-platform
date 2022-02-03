@@ -1094,14 +1094,10 @@ impl<'a> DriveQuery<'a> {
             ))),
         }?;
 
-        dbg!(&in_clause);
-
         let equal_clauses: HashMap<String, WhereClause> = equal_clauses_array
             .into_iter()
             .map(|where_clause| (where_clause.field.clone(), where_clause))
             .collect();
-
-        dbg!(&equal_clauses);
 
         Ok((range_clause, in_clause, equal_clauses))
     }
