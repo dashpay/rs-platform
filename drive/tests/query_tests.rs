@@ -54,10 +54,7 @@ pub fn setup(count: u32, seed: u64) -> (Drive, Contract) {
         "tests/supporting_files/contract/family/family-contract.json",
     );
 
-    let storage = drive.grove.storage();
-    let db_transaction = storage.transaction();
-    drive.grove.start_transaction();
-
+    let mut counter = 0;
     let people = Person::random_people(count, seed);
     for person in people {
         let value = serde_json::to_value(&person).expect("serialized person");
@@ -65,6 +62,9 @@ pub fn setup(count: u32, seed: u64) -> (Drive, Contract) {
             common::value_to_cbor(value, Some(rs_drive::drive::defaults::PROTOCOL_VERSION));
         let document = Document::from_cbor(document_cbor.as_slice(), None, None)
             .expect("document should be properly deserialized");
+        let storage = drive.grove.storage();
+        let db_transaction = storage.transaction();
+        drive.grove.start_transaction().unwrap();
         drive
             .add_document_for_contract(
                 &document,
@@ -76,8 +76,10 @@ pub fn setup(count: u32, seed: u64) -> (Drive, Contract) {
                 Some(&db_transaction),
             )
             .expect("document should be inserted");
+        drive.grove.commit_transaction(db_transaction);
+        counter += 1;
+        println!("{}", counter);
     }
-    drive.grove.commit_transaction(db_transaction);
     (drive, contract)
 }
 
@@ -713,4 +715,9 @@ fn test_sql_query() {
     let query2 = DriveQuery::from_sql_expr(sql_string, &contract).expect("should build query");
 
     assert_eq!(query1, query2);
+}
+
+#[test]
+fn test_insert_many() {
+    setup(500000, 10);
 }
