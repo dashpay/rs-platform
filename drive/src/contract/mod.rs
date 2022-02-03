@@ -17,27 +17,27 @@ use std::collections::HashMap;
 //               - unique
 
 // Struct Definitions
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct Contract {
     pub document_types: HashMap<String, DocumentType>,
     pub id: Vec<u8>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct DocumentType {
     pub name: String,
     pub indices: Vec<Index>,
     pub properties: HashMap<String, types::DocumentFieldType>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct Document {
     pub id: Vec<u8>,
     pub properties: HashMap<String, CborValue>,
     pub owner_id: Vec<u8>,
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub struct Index {
     pub properties: Vec<IndexProperty>,
     pub unique: bool,
@@ -121,7 +121,7 @@ impl Index {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub struct IndexProperty {
     pub(crate) name: String,
     pub(crate) ascending: bool,

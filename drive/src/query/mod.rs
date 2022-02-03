@@ -61,7 +61,7 @@ impl WhereOperator {
             BetweenExcludeLeft => Err(Error::InvalidQuery("Between clause order invalid")),
             BetweenExcludeRight => Err(Error::InvalidQuery("Between clause order invalid")),
             In => Err(Error::InvalidQuery("In clause order invalid")),
-            StartsWith => Err(Error::InvalidQuery("Startswith order invalid")),
+            StartsWith => Err(Error::InvalidQuery("Startswith clause order invalid")),
         }
     }
 }
@@ -147,7 +147,7 @@ fn sql_value_to_cbor(sql_value: ast::Value) -> Option<CborValue> {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct WhereClause {
     field: String,
     operator: WhereOperator,
@@ -698,7 +698,7 @@ impl<'a> WhereClause {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct OrderClause {
     pub field: String,
     pub ascending: bool,
@@ -744,7 +744,7 @@ impl<'a> OrderClause {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct DriveQuery<'a> {
     pub contract: &'a Contract,
     pub document_type: &'a DocumentType,
@@ -1036,7 +1036,7 @@ impl<'a> DriveQuery<'a> {
         let (range_clause, in_clause, equal_clauses) = Self::extract_clauses(all_where_clauses)?;
 
         let start_at_option = None;
-        let start_at_included = false;
+        let start_at_included = true;
         let start_at: Option<Vec<u8>> = start_at_option.and_then(bytes_for_system_value);
 
         Ok(DriveQuery {

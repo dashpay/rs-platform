@@ -609,7 +609,7 @@ fn test_sql_query() {
     // let sql_string =  "select * from person where firstName >= 'Chris' order by firstName ASC limit 2";
     // let sql_string = "select * from person";
     // let sql_string = "select * from person where age > 50 order by age asc";
-    let sql_string = "select * from person where firstName like 'Met%' order by firstName asc";
+    let sql_string = "select * from person order by firstName asc limit 100";
     // "Adey".to_string(),
     // "Briney".to_string(),
     // "Cammi".to_string(),
@@ -621,8 +621,26 @@ fn test_sql_query() {
     // "Noellyn".to_string(),
     // "Prissie".to_string(),
     let drive_query = DriveQuery::from_sql_expr(sql_string, &contract).unwrap();
-    let (results, _) = drive_query
-        .execute_no_proof(&mut drive.grove, None)
-        .unwrap();
-    dbg!(results.len());
+    // dbg!(drive_query);
+
+    let query_value = json!({
+        "where": [
+        ],
+        "limit": 100,
+        "orderBy": [
+            ["firstName", "asc"]
+        ]
+    });
+    let where_cbor = common::value_to_cbor(query_value, None);
+    let person_document_type = contract
+        .document_types
+        .get("person")
+        .expect("contract should have a person document type");
+    let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &person_document_type)
+        .expect("query should be built");
+    // dbg!(query);
+
+    assert!(drive_query == query);
+
+    // dbg!(results.len());
 }
