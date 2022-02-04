@@ -91,6 +91,21 @@ describe('GroveDB', () => {
     }
   });
 
+  describe('#get', () => {
+    it('should return error if key is not exist', async () => {
+      try {
+        await groveDb.get([], Buffer.from('nothing'));
+
+        expect.fail('should throw an error');
+      } catch (e) {
+        expect(e.message).to.equal('invalid path: no subtree found under that path');
+        expect(e.stack).to.be.a('string').and.satisfy((msg) => (
+          msg.startsWith('Error: invalid path: no subtree found under that path')
+        ));
+      }
+    });
+  });
+
   describe('#startTransaction', () => {
     it('should not allow to insert data to main database after it called', async () => {
       // Making a subtree to insert items into
