@@ -7,6 +7,7 @@ use rs_drive::query::DriveQuery;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashMap;
+use tempdir::TempDir;
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -48,15 +49,26 @@ impl Person {
 }
 
 pub fn setup(count: u32, seed: u64) -> (Drive, Contract) {
-    // setup code
-    let (mut drive, contract) = common::setup_contract(
-        "family",
-        "tests/supporting_files/contract/family/family-contract.json",
-    );
+
+    let tmp_dir = TempDir::new("family").unwrap();
+    let mut drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
 
     let storage = drive.grove.storage();
     let db_transaction = storage.transaction();
-    drive.grove.start_transaction();
+
+    drive
+        .create_root_tree(Some(&db_transaction))
+        .expect("expected to create root tree successfully");
+
+    // setup code
+    let contract = common::setup_contract(
+        &mut drive,
+        "tests/supporting_files/contract/family/family-contract.json",
+        Some(&db_transaction),
+    );
+
+
+    drive.grove.start_transaction().expect("transaction should be started");
 
     let people = Person::random_people(count, seed);
     for person in people {
@@ -77,7 +89,7 @@ pub fn setup(count: u32, seed: u64) -> (Drive, Contract) {
             )
             .expect("document should be inserted");
     }
-    drive.grove.commit_transaction(db_transaction);
+    drive.grove.commit_transaction(db_transaction).expect("transaction should be committed");
     (drive, contract)
 }
 
@@ -102,6 +114,10 @@ fn test_query() {
         "Prissie".to_string(),
     ];
 
+    let storage = drive.grove.storage();
+    let db_transaction = storage.transaction();
+    drive.grove.start_transaction();
+
     // A query getting all elements by firstName
 
     let query_value = json!({
@@ -120,7 +136,7 @@ fn test_query() {
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &person_document_type)
         .expect("query should be built");
     let (results, _) = query
-        .execute_no_proof(&mut drive.grove, None)
+        .execute_no_proof(&mut drive.grove, Some(&db_transaction))
         .expect("proof should be executed");
     let names: Vec<String> = results
         .into_iter()
