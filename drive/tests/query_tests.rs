@@ -49,7 +49,6 @@ impl Person {
 }
 
 pub fn setup(count: u32, seed: u64) -> (Drive, Contract) {
-
     let tmp_dir = TempDir::new("family").unwrap();
     let mut drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
 
@@ -67,8 +66,10 @@ pub fn setup(count: u32, seed: u64) -> (Drive, Contract) {
         Some(&db_transaction),
     );
 
-
-    drive.grove.start_transaction().expect("transaction should be started");
+    drive
+        .grove
+        .start_transaction()
+        .expect("transaction should be started");
 
     let people = Person::random_people(count, seed);
     for person in people {
@@ -89,7 +90,10 @@ pub fn setup(count: u32, seed: u64) -> (Drive, Contract) {
             )
             .expect("document should be inserted");
     }
-    drive.grove.commit_transaction(db_transaction).expect("transaction should be committed");
+    drive
+        .grove
+        .commit_transaction(db_transaction)
+        .expect("transaction should be committed");
     (drive, contract)
 }
 

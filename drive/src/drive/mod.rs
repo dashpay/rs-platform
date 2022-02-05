@@ -845,7 +845,7 @@ mod tests {
         let contract = setup_contract(
             &mut drive,
             "tests/supporting_files/contract/dpns/dpns-contract.json",
-            Some(&db_transaction)
+            Some(&db_transaction),
         );
 
         let dpns_domain_document_cbor =
@@ -869,7 +869,10 @@ mod tests {
             )
             .expect("expected to insert a document successfully");
 
-        drive.grove.commit_transaction(db_transaction).expect("unable to commit transaction");
+        drive
+            .grove
+            .commit_transaction(db_transaction)
+            .expect("unable to commit transaction");
     }
 
     #[test]

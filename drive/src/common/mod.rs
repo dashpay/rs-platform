@@ -8,10 +8,16 @@ use std::path::Path;
 use storage::rocksdb_storage::OptimisticTransactionDBTransaction;
 use tempdir::TempDir;
 
-pub fn setup_contract(drive: &mut Drive, path: &str, transaction: Option<&OptimisticTransactionDBTransaction>) -> Contract {
+pub fn setup_contract(
+    drive: &mut Drive,
+    path: &str,
+    transaction: Option<&OptimisticTransactionDBTransaction>,
+) -> Contract {
     let contract_cbor = json_document_to_cbor(path, Some(crate::drive::defaults::PROTOCOL_VERSION));
     let contract = Contract::from_cbor(&contract_cbor).expect("contract should be deserialized");
-    drive.apply_contract(contract_cbor, transaction).expect("contract should be applied");
+    drive
+        .apply_contract(contract_cbor, transaction)
+        .expect("contract should be applied");
     contract
 }
 
