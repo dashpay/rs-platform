@@ -121,22 +121,14 @@ fn sql_value_to_cbor(sql_value: ast::Value) -> Option<CborValue> {
         ast::Value::Boolean(bool) => Some(CborValue::Bool(bool)),
         ast::Value::Number(num, _) => {
             let number_as_string = num as String;
-            if number_as_string.contains(".") {
+            if number_as_string.contains('.') {
                 // Float
                 let num_as_float = number_as_string.parse::<f64>().ok();
-                if let Some(num) = num_as_float {
-                    Some(CborValue::Float(num))
-                } else {
-                    None
-                }
+                num_as_float.map(CborValue::Float)
             } else {
                 // Integer
                 let num_as_int = number_as_string.parse::<i64>().ok();
-                if let Some(num) = num_as_int {
-                    Some(CborValue::Integer(Integer::from(num)))
-                } else {
-                    None
-                }
+                num_as_int.map(|num| CborValue::Integer(Integer::from(num)))
             }
         }
         ast::Value::DoubleQuotedString(s) => Some(CborValue::Text(s)),
@@ -911,20 +903,16 @@ impl<'a> DriveQuery<'a> {
         let document_type_name = match &select
             .from
             .get(0)
-            .ok_or_else(|| Error::InvalidQuery("Invalid query: missing from section"))?
+            .ok_or(Error::InvalidQuery("Invalid query: missing from section"))?
             .relation
         {
             Table {
                 name,
-                alias,
-                args,
-                with_hints,
+                alias: _,
+                args: _,
+                with_hints: _,
             } => {
-                if let Some(identifier) = &name.0.get(0) {
-                    Some(&identifier.value)
-                } else {
-                    None
-                }
+                name.0.get(0).as_ref().map(|identifier| &identifier.value)
             }
             _ => None,
         }
@@ -935,7 +923,7 @@ impl<'a> DriveQuery<'a> {
         let document_type = contract
             .document_types
             .get(document_type_name)
-            .ok_or_else(|| Error::InvalidQuery("document type not found in contract"))?;
+            .ok_or(Error::InvalidQuery("document type not found in contract"))?;
 
         // Restrictions
         // only binary where clauses are supported
@@ -961,8 +949,8 @@ impl<'a> DriveQuery<'a> {
                         let mut where_operator = where_operator_from_sql_operator(op.clone())
                             .ok_or(Error::InvalidQuery("Unknown operator"))?;
 
-                        let mut identifier;
-                        let mut value_expr;
+                        let identifier;
+                        let value_expr;
 
                         if matches!(&**left, ast::Expr::Identifier(_))
                             && matches!(&**right, ast::Expr::Value(_))
@@ -988,16 +976,16 @@ impl<'a> DriveQuery<'a> {
                         };
 
                         let value = if let ast::Expr::Value(value) = value_expr {
-                            let cbor_val = sql_value_to_cbor(value.clone()).ok_or_else(|| {
+                            let cbor_val = sql_value_to_cbor(value.clone()).ok_or({
                                 Error::InvalidQuery("Invalid query: unexpected value type")
                             })?;
                             if where_operator == StartsWith {
                                 // make sure the value is of the right format i.e prefix%
-                                let inner_text = cbor_val.as_text().ok_or_else(|| {
+                                let inner_text = cbor_val.as_text().ok_or({
                                     Error::InvalidQuery("Invalid query: startsWith takes text")
                                 })?;
                                 let match_locations: Vec<_> =
-                                    inner_text.match_indices("%").collect();
+                                    inner_text.match_indices('%').collect();
                                 if match_locations.len() == 1
                                     && match_locations[0].0 == inner_text.len() - 1
                                 {
