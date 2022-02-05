@@ -810,8 +810,8 @@ impl<'a> DriveQuery<'a> {
 
     pub fn execute_with_proof(
         self,
-        grove: &mut GroveDb,
-        transaction: Option<&OptimisticTransactionDBTransaction>,
+        _grove: &mut GroveDb,
+        _transaction: Option<&OptimisticTransactionDBTransaction>,
     ) -> Result<Vec<u8>, Error> {
         todo!()
     }
