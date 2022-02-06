@@ -1037,6 +1037,51 @@ mod tests {
     }
 
     #[test]
+    fn test_add_and_remove_family_documents_with_empty_fields() {
+        let tmp_dir = TempDir::new("family").unwrap();
+        let mut drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+
+        let storage = drive.grove.storage();
+        let db_transaction = storage.transaction();
+
+        drive
+            .create_root_tree(Some(&db_transaction))
+            .expect("expected to create root tree successfully");
+
+        let contract = setup_contract(
+            &mut drive,
+            "tests/supporting_files/contract/family/family-contract.json",
+            Some(&db_transaction),
+        );
+
+        let dpns_domain_document_cbor =
+            json_document_to_cbor("tests/supporting_files/contract/family/person0.json", Some(1));
+
+        let random_owner_id = rand::thread_rng().gen::<[u8; 32]>();
+
+        let document =
+            Document::from_cbor(&dpns_domain_document_cbor, None, Some(&random_owner_id))
+                .expect("expected to deserialize the document");
+
+        drive
+            .add_document_for_contract(
+                &document,
+                &dpns_domain_document_cbor,
+                &contract,
+                "domain",
+                None,
+                false,
+                Some(&db_transaction),
+            )
+            .expect("expected to insert a document successfully");
+
+        drive
+            .grove
+            .commit_transaction(db_transaction)
+            .expect("unable to commit transaction");
+    }
+
+    #[test]
     fn test_add_dashpay_many_non_conflicting_documents() {
         let (mut drive, dashpay_cbor) = setup_dashpay("add_no_conflict");
 

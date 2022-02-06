@@ -105,6 +105,16 @@ pub fn setup(count: u32, seed: u64) -> (Drive, Contract) {
 #[test]
 fn test_query() {
     let (mut drive, contract) = setup(10, 73509);
+
+    let storage = drive.grove.storage();
+    let db_transaction = storage.transaction();
+
+    let root_hash = drive.grove.root_hash(Some(&db_transaction)).expect("there is always a root hash");
+    assert_eq!(root_hash.as_slice(), vec![
+        0, 0, 55, 55, 55, 55, 55, 55, 55, 55, 55, 55, 55, 55, 55, 55, 55, 55, 55, 55, 55,
+        55, 55, 55, 55, 55, 55, 55, 55, 55, 55, 55, 55, 55, 1,
+    ]);
+
     let all_names = [
         "Adey".to_string(),
         "Briney".to_string(),
