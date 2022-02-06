@@ -6,7 +6,6 @@ use std::io;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 use storage::rocksdb_storage::OptimisticTransactionDBTransaction;
-use tempdir::TempDir;
 
 pub fn setup_contract(
     drive: &mut Drive,
