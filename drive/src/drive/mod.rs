@@ -439,7 +439,7 @@ impl Drive {
                     contract,
                     owner_id,
                 )?
-                .unwrap_or_else(|| vec![0]);
+                .unwrap_or_default();
 
             let index_path_slices: Vec<&[u8]> = index_path.iter().map(|x| x.as_slice()).collect();
 
@@ -460,17 +460,12 @@ impl Drive {
                     Error::CorruptedData(String::from("invalid contract indices"))
                 })?;
 
-                let document_index_field_result = document.get_raw_for_contract(
+                let document_index_field = document.get_raw_for_contract(
                     &index_property.name,
                     document_type_name,
                     contract,
                     owner_id,
-                )?;
-
-                let document_index_field = match document_index_field_result {
-                    Some(document_index_field) => document_index_field,
-                    None => continue, // Do nothing is optional indexed field is not present
-                };
+                )?.unwrap_or_default();
 
                 let index_path_slices: Vec<&[u8]> =
                     index_path.iter().map(|x| x.as_slice()).collect();
@@ -694,12 +689,7 @@ impl Drive {
                     document_type_name,
                     contract,
                     owner_id,
-                )?
-                .ok_or_else(|| {
-                    Error::CorruptedData(String::from(
-                        "unable to get document top index field for deletion",
-                    ))
-                })?;
+                )?.unwrap_or_default();
 
             // we push the actual value of the index path
             index_path.push(document_top_field);
@@ -720,10 +710,7 @@ impl Drive {
                         document_type_name,
                         contract,
                         owner_id,
-                    )?
-                    .ok_or_else(|| {
-                        Error::CorruptedData(String::from("unable to get document field"))
-                    })?;
+                    )?.unwrap_or_default();
 
                 // we push the actual value of the index path
                 index_path.push(document_top_field);
@@ -1043,6 +1030,7 @@ mod tests {
 
         let storage = drive.grove.storage();
         let db_transaction = storage.transaction();
+        drive.grove.start_transaction().expect("expected to start transaction");
 
         drive
             .create_root_tree(Some(&db_transaction))
@@ -1050,30 +1038,71 @@ mod tests {
 
         let contract = setup_contract(
             &mut drive,
-            "tests/supporting_files/contract/family/family-contract.json",
+            "tests/supporting_files/contract/family/family-contract-reduced.json",
             Some(&db_transaction),
         );
 
-        let dpns_domain_document_cbor =
+        let person_document_cbor =
             json_document_to_cbor("tests/supporting_files/contract/family/person0.json", Some(1));
 
         let random_owner_id = rand::thread_rng().gen::<[u8; 32]>();
 
         let document =
-            Document::from_cbor(&dpns_domain_document_cbor, None, Some(&random_owner_id))
+            Document::from_cbor(&person_document_cbor, None, Some(&random_owner_id))
                 .expect("expected to deserialize the document");
 
         drive
             .add_document_for_contract(
                 &document,
-                &dpns_domain_document_cbor,
+                &person_document_cbor,
                 &contract,
-                "domain",
+                "person",
                 None,
                 false,
                 Some(&db_transaction),
             )
             .expect("expected to insert a document successfully");
+
+        let person_document_cbor =
+            json_document_to_cbor("tests/supporting_files/contract/family/person1-no-middle-name.json", Some(1));
+
+        let random_owner_id = rand::thread_rng().gen::<[u8; 32]>();
+
+        let document =
+            Document::from_cbor(&person_document_cbor, None, Some(&random_owner_id))
+                .expect("expected to deserialize the document");
+
+        drive
+            .add_document_for_contract(
+                &document,
+                &person_document_cbor,
+                &contract,
+                "person",
+                None,
+                false,
+                Some(&db_transaction),
+            )
+            .expect("expected to insert a document successfully");
+
+        drive
+            .grove
+            .commit_transaction(db_transaction)
+            .expect("unable to commit transaction");
+
+        let document_id = bs58::decode("BZjYxDqLy2hvGQADqE6FAkBnQEpJSzNd3CRw1tpS6vZ7").into_vec().expect("this should decode");
+
+        let db_transaction = storage.transaction();
+        drive.grove.start_transaction().expect("expected to start transaction");
+
+        drive
+            .delete_document_for_contract(
+                &document_id,
+                &contract,
+                "person",
+                Some(&random_owner_id),
+                Some(&db_transaction),
+            )
+            .expect("expected to be able to delete the document");
 
         drive
             .grove

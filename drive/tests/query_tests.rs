@@ -54,6 +54,7 @@ pub fn setup(count: u32, seed: u64) -> (Drive, Contract) {
 
     let storage = drive.grove.storage();
     let db_transaction = storage.transaction();
+    drive.grove.start_transaction().expect("expected to start transaction successfully");
 
     drive
         .create_root_tree(Some(&db_transaction))
@@ -65,11 +66,6 @@ pub fn setup(count: u32, seed: u64) -> (Drive, Contract) {
         "tests/supporting_files/contract/family/family-contract.json",
         Some(&db_transaction),
     );
-
-    drive
-        .grove
-        .start_transaction()
-        .expect("transaction should be started");
 
     let people = Person::random_people(count, seed);
     for person in people {
@@ -108,12 +104,10 @@ fn test_query() {
 
     let storage = drive.grove.storage();
     let db_transaction = storage.transaction();
+    drive.grove.start_transaction().expect("expected to start transaction");
 
     let root_hash = drive.grove.root_hash(Some(&db_transaction)).expect("there is always a root hash");
-    assert_eq!(root_hash.as_slice(), vec![
-        0, 0, 55, 55, 55, 55, 55, 55, 55, 55, 55, 55, 55, 55, 55, 55, 55, 55, 55, 55, 55,
-        55, 55, 55, 55, 55, 55, 55, 55, 55, 55, 55, 55, 55, 1,
-    ]);
+    assert_eq!(root_hash.as_slice(), vec![36, 148, 221, 163, 46, 216, 16, 100, 121, 174, 200, 97, 221, 19, 165, 104, 73, 190, 202, 145, 86, 215, 115, 198, 103, 167, 187, 182, 253, 155, 166, 205]);
 
     let all_names = [
         "Adey".to_string(),
@@ -128,9 +122,6 @@ fn test_query() {
         "Prissie".to_string(),
     ];
 
-    let storage = drive.grove.storage();
-    let db_transaction = storage.transaction();
-    drive.grove.start_transaction();
 
     // A query getting all elements by firstName
 
