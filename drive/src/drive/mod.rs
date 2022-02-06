@@ -811,7 +811,7 @@ mod tests {
     }
 
     #[test]
-    fn test_add_dashpay_documents() {
+    fn test_add_dashpay_documents_no_transaction() {
         let (mut drive, dashpay_cbor) = setup_dashpay("add");
 
         let dashpay_cr_document_cbor = json_document_to_cbor(
@@ -850,6 +850,65 @@ mod tests {
                 Some(&random_owner_id),
                 true,
                 None,
+            )
+            .expect("expected to override a document successfully");
+    }
+
+    #[test]
+    fn test_add_dashpay_documents() {
+        let tmp_dir = TempDir::new("add").unwrap();
+        let mut drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+
+        let storage = drive.grove.storage();
+        let db_transaction = storage.transaction();
+
+        drive
+            .create_root_tree(Some(&db_transaction))
+            .expect("expected to create root tree successfully");
+
+        let contract = setup_contract(
+            &mut drive,
+            "tests/supporting_files/contract/dashpay/dashpay-contract.json",
+            Some(&db_transaction),
+        );
+
+
+        let dashpay_cr_document_cbor = json_document_to_cbor(
+            "tests/supporting_files/contract/dashpay/contact-request0.json",
+            Some(1),
+        );
+
+        let random_owner_id = rand::thread_rng().gen::<[u8; 32]>();
+        drive
+            .add_document_cbor_for_contract(
+                &dashpay_cr_document_cbor,
+                &contract,
+                "contactRequest",
+                Some(&random_owner_id),
+                false,
+                Some(&db_transaction),
+            )
+            .expect("expected to insert a document successfully");
+
+        drive
+            .add_document_cbor_for_contract(
+                &dashpay_cr_document_cbor,
+                &contract,
+                "contactRequest",
+                Some(&random_owner_id),
+                false,
+                Some(&db_transaction),
+            )
+            .expect_err("expected not to be able to insert same document twice");
+
+        drive
+            .add_document_cbor_for_contract(
+                &dashpay_cr_document_cbor,
+                &contract,
+                "contactRequest",
+                Some(&random_owner_id),
+                true,
+                Some(&db_transaction),
             )
             .expect("expected to override a document successfully");
     }
