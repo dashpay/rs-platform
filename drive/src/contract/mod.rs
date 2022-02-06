@@ -370,12 +370,7 @@ impl DocumentType {
 
         // Based on the property name, determine the type
         for (property_key, property_value) in property_values {
-            insert_values(
-                &mut document_properties,
-                None,
-                property_key,
-                property_value,
-            )?;
+            insert_values(&mut document_properties, None, property_key, property_value)?;
         }
 
         // Add system properties

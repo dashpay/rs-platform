@@ -914,9 +914,7 @@ impl<'a> DriveQuery<'a> {
                 alias: _,
                 args: _,
                 with_hints: _,
-            } => {
-                name.0.get(0).as_ref().map(|identifier| &identifier.value)
-            }
+            } => name.0.get(0).as_ref().map(|identifier| &identifier.value),
             _ => None,
         }
         .ok_or_else(|| {
@@ -1042,14 +1040,7 @@ impl<'a> DriveQuery<'a> {
         })
     }
 
-
-
-    fn extract_clauses(
-        all_where_clauses: Vec<WhereClause>,
-    ) -> Result<
-        InternalClauses,
-        Error,
-    > {
+    fn extract_clauses(all_where_clauses: Vec<WhereClause>) -> Result<InternalClauses, Error> {
         let range_clause = WhereClause::group_range_clauses(&all_where_clauses)?;
 
         let equal_clauses_array = all_where_clauses
@@ -1086,10 +1077,10 @@ impl<'a> DriveQuery<'a> {
             .map(|where_clause| (where_clause.field.clone(), where_clause))
             .collect();
 
-        Ok(InternalClauses{
+        Ok(InternalClauses {
             in_clause,
             range_clause,
-            equal_clauses
+            equal_clauses,
         })
     }
 
@@ -1186,23 +1177,28 @@ impl<'a> DriveQuery<'a> {
             .iter()
             .filter_map(|field| self.internal_clauses.equal_clauses.get(field.name.as_str()))
             .collect();
-        let (last_clause, last_clause_is_range, subquery_clause) = match &self.internal_clauses.in_clause {
-            None => match &self.internal_clauses.range_clause {
-                None => (ordered_clauses.last().copied(), false, None),
-                Some(where_clause) => (Some(where_clause), true, None),
-            },
-            Some(where_clause) => match &self.internal_clauses.range_clause {
-                None => (Some(where_clause), true, None),
-                Some(range_clause) => (Some(where_clause), true, Some(range_clause)),
-            },
-        };
+        let (last_clause, last_clause_is_range, subquery_clause) =
+            match &self.internal_clauses.in_clause {
+                None => match &self.internal_clauses.range_clause {
+                    None => (ordered_clauses.last().copied(), false, None),
+                    Some(where_clause) => (Some(where_clause), true, None),
+                },
+                Some(where_clause) => match &self.internal_clauses.range_clause {
+                    None => (Some(where_clause), true, None),
+                    Some(range_clause) => (Some(where_clause), true, Some(range_clause)),
+                },
+            };
 
         // We need to get the terminal indexes unused by clauses.
         let left_over_index_properties = index
             .properties
             .iter()
             .filter(|field| {
-                !(self.internal_clauses.equal_clauses.get(field.name.as_str()).is_some()
+                !(self
+                    .internal_clauses
+                    .equal_clauses
+                    .get(field.name.as_str())
+                    .is_some()
                     || (last_clause.is_some() && last_clause.unwrap().field == field.name)
                     || (subquery_clause.is_some() && subquery_clause.unwrap().field == field.name))
             })
