@@ -121,22 +121,14 @@ fn sql_value_to_cbor(sql_value: ast::Value) -> Option<CborValue> {
         ast::Value::Boolean(bool) => Some(CborValue::Bool(bool)),
         ast::Value::Number(num, _) => {
             let number_as_string = num as String;
-            if number_as_string.contains(".") {
+            if number_as_string.contains('.') {
                 // Float
                 let num_as_float = number_as_string.parse::<f64>().ok();
-                if let Some(num) = num_as_float {
-                    Some(CborValue::Float(num))
-                } else {
-                    None
-                }
+                num_as_float.map(CborValue::Float)
             } else {
                 // Integer
                 let num_as_int = number_as_string.parse::<i64>().ok();
-                if let Some(num) = num_as_int {
-                    Some(CborValue::Integer(Integer::from(num)))
-                } else {
-                    None
-                }
+                num_as_int.map(|num| CborValue::Integer(Integer::from(num)))
             }
         }
         ast::Value::DoubleQuotedString(s) => Some(CborValue::Text(s)),
@@ -152,6 +144,13 @@ pub struct WhereClause {
     field: String,
     operator: WhereOperator,
     value: Value,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct InternalClauses {
+    in_clause: Option<WhereClause>,
+    range_clause: Option<WhereClause>,
+    equal_clauses: HashMap<String, WhereClause>,
 }
 
 impl<'a> WhereClause {
@@ -748,9 +747,7 @@ impl<'a> OrderClause {
 pub struct DriveQuery<'a> {
     pub contract: &'a Contract,
     pub document_type: &'a DocumentType,
-    pub equal_clauses: HashMap<String, WhereClause>,
-    pub in_clause: Option<WhereClause>,
-    pub range_clause: Option<WhereClause>,
+    pub internal_clauses: InternalClauses,
     pub offset: u16,
     pub limit: u16,
     pub order_by: IndexMap<String, OrderClause>,
@@ -802,7 +799,7 @@ impl<'a> DriveQuery<'a> {
                 }
             })?;
 
-        let (range_clause, in_clause, equal_clauses) = Self::extract_clauses(all_where_clauses)?;
+        let internal_clauses = Self::extract_clauses(all_where_clauses)?;
 
         let start_at_option = query_document.get("startAt");
         let start_after_option = query_document.get("startAfter");
@@ -851,9 +848,7 @@ impl<'a> DriveQuery<'a> {
         Ok(DriveQuery {
             contract,
             document_type,
-            equal_clauses,
-            in_clause,
-            range_clause,
+            internal_clauses,
             offset: 0,
             limit,
             order_by,
@@ -911,21 +906,15 @@ impl<'a> DriveQuery<'a> {
         let document_type_name = match &select
             .from
             .get(0)
-            .ok_or_else(|| Error::InvalidQuery("Invalid query: missing from section"))?
+            .ok_or(Error::InvalidQuery("Invalid query: missing from section"))?
             .relation
         {
             Table {
                 name,
-                alias,
-                args,
-                with_hints,
-            } => {
-                if let Some(identifier) = &name.0.get(0) {
-                    Some(&identifier.value)
-                } else {
-                    None
-                }
-            }
+                alias: _,
+                args: _,
+                with_hints: _,
+            } => name.0.get(0).as_ref().map(|identifier| &identifier.value),
             _ => None,
         }
         .ok_or_else(|| {
@@ -935,7 +924,7 @@ impl<'a> DriveQuery<'a> {
         let document_type = contract
             .document_types
             .get(document_type_name)
-            .ok_or_else(|| Error::InvalidQuery("document type not found in contract"))?;
+            .ok_or(Error::InvalidQuery("document type not found in contract"))?;
 
         // Restrictions
         // only binary where clauses are supported
@@ -961,8 +950,8 @@ impl<'a> DriveQuery<'a> {
                         let mut where_operator = where_operator_from_sql_operator(op.clone())
                             .ok_or(Error::InvalidQuery("Unknown operator"))?;
 
-                        let mut identifier;
-                        let mut value_expr;
+                        let identifier;
+                        let value_expr;
 
                         if matches!(&**left, ast::Expr::Identifier(_))
                             && matches!(&**right, ast::Expr::Value(_))
@@ -988,16 +977,16 @@ impl<'a> DriveQuery<'a> {
                         };
 
                         let value = if let ast::Expr::Value(value) = value_expr {
-                            let cbor_val = sql_value_to_cbor(value.clone()).ok_or_else(|| {
+                            let cbor_val = sql_value_to_cbor(value.clone()).ok_or({
                                 Error::InvalidQuery("Invalid query: unexpected value type")
                             })?;
                             if where_operator == StartsWith {
                                 // make sure the value is of the right format i.e prefix%
-                                let inner_text = cbor_val.as_text().ok_or_else(|| {
+                                let inner_text = cbor_val.as_text().ok_or({
                                     Error::InvalidQuery("Invalid query: startsWith takes text")
                                 })?;
                                 let match_locations: Vec<_> =
-                                    inner_text.match_indices("%").collect();
+                                    inner_text.match_indices('%').collect();
                                 if match_locations.len() == 1
                                     && match_locations[0].0 == inner_text.len() - 1
                                 {
@@ -1033,7 +1022,7 @@ impl<'a> DriveQuery<'a> {
             build_where_clause(selection_tree, &mut all_where_clauses)?;
         }
 
-        let (range_clause, in_clause, equal_clauses) = Self::extract_clauses(all_where_clauses)?;
+        let internal_clauses = Self::extract_clauses(all_where_clauses)?;
 
         let start_at_option = None;
         let start_at_included = true;
@@ -1042,9 +1031,7 @@ impl<'a> DriveQuery<'a> {
         Ok(DriveQuery {
             contract,
             document_type,
-            equal_clauses,
-            in_clause,
-            range_clause,
+            internal_clauses,
             offset: 0,
             limit,
             order_by,
@@ -1053,16 +1040,7 @@ impl<'a> DriveQuery<'a> {
         })
     }
 
-    fn extract_clauses(
-        all_where_clauses: Vec<WhereClause>,
-    ) -> Result<
-        (
-            Option<WhereClause>,
-            Option<WhereClause>,
-            HashMap<String, WhereClause>,
-        ),
-        Error,
-    > {
+    fn extract_clauses(all_where_clauses: Vec<WhereClause>) -> Result<InternalClauses, Error> {
         let range_clause = WhereClause::group_range_clauses(&all_where_clauses)?;
 
         let equal_clauses_array = all_where_clauses
@@ -1099,7 +1077,11 @@ impl<'a> DriveQuery<'a> {
             .map(|where_clause| (where_clause.field.clone(), where_clause))
             .collect();
 
-        Ok((range_clause, in_clause, equal_clauses))
+        Ok(InternalClauses {
+            in_clause,
+            range_clause,
+            equal_clauses,
+        })
     }
 
     pub fn execute_with_proof(
@@ -1145,15 +1127,18 @@ impl<'a> DriveQuery<'a> {
         }?;
 
         let equal_fields = self
+            .internal_clauses
             .equal_clauses
             .keys()
             .map(|s| s.as_str())
             .collect::<Vec<&str>>();
         let in_field = self
+            .internal_clauses
             .in_clause
             .as_ref()
             .map(|in_clause| in_clause.field.as_str());
         let range_field = self
+            .internal_clauses
             .range_clause
             .as_ref()
             .map(|range_clause| range_clause.field.as_str());
@@ -1190,25 +1175,30 @@ impl<'a> DriveQuery<'a> {
         let ordered_clauses: Vec<&WhereClause> = index
             .properties
             .iter()
-            .filter_map(|field| self.equal_clauses.get(field.name.as_str()))
+            .filter_map(|field| self.internal_clauses.equal_clauses.get(field.name.as_str()))
             .collect();
-        let (last_clause, last_clause_is_range, subquery_clause) = match &self.in_clause {
-            None => match &self.range_clause {
-                None => (ordered_clauses.last().copied(), false, None),
-                Some(where_clause) => (Some(where_clause), true, None),
-            },
-            Some(where_clause) => match &self.range_clause {
-                None => (Some(where_clause), true, None),
-                Some(range_clause) => (Some(where_clause), true, Some(range_clause)),
-            },
-        };
+        let (last_clause, last_clause_is_range, subquery_clause) =
+            match &self.internal_clauses.in_clause {
+                None => match &self.internal_clauses.range_clause {
+                    None => (ordered_clauses.last().copied(), false, None),
+                    Some(where_clause) => (Some(where_clause), true, None),
+                },
+                Some(where_clause) => match &self.internal_clauses.range_clause {
+                    None => (Some(where_clause), true, None),
+                    Some(range_clause) => (Some(where_clause), true, Some(range_clause)),
+                },
+            };
 
         // We need to get the terminal indexes unused by clauses.
         let left_over_index_properties = index
             .properties
             .iter()
             .filter(|field| {
-                !(self.equal_clauses.get(field.name.as_str()).is_some()
+                !(self
+                    .internal_clauses
+                    .equal_clauses
+                    .get(field.name.as_str())
+                    .is_some()
                     || (last_clause.is_some() && last_clause.unwrap().field == field.name)
                     || (subquery_clause.is_some() && subquery_clause.unwrap().field == field.name))
             })
@@ -1218,7 +1208,7 @@ impl<'a> DriveQuery<'a> {
                 .properties
                 .iter()
                 .filter_map(|field| {
-                    match self.equal_clauses.get(field.name.as_str()) {
+                    match self.internal_clauses.equal_clauses.get(field.name.as_str()) {
                         None => None,
                         Some(where_clause) => {
                             if self.order_by.is_empty()

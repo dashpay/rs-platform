@@ -80,7 +80,7 @@ impl Index {
                 if matched_ordering {
                     break;
                 }
-                if let Some((last, elements)) = reduced_properties.split_last() {
+                if let Some((_last, elements)) = reduced_properties.split_last() {
                     // should_ignore.push(last.name.clone());
                     reduced_properties = elements;
                 } else {
@@ -370,12 +370,7 @@ impl DocumentType {
 
         // Based on the property name, determine the type
         for (property_key, property_value) in property_values {
-            insert_values(
-                &mut document_properties,
-                None,
-                &property_key,
-                &property_value,
-            )?;
+            insert_values(&mut document_properties, None, property_key, property_value)?;
         }
 
         // Add system properties
