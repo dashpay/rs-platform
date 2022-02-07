@@ -48,9 +48,9 @@ impl Person {
     }
 }
 
-pub fn setup(count: u32, seed: u64) -> (Drive, Contract) {
+pub fn setup(count: u32, seed: u64) -> (Drive, Contract, TempDir) {
     let tmp_dir = TempDir::new("family").unwrap();
-    let mut drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+    let mut drive: Drive = Drive::open(&tmp_dir).expect("expected to open Drive successfully");
 
     drive
         .create_root_tree(None)
@@ -94,17 +94,18 @@ pub fn setup(count: u32, seed: u64) -> (Drive, Contract) {
             .commit_transaction(db_transaction)
             .expect("transaction should be committed");
     }
-    (drive, contract)
+
+    (drive, contract, tmp_dir)
 }
 
 #[test]
 fn test_multiple_insert() {
-    let (mut drive, contract) = setup(2000, 73509);
+    let (mut drive, contract, tmp_dir) = setup(2000, 73509);
 }
 
 #[test]
 fn test_query() {
-    let (mut drive, contract) = setup(10, 73509);
+    let (mut drive, contract, tmp_dir) = setup(10, 73509);
     let all_names = [
         "Adey".to_string(),
         "Briney".to_string(),
@@ -720,7 +721,7 @@ fn test_sql_query() {
     // These tests confirm that sql statements produce the same drive query
     // as their json counterparts, tests above confirm that the json queries
     // produce the correct result set
-    let (_, contract) = setup(10, 73509);
+    let (_, contract, tmp_dir) = setup(10, 73509);
     let person_document_type = contract
         .document_types
         .get("person")
