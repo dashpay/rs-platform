@@ -56,6 +56,11 @@ pub fn setup(count: u32, seed: u64) -> (Drive, Contract, TempDir) {
     let db_transaction = storage.transaction();
 
     drive
+        .grove
+        .start_transaction()
+        .expect("transaction should be started");
+
+    drive
         .create_root_tree(Some(&db_transaction))
         .expect("expected to create root tree successfully");
 
@@ -65,11 +70,6 @@ pub fn setup(count: u32, seed: u64) -> (Drive, Contract, TempDir) {
         "tests/supporting_files/contract/family/family-contract.json",
         Some(&db_transaction),
     );
-
-    drive
-        .grove
-        .start_transaction()
-        .expect("transaction should be started");
 
     let people = Person::random_people(count, seed);
     for person in people {
