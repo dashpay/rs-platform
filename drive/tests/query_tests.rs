@@ -97,10 +97,35 @@ pub fn setup(count: u32, seed: u64) -> (Drive, Contract) {
     (drive, contract)
 }
 
-// #[test]
-// fn test_query_many() {
-//     let (mut drive, contract) = setup(1000, 73509);
-// }
+#[test]
+fn test_query_many() {
+    let (mut drive, contract) = setup(1600, 73509);
+    let storage = drive.grove.storage();
+    let db_transaction = storage.transaction();
+    let people = Person::random_people(10, 73409);
+    for person in people {
+        let value = serde_json::to_value(&person).expect("serialized person");
+        let document_cbor =
+            common::value_to_cbor(value, Some(rs_drive::drive::defaults::PROTOCOL_VERSION));
+        let document = Document::from_cbor(document_cbor.as_slice(), None, None)
+            .expect("document should be properly deserialized");
+        drive
+            .add_document_for_contract(
+                &document,
+                &document_cbor,
+                &contract,
+                "person",
+                None,
+                true,
+                Some(&db_transaction),
+            )
+            .expect("document should be inserted");
+    }
+    drive
+        .grove
+        .commit_transaction(db_transaction)
+        .expect("transaction should be committed");
+}
 
 #[test]
 fn test_query() {
