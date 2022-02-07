@@ -52,27 +52,26 @@ pub fn setup(count: u32, seed: u64) -> (Drive, Contract) {
     let tmp_dir = TempDir::new("family").unwrap();
     let mut drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
 
-    let storage = drive.grove.storage();
-    let db_transaction = storage.transaction();
-
     drive
-        .create_root_tree(Some(&db_transaction))
+        .create_root_tree(None)
         .expect("expected to create root tree successfully");
 
     // setup code
     let contract = common::setup_contract(
         &mut drive,
         "tests/supporting_files/contract/family/family-contract.json",
-        Some(&db_transaction),
+        None,
     );
-
-    drive
-        .grove
-        .start_transaction()
-        .expect("transaction should be started");
 
     let people = Person::random_people(count, seed);
     for person in people {
+        let storage = drive.grove.storage();
+        let db_transaction = storage.transaction();
+        drive
+            .grove
+            .start_transaction()
+            .expect("transaction should be started");
+
         let value = serde_json::to_value(&person).expect("serialized person");
         let document_cbor =
             common::value_to_cbor(value, Some(rs_drive::drive::defaults::PROTOCOL_VERSION));
@@ -89,18 +88,19 @@ pub fn setup(count: u32, seed: u64) -> (Drive, Contract) {
                 Some(&db_transaction),
             )
             .expect("document should be inserted");
+
+        drive
+            .grove
+            .commit_transaction(db_transaction)
+            .expect("transaction should be committed");
     }
-    drive
-        .grove
-        .commit_transaction(db_transaction)
-        .expect("transaction should be committed");
     (drive, contract)
 }
 
-// #[test]
-// fn test_query_many() {
-//     let (mut drive, contract) = setup(1000, 73509);
-// }
+#[test]
+fn test_multiple_insert() {
+    let (mut drive, contract) = setup(2000, 73509);
+}
 
 #[test]
 fn test_query() {
