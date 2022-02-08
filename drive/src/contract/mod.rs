@@ -5,6 +5,7 @@ use ciborium::value::{Value as CborValue, Value};
 use grovedb::Error;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use crate::common;
 use crate::common::bytes_for_system_value_from_hash_map;
 
 // contract
@@ -265,7 +266,7 @@ impl DocumentType {
     ) -> Result<Self, Error> {
         let mut document_properties: HashMap<String, types::DocumentFieldType> = HashMap::new();
 
-        let index_values = match cbor_inner_array_value(document_type_value_map, "indices") {
+        let index_values = match common::cbor_inner_array_value(document_type_value_map, "indices") {
             Some(index_values) => index_values,
             None => {
                 return Ok(DocumentType {
@@ -288,7 +289,7 @@ impl DocumentType {
         }
 
         // Extract the properties
-        let property_values = cbor_inner_map_value(document_type_value_map, "properties")
+        let property_values = common::cbor_inner_map_value(document_type_value_map, "properties")
             .ok_or_else(|| {
                 Error::CorruptedData(String::from(
                     "unable to get document properties from the contract",
@@ -324,7 +325,7 @@ impl DocumentType {
             }
 
             let inner_property_values = property_value.as_map().expect("confirmed as map");
-            let type_value = cbor_inner_text_value(inner_property_values, "type")
+            let type_value = common::cbor_inner_text_value(inner_property_values, "type")
                 .ok_or_else(|| Error::CorruptedData(String::from("cannot find type property")))?;
 
             let field_type: types::DocumentFieldType;
@@ -333,7 +334,7 @@ impl DocumentType {
                 "array" => {
                     // Only handling bytearrays for v1
                     // Return an error if it is not a byte array
-                    field_type = match cbor_inner_bool_value(inner_property_values, "byteArray") {
+                    field_type = match common::cbor_inner_bool_value(inner_property_values, "byteArray") {
                         Some(inner_bool) => {
                             if inner_bool {
                                 types::DocumentFieldType::ByteArray
@@ -347,7 +348,7 @@ impl DocumentType {
                     document_properties.insert(prefixed_property_key, field_type);
                 }
                 "object" => {
-                    let properties = cbor_inner_map_value(inner_property_values, "properties")
+                    let properties = common::cbor_inner_map_value(inner_property_values, "properties")
                         .ok_or_else(|| {
                             Error::CorruptedData(String::from(
                                 "cannot find byteArray property for array type",
@@ -542,7 +543,7 @@ impl Document {
                     let map_values = value.as_map().ok_or_else(|| {
                         Error::CorruptedData(String::from("inner key must refer to a value map"))
                     })?;
-                    match get_key_from_cbor_map(map_values, key) {
+                    match common::get_key_from_cbor_map(map_values, key) {
                         None => Ok(None),
                         Some(value) => get_value_at_path(value, rest_key_paths),
                     }
@@ -657,57 +658,6 @@ fn contract_document_types(contract: &HashMap<String, CborValue>) -> Option<&Vec
             None
         }
     })
-}
-
-fn get_key_from_cbor_map<'a>(cbor_map: &'a [(Value, Value)], key: &'a str) -> Option<&'a Value> {
-    for (cbor_key, cbor_value) in cbor_map.iter() {
-        if !cbor_key.is_text() {
-            continue;
-        }
-
-        if cbor_key.as_text().expect("confirmed as text") == key {
-            return Some(cbor_value);
-        }
-    }
-    None
-}
-
-fn cbor_inner_array_value<'a>(
-    document_type: &'a [(Value, Value)],
-    key: &'a str,
-) -> Option<&'a Vec<Value>> {
-    let key_value = get_key_from_cbor_map(document_type, key)?;
-    if let Value::Array(key_value) = key_value {
-        return Some(key_value);
-    }
-    None
-}
-
-fn cbor_inner_map_value<'a>(
-    document_type: &'a [(Value, Value)],
-    key: &'a str,
-) -> Option<&'a Vec<(Value, Value)>> {
-    let key_value = get_key_from_cbor_map(document_type, key)?;
-    if let Value::Map(map_value) = key_value {
-        return Some(map_value);
-    }
-    None
-}
-
-fn cbor_inner_text_value<'a>(document_type: &'a [(Value, Value)], key: &'a str) -> Option<&'a str> {
-    let key_value = get_key_from_cbor_map(document_type, key)?;
-    if let Value::Text(string_value) = key_value {
-        return Some(string_value);
-    }
-    None
-}
-
-fn cbor_inner_bool_value(document_type: &[(Value, Value)], key: &str) -> Option<bool> {
-    let key_value = get_key_from_cbor_map(document_type, key)?;
-    if let Value::Bool(bool_value) = key_value {
-        return Some(*bool_value);
-    }
-    None
 }
 
 #[cfg(test)]

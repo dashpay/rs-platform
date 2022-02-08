@@ -82,3 +82,87 @@ pub fn bytes_for_system_value_from_hash_map(
 ) -> Option<Vec<u8>> {
     document.get(key).and_then(bytes_for_system_value)
 }
+
+
+pub (crate) fn get_key_from_cbor_map<'a>(cbor_map: &'a [(CborValue, CborValue)], key: &'a str) -> Option<&'a CborValue> {
+    for (cbor_key, cbor_value) in cbor_map.iter() {
+        if !cbor_key.is_text() {
+            continue;
+        }
+
+        if cbor_key.as_text().expect("confirmed as text") == key {
+            return Some(cbor_value);
+        }
+    }
+    None
+}
+
+pub (crate) fn cbor_inner_array_value<'a>(
+    document_type: &'a [(CborValue, CborValue)],
+    key: &'a str,
+) -> Option<&'a Vec<CborValue>> {
+    let key_value = get_key_from_cbor_map(document_type, key)?;
+    if let CborValue::Array(key_value) = key_value {
+        return Some(key_value);
+    }
+    None
+}
+
+pub (crate) fn cbor_inner_map_value<'a>(
+    document_type: &'a [(CborValue, CborValue)],
+    key: &'a str,
+) -> Option<&'a Vec<(CborValue, CborValue)>> {
+    let key_value = get_key_from_cbor_map(document_type, key)?;
+    if let CborValue::Map(map_value) = key_value {
+        return Some(map_value);
+    }
+    None
+}
+
+pub (crate) fn cbor_inner_text_value<'a>(document_type: &'a [(CborValue, CborValue)], key: &'a str) -> Option<&'a str> {
+    let key_value = get_key_from_cbor_map(document_type, key)?;
+    if let CborValue::Text(string_value) = key_value {
+        return Some(string_value);
+    }
+    None
+}
+
+pub (crate) fn cbor_inner_u64_value<'a>(document_type: &'a [(CborValue, CborValue)], key: &'a str) -> Option<u64> {
+    let key_value = get_key_from_cbor_map(document_type, key)?;
+    if let CborValue::Integer(integer_value) = key_value {
+        return Some(i128::from(*integer_value) as u64);
+    }
+    None
+}
+
+pub (crate) fn cbor_inner_u32_value<'a>(document_type: &'a [(CborValue, CborValue)], key: &'a str) -> Option<u32> {
+    let key_value = get_key_from_cbor_map(document_type, key)?;
+    if let CborValue::Integer(integer_value) = key_value {
+        return Some(i128::from(*integer_value) as u32);
+    }
+    None
+}
+
+pub (crate) fn cbor_inner_u16_value<'a>(document_type: &'a [(CborValue, CborValue)], key: &'a str) -> Option<u16> {
+    let key_value = get_key_from_cbor_map(document_type, key)?;
+    if let CborValue::Integer(integer_value) = key_value {
+        return Some(i128::from(*integer_value) as u16);
+    }
+    None
+}
+
+pub (crate) fn cbor_inner_u8_value<'a>(document_type: &'a [(CborValue, CborValue)], key: &'a str) -> Option<u8> {
+    let key_value = get_key_from_cbor_map(document_type, key)?;
+    if let CborValue::Integer(integer_value) = key_value {
+        return Some(i128::from(*integer_value) as u8);
+    }
+    None
+}
+
+pub (crate) fn cbor_inner_bool_value(document_type: &[(CborValue, CborValue)], key: &str) -> Option<bool> {
+    let key_value = get_key_from_cbor_map(document_type, key)?;
+    if let CborValue::Bool(bool_value) = key_value {
+        return Some(*bool_value);
+    }
+    None
+}
