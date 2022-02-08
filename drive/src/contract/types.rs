@@ -54,7 +54,7 @@ pub fn encode_document_field_type(
                 .map_err(|_| Error::CorruptedData(String::from("expected integer value")))?;
 
             encode_integer(value_as_i64)
-        },
+        }
         DocumentFieldType::Number => {
             let value_as_f64 = if value.is_integer() {
                 let value_as_integer = value
