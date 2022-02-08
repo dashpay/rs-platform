@@ -751,8 +751,8 @@ fn bytes_for_system_value_from_hash_map(
 mod tests {
     use crate::common::json_document_to_cbor;
     use crate::contract::Contract;
-    use crate::drive::{Drive};
-    use std::{collections::HashMap};
+    use crate::drive::Drive;
+    use std::collections::HashMap;
 
     #[test]
     fn test_cbor_deserialization() {
