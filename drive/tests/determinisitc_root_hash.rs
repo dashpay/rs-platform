@@ -262,7 +262,6 @@ fn test_deterministic_root_hash() {
         .expect("transaction should be started");
 
     for _ in 0..10 {
-        println!("one");
         test_root_hash(&mut drive, &db_transaction);
 
         drive
