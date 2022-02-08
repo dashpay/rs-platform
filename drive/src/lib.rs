@@ -2,6 +2,7 @@ pub mod common;
 pub mod contract;
 pub mod drive;
 pub mod query;
+mod identity;
 
 #[cfg(test)]
 mod tests {

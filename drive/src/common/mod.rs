@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use crate::contract::Contract;
 use crate::drive::Drive;
 use byteorder::{BigEndian, WriteBytesExt};
@@ -5,7 +6,9 @@ use std::fs::File;
 use std::io;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
+use ciborium::value::Value as CborValue;
 use storage::rocksdb_storage::OptimisticTransactionDBTransaction;
+use grovedb::Error;
 
 pub fn setup_contract(
     drive: &mut Drive,
@@ -40,4 +43,42 @@ pub fn text_file_strings(path: impl AsRef<Path>) -> Vec<String> {
     let file = File::open(path).expect("file not found");
     let reader = io::BufReader::new(file).lines();
     reader.into_iter().map(|a| a.unwrap()).collect()
+}
+
+pub fn bytes_for_system_value(value: &CborValue) -> Option<Vec<u8>> {
+    match value {
+        CborValue::Bytes(bytes) => Some(bytes.clone()),
+        CborValue::Text(text) => match bs58::decode(text).into_vec() {
+            Ok(data) => Some(data),
+            Err(_) => None,
+        },
+        CborValue::Array(array) => {
+            let bytes_result: Result<Vec<u8>, Error> = array
+                .iter()
+                .map(|byte| match byte {
+                    CborValue::Integer(int) => {
+                        let value_as_u8: u8 = (*int)
+                            .try_into()
+                            .map_err(|_| Error::CorruptedData(String::from("expected u8 value")))?;
+                        Ok(value_as_u8)
+                    }
+                    _ => Err(Error::CorruptedData(String::from(
+                        "not an array of integers",
+                    ))),
+                })
+                .collect::<Result<Vec<u8>, Error>>();
+            match bytes_result {
+                Ok(bytes) => Some(bytes),
+                Err(_) => None,
+            }
+        }
+        _ => None,
+    }
+}
+
+pub fn bytes_for_system_value_from_hash_map(
+    document: &HashMap<String, CborValue>,
+    key: &str,
+) -> Option<Vec<u8>> {
+    document.get(key).and_then(bytes_for_system_value)
 }

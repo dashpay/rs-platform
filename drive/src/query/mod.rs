@@ -1,6 +1,6 @@
 mod defaults;
 
-use crate::contract::{bytes_for_system_value, Contract, Document, DocumentType, IndexProperty};
+use crate::contract::{Contract, Document, DocumentType, IndexProperty};
 use crate::query::WhereOperator::{
     Between, BetweenExcludeBounds, BetweenExcludeLeft, BetweenExcludeRight, Equal, GreaterThan,
     GreaterThanOrEquals, In, LessThan, LessThanOrEquals, StartsWith,
@@ -16,6 +16,7 @@ use sqlparser::dialect::GenericDialect;
 use sqlparser::parser::Parser;
 use std::collections::HashMap;
 use storage::rocksdb_storage::OptimisticTransactionDBTransaction;
+use crate::common::bytes_for_system_value;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum WhereOperator {

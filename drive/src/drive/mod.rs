@@ -153,6 +153,21 @@ impl Drive {
         Ok(())
     }
 
+    fn insert_identity(
+        &mut self,
+        identity_key: &[u8],
+        identity_bytes: Element,
+        transaction: Option<&OptimisticTransactionDBTransaction>,
+    ) -> Result<u64, Error> {
+        self.grove.insert(
+            [Into::<&[u8; 1]>::into(RootTree::Identities).as_slice()],
+            identity_key,
+            identity_bytes,
+            transaction,
+        )?;
+        Ok(1)
+    }
+
     fn insert_contract(
         &mut self,
         contract_bytes: Element,
@@ -761,10 +776,12 @@ impl Drive {
 mod tests {
     use crate::common::{json_document_to_cbor, setup_contract};
     use crate::contract::Document;
-    use crate::drive::Drive;
+    use crate::drive::{Drive, RootTree};
     use rand::Rng;
     use std::{collections::HashMap, fs::File, io::BufReader, path::Path};
+    use grovedb::Element;
     use tempdir::TempDir;
+    use crate::identity::Identity;
 
     fn setup_dashpay(prefix: &str) -> (Drive, Vec<u8>) {
         let tmp_dir = TempDir::new(prefix).unwrap();
@@ -964,6 +981,45 @@ mod tests {
             .expect_err(
                 "expected not to be able to insert document with already existing unique index",
             );
+    }
+
+    #[test]
+    fn test_insert_root_tree() {
+        let tmp_dir = TempDir::new("identity").unwrap();
+        let mut drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+
+        let storage = drive.grove.storage();
+        let db_transaction = storage.transaction();
+        drive.grove.start_transaction();
+
+        drive.grove.insert(
+            [],
+            Into::<&[u8; 1]>::into(RootTree::Identities),
+            Element::empty_tree(),
+            Some(&db_transaction),
+        ).expect("expected to be able to insert root tree");
+    }
+
+    #[test]
+    fn test_insert_identity() {
+        let tmp_dir = TempDir::new("identity").unwrap();
+        let mut drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+
+        let storage = drive.grove.storage();
+        let db_transaction = storage.transaction();
+        drive.grove.start_transaction().expect("expected to start a transaction");
+
+        drive
+            .create_root_tree(Some(&db_transaction))
+            .expect("expected to create root tree successfully");
+
+        let identity_bytes = hex::decode("01000000a462696458203012c19b98ec0033addb36cd64b7f510670f2a351a4304b5f6994144286efdac6762616c616e636500687265766973696f6e006a7075626c69634b65797381a6626964006464617461582102abb64674c5df796559eb3cf92a84525cc1a6068e7ad9d4ff48a1f0b179ae29e164747970650067707572706f73650068726561644f6e6c79f76d73656375726974794c6576656c00").expect("expected to decode identity hex");
+
+        let identity = Identity::from_cbor(identity_bytes.as_slice()).expect("expected to deserialize an identity");
+
+        drive.insert_identity(&identity.id, Element::Item(identity_bytes), Some(&db_transaction)).expect("expected to insert identity");
+
+        drive.grove.commit_transaction(db_transaction).expect("expected to be able to commit a transaction");
     }
 
     #[test]

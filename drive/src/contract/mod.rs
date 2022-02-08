@@ -5,6 +5,7 @@ use ciborium::value::{Value as CborValue, Value};
 use grovedb::Error;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use crate::common::bytes_for_system_value_from_hash_map;
 
 // contract
 // - id
@@ -707,44 +708,6 @@ fn cbor_inner_bool_value(document_type: &[(Value, Value)], key: &str) -> Option<
         return Some(*bool_value);
     }
     None
-}
-
-pub fn bytes_for_system_value(value: &Value) -> Option<Vec<u8>> {
-    match value {
-        Value::Bytes(bytes) => Some(bytes.clone()),
-        Value::Text(text) => match bs58::decode(text).into_vec() {
-            Ok(data) => Some(data),
-            Err(_) => None,
-        },
-        Value::Array(array) => {
-            let bytes_result: Result<Vec<u8>, Error> = array
-                .iter()
-                .map(|byte| match byte {
-                    Value::Integer(int) => {
-                        let value_as_u8: u8 = (*int)
-                            .try_into()
-                            .map_err(|_| Error::CorruptedData(String::from("expected u8 value")))?;
-                        Ok(value_as_u8)
-                    }
-                    _ => Err(Error::CorruptedData(String::from(
-                        "not an array of integers",
-                    ))),
-                })
-                .collect::<Result<Vec<u8>, Error>>();
-            match bytes_result {
-                Ok(bytes) => Some(bytes),
-                Err(_) => None,
-            }
-        }
-        _ => None,
-    }
-}
-
-fn bytes_for_system_value_from_hash_map(
-    document: &HashMap<String, CborValue>,
-    key: &str,
-) -> Option<Vec<u8>> {
-    document.get(key).and_then(bytes_for_system_value)
 }
 
 #[cfg(test)]
