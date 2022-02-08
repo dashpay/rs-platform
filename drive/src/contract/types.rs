@@ -1,6 +1,7 @@
 use byteorder::{BigEndian, WriteBytesExt};
 use ciborium::value::Value;
 use grovedb::Error;
+use rand_distr::num_traits::ToPrimitive;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
@@ -43,17 +44,33 @@ pub fn encode_document_field_type(
             let value_as_text = value.as_text().ok_or_else(get_field_type_matching_error)?;
             Ok(value_as_text.as_bytes().to_vec())
         }
-        DocumentFieldType::Date | DocumentFieldType::Integer => encode_cbor_integer(value),
+        DocumentFieldType::Date | DocumentFieldType::Integer => {
+            let value_as_integer = value
+                .as_integer()
+                .ok_or_else(get_field_type_matching_error)?;
+
+            let value_as_i64: i64 = value_as_integer
+                .try_into()
+                .map_err(|_| Error::CorruptedData(String::from("expected integer value")))?;
+
+            encode_integer(value_as_i64)
+        },
         DocumentFieldType::Number => {
-            if value.is_integer() {
-                encode_cbor_integer(value)
-            } else {
-                let value_as_float = value.as_float().ok_or_else(get_field_type_matching_error)?;
-                let value_as_f64 = value_as_float
+            let value_as_f64 = if value.is_integer() {
+                let value_as_integer = value
+                    .as_integer()
+                    .ok_or_else(get_field_type_matching_error)?;
+
+                let value_as_i64: i64 = value_as_integer
                     .try_into()
-                    .map_err(|_| Error::CorruptedData(String::from("expected float value")))?;
-                encode_float(value_as_f64)
-            }
+                    .map_err(|_| Error::CorruptedData(String::from("expected number value")))?;
+
+                value_as_i64 as f64
+            } else {
+                value.as_float().ok_or_else(get_field_type_matching_error)?
+            };
+
+            encode_float(value_as_f64)
         }
         DocumentFieldType::ByteArray => {
             // Byte array could either be raw bytes or encoded as a base64 string
@@ -84,18 +101,6 @@ pub fn encode_document_field_type(
             "we should never try encoding an array",
         ))),
     };
-}
-
-fn encode_cbor_integer(value: &Value) -> Result<Vec<u8>, Error> {
-    let value_as_integer = value
-        .as_integer()
-        .ok_or_else(get_field_type_matching_error)?;
-
-    let value_as_i64: i64 = value_as_integer
-        .try_into()
-        .map_err(|_| Error::CorruptedData(String::from("expected integer value")))?;
-
-    encode_integer(value_as_i64)
 }
 
 fn encode_integer(val: i64) -> Result<Vec<u8>, Error> {
