@@ -5,6 +5,7 @@ use crate::query::DriveQuery;
 use grovedb::{Element, Error, GroveDb};
 use std::path::Path;
 use storage::rocksdb_storage::OptimisticTransactionDBTransaction;
+use crate::identity::Identity;
 
 pub struct Drive {
     pub grove: GroveDb,
@@ -166,6 +167,23 @@ impl Drive {
             transaction,
         )?;
         Ok(1)
+    }
+
+    pub fn insert_identity_cbor(
+        &mut self,
+        identity_id: Option<&[u8]>,
+        identity_bytes: Vec<u8>,
+        transaction: Option<&OptimisticTransactionDBTransaction>,
+    ) -> Result<u64, Error> {
+        let identity_id = match identity_id {
+            None => {
+                let identity = Identity::from_cbor(identity_bytes.as_slice())?;
+                Vec::from(identity.id)
+            }
+            Some(identity_id) => { Vec::from(identity_id) }
+        };
+
+        self.insert_identity(identity_id.as_slice(), Element::Item(identity_bytes), transaction)
     }
 
     fn insert_contract(
@@ -1013,7 +1031,7 @@ mod tests {
             .create_root_tree(Some(&db_transaction))
             .expect("expected to create root tree successfully");
 
-        let identity_bytes = hex::decode("01000000a462696458203012c19b98ec0033addb36cd64b7f510670f2a351a4304b5f6994144286efdac6762616c616e636500687265766973696f6e006a7075626c69634b65797381a6626964006464617461582102abb64674c5df796559eb3cf92a84525cc1a6068e7ad9d4ff48a1f0b179ae29e164747970650067707572706f73650068726561644f6e6c79f76d73656375726974794c6576656c00").expect("expected to decode identity hex");
+        let identity_bytes = hex::decode("01000000a462696458203012c19b98ec0033addb36cd64b7f510670f2a351a4304b5f6994144286efdac6762616c616e636500687265766973696f6e006a7075626c69634b65797381a6626964006464617461582102abb64674c5df796559eb3cf92a84525cc1a6068e7ad9d4ff48a1f0b179ae29e164747970650067707572706f73650068726561644f6e6c79f46d73656375726974794c6576656c00").expect("expected to decode identity hex");
 
         let identity = Identity::from_cbor(identity_bytes.as_slice()).expect("expected to deserialize an identity");
 

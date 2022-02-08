@@ -119,6 +119,17 @@ pub (crate) fn cbor_inner_map_value<'a>(
     None
 }
 
+pub (crate) fn cbor_inner_bytes_value<'a>(
+    document_type: &'a [(CborValue, CborValue)],
+    key: &'a str,
+) -> Option<&'a [u8]> {
+    let key_value = get_key_from_cbor_map(document_type, key)?;
+    if let CborValue::Bytes(key_value) = key_value {
+        return Some(key_value);
+    }
+    None
+}
+
 pub (crate) fn cbor_inner_text_value<'a>(document_type: &'a [(CborValue, CborValue)], key: &'a str) -> Option<&'a str> {
     let key_value = get_key_from_cbor_map(document_type, key)?;
     if let CborValue::Text(string_value) = key_value {

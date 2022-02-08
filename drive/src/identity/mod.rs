@@ -74,11 +74,11 @@ impl IdentityKey {
             }
         };
 
-        let public_key_bytes = match common::cbor_inner_array_value(key_value_map, "data") {
+        let public_key_bytes = match common::cbor_inner_bytes_value(key_value_map, "data") {
             Some(index_values) => index_values,
             None => {
                 return Err(Error::CorruptedData(String::from(
-                    "a key must have a readOnly value",
+                    "a key must have a data value",
                 )))
             }
         };
@@ -86,7 +86,7 @@ impl IdentityKey {
         Ok(IdentityKey{
             id,
             key_type,
-            public_key_bytes: vec![],
+            public_key_bytes: Vec::from(public_key_bytes),
             purpose,
             security_level,
             readonly,
