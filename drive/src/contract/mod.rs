@@ -752,8 +752,8 @@ mod tests {
     use crate::common::json_document_to_cbor;
     use crate::contract::Contract;
     use crate::drive::{Drive, RootTree};
-    use std::{collections::HashMap, fs::File, io::BufReader, path::Path};
     use grovedb::Element;
+    use std::{collections::HashMap, fs::File, io::BufReader, path::Path};
     use tempdir::TempDir;
 
     #[test]
