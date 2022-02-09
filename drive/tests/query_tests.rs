@@ -48,9 +48,9 @@ impl Person {
     }
 }
 
-pub fn setup(count: u32, seed: u64) -> (Drive, Contract) {
+pub fn setup(count: u32, seed: u64) -> (Drive, Contract, TempDir) {
     let tmp_dir = TempDir::new("family").unwrap();
-    let mut drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+    let mut drive: Drive = Drive::open(&tmp_dir).expect("expected to open Drive successfully");
 
     let storage = drive.grove.storage();
     let db_transaction = storage.transaction();
@@ -58,6 +58,11 @@ pub fn setup(count: u32, seed: u64) -> (Drive, Contract) {
         .grove
         .start_transaction()
         .expect("expected to start transaction successfully");
+
+    drive
+        .grove
+        .start_transaction()
+        .expect("transaction should be started");
 
     drive
         .create_root_tree(Some(&db_transaction))
@@ -93,17 +98,42 @@ pub fn setup(count: u32, seed: u64) -> (Drive, Contract) {
         .grove
         .commit_transaction(db_transaction)
         .expect("transaction should be committed");
-    (drive, contract)
+    (drive, contract, tmp_dir)
 }
 
-// #[test]
-// fn test_query_many() {
-//     let (mut drive, contract) = setup(1000, 73509);
-// }
+#[test]
+fn test_query_many() {
+    let (mut drive, contract, tmp_dir) = setup(1600, 73509);
+    let storage = drive.grove.storage();
+    let db_transaction = storage.transaction();
+    let people = Person::random_people(10, 73409);
+    for person in people {
+        let value = serde_json::to_value(&person).expect("serialized person");
+        let document_cbor =
+            common::value_to_cbor(value, Some(rs_drive::drive::defaults::PROTOCOL_VERSION));
+        let document = Document::from_cbor(document_cbor.as_slice(), None, None)
+            .expect("document should be properly deserialized");
+        drive
+            .add_document_for_contract(
+                &document,
+                &document_cbor,
+                &contract,
+                "person",
+                None,
+                true,
+                Some(&db_transaction),
+            )
+            .expect("document should be inserted");
+    }
+    drive
+        .grove
+        .commit_transaction(db_transaction)
+        .expect("transaction should be committed");
+}
 
 #[test]
 fn test_query() {
-    let (mut drive, contract) = setup(10, 73509);
+    let (mut drive, contract, tmp_dir) = setup(10, 73509);
 
     let storage = drive.grove.storage();
     let db_transaction = storage.transaction();
@@ -735,7 +765,7 @@ fn test_sql_query() {
     // These tests confirm that sql statements produce the same drive query
     // as their json counterparts, tests above confirm that the json queries
     // produce the correct result set
-    let (_, contract) = setup(10, 73509);
+    let (_, contract, tmp_dir) = setup(10, 73509);
     let person_document_type = contract
         .document_types
         .get("person")
