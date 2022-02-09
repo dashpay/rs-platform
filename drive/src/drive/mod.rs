@@ -775,7 +775,9 @@ mod tests {
     use crate::drive::Drive;
     use rand::Rng;
     use std::{collections::HashMap, fs::File, io::BufReader, path::Path};
+    use grovedb::Query;
     use tempdir::TempDir;
+    use crate::query::DriveQuery;
 
     fn setup_dashpay(prefix: &str) -> (Drive, Vec<u8>) {
         let tmp_dir = TempDir::new(prefix).unwrap();
@@ -1068,10 +1070,22 @@ mod tests {
             .commit_transaction(db_transaction)
             .expect("unable to commit transaction");
 
-        let document_id = bs58::decode("AYjYxDqLy2hvGQADqE6FAkBnQEpJSzNd3CRw1tpS6vZ7").into_vec().expect("this should decode");
+        let sql_string =
+            "select * from person where firstName = 'Samuel' order by firstName asc limit 100";
+        let query = DriveQuery::from_sql_expr(sql_string, &contract).expect("should build query");
+
+        let (results_no_transaction, _) = query.execute_no_proof(&mut drive.grove, None).expect("expected to execute query");
+
+        assert_eq!(results_no_transaction.len(), 1);
 
         let db_transaction = storage.transaction();
         drive.grove.start_transaction().expect("expected to start transaction");
+
+        let (results_on_transaction, _) = query.execute_no_proof(&mut drive.grove, Some(&db_transaction)).expect("expected to execute query");
+
+        assert_eq!(results_on_transaction.len(), 1);
+        let document_id = bs58::decode("AYjYxDqLy2hvGQADqE6FAkBnQEpJSzNd3CRw1tpS6vZ7").into_vec().expect("this should decode");
+
 
         drive
             .delete_document_for_contract(
