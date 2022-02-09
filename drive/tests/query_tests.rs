@@ -60,11 +60,6 @@ pub fn setup(count: u32, seed: u64) -> (Drive, Contract, TempDir) {
         .expect("expected to start transaction successfully");
 
     drive
-        .grove
-        .start_transaction()
-        .expect("transaction should be started");
-
-    drive
         .create_root_tree(Some(&db_transaction))
         .expect("expected to create root tree successfully");
 
