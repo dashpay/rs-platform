@@ -1,11 +1,11 @@
 pub mod defaults;
 
 use crate::contract::{Contract, Document, DocumentType};
+use crate::drive::defaults::CONTRACT_DOCUMENTS_PATH_HEIGHT;
 use crate::query::DriveQuery;
 use grovedb::{Element, Error, GroveDb};
 use std::path::Path;
 use storage::rocksdb_storage::OptimisticTransactionDBTransaction;
-use crate::drive::defaults::CONTRACT_DOCUMENTS_PATH_HEIGHT;
 
 pub struct Drive {
     pub grove: GroveDb,
@@ -460,12 +460,14 @@ impl Drive {
                     Error::CorruptedData(String::from("invalid contract indices"))
                 })?;
 
-                let document_index_field = document.get_raw_for_contract(
-                    &index_property.name,
-                    document_type_name,
-                    contract,
-                    owner_id,
-                )?.unwrap_or_default();
+                let document_index_field = document
+                    .get_raw_for_contract(
+                        &index_property.name,
+                        document_type_name,
+                        contract,
+                        owner_id,
+                    )?
+                    .unwrap_or_default();
 
                 let index_path_slices: Vec<&[u8]> =
                     index_path.iter().map(|x| x.as_slice()).collect();
@@ -689,7 +691,8 @@ impl Drive {
                     document_type_name,
                     contract,
                     owner_id,
-                )?.unwrap_or_default();
+                )?
+                .unwrap_or_default();
 
             // we push the actual value of the index path
             index_path.push(document_top_field);
@@ -710,7 +713,8 @@ impl Drive {
                         document_type_name,
                         contract,
                         owner_id,
-                    )?.unwrap_or_default();
+                    )?
+                    .unwrap_or_default();
 
                 // we push the actual value of the index path
                 index_path.push(document_top_field);
@@ -727,15 +731,23 @@ impl Drive {
                     index_path.iter().map(|x| x.as_slice()).collect();
 
                 // here we should return an error if the element already exists
-                self.grove
-                    .delete_up_tree_while_empty(index_path_slices, document_id, Some(CONTRACT_DOCUMENTS_PATH_HEIGHT), transaction)?;
+                self.grove.delete_up_tree_while_empty(
+                    index_path_slices,
+                    document_id,
+                    Some(CONTRACT_DOCUMENTS_PATH_HEIGHT),
+                    transaction,
+                )?;
             } else {
                 let index_path_slices: Vec<&[u8]> =
                     index_path.iter().map(|x| x.as_slice()).collect();
 
                 // here we should return an error if the element already exists
-                self.grove
-                    .delete_up_tree_while_empty(index_path_slices, &[0], Some(CONTRACT_DOCUMENTS_PATH_HEIGHT), transaction)?;
+                self.grove.delete_up_tree_while_empty(
+                    index_path_slices,
+                    &[0],
+                    Some(CONTRACT_DOCUMENTS_PATH_HEIGHT),
+                    transaction,
+                )?;
             }
         }
         Ok(0)
@@ -773,11 +785,10 @@ mod tests {
     use crate::common::{json_document_to_cbor, setup_contract};
     use crate::contract::Document;
     use crate::drive::Drive;
+    use crate::query::DriveQuery;
     use rand::Rng;
     use std::{collections::HashMap, fs::File, io::BufReader, path::Path};
-    use grovedb::Query;
     use tempdir::TempDir;
-    use crate::query::DriveQuery;
 
     fn setup_dashpay(prefix: &str) -> (Drive, Vec<u8>) {
         let tmp_dir = TempDir::new(prefix).unwrap();
@@ -861,7 +872,6 @@ mod tests {
             Some(&db_transaction),
         );
 
-
         let dashpay_cr_document_cbor = json_document_to_cbor(
             "tests/supporting_files/contract/dashpay/contact-request0.json",
             Some(1),
@@ -906,8 +916,10 @@ mod tests {
     fn test_delete_dashpay_documents_no_transaction() {
         let (mut drive, dashpay_cbor) = setup_dashpay("delete");
 
-        let dashpay_cr_document_cbor =
-            json_document_to_cbor("tests/supporting_files/contract/dashpay/contact-request0.json", Some(1));
+        let dashpay_cr_document_cbor = json_document_to_cbor(
+            "tests/supporting_files/contract/dashpay/contact-request0.json",
+            Some(1),
+        );
 
         let random_owner_id = rand::thread_rng().gen::<[u8; 32]>();
         drive
@@ -921,7 +933,9 @@ mod tests {
             )
             .expect("expected to insert a document successfully");
 
-        let document_id = bs58::decode("AYjYxDqLy2hvGQADqE6FAkBnQEpJSzNd3CRw1tpS6vZ7").into_vec().expect("this should decode");
+        let document_id = bs58::decode("AYjYxDqLy2hvGQADqE6FAkBnQEpJSzNd3CRw1tpS6vZ7")
+            .into_vec()
+            .expect("this should decode");
 
         drive
             .delete_document_for_contract_cbor(
@@ -952,8 +966,10 @@ mod tests {
             Some(&db_transaction),
         );
 
-        let dashpay_cr_document_cbor =
-            json_document_to_cbor("tests/supporting_files/contract/dashpay/contact-request0.json", Some(1));
+        let dashpay_cr_document_cbor = json_document_to_cbor(
+            "tests/supporting_files/contract/dashpay/contact-request0.json",
+            Some(1),
+        );
 
         let random_owner_id = rand::thread_rng().gen::<[u8; 32]>();
         drive
@@ -967,7 +983,9 @@ mod tests {
             )
             .expect("expected to insert a document successfully");
 
-        let document_id = bs58::decode("AYjYxDqLy2hvGQADqE6FAkBnQEpJSzNd3CRw1tpS6vZ7").into_vec().expect("this should decode");
+        let document_id = bs58::decode("AYjYxDqLy2hvGQADqE6FAkBnQEpJSzNd3CRw1tpS6vZ7")
+            .into_vec()
+            .expect("this should decode");
 
         drive
             .delete_document_for_contract(
@@ -1032,7 +1050,10 @@ mod tests {
 
         let storage = drive.grove.storage();
         let db_transaction = storage.transaction();
-        drive.grove.start_transaction().expect("expected to start transaction");
+        drive
+            .grove
+            .start_transaction()
+            .expect("expected to start transaction");
 
         drive
             .create_root_tree(Some(&db_transaction))
@@ -1044,14 +1065,15 @@ mod tests {
             Some(&db_transaction),
         );
 
-        let person_document_cbor =
-            json_document_to_cbor("tests/supporting_files/contract/family/person0.json", Some(1));
+        let person_document_cbor = json_document_to_cbor(
+            "tests/supporting_files/contract/family/person0.json",
+            Some(1),
+        );
 
         let random_owner_id = rand::thread_rng().gen::<[u8; 32]>();
 
-        let document =
-            Document::from_cbor(&person_document_cbor, None, Some(&random_owner_id))
-                .expect("expected to deserialize the document");
+        let document = Document::from_cbor(&person_document_cbor, None, Some(&random_owner_id))
+            .expect("expected to deserialize the document");
 
         drive
             .add_document_for_contract(
@@ -1074,18 +1096,26 @@ mod tests {
             "select * from person where firstName = 'Samuel' order by firstName asc limit 100";
         let query = DriveQuery::from_sql_expr(sql_string, &contract).expect("should build query");
 
-        let (results_no_transaction, _) = query.execute_no_proof(&mut drive.grove, None).expect("expected to execute query");
+        let (results_no_transaction, _) = query
+            .execute_no_proof(&mut drive.grove, None)
+            .expect("expected to execute query");
 
         assert_eq!(results_no_transaction.len(), 1);
 
         let db_transaction = storage.transaction();
-        drive.grove.start_transaction().expect("expected to start transaction");
+        drive
+            .grove
+            .start_transaction()
+            .expect("expected to start transaction");
 
-        let (results_on_transaction, _) = query.execute_no_proof(&mut drive.grove, Some(&db_transaction)).expect("expected to execute query");
+        let (results_on_transaction, _) = query
+            .execute_no_proof(&mut drive.grove, Some(&db_transaction))
+            .expect("expected to execute query");
 
         assert_eq!(results_on_transaction.len(), 1);
-        let document_id = bs58::decode("AYjYxDqLy2hvGQADqE6FAkBnQEpJSzNd3CRw1tpS6vZ7").into_vec().expect("this should decode");
-
+        let document_id = bs58::decode("AYjYxDqLy2hvGQADqE6FAkBnQEpJSzNd3CRw1tpS6vZ7")
+            .into_vec()
+            .expect("this should decode");
 
         drive
             .delete_document_for_contract(
@@ -1101,6 +1131,18 @@ mod tests {
             .grove
             .commit_transaction(db_transaction)
             .expect("unable to commit transaction");
+
+        let db_transaction = storage.transaction();
+        drive
+            .grove
+            .start_transaction()
+            .expect("expected to start transaction");
+
+        let (results_on_transaction, _) = query
+            .execute_no_proof(&mut drive.grove, Some(&db_transaction))
+            .expect("expected to execute query");
+
+        assert_eq!(results_on_transaction.len(), 0);
     }
 
     #[test]
@@ -1110,7 +1152,10 @@ mod tests {
 
         let storage = drive.grove.storage();
         let db_transaction = storage.transaction();
-        drive.grove.start_transaction().expect("expected to start transaction");
+        drive
+            .grove
+            .start_transaction()
+            .expect("expected to start transaction");
 
         drive
             .create_root_tree(Some(&db_transaction))
@@ -1122,14 +1167,15 @@ mod tests {
             Some(&db_transaction),
         );
 
-        let person_document_cbor =
-            json_document_to_cbor("tests/supporting_files/contract/family/person0.json", Some(1));
+        let person_document_cbor = json_document_to_cbor(
+            "tests/supporting_files/contract/family/person0.json",
+            Some(1),
+        );
 
         let random_owner_id = rand::thread_rng().gen::<[u8; 32]>();
 
-        let document =
-            Document::from_cbor(&person_document_cbor, None, Some(&random_owner_id))
-                .expect("expected to deserialize the document");
+        let document = Document::from_cbor(&person_document_cbor, None, Some(&random_owner_id))
+            .expect("expected to deserialize the document");
 
         drive
             .add_document_for_contract(
@@ -1143,14 +1189,15 @@ mod tests {
             )
             .expect("expected to insert a document successfully");
 
-        let person_document_cbor =
-            json_document_to_cbor("tests/supporting_files/contract/family/person1.json", Some(1));
+        let person_document_cbor = json_document_to_cbor(
+            "tests/supporting_files/contract/family/person1.json",
+            Some(1),
+        );
 
         let random_owner_id = rand::thread_rng().gen::<[u8; 32]>();
 
-        let document =
-            Document::from_cbor(&person_document_cbor, None, Some(&random_owner_id))
-                .expect("expected to deserialize the document");
+        let document = Document::from_cbor(&person_document_cbor, None, Some(&random_owner_id))
+            .expect("expected to deserialize the document");
 
         drive
             .add_document_for_contract(
@@ -1169,10 +1216,25 @@ mod tests {
             .commit_transaction(db_transaction)
             .expect("unable to commit transaction");
 
-        let document_id = bs58::decode("8wjx2TC1vj2grssQvdwWnksNLwpi4xKraYy1TbProgd4").into_vec().expect("this should decode");
+        let sql_string =
+            "select * from person where firstName > 'A' order by firstName asc limit 5";
+        let query = DriveQuery::from_sql_expr(sql_string, &contract).expect("should build query");
+
+        let (results_no_transaction, _) = query
+            .execute_no_proof(&mut drive.grove, None)
+            .expect("expected to execute query");
+
+        assert_eq!(results_no_transaction.len(), 2);
+
+        let document_id = bs58::decode("8wjx2TC1vj2grssQvdwWnksNLwpi4xKraYy1TbProgd4")
+            .into_vec()
+            .expect("this should decode");
 
         let db_transaction = storage.transaction();
-        drive.grove.start_transaction().expect("expected to start transaction");
+        drive
+            .grove
+            .start_transaction()
+            .expect("expected to start transaction");
 
         drive
             .delete_document_for_contract(
@@ -1188,6 +1250,51 @@ mod tests {
             .grove
             .commit_transaction(db_transaction)
             .expect("unable to commit transaction");
+
+        let sql_string =
+            "select * from person where firstName > 'A' order by firstName asc limit 5";
+        let query = DriveQuery::from_sql_expr(sql_string, &contract).expect("should build query");
+
+        let (results_no_transaction, _) = query
+            .execute_no_proof(&mut drive.grove, None)
+            .expect("expected to execute query");
+
+        assert_eq!(results_no_transaction.len(), 1);
+
+        let document_id = bs58::decode("AYjYxDqLy2hvGQADqE6FAkBnQEpJSzNd3CRw1tpS6vZ7")
+            .into_vec()
+            .expect("this should decode");
+
+        let db_transaction = storage.transaction();
+        drive
+            .grove
+            .start_transaction()
+            .expect("expected to start transaction");
+
+        drive
+            .delete_document_for_contract(
+                &document_id,
+                &contract,
+                "person",
+                Some(&random_owner_id),
+                Some(&db_transaction),
+            )
+            .expect("expected to be able to delete the document");
+
+        drive
+            .grove
+            .commit_transaction(db_transaction)
+            .expect("unable to commit transaction");
+
+        let sql_string =
+            "select * from person where firstName > 'A' order by firstName asc limit 5";
+        let query = DriveQuery::from_sql_expr(sql_string, &contract).expect("should build query");
+
+        let (results_no_transaction, _) = query
+            .execute_no_proof(&mut drive.grove, None)
+            .expect("expected to execute query");
+
+        assert_eq!(results_no_transaction.len(), 0);
     }
 
     #[test]
@@ -1197,7 +1304,10 @@ mod tests {
 
         let storage = drive.grove.storage();
         let db_transaction = storage.transaction();
-        drive.grove.start_transaction().expect("expected to start transaction");
+        drive
+            .grove
+            .start_transaction()
+            .expect("expected to start transaction");
 
         drive
             .create_root_tree(Some(&db_transaction))
@@ -1209,14 +1319,15 @@ mod tests {
             Some(&db_transaction),
         );
 
-        let person_document_cbor =
-            json_document_to_cbor("tests/supporting_files/contract/family/person0.json", Some(1));
+        let person_document_cbor = json_document_to_cbor(
+            "tests/supporting_files/contract/family/person0.json",
+            Some(1),
+        );
 
         let random_owner_id = rand::thread_rng().gen::<[u8; 32]>();
 
-        let document =
-            Document::from_cbor(&person_document_cbor, None, Some(&random_owner_id))
-                .expect("expected to deserialize the document");
+        let document = Document::from_cbor(&person_document_cbor, None, Some(&random_owner_id))
+            .expect("expected to deserialize the document");
 
         drive
             .add_document_for_contract(
@@ -1230,14 +1341,15 @@ mod tests {
             )
             .expect("expected to insert a document successfully");
 
-        let person_document_cbor =
-            json_document_to_cbor("tests/supporting_files/contract/family/person2-no-middle-name.json", Some(1));
+        let person_document_cbor = json_document_to_cbor(
+            "tests/supporting_files/contract/family/person2-no-middle-name.json",
+            Some(1),
+        );
 
         let random_owner_id = rand::thread_rng().gen::<[u8; 32]>();
 
-        let document =
-            Document::from_cbor(&person_document_cbor, None, Some(&random_owner_id))
-                .expect("expected to deserialize the document");
+        let document = Document::from_cbor(&person_document_cbor, None, Some(&random_owner_id))
+            .expect("expected to deserialize the document");
 
         drive
             .add_document_for_contract(
@@ -1256,10 +1368,25 @@ mod tests {
             .commit_transaction(db_transaction)
             .expect("unable to commit transaction");
 
-        let document_id = bs58::decode("BZjYxDqLy2hvGQADqE6FAkBnQEpJSzNd3CRw1tpS6vZ7").into_vec().expect("this should decode");
+        let sql_string =
+            "select * from person where firstName > 'A' order by firstName asc limit 5";
+        let query = DriveQuery::from_sql_expr(sql_string, &contract).expect("should build query");
+
+        let (results_no_transaction, _) = query
+            .execute_no_proof(&mut drive.grove, None)
+            .expect("expected to execute query");
+
+        assert_eq!(results_no_transaction.len(), 2);
+
+        let document_id = bs58::decode("BZjYxDqLy2hvGQADqE6FAkBnQEpJSzNd3CRw1tpS6vZ7")
+            .into_vec()
+            .expect("this should decode");
 
         let db_transaction = storage.transaction();
-        drive.grove.start_transaction().expect("expected to start transaction");
+        drive
+            .grove
+            .start_transaction()
+            .expect("expected to start transaction");
 
         drive
             .delete_document_for_contract(
@@ -1275,6 +1402,81 @@ mod tests {
             .grove
             .commit_transaction(db_transaction)
             .expect("unable to commit transaction");
+
+        // Let's try adding the document back after it was deleted
+
+        let db_transaction = storage.transaction();
+        drive
+            .grove
+            .start_transaction()
+            .expect("expected to start transaction");
+
+        let document = Document::from_cbor(&person_document_cbor, None, Some(&random_owner_id))
+            .expect("expected to deserialize the document");
+
+        drive
+            .add_document_for_contract(
+                &document,
+                &person_document_cbor,
+                &contract,
+                "person",
+                None,
+                false,
+                Some(&db_transaction),
+            )
+            .expect("expected to insert a document successfully");
+
+        drive
+            .grove
+            .commit_transaction(db_transaction)
+            .expect("unable to commit transaction");
+
+        // Let's try removing all documents now
+
+        let db_transaction = storage.transaction();
+        drive
+            .grove
+            .start_transaction()
+            .expect("expected to start transaction");
+
+        drive
+            .delete_document_for_contract(
+                &document_id,
+                &contract,
+                "person",
+                Some(&random_owner_id),
+                Some(&db_transaction),
+            )
+            .expect("expected to be able to delete the document");
+
+        let document_id = bs58::decode("AYjYxDqLy2hvGQADqE6FAkBnQEpJSzNd3CRw1tpS6vZ7")
+            .into_vec()
+            .expect("this should decode");
+
+        drive
+            .delete_document_for_contract(
+                &document_id,
+                &contract,
+                "person",
+                Some(&random_owner_id),
+                Some(&db_transaction),
+            )
+            .expect("expected to be able to delete the document");
+
+        drive
+            .grove
+            .commit_transaction(db_transaction)
+            .expect("unable to commit transaction");
+
+        let sql_string =
+            "select * from person where firstName > 'A' order by firstName asc limit 5";
+        let query = DriveQuery::from_sql_expr(sql_string, &contract).expect("should build query");
+
+        let (results_no_transaction, _) = query
+            .execute_no_proof(&mut drive.grove, None)
+            .expect("expected to execute query");
+
+        assert_eq!(results_no_transaction.len(), 0);
     }
 
     #[test]
