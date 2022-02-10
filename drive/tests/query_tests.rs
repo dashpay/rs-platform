@@ -752,7 +752,29 @@ fn test_query() {
         .get("Meta")
         .expect("we should be able to get Kevina as she is 48");
 
-    assert_eq!(*meta_age, 59)
+    assert_eq!(*meta_age, 59);
+
+    // fetching by $id
+
+    let query_value = json!({
+        "where": [
+            ["$id", "in", ["1", "2"]],
+        ],
+        "orderBy": [["$id", "asc"]],
+    });
+
+    let query_cbor = common::value_to_cbor(query_value, None);
+
+    let person_document_type = contract
+        .document_types
+        .get("person")
+        .expect("contract should have a person document type");
+
+    let (results, _) = drive
+        .query_documents_from_contract(&contract, person_document_type, query_cbor.as_slice(), None)
+        .expect("query should be executed");
+
+    assert_eq!(results.len(), 1);
 }
 
 #[test]
