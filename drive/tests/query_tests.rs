@@ -886,7 +886,7 @@ fn test_sql_query() {
         .expect("should build query");
 
     let sql_string =
-        "select * from person where firstName in ('a', 'b') order by firstName, limit 100";
+        "select * from person where firstName in ('a', 'b') order by firstName limit 100";
     let query2 = DriveQuery::from_sql_expr(sql_string, &contract).expect("should build query");
 
     assert_eq!(query1, query2);
