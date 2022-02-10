@@ -153,7 +153,9 @@ impl InternalClauses {
         // There can only be 1 primary key clause, or many other clauses
         if self.primary_key_in_clause.is_some() ^ self.primary_key_equal_clause.is_some() {
             // One is set, all rest must be empty
-            !(self.in_clause.is_some() || self.range_clause.is_some() || !self.equal_clauses.is_empty())
+            !(self.in_clause.is_some()
+                || self.range_clause.is_some()
+                || !self.equal_clauses.is_empty())
         } else {
             !(self.primary_key_in_clause.is_some() && self.primary_key_equal_clause.is_some())
         }
@@ -171,10 +173,9 @@ pub struct WhereClause {
     value: Value,
 }
 
-
 impl<'a> WhereClause {
     pub fn is_identifier(&self) -> bool {
-        return self.field == "$id"
+        return self.field == "$id";
     }
 
     pub fn from_components(clause_components: &'a [Value]) -> Result<Self, Error> {
@@ -1064,15 +1065,12 @@ impl<'a> DriveQuery<'a> {
     }
 
     fn extract_clauses(all_where_clauses: Vec<WhereClause>) -> Result<InternalClauses, Error> {
-
         let primary_key_equal_clauses_array = all_where_clauses
             .iter()
             .filter_map(|where_clause| match where_clause.operator {
-                Equal => {
-                    match where_clause.is_identifier() {
-                        true => Some(where_clause.clone()),
-                        false => None
-                    }
+                Equal => match where_clause.is_identifier() {
+                    true => Some(where_clause.clone()),
+                    false => None,
                 },
                 _ => None,
             })
@@ -1081,11 +1079,9 @@ impl<'a> DriveQuery<'a> {
         let primary_key_in_clauses_array = all_where_clauses
             .iter()
             .filter_map(|where_clause| match where_clause.operator {
-                In => {
-                    match where_clause.is_identifier() {
-                        true => Some(where_clause.clone()),
-                        false => None
-                    }
+                In => match where_clause.is_identifier() {
+                    true => Some(where_clause.clone()),
+                    false => None,
                 },
                 _ => None,
             })
@@ -1096,11 +1092,9 @@ impl<'a> DriveQuery<'a> {
         let equal_clauses_array = all_where_clauses
             .iter()
             .filter_map(|where_clause| match where_clause.operator {
-                Equal => {
-                    match where_clause.is_identifier() {
-                        true => None,
-                        false => Some(where_clause.clone()),
-                    }
+                Equal => match where_clause.is_identifier() {
+                    true => None,
+                    false => Some(where_clause.clone()),
                 },
                 _ => None,
             })
@@ -1109,11 +1103,9 @@ impl<'a> DriveQuery<'a> {
         let in_clauses_array = all_where_clauses
             .iter()
             .filter_map(|where_clause| match where_clause.operator {
-                In => {
-                    match where_clause.is_identifier() {
-                        true => None,
-                        false => Some(where_clause.clone())
-                    }
+                In => match where_clause.is_identifier() {
+                    true => None,
+                    false => Some(where_clause.clone()),
                 },
                 _ => None,
             })
@@ -1172,12 +1164,8 @@ impl<'a> DriveQuery<'a> {
         };
 
         match internal_clauses.verify() {
-            true => {
-                Ok(internal_clauses)
-            }
-            false => {
-                Err(Error::InvalidQuery("Query has invalid where clauses"))
-            }
+            true => Ok(internal_clauses),
+            false => Err(Error::InvalidQuery("Query has invalid where clauses")),
         }
     }
 
@@ -1454,7 +1442,8 @@ impl<'a> DriveQuery<'a> {
             // Add primary key ($id) subtree
             path.push(vec![0]);
 
-            if let Some(primary_key_equal_clause) = &self.internal_clauses.primary_key_equal_clause {
+            if let Some(primary_key_equal_clause) = &self.internal_clauses.primary_key_equal_clause
+            {
                 let mut query = Query::new();
                 let key = self
                     .document_type
@@ -1465,7 +1454,8 @@ impl<'a> DriveQuery<'a> {
                     path,
                     SizedQuery::new(query, Some(self.limit), Some(self.offset)),
                 ))
-            } else if let Some(primary_key_in_clause) = &self.internal_clauses.primary_key_in_clause {
+            } else if let Some(primary_key_in_clause) = &self.internal_clauses.primary_key_in_clause
+            {
                 let left_to_right = if self.order_by.keys().len() == 1 {
                     if self.order_by.keys().next().unwrap() != "$id" {
                         return Err(Error::CorruptedData(String::from(
@@ -1500,15 +1490,13 @@ impl<'a> DriveQuery<'a> {
                 match starts_at_key_option {
                     None => {
                         for value in in_values.iter() {
-                            let key =
-                                self.document_type.serialize_value_for_key("$id", value)?;
+                            let key = self.document_type.serialize_value_for_key("$id", value)?;
                             query.insert_key(key)
                         }
                     }
                     Some((starts_at_key, included)) => {
                         for value in in_values.iter() {
-                            let key =
-                                self.document_type.serialize_value_for_key("$id", value)?;
+                            let key = self.document_type.serialize_value_for_key("$id", value)?;
 
                             if (left_to_right && starts_at_key < key)
                                 || (!left_to_right && starts_at_key > key)
