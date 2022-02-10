@@ -1126,6 +1126,7 @@ impl<'a> DriveQuery<'a> {
             }
         }?;
 
+
         let equal_fields = self
             .internal_clauses
             .equal_clauses
@@ -1142,6 +1143,16 @@ impl<'a> DriveQuery<'a> {
             .range_clause
             .as_ref()
             .map(|range_clause| range_clause.field.as_str());
+
+        let mut is_primary_key_query = equal_fields.contains(&"$id");
+        if !is_primary_key_query{
+            if let Some(field) = in_field {
+                if field == "$id" {
+                    is_primary_key_query = true
+                }
+            }
+        }
+
         let mut fields = equal_fields;
         if let Some(range_field) = range_field {
             fields.push(range_field);
@@ -1165,9 +1176,9 @@ impl<'a> DriveQuery<'a> {
 
         // TODO: It's done in a terrable way due to unblock integration ASAP
         //   must be refactoring in the upcoming PR
-        let is_primary_key_query = fields.contains(&"$id");
 
         let path_query = if !is_primary_key_query {
+            dbg!("Not primary key");
             let (index, difference) = self
                 .document_type
                 .index_for_types(fields.as_slice(), in_field, order_by_keys.as_slice())
@@ -1356,6 +1367,7 @@ impl<'a> DriveQuery<'a> {
                 SizedQuery::new(final_query, Some(self.limit), Some(self.offset)),
             )
         } else {
+            dbg!("primary key");
             let mut path = document_type_path.clone();
 
             // Add primary key ($id) subtree

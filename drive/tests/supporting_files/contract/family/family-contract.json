@@ -13,6 +13,13 @@
         {
           "properties":[
             {
+              "$ownerId":"asc"
+            }
+          ]
+        },
+        {
+          "properties":[
+            {
               "firstName":"asc"
             },
             {
