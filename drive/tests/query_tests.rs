@@ -756,7 +756,8 @@ fn test_query() {
 
     // fetching by $id
     let mut rng = rand::rngs::StdRng::seed_from_u64(84594);
-    let id_bytes = base64::decode("x6XSJyDA27X4EnzVt5nde0arptHT8lBIw2/rTaxgVEY=").expect("should decode");
+    let id_bytes =
+        base64::decode("x6XSJyDA27X4EnzVt5nde0arptHT8lBIw2/rTaxgVEY=").expect("should decode");
 
     let fixed_person = Person {
         id: id_bytes,
@@ -767,18 +768,24 @@ fn test_query() {
         age: rng.gen_range(0..85),
     };
     let serialzed_person = serde_json::to_value(&fixed_person).expect("serialized person");
-    let person_cbor = common::value_to_cbor(serialzed_person, Some(rs_drive::drive::defaults::PROTOCOL_VERSION));
-    let document = Document::from_cbor(person_cbor.as_slice(), None, None).expect("document should be properly deserialized");
+    let person_cbor = common::value_to_cbor(
+        serialzed_person,
+        Some(rs_drive::drive::defaults::PROTOCOL_VERSION),
+    );
+    let document = Document::from_cbor(person_cbor.as_slice(), None, None)
+        .expect("document should be properly deserialized");
 
-    drive.add_document_for_contract(
-        &document,
-        &person_cbor,
-        &contract,
-        "person",
-        None,
-        true,
-        Some(&db_transaction),
-    ).expect("document should be inserted");
+    drive
+        .add_document_for_contract(
+            &document,
+            &person_cbor,
+            &contract,
+            "person",
+            None,
+            true,
+            Some(&db_transaction),
+        )
+        .expect("document should be inserted");
 
     let query_value = json!({
         "where": [
@@ -795,7 +802,12 @@ fn test_query() {
         .expect("contract should have a person document type");
 
     let (results, _) = drive
-        .query_documents_from_contract(&contract, person_document_type, query_cbor.as_slice(), Some(&db_transaction))
+        .query_documents_from_contract(
+            &contract,
+            person_document_type,
+            query_cbor.as_slice(),
+            Some(&db_transaction),
+        )
         .expect("query should be executed");
 
     assert_eq!(results.len(), 1);

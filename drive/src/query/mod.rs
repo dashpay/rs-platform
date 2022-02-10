@@ -1204,34 +1204,34 @@ impl<'a> DriveQuery<'a> {
                         .get(field.name.as_str())
                         .is_some()
                         || (last_clause.is_some() && last_clause.unwrap().field == field.name)
-                        || (subquery_clause.is_some() && subquery_clause.unwrap().field == field.name))
+                        || (subquery_clause.is_some()
+                            && subquery_clause.unwrap().field == field.name))
                 })
                 .collect::<Vec<&IndexProperty>>();
 
-            let intermediate_values =
-                index
-                    .properties
-                    .iter()
-                    .filter_map(|field| {
-                        match self.internal_clauses.equal_clauses.get(field.name.as_str()) {
-                            None => None,
-                            Some(where_clause) => {
-                                if !last_clause_is_range
-                                    && last_clause.is_some()
-                                    && last_clause.unwrap().field == field.name
-                                {
-                                    //there is no need to give an intermediate value as the last clause is an equality
-                                    None
-                                } else {
-                                    Some(self.document_type.serialize_value_for_key(
-                                        field.name.as_str(),
-                                        &where_clause.value,
-                                    ))
-                                }
+            let intermediate_values = index
+                .properties
+                .iter()
+                .filter_map(|field| {
+                    match self.internal_clauses.equal_clauses.get(field.name.as_str()) {
+                        None => None,
+                        Some(where_clause) => {
+                            if !last_clause_is_range
+                                && last_clause.is_some()
+                                && last_clause.unwrap().field == field.name
+                            {
+                                //there is no need to give an intermediate value as the last clause is an equality
+                                None
+                            } else {
+                                Some(self.document_type.serialize_value_for_key(
+                                    field.name.as_str(),
+                                    &where_clause.value,
+                                ))
                             }
                         }
-                    })
-                    .collect::<Result<Vec<Vec<u8>>, Error>>()?;
+                    }
+                })
+                .collect::<Result<Vec<Vec<u8>>, Error>>()?;
 
             fn recursive_insert(
                 query: Option<&mut Query>,
@@ -1341,7 +1341,7 @@ impl<'a> DriveQuery<'a> {
             let mut path = document_type_path;
 
             for (intermediate_index, intermediate_value) in
-            intermediate_indexes.iter().zip(intermediate_values.iter())
+                intermediate_indexes.iter().zip(intermediate_values.iter())
             {
                 path.push(intermediate_index.name.as_bytes().to_vec());
                 path.push(intermediate_value.as_slice().to_vec());
@@ -1359,9 +1359,11 @@ impl<'a> DriveQuery<'a> {
             // Add primary key ($id) subtree
             path.push(vec![0]);
 
-            let left_to_right = if self.order_by.keys().len() == 1  {
+            let left_to_right = if self.order_by.keys().len() == 1 {
                 if self.order_by.keys().next().unwrap() != "$id" {
-                    return Err(Error::CorruptedData(String::from("order by should include $id only")));
+                    return Err(Error::CorruptedData(String::from(
+                        "order by should include $id only",
+                    )));
                 }
 
                 let order_clause = self.order_by.get("$id").unwrap();
@@ -1375,7 +1377,9 @@ impl<'a> DriveQuery<'a> {
 
             // Allow only in and == operators
             if self.internal_clauses.range_clause.is_some() {
-                return Err(Error::CorruptedData(String::from("$id can be used only with '==' or 'in' operators")));
+                return Err(Error::CorruptedData(String::from(
+                    "$id can be used only with '==' or 'in' operators",
+                )));
             }
 
             let where_clause = if self.internal_clauses.equal_clauses.get("$id").is_some() {
@@ -1383,7 +1387,9 @@ impl<'a> DriveQuery<'a> {
             } else if self.internal_clauses.in_clause.is_some() {
                 self.internal_clauses.in_clause.as_ref().unwrap()
             } else {
-                return Err(Error::CorruptedData(String::from("order by should include $id only")));
+                return Err(Error::CorruptedData(String::from(
+                    "order by should include $id only",
+                )));
             };
 
             // If there is a start_at_document, we need to get the value that it has for the
@@ -1400,7 +1406,8 @@ impl<'a> DriveQuery<'a> {
 
             match where_clause.operator {
                 Equal => {
-                    let key = self.document_type
+                    let key = self
+                        .document_type
                         .serialize_value_for_key("$id", &where_clause.value)?;
 
                     match starts_at_key_option {
@@ -1427,15 +1434,15 @@ impl<'a> DriveQuery<'a> {
                     match starts_at_key_option {
                         None => {
                             for value in in_values.iter() {
-                                let key = self.document_type
-                                    .serialize_value_for_key("$id", value)?;
+                                let key =
+                                    self.document_type.serialize_value_for_key("$id", value)?;
                                 query.insert_key(key)
                             }
                         }
                         Some((starts_at_key, included)) => {
                             for value in in_values.iter() {
-                                let key = self.document_type
-                                    .serialize_value_for_key("$id", value)?;
+                                let key =
+                                    self.document_type.serialize_value_for_key("$id", value)?;
 
                                 if (left_to_right && starts_at_key < key)
                                     || (!left_to_right && starts_at_key > key)
@@ -1447,9 +1454,11 @@ impl<'a> DriveQuery<'a> {
                         }
                     }
                 }
-                _ => return Err(Error::CorruptedData(
-                    String::from("only '==' and 'in' operators are supported for $id"))
-                )
+                _ => {
+                    return Err(Error::CorruptedData(String::from(
+                        "only '==' and 'in' operators are supported for $id",
+                    )))
+                }
             }
 
             PathQuery::new(
