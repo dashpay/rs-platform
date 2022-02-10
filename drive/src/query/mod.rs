@@ -1126,7 +1126,6 @@ impl<'a> DriveQuery<'a> {
             }
         }?;
 
-
         let equal_fields = self
             .internal_clauses
             .equal_clauses
@@ -1145,7 +1144,7 @@ impl<'a> DriveQuery<'a> {
             .map(|range_clause| range_clause.field.as_str());
 
         let mut is_primary_key_query = equal_fields.contains(&"$id");
-        if !is_primary_key_query{
+        if !is_primary_key_query {
             if let Some(field) = in_field {
                 if field == "$id" {
                     is_primary_key_query = true
