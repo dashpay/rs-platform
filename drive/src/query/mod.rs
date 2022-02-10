@@ -15,7 +15,6 @@ use sqlparser::ast::{OrderByExpr, Select, Statement};
 use sqlparser::dialect::GenericDialect;
 use sqlparser::parser::Parser;
 use std::collections::HashMap;
-use std::intrinsics::atomic_cxchgweak;
 use storage::rocksdb_storage::OptimisticTransactionDBTransaction;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -1164,7 +1163,7 @@ impl<'a> DriveQuery<'a> {
             })
             .collect();
 
-        let is_primary_key_query = fields.contains(String::from("$id"));
+        let is_primary_key_query = fields.contains(&"$id");
 
         let path_query = if !is_primary_key_query {
             let (index, difference) = self
@@ -1382,7 +1381,7 @@ impl<'a> DriveQuery<'a> {
             let where_clause = if self.internal_clauses.equal_clauses.get("$id").is_some() {
                 self.internal_clauses.equal_clauses.get("$id").unwrap()
             } else if self.internal_clauses.in_clause.is_some() {
-                &self.internal_clauses.in_clause.unwrap()
+                self.internal_clauses.in_clause.as_ref().unwrap()
             } else {
                 return Err(Error::CorruptedData(String::from("order by should include $id only")));
             };
@@ -1453,11 +1452,11 @@ impl<'a> DriveQuery<'a> {
                 )
             }
 
-            PathQuery:new(
+            PathQuery::new(
                 path,
                 SizedQuery::new(query, Some(self.limit), Some(self.offset)),
             )
-        }
+        };
 
         let query_result = grove.get_path_query(&path_query, transaction);
         match query_result {
