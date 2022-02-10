@@ -775,12 +775,8 @@ impl Drive {
         transaction: Option<&OptimisticTransactionDBTransaction>,
     ) -> Result<(Vec<Vec<u8>>, u16), Error> {
         let query = DriveQuery::from_cbor(query_cbor, contract, document_type)?;
-        
-        if query.internal_clauses.verify() {
-            query.execute_no_proof(&mut self.grove, transaction)
-        } else {
-            Err(Error::InvalidQuery("Query has invalid where clauses"))
-        }
+
+        query.execute_no_proof(&mut self.grove, transaction)
     }
 }
 

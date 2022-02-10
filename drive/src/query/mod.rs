@@ -160,7 +160,7 @@ impl InternalClauses {
     }
 
     pub fn is_for_primary_key(&self) -> bool {
-        return self.primary_key_in_clause.is_some() || self.primary_key_equal_clause.is_some()
+        self.primary_key_in_clause.is_some() || self.primary_key_equal_clause.is_some()
     }
 }
 
@@ -1163,13 +1163,22 @@ impl<'a> DriveQuery<'a> {
             .map(|where_clause| (where_clause.field.clone(), where_clause))
             .collect();
 
-        Ok(InternalClauses {
+        let internal_clauses = InternalClauses {
             primary_key_equal_clause,
             primary_key_in_clause,
             in_clause,
             range_clause,
             equal_clauses,
-        })
+        };
+
+        match internal_clauses.verify() {
+            true => {
+                Ok(internal_clauses)
+            }
+            false => {
+                Err(Error::InvalidQuery("Query has invalid where clauses"))
+            }
+        }
     }
 
     pub fn execute_with_proof(
