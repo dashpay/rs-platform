@@ -1164,6 +1164,9 @@ impl<'a> DriveQuery<'a> {
             })
             .collect();
 
+        // TODO: It's done in a terrable way due to unblock integration ASAP
+        //   must be refactoring in the upcoming PR
+
         let is_primary_key_query = fields.contains(String::from("$id"));
 
         let path_query = if !is_primary_key_query {
