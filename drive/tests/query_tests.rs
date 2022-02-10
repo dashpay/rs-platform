@@ -760,6 +760,27 @@ fn test_query() {
         "where": [
             ["$id", "in", ["1", "2"]],
         ],
+    });
+
+    let query_cbor = common::value_to_cbor(query_value, None);
+
+    let person_document_type = contract
+        .document_types
+        .get("person")
+        .expect("contract should have a person document type");
+
+    let (results, _) = drive
+        .query_documents_from_contract(&contract, person_document_type, query_cbor.as_slice(), None)
+        .expect("query should be executed");
+
+    assert_eq!(results.len(), 0);
+
+    // fetching by $id with order by
+
+    let query_value = json!({
+        "where": [
+            ["$id", "in", ["1", "2"]],
+        ],
         "orderBy": [["$id", "asc"]],
     });
 
@@ -774,7 +795,43 @@ fn test_query() {
         .query_documents_from_contract(&contract, person_document_type, query_cbor.as_slice(), None)
         .expect("query should be executed");
 
-    assert_eq!(results.len(), 1);
+    assert_eq!(results.len(), 0);
+
+    // fetching with empty where and orderBy
+
+    let query_value = json!({});
+
+    let query_cbor = common::value_to_cbor(query_value, None);
+
+    let person_document_type = contract
+        .document_types
+        .get("person")
+        .expect("contract should have a person document type");
+
+    let (results, _) = drive
+        .query_documents_from_contract(&contract, person_document_type, query_cbor.as_slice(), None)
+        .expect("query should be executed");
+
+    assert_eq!(results.len(), 0);
+
+    // fetching with empty where
+
+    let query_value = json!({
+        "orderBy": [["$id", "asc"]]
+    });
+
+    let query_cbor = common::value_to_cbor(query_value, None);
+
+    let person_document_type = contract
+        .document_types
+        .get("person")
+        .expect("contract should have a person document type");
+
+    let (results, _) = drive
+        .query_documents_from_contract(&contract, person_document_type, query_cbor.as_slice(), None)
+        .expect("query should be executed");
+
+    assert_eq!(results.len(), 0);
 }
 
 #[test]
