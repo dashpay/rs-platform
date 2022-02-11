@@ -132,14 +132,14 @@ jobs:
         uses: docker://messense/rust-musl-cross:aarch64-musl
         with:
           workdir: /github/workspace/
-          entrypoint: node/docker/build-aarch64-unknown-linux-musl.sh
+          entrypoint: node/docker/build.sh -a ${{ matrix.node_arch }} -t ${{ steps.set-target.outputs.result }} -l ${{ steps.set-libc.outputs.result }}
 
       - name: Build
         if: ${{ steps.set-target.outputs.result != 'aarch64-unknown-linux-musl' }}
-        run: npm run build:release
-        env:
-          LIBC: ${{ steps.set-libc.outputs.result }}
-          ARCH: ${{ matrix.node_arch }} # Overwrite current arch with target one
+        uses: docker://messense/rust-musl-cross:x86_64-musl
+        with:
+          workdir: /github/workspace/
+          entrypoint: node/docker/build.sh -a ${{ matrix.node_arch }} -t ${{ steps.set-target.outputs.result }} -l ${{ steps.set-libc.outputs.result }}
 
       - name: Upload prebuild artifacts
         uses: actions/upload-artifact@v2
