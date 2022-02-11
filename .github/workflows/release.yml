@@ -1,10 +1,17 @@
 name: Release
 
+# on:
+#   workflow_dispatch:
+#   release:
+#     types:
+#       - published
 on:
   workflow_dispatch:
-  release:
-    types:
-      - published
+  pull_request:
+    branches:
+      - master
+      - develop
+      - v[0-9]+\.[0-9]+-dev
 
 jobs:
   build:
@@ -16,24 +23,19 @@ jobs:
         include:
           - os: ubuntu-latest
             arch: x86_64
+            node_arch: x64
             compiler: gnu
             platform: unknown-linux
-# TODO: Enable build for arm64 linux gnu
-#          - os: ubuntu-latest
-#            arch: aarch64
-#            node_arch: arm64
-#            compiler: gnu
-#            platform: unknown-linux
-#            build_dependencies:
-#              - gcc-aarch64-linux-gnu
-#              - binutils-aarch64-linux-gnu
-#              - clang
           - os: ubuntu-latest
             arch: x86_64
+            node_arch: x64
             compiler: musl
             platform: unknown-linux
-            build_dependencies:
-              - musl-tools
+          - os: ubuntu-latest
+            arch: aarch64
+            node_arch: arm64
+            compiler: gnu
+            platform: unknown-linux
           - os: ubuntu-latest
             arch: aarch64
             node_arch: arm64
@@ -127,19 +129,19 @@ jobs:
           LIBC: ${{ steps.set-libc.outputs.result }}
           ARCH: ${{ matrix.node_arch }} # Overwrite current arch with target one
 
-      - name: Build aarch64-unknown-linux-musl
-        if: ${{ steps.set-target.outputs.result == 'aarch64-unknown-linux-musl' }}
-        uses: docker://messense/rust-musl-cross:aarch64-musl
+      - name: Build Linux
+        if: ${{ matrix.os == 'ubuntu-latest' }}
+        uses: docker://messense/rust-musl-cross:${{ matrix.arch }}-musl
         with:
           workdir: /github/workspace/
           entrypoint: node/docker/build.sh -a ${{ matrix.node_arch }} -t ${{ steps.set-target.outputs.result }} -l ${{ steps.set-libc.outputs.result }}
 
-      - name: Build
-        if: ${{ steps.set-target.outputs.result != 'aarch64-unknown-linux-musl' }}
-        uses: docker://messense/rust-musl-cross:x86_64-musl
-        with:
-          workdir: /github/workspace/
-          entrypoint: node/docker/build.sh -a ${{ matrix.node_arch }} -t ${{ steps.set-target.outputs.result }} -l ${{ steps.set-libc.outputs.result }}
+      - name: Build Mac OS
+        if: ${{ matrix.os == 'macos-11' }}
+        run: npm run build:release
+        env:
+          LIBC: ${{ steps.set-libc.outputs.result }}
+          ARCH: ${{ matrix.node_arch }} # Overwrite current arch with target one
 
       - name: Upload prebuild artifacts
         uses: actions/upload-artifact@v2
@@ -147,38 +149,38 @@ jobs:
           name: prebuilds
           path: prebuilds/
 
-  publish:
-    name: Publish NPM Package
-    needs: [build]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout the repo
-        uses: actions/checkout@v2
+  # publish:
+  #   name: Publish NPM Package
+  #   needs: [build]
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout the repo
+  #       uses: actions/checkout@v2
 
-      - name: Check package version matches tag
-        uses: geritol/match-tag-to-package-version@0.2.0
-        env:
-          TAG_PREFIX: v
+  #     - name: Check package version matches tag
+  #       uses: geritol/match-tag-to-package-version@0.2.0
+  #       env:
+  #         TAG_PREFIX: v
 
-      - name: Setup Node.JS
-        uses: actions/setup-node@v2
-        with:
-          node-version: ${{ matrix.node-version }}
+  #     - name: Setup Node.JS
+  #       uses: actions/setup-node@v2
+  #       with:
+  #         node-version: ${{ matrix.node-version }}
 
-      - name: Install NPM deps
-        run: npm ci
+  #     - name: Install NPM deps
+  #       run: npm ci
 
-      - name: Download prebuild artifacts
-        uses: actions/download-artifact@v2
-        with:
-          name: prebuilds
-          path: prebuilds
+  #     - name: Download prebuild artifacts
+  #       uses: actions/download-artifact@v2
+  #       with:
+  #         name: prebuilds
+  #         path: prebuilds
 
-      - name: List prebuilds
-        run: ls -laR prebuilds
+  #     - name: List prebuilds
+  #       run: ls -laR prebuilds
 
-      - name: Publish NPM package
-        uses: JS-DevTools/npm-publish@v1
-        with:
-          access: public
-          token: ${{ secrets.NPM_TOKEN }}
+  #     - name: Publish NPM package
+  #       uses: JS-DevTools/npm-publish@v1
+  #       with:
+  #         access: public
+  #         token: ${{ secrets.NPM_TOKEN }}
