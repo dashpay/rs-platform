@@ -102,9 +102,17 @@ jobs:
             return env;
           result-encoding: string
 
-      - name: Build for Linux
-        if: ${{ matrix.os == 'ubuntu-latest' }}
-        uses: docker://messense/rust-musl-cross:${{ matrix.arch }}-musl
+      - name: Build for Linux (x86)
+        if: ${{ matrix.os == 'ubuntu-latest' && matrix.arch == 'x86_64' }}
+        uses: docker://messense/rust-musl-cross:x86_64-musl
+        with:
+          workdir: /github/workspace/
+          entrypoint: node/docker/build.sh
+          args: -a ${{ matrix.node_arch }} -t ${{ steps.set-target.outputs.result }} -l ${{ steps.set-libc.outputs.result }}
+
+      - name: Build for Linux (aarch64)
+        if: ${{ matrix.os == 'ubuntu-latest' && matrix.arch == 'aarch64' }}
+        uses: docker://messense/rust-musl-cross:aarch64-musl
         with:
           workdir: /github/workspace/
           entrypoint: node/docker/build.sh
