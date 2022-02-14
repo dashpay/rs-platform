@@ -845,7 +845,7 @@ impl<'a> DriveQuery<'a> {
             start_at_included = true;
         }
 
-        let start_at : Option<Vec<u8>> = if start_option.is_some() {
+        let start_at: Option<Vec<u8>> = if start_option.is_some() {
             bytes_for_system_value(start_option.unwrap())?
         } else {
             None

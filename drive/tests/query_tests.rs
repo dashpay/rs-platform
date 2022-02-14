@@ -143,7 +143,10 @@ fn test_query() {
         .expect("there is always a root hash");
     assert_eq!(
         root_hash.as_slice(),
-        vec![164, 56, 26, 188, 12, 251, 247, 43, 109, 153, 109, 110, 78, 131, 37, 79, 19, 178, 159, 69, 35, 250, 159, 210, 2, 125, 12, 103, 50, 40, 108, 114]
+        vec![
+            164, 56, 26, 188, 12, 251, 247, 43, 109, 153, 109, 110, 78, 131, 37, 79, 19, 178, 159,
+            69, 35, 250, 159, 210, 2, 125, 12, 103, 50, 40, 108, 114
+        ]
     );
 
     let all_names = [
@@ -353,7 +356,6 @@ fn test_query() {
         .expect("query should be executed");
 
     assert_eq!(results.len(), 1);
-
 
     // A query getting all people who's first name is before Chris
 
@@ -775,13 +777,13 @@ fn test_query() {
 
     // fetching by $id
     let mut rng = rand::rngs::StdRng::seed_from_u64(84594);
-    let id_bytes =
-        bs58::decode("ATxXeP5AvY4aeUFA6WRo7uaBKTBgPQCjTrgtNpCMNVRD").into_vec()
-            .expect("this should decode");
+    let id_bytes = bs58::decode("ATxXeP5AvY4aeUFA6WRo7uaBKTBgPQCjTrgtNpCMNVRD")
+        .into_vec()
+        .expect("this should decode");
 
-    let owner_id_bytes =
-        bs58::decode("BYR3zJgXDuz1BYAkEagwSjVqTcE1gbqEojd6RwAGuMzj").into_vec()
-            .expect("this should decode");
+    let owner_id_bytes = bs58::decode("BYR3zJgXDuz1BYAkEagwSjVqTcE1gbqEojd6RwAGuMzj")
+        .into_vec()
+        .expect("this should decode");
 
     let fixed_person = Person {
         id: id_bytes,
@@ -811,11 +813,12 @@ fn test_query() {
         )
         .expect("document should be inserted");
 
-    let id_two_bytes =
-        bs58::decode("6A8SGgdmj2NtWCYoYDPDpbsYkq2MCbgi6Lx4ALLfF179").into_vec().expect("should decode");
-    let owner_id_bytes =
-        bs58::decode("Di8dtJXv3L2YnzDNUN4w5rWLPSsSAzv6hLMMQbg3eyVA").into_vec()
-            .expect("this should decode");
+    let id_two_bytes = bs58::decode("6A8SGgdmj2NtWCYoYDPDpbsYkq2MCbgi6Lx4ALLfF179")
+        .into_vec()
+        .expect("should decode");
+    let owner_id_bytes = bs58::decode("Di8dtJXv3L2YnzDNUN4w5rWLPSsSAzv6hLMMQbg3eyVA")
+        .into_vec()
+        .expect("this should decode");
     let next_person = Person {
         id: id_two_bytes,
         owner_id: owner_id_bytes,
@@ -981,7 +984,10 @@ fn test_query() {
         .expect("there is always a root hash");
     assert_eq!(
         root_hash.as_slice(),
-        vec![84, 219, 205, 67, 253, 96, 148, 19, 207, 81, 77, 219, 252, 21, 109, 59, 247, 36, 196, 182, 199, 250, 174, 118, 180, 251, 127, 165, 73, 206, 63, 127]
+        vec![
+            84, 219, 205, 67, 253, 96, 148, 19, 207, 81, 77, 219, 252, 21, 109, 59, 247, 36, 196,
+            182, 199, 250, 174, 118, 180, 251, 127, 165, 73, 206, 63, 127
+        ]
     );
 }
 
