@@ -124,38 +124,38 @@ jobs:
           name: prebuilds
           path: prebuilds/
 
-  # publish:
-  #   name: Publish NPM Package
-  #   needs: [build]
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Checkout the repo
-  #       uses: actions/checkout@v2
+  publish:
+    name: Publish NPM Package
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the repo
+        uses: actions/checkout@v2
 
-  #     - name: Check package version matches tag
-  #       uses: geritol/match-tag-to-package-version@0.2.0
-  #       env:
-  #         TAG_PREFIX: v
+      - name: Check package version matches tag
+        uses: geritol/match-tag-to-package-version@0.2.0
+        env:
+          TAG_PREFIX: v
 
-  #     - name: Setup Node.JS
-  #       uses: actions/setup-node@v2
-  #       with:
-  #         node-version: ${{ matrix.node-version }}
+      - name: Setup Node.JS
+        uses: actions/setup-node@v2
+        with:
+          node-version: ${{ matrix.node-version }}
 
-  #     - name: Install NPM deps
-  #       run: npm ci
+      - name: Install NPM deps
+        run: npm ci
 
-  #     - name: Download prebuild artifacts
-  #       uses: actions/download-artifact@v2
-  #       with:
-  #         name: prebuilds
-  #         path: prebuilds
+      - name: Download prebuild artifacts
+        uses: actions/download-artifact@v2
+        with:
+          name: prebuilds
+          path: prebuilds
 
-  #     - name: List prebuilds
-  #       run: ls -laR prebuilds
+      - name: List prebuilds
+        run: ls -laR prebuilds
 
-  #     - name: Publish NPM package
-  #       uses: JS-DevTools/npm-publish@v1
-  #       with:
-  #         access: public
-  #         token: ${{ secrets.NPM_TOKEN }}
+      - name: Publish NPM package
+        uses: JS-DevTools/npm-publish@v1
+        with:
+          access: public
+          token: ${{ secrets.NPM_TOKEN }}
