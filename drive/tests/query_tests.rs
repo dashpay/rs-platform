@@ -914,7 +914,7 @@ fn test_query() {
         )
         .expect("query should be executed");
 
-    assert_eq!(results.len(), 10);
+    assert_eq!(results.len(), 12);
 
     //
     // // fetching with empty where and orderBy
