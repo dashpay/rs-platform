@@ -141,10 +141,10 @@ fn test_query() {
         .grove
         .root_hash(Some(&db_transaction))
         .expect("there is always a root hash");
-    // assert_eq!(
-    //     root_hash.as_slice(),
-    //     vec![166, 104, 174, 7, 173, 253, 102, 105, 154, 203, 106, 174, 102, 190, 117, 253, 35, 97, 220, 13, 212, 93, 100, 177, 141, 66, 223, 225, 201, 54, 236, 133]
-    // );
+    assert_eq!(
+        root_hash.as_slice(),
+        vec![164, 56, 26, 188, 12, 251, 247, 43, 109, 153, 109, 110, 78, 131, 37, 79, 19, 178, 159, 69, 35, 250, 159, 210, 2, 125, 12, 103, 50, 40, 108, 114]
+    );
 
     let all_names = [
         "Adey".to_string(),
@@ -813,9 +813,12 @@ fn test_query() {
 
     let id_two_bytes =
         bs58::decode("6A8SGgdmj2NtWCYoYDPDpbsYkq2MCbgi6Lx4ALLfF179").into_vec().expect("should decode");
+    let owner_id_bytes =
+        bs58::decode("Di8dtJXv3L2YnzDNUN4w5rWLPSsSAzv6hLMMQbg3eyVA").into_vec()
+            .expect("this should decode");
     let next_person = Person {
         id: id_two_bytes,
-        owner_id: Vec::from(rng.gen::<[u8; 32]>()),
+        owner_id: owner_id_bytes,
         first_name: String::from("Wdskdfslgjfdlj"),
         middle_name: String::from("Mdsfdsgsdl"),
         last_name: String::from("dkfjghfdk"),
@@ -917,12 +920,39 @@ fn test_query() {
     assert_eq!(results.len(), 12);
 
     //
-    // // fetching with empty where and orderBy
+    // // fetching with ownerId in a set of values
     //
     let query_value = json!({
         "where": [
-            ["$ownerId", "in", ["BYR3zJgXDuz1BYAkEagwSjVqTcE1gbqEojd6RwAGuMzj"]]
-            //["$ownerId", "==", "BYR3zJgXDuz1BYAkEagwSjVqTcE1gbqEojd6RwAGuMzj"]
+            ["$ownerId", "in", ["BYR3zJgXDuz1BYAkEagwSjVqTcE1gbqEojd6RwAGuMzj", "Di8dtJXv3L2YnzDNUN4w5rWLPSsSAzv6hLMMQbg3eyVA"]]
+        ],
+        "orderBy": [["$ownerId", "desc"]]
+    });
+
+    let query_cbor = common::value_to_cbor(query_value, None);
+
+    let person_document_type = contract
+        .document_types
+        .get("person")
+        .expect("contract should have a person document type");
+
+    let (results, _) = drive
+        .query_documents_from_contract(
+            &contract,
+            person_document_type,
+            query_cbor.as_slice(),
+            Some(&db_transaction),
+        )
+        .expect("query should be executed");
+
+    assert_eq!(results.len(), 2);
+
+    //
+    // // fetching with ownerId equal and orderBy
+    //
+    let query_value = json!({
+        "where": [
+            ["$ownerId", "==", "BYR3zJgXDuz1BYAkEagwSjVqTcE1gbqEojd6RwAGuMzj"]
         ],
         "orderBy": [["$ownerId", "asc"]]
     });
@@ -945,25 +975,14 @@ fn test_query() {
 
     assert_eq!(results.len(), 1);
 
-    //
-    // // fetching with empty where
-    //
-    // let query_value = json!({
-    //     "orderBy": [["$id", "asc"]]
-    // });
-    //
-    // let query_cbor = common::value_to_cbor(query_value, None);
-    //
-    // let person_document_type = contract
-    //     .document_types
-    //     .get("person")
-    //     .expect("contract should have a person document type");
-    //
-    // let (results, _) = drive
-    //     .query_documents_from_contract(&contract, person_document_type, query_cbor.as_slice(), Some(&db_transaction))
-    //     .expect("query should be executed");
-    //
-    // assert_eq!(results.len(), 0);
+    let root_hash = drive
+        .grove
+        .root_hash(Some(&db_transaction))
+        .expect("there is always a root hash");
+    assert_eq!(
+        root_hash.as_slice(),
+        vec![84, 219, 205, 67, 253, 96, 148, 19, 207, 81, 77, 219, 252, 21, 109, 59, 247, 36, 196, 182, 199, 250, 174, 118, 180, 251, 127, 165, 73, 206, 63, 127]
+    );
 }
 
 #[test]
