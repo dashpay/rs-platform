@@ -1250,7 +1250,7 @@ impl<'a> DriveQuery<'a> {
         document_type_path: Vec<Vec<u8>>,
         starts_at_document: Option<(Document, bool)>,
     ) -> Result<PathQuery, Error> {
-        let mut path = document_type_path.clone();
+        let mut path = document_type_path;
 
         // Add primary key ($id) subtree
         path.push(vec![0]);
