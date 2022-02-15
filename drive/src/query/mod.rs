@@ -948,7 +948,7 @@ impl<'a> DriveQuery<'a> {
                     list,
                     negated,
                 } => {
-                    if *negated == true {
+                    if *negated {
                         return Err(Error::InvalidQuery(
                             "Invalid query: negated in clause not supported",
                         ));
@@ -1085,13 +1085,13 @@ impl<'a> DriveQuery<'a> {
     fn extract_clauses(all_where_clauses: Vec<WhereClause>) -> Result<InternalClauses, Error> {
         let range_clause = WhereClause::group_range_clauses(&all_where_clauses)?;
 
-        let equal_clauses_array = all_where_clauses
-            .iter()
-            .filter_map(|where_clause| match where_clause.operator {
-                Equal => Some(where_clause.clone()),
-                _ => None,
-            })
-            .collect::<Vec<WhereClause>>();
+        let equal_clauses_array =
+            all_where_clauses
+                .iter()
+                .filter_map(|where_clause| match where_clause.operator {
+                    Equal => Some(where_clause.clone()),
+                    _ => None,
+                });
 
         let in_clauses_array = all_where_clauses
             .iter()
