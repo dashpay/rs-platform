@@ -1171,7 +1171,10 @@ impl<'a> DriveQuery<'a> {
             all_where_clauses
                 .iter()
                 .filter_map(|where_clause| match where_clause.operator {
-                    Equal => Some(where_clause.clone()),
+                    Equal => match where_clause.is_identifier() {
+                        true => None,
+                        false => Some(where_clause.clone()),
+                    },
                     _ => None,
                 });
 
