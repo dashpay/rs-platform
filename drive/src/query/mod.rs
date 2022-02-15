@@ -1174,7 +1174,7 @@ impl<'a> DriveQuery<'a> {
                     Equal => Some(where_clause.clone()),
                     _ => None,
                 });
-      
+
         let in_clauses_array = all_where_clauses
             .iter()
             .filter_map(|where_clause| match where_clause.operator {
