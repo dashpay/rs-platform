@@ -15,6 +15,7 @@ use sqlparser::ast::{OrderByExpr, Select, Statement};
 use sqlparser::dialect::GenericDialect;
 use sqlparser::parser::Parser;
 use std::collections::HashMap;
+use std::ops::BitXor;
 use storage::rocksdb_storage::OptimisticTransactionDBTransaction;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -140,20 +141,56 @@ fn sql_value_to_cbor(sql_value: ast::Value) -> Option<CborValue> {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct InternalClauses {
+    primary_key_in_clause: Option<WhereClause>,
+    primary_key_equal_clause: Option<WhereClause>,
+    in_clause: Option<WhereClause>,
+    range_clause: Option<WhereClause>,
+    equal_clauses: HashMap<String, WhereClause>,
+}
+
+impl InternalClauses {
+    pub fn verify(&self) -> bool {
+        // There can only be 1 primary key clause, or many other clauses
+        if self
+            .primary_key_in_clause
+            .is_some()
+            .bitxor(self.primary_key_equal_clause.is_some())
+        {
+            // One is set, all rest must be empty
+            !(self.in_clause.is_some()
+                || self.range_clause.is_some()
+                || !self.equal_clauses.is_empty())
+        } else {
+            !(self.primary_key_in_clause.is_some() && self.primary_key_equal_clause.is_some())
+        }
+    }
+
+    pub fn is_for_primary_key(&self) -> bool {
+        self.primary_key_in_clause.is_some() || self.primary_key_equal_clause.is_some()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.in_clause.is_none()
+            && self.range_clause.is_none()
+            && self.equal_clauses.is_empty()
+            && self.primary_key_in_clause.is_none()
+            && self.primary_key_equal_clause.is_none()
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct WhereClause {
     field: String,
     operator: WhereOperator,
     value: Value,
 }
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct InternalClauses {
-    in_clause: Option<WhereClause>,
-    range_clause: Option<WhereClause>,
-    equal_clauses: HashMap<String, WhereClause>,
-}
-
 impl<'a> WhereClause {
+    pub fn is_identifier(&self) -> bool {
+        return self.field == "$id";
+    }
+
     pub fn from_components(clause_components: &'a [Value]) -> Result<Self, Error> {
         if clause_components.len() != 3 {
             return Err(Error::CorruptedData(String::from(
@@ -756,6 +793,21 @@ pub struct DriveQuery<'a> {
 }
 
 impl<'a> DriveQuery<'a> {
+    pub fn is_for_primary_key(&self) -> bool {
+        self.internal_clauses.is_for_primary_key()
+            || (self.internal_clauses.is_empty()
+                && (self.order_by.is_empty()
+                    || (self.order_by.len() == 1
+                        && self
+                            .order_by
+                            .keys()
+                            .collect::<Vec<&String>>()
+                            .first()
+                            .unwrap()
+                            .as_str()
+                            == "$id")))
+    }
+
     pub fn from_cbor(
         query_cbor: &[u8],
         contract: &'a Contract,
@@ -821,7 +873,11 @@ impl<'a> DriveQuery<'a> {
             start_at_included = true;
         }
 
-        let start_at: Option<Vec<u8>> = start_option.and_then(bytes_for_system_value);
+        let start_at: Option<Vec<u8>> = if start_option.is_some() {
+            bytes_for_system_value(start_option.unwrap())?
+        } else {
+            None
+        };
 
         let order_by: IndexMap<String, OrderClause> = query_document
             .get("orderBy")
@@ -1068,7 +1124,11 @@ impl<'a> DriveQuery<'a> {
 
         let start_at_option = None;
         let start_at_included = true;
-        let start_at: Option<Vec<u8>> = start_at_option.and_then(bytes_for_system_value);
+        let start_at: Option<Vec<u8>> = if start_at_option.is_some() {
+            bytes_for_system_value(start_at_option.unwrap())?
+        } else {
+            None
+        };
 
         Ok(DriveQuery {
             contract,
@@ -1083,6 +1143,28 @@ impl<'a> DriveQuery<'a> {
     }
 
     fn extract_clauses(all_where_clauses: Vec<WhereClause>) -> Result<InternalClauses, Error> {
+        let primary_key_equal_clauses_array = all_where_clauses
+            .iter()
+            .filter_map(|where_clause| match where_clause.operator {
+                Equal => match where_clause.is_identifier() {
+                    true => Some(where_clause.clone()),
+                    false => None,
+                },
+                _ => None,
+            })
+            .collect::<Vec<WhereClause>>();
+
+        let primary_key_in_clauses_array = all_where_clauses
+            .iter()
+            .filter_map(|where_clause| match where_clause.operator {
+                In => match where_clause.is_identifier() {
+                    true => Some(where_clause.clone()),
+                    false => None,
+                },
+                _ => None,
+            })
+            .collect::<Vec<WhereClause>>();
+
         let range_clause = WhereClause::group_range_clauses(&all_where_clauses)?;
 
         let equal_clauses_array =
@@ -1092,14 +1174,43 @@ impl<'a> DriveQuery<'a> {
                     Equal => Some(where_clause.clone()),
                     _ => None,
                 });
-
+      
         let in_clauses_array = all_where_clauses
             .iter()
             .filter_map(|where_clause| match where_clause.operator {
-                In => Some(where_clause.clone()),
+                In => match where_clause.is_identifier() {
+                    true => None,
+                    false => Some(where_clause.clone()),
+                },
                 _ => None,
             })
             .collect::<Vec<WhereClause>>();
+
+        let primary_key_equal_clause = match primary_key_equal_clauses_array.len() {
+            0 => Ok(None),
+            1 => Ok(Some(
+                primary_key_equal_clauses_array
+                    .get(0)
+                    .expect("there must be a value")
+                    .clone(),
+            )),
+            _ => Err(Error::CorruptedData(String::from(
+                "There should only be one equal clause for the primary key",
+            ))),
+        }?;
+
+        let primary_key_in_clause = match primary_key_in_clauses_array.len() {
+            0 => Ok(None),
+            1 => Ok(Some(
+                primary_key_in_clauses_array
+                    .get(0)
+                    .expect("there must be a value")
+                    .clone(),
+            )),
+            _ => Err(Error::CorruptedData(String::from(
+                "There should only be one in clause for the primary key",
+            ))),
+        }?;
 
         let in_clause = match in_clauses_array.len() {
             0 => Ok(None),
@@ -1119,26 +1230,25 @@ impl<'a> DriveQuery<'a> {
             .map(|where_clause| (where_clause.field.clone(), where_clause))
             .collect();
 
-        Ok(InternalClauses {
+        let internal_clauses = InternalClauses {
+            primary_key_equal_clause,
+            primary_key_in_clause,
             in_clause,
             range_clause,
             equal_clauses,
-        })
+        };
+
+        match internal_clauses.verify() {
+            true => Ok(internal_clauses),
+            false => Err(Error::InvalidQuery("Query has invalid where clauses")),
+        }
     }
 
-    pub fn execute_with_proof(
-        self,
-        _grove: &mut GroveDb,
-        _transaction: Option<&OptimisticTransactionDBTransaction>,
-    ) -> Result<Vec<u8>, Error> {
-        todo!()
-    }
-
-    pub fn execute_no_proof(
+    pub fn construct_path_query(
         &self,
-        grove: &mut GroveDb,
+        grove: &GroveDb,
         transaction: Option<&OptimisticTransactionDBTransaction>,
-    ) -> Result<(Vec<Vec<u8>>, u16), Error> {
+    ) -> Result<PathQuery, Error> {
         // First we should get the overall document_type_path
         let document_type_path = self
             .contract
@@ -1167,7 +1277,124 @@ impl<'a> DriveQuery<'a> {
                 }
             }
         }?;
+        if self.is_for_primary_key() {
+            self.get_primary_key_path_query(document_type_path, starts_at_document)
+        } else {
+            self.get_non_primary_key_path_query(document_type_path, starts_at_document)
+        }
+    }
 
+    pub fn get_primary_key_path_query(
+        &self,
+        document_type_path: Vec<Vec<u8>>,
+        starts_at_document: Option<(Document, bool)>,
+    ) -> Result<PathQuery, Error> {
+        let mut path = document_type_path;
+
+        // Add primary key ($id) subtree
+        path.push(vec![0]);
+
+        if let Some(primary_key_equal_clause) = &self.internal_clauses.primary_key_equal_clause {
+            let mut query = Query::new();
+            let key = self
+                .document_type
+                .serialize_value_for_key("$id", &primary_key_equal_clause.value)?;
+            query.insert_key(key);
+
+            Ok(PathQuery::new(
+                path,
+                SizedQuery::new(query, Some(self.limit), Some(self.offset)),
+            ))
+        } else {
+            // This is for a range
+            let left_to_right = if self.order_by.keys().len() == 1 {
+                if self.order_by.keys().next().unwrap() != "$id" {
+                    return Err(Error::CorruptedData(String::from(
+                        "order by should include $id only",
+                    )));
+                }
+
+                let order_clause = self.order_by.get("$id").unwrap();
+
+                order_clause.ascending
+            } else {
+                true
+            };
+
+            let mut query = Query::new_with_direction(left_to_right);
+            // If there is a start_at_document, we need to get the value that it has for the
+            // current field.
+            let starts_at_key_option = match starts_at_document {
+                None => None,
+                Some((document, included)) => {
+                    // if the key doesn't exist then we should ignore the starts at key
+                    document
+                        .get_raw_for_document_type("$id", self.document_type, None)?
+                        .map(|raw_value_option| (raw_value_option, included))
+                }
+            };
+
+            if let Some(primary_key_in_clause) = &self.internal_clauses.primary_key_in_clause {
+                let in_values = match &primary_key_in_clause.value {
+                    Value::Array(array) => Ok(array),
+                    _ => Err(Error::CorruptedData(String::from(
+                        "when using in operator you must provide an array of values",
+                    ))),
+                }?;
+                match starts_at_key_option {
+                    None => {
+                        for value in in_values.iter() {
+                            let key = self.document_type.serialize_value_for_key("$id", value)?;
+                            query.insert_key(key)
+                        }
+                    }
+                    Some((starts_at_key, included)) => {
+                        for value in in_values.iter() {
+                            let key = self.document_type.serialize_value_for_key("$id", value)?;
+
+                            if (left_to_right && starts_at_key < key)
+                                || (!left_to_right && starts_at_key > key)
+                                || (included && starts_at_key == key)
+                            {
+                                query.insert_key(key);
+                            }
+                        }
+                    }
+                }
+                Ok(PathQuery::new(
+                    path,
+                    SizedQuery::new(query, Some(self.limit), Some(self.offset)),
+                ))
+            } else {
+                // this is a range on all elements
+                match starts_at_key_option {
+                    None => {
+                        query.insert_all();
+                    }
+                    Some((starts_at_key, included)) => match left_to_right {
+                        true => match included {
+                            true => query.insert_range_from(starts_at_key..),
+                            false => query.insert_range_after(starts_at_key..),
+                        },
+                        false => match included {
+                            true => query.insert_range_to_inclusive(..=starts_at_key),
+                            false => query.insert_range_to(..starts_at_key),
+                        },
+                    },
+                }
+                Ok(PathQuery::new(
+                    path,
+                    SizedQuery::new(query, Some(self.limit), Some(self.offset)),
+                ))
+            }
+        }
+    }
+
+    pub fn get_non_primary_key_path_query(
+        &self,
+        document_type_path: Vec<Vec<u8>>,
+        starts_at_document: Option<(Document, bool)>,
+    ) -> Result<PathQuery, Error> {
         let equal_fields = self
             .internal_clauses
             .equal_clauses
@@ -1214,6 +1441,7 @@ impl<'a> DriveQuery<'a> {
                 "query must better match an existing index",
             ));
         }
+
         let ordered_clauses: Vec<&WhereClause> = index
             .properties
             .iter()
@@ -1245,6 +1473,7 @@ impl<'a> DriveQuery<'a> {
                     || (subquery_clause.is_some() && subquery_clause.unwrap().field == field.name))
             })
             .collect::<Vec<&IndexProperty>>();
+
         let intermediate_values =
             index
                 .properties
@@ -1386,10 +1615,26 @@ impl<'a> DriveQuery<'a> {
 
         path.push(last_index.name.as_bytes().to_vec());
 
-        let path_query = PathQuery::new(
+        Ok(PathQuery::new(
             path,
             SizedQuery::new(final_query, Some(self.limit), Some(self.offset)),
-        );
+        ))
+    }
+
+    pub fn execute_with_proof(
+        self,
+        _grove: &mut GroveDb,
+        _transaction: Option<&OptimisticTransactionDBTransaction>,
+    ) -> Result<Vec<u8>, Error> {
+        todo!()
+    }
+
+    pub fn execute_no_proof(
+        &self,
+        grove: &mut GroveDb,
+        transaction: Option<&OptimisticTransactionDBTransaction>,
+    ) -> Result<(Vec<Vec<u8>>, u16), Error> {
+        let path_query = self.construct_path_query(grove, transaction)?;
 
         let query_result = grove.get_path_query(&path_query, transaction);
         match query_result {

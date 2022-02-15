@@ -144,8 +144,8 @@ fn test_query() {
     assert_eq!(
         root_hash.as_slice(),
         vec![
-            36, 148, 221, 163, 46, 216, 16, 100, 121, 174, 200, 97, 221, 19, 165, 104, 73, 190,
-            202, 145, 86, 215, 115, 198, 103, 167, 187, 182, 253, 155, 166, 205
+            164, 56, 26, 188, 12, 251, 247, 43, 109, 153, 109, 110, 78, 131, 37, 79, 19, 178, 159,
+            69, 35, 250, 159, 210, 2, 125, 12, 103, 50, 40, 108, 114
         ]
     );
 
@@ -335,6 +335,27 @@ fn test_query() {
         .expect("query should be executed");
 
     assert_eq!(results.len(), 0);
+
+    // A query getting a middle name
+
+    let query_value = json!({
+        "where": [
+            ["middleName", "==", "Briggs"]
+        ]
+    });
+
+    let query_cbor = common::value_to_cbor(query_value, None);
+
+    let person_document_type = contract
+        .document_types
+        .get("person")
+        .expect("contract should have a person document type");
+
+    let (results, _) = drive
+        .query_documents_from_contract(&contract, person_document_type, query_cbor.as_slice(), None)
+        .expect("query should be executed");
+
+    assert_eq!(results.len(), 1);
 
     // A query getting all people who's first name is before Chris
 
@@ -752,7 +773,259 @@ fn test_query() {
         .get("Meta")
         .expect("we should be able to get Kevina as she is 48");
 
-    assert_eq!(*meta_age, 59)
+    assert_eq!(*meta_age, 59);
+
+    // fetching by $id
+    let mut rng = rand::rngs::StdRng::seed_from_u64(84594);
+    let id_bytes = bs58::decode("ATxXeP5AvY4aeUFA6WRo7uaBKTBgPQCjTrgtNpCMNVRD")
+        .into_vec()
+        .expect("this should decode");
+
+    let owner_id_bytes = bs58::decode("BYR3zJgXDuz1BYAkEagwSjVqTcE1gbqEojd6RwAGuMzj")
+        .into_vec()
+        .expect("this should decode");
+
+    let fixed_person = Person {
+        id: id_bytes,
+        owner_id: owner_id_bytes,
+        first_name: String::from("Wisdom"),
+        middle_name: String::from("Madabuchukwu"),
+        last_name: String::from("Ogwu"),
+        age: rng.gen_range(0..85),
+    };
+    let serialized_person = serde_json::to_value(&fixed_person).expect("serialized person");
+    let person_cbor = common::value_to_cbor(
+        serialized_person,
+        Some(rs_drive::drive::defaults::PROTOCOL_VERSION),
+    );
+    let document = Document::from_cbor(person_cbor.as_slice(), None, None)
+        .expect("document should be properly deserialized");
+
+    drive
+        .add_document_for_contract(
+            &document,
+            &person_cbor,
+            &contract,
+            "person",
+            None,
+            true,
+            Some(&db_transaction),
+        )
+        .expect("document should be inserted");
+
+    let id_two_bytes = bs58::decode("6A8SGgdmj2NtWCYoYDPDpbsYkq2MCbgi6Lx4ALLfF179")
+        .into_vec()
+        .expect("should decode");
+    let owner_id_bytes = bs58::decode("Di8dtJXv3L2YnzDNUN4w5rWLPSsSAzv6hLMMQbg3eyVA")
+        .into_vec()
+        .expect("this should decode");
+    let next_person = Person {
+        id: id_two_bytes,
+        owner_id: owner_id_bytes,
+        first_name: String::from("Wdskdfslgjfdlj"),
+        middle_name: String::from("Mdsfdsgsdl"),
+        last_name: String::from("dkfjghfdk"),
+        age: rng.gen_range(0..85),
+    };
+    let serialized_person = serde_json::to_value(&next_person).expect("serialized person");
+    let person_cbor = common::value_to_cbor(
+        serialized_person,
+        Some(rs_drive::drive::defaults::PROTOCOL_VERSION),
+    );
+    let document = Document::from_cbor(person_cbor.as_slice(), None, None)
+        .expect("document should be properly deserialized");
+
+    drive
+        .add_document_for_contract(
+            &document,
+            &person_cbor,
+            &contract,
+            "person",
+            None,
+            true,
+            Some(&db_transaction),
+        )
+        .expect("document should be inserted");
+
+    let query_value = json!({
+        "where": [
+            ["$id", "in", vec![String::from("6A8SGgdmj2NtWCYoYDPDpbsYkq2MCbgi6Lx4ALLfF179")]],
+        ],
+    });
+
+    let query_cbor = common::value_to_cbor(query_value, None);
+
+    let person_document_type = contract
+        .document_types
+        .get("person")
+        .expect("contract should have a person document type");
+
+    let (results, _) = drive
+        .query_documents_from_contract(
+            &contract,
+            person_document_type,
+            query_cbor.as_slice(),
+            Some(&db_transaction),
+        )
+        .expect("query should be executed");
+
+    // dbg!(&results);
+    assert_eq!(results.len(), 1);
+
+    // fetching by $id with order by
+
+    let query_value = json!({
+        "where": [
+            ["$id", "in", [String::from("ATxXeP5AvY4aeUFA6WRo7uaBKTBgPQCjTrgtNpCMNVRD"), String::from("6A8SGgdmj2NtWCYoYDPDpbsYkq2MCbgi6Lx4ALLfF179")]],
+        ],
+        "orderBy": [["$id", "asc"]],
+    });
+
+    let query_cbor = common::value_to_cbor(query_value, None);
+
+    let person_document_type = contract
+        .document_types
+        .get("person")
+        .expect("contract should have a person document type");
+
+    let (results, _) = drive
+        .query_documents_from_contract(
+            &contract,
+            person_document_type,
+            query_cbor.as_slice(),
+            Some(&db_transaction),
+        )
+        .expect("query should be executed");
+    // dbg!(&results);
+
+    assert_eq!(results.len(), 2);
+    //
+    // // fetching with empty where and orderBy
+    //
+    let query_value = json!({});
+
+    let query_cbor = common::value_to_cbor(query_value, None);
+
+    let person_document_type = contract
+        .document_types
+        .get("person")
+        .expect("contract should have a person document type");
+
+    let (results, _) = drive
+        .query_documents_from_contract(
+            &contract,
+            person_document_type,
+            query_cbor.as_slice(),
+            Some(&db_transaction),
+        )
+        .expect("query should be executed");
+
+    assert_eq!(results.len(), 12);
+
+    //
+    // // fetching with empty where and orderBy $id desc
+    //
+    let query_value = json!({
+        "orderBy": [["$id", "desc"]]
+    });
+
+    let query_cbor = common::value_to_cbor(query_value, None);
+
+    let person_document_type = contract
+        .document_types
+        .get("person")
+        .expect("contract should have a person document type");
+
+    let (results, _) = drive
+        .query_documents_from_contract(
+            &contract,
+            person_document_type,
+            query_cbor.as_slice(),
+            Some(&db_transaction),
+        )
+        .expect("query should be executed");
+
+    assert_eq!(results.len(), 12);
+
+    let last_person = Document::from_cbor(results.first().unwrap().as_slice(), None, None)
+        .expect("we should be able to deserialize the cbor");
+
+    assert_eq!(
+        last_person.id,
+        vec![
+            249, 170, 70, 122, 181, 31, 35, 176, 175, 131, 70, 150, 250, 223, 194, 203, 175, 200,
+            107, 252, 199, 227, 154, 105, 89, 57, 38, 85, 236, 192, 254, 88
+        ]
+        .as_slice()
+    );
+
+    //
+    // // fetching with ownerId in a set of values
+    //
+    let query_value = json!({
+        "where": [
+            ["$ownerId", "in", ["BYR3zJgXDuz1BYAkEagwSjVqTcE1gbqEojd6RwAGuMzj", "Di8dtJXv3L2YnzDNUN4w5rWLPSsSAzv6hLMMQbg3eyVA"]]
+        ],
+        "orderBy": [["$ownerId", "desc"]]
+    });
+
+    let query_cbor = common::value_to_cbor(query_value, None);
+
+    let person_document_type = contract
+        .document_types
+        .get("person")
+        .expect("contract should have a person document type");
+
+    let (results, _) = drive
+        .query_documents_from_contract(
+            &contract,
+            person_document_type,
+            query_cbor.as_slice(),
+            Some(&db_transaction),
+        )
+        .expect("query should be executed");
+
+    assert_eq!(results.len(), 2);
+
+    //
+    // // fetching with ownerId equal and orderBy
+    //
+    let query_value = json!({
+        "where": [
+            ["$ownerId", "==", "BYR3zJgXDuz1BYAkEagwSjVqTcE1gbqEojd6RwAGuMzj"]
+        ],
+        "orderBy": [["$ownerId", "asc"]]
+    });
+
+    let query_cbor = common::value_to_cbor(query_value, None);
+
+    let person_document_type = contract
+        .document_types
+        .get("person")
+        .expect("contract should have a person document type");
+
+    let (results, _) = drive
+        .query_documents_from_contract(
+            &contract,
+            person_document_type,
+            query_cbor.as_slice(),
+            Some(&db_transaction),
+        )
+        .expect("query should be executed");
+
+    assert_eq!(results.len(), 1);
+
+    let root_hash = drive
+        .grove
+        .root_hash(Some(&db_transaction))
+        .expect("there is always a root hash");
+    assert_eq!(
+        root_hash.as_slice(),
+        vec![
+            84, 219, 205, 67, 253, 96, 148, 19, 207, 81, 77, 219, 252, 21, 109, 59, 247, 36, 196,
+            182, 199, 250, 174, 118, 180, 251, 127, 165, 73, 206, 63, 127
+        ]
+    );
 }
 
 #[test]
