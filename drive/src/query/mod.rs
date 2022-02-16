@@ -1648,6 +1648,13 @@ impl<'a> DriveQuery<'a> {
                     query_result
                 }
             }
+            Err(Error::InvalidPath(ref message)) => {
+                if message.to_string() == "no subtree found as parent in path is empty" {
+                    Ok((Vec::new(), 0))
+                } else {
+                    query_result
+                }
+            }
             Err(e) => Err(e),
             Ok(result) => Ok(result),
         }
