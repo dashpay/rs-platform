@@ -1641,22 +1641,10 @@ impl<'a> DriveQuery<'a> {
 
         let query_result = grove.get_path_query(&path_query, transaction);
         match query_result {
-            Err(Error::InvalidPathKey(ref message)) => {
-                if message.starts_with("key not found in Merk:") {
-                    Ok((Vec::new(), 0))
-                } else {
-                    query_result
-                }
+            Err(Error::PathKeyNotFound(_)) | Err(Error::PathNotFound(_)) => {
+                Ok((Vec::new(), 0))
             }
-            Err(Error::InvalidPath(ref message)) => {
-                if message.to_string() == "no subtree found as parent in path is empty" {
-                    Ok((Vec::new(), 0))
-                } else {
-                    query_result
-                }
-            }
-            Err(e) => Err(e),
-            Ok(result) => Ok(result),
+            _ => query_result,
         }
     }
 }
