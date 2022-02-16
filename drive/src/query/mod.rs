@@ -1641,9 +1641,7 @@ impl<'a> DriveQuery<'a> {
 
         let query_result = grove.get_path_query(&path_query, transaction);
         match query_result {
-            Err(Error::PathKeyNotFound(_)) | Err(Error::PathNotFound(_)) => {
-                Ok((Vec::new(), 0))
-            }
+            Err(Error::PathKeyNotFound(_)) | Err(Error::PathNotFound(_)) => Ok((Vec::new(), 0)),
             _ => query_result,
         }
     }
