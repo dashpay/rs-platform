@@ -23,8 +23,8 @@ sqlparser = "0.13.0"
 
 [dependencies.grovedb]
 git = "https://github.com/dashevo/grovedb"
-branch = "fix/dontCacheDeleteTrees"
+branch = "master"
 
 [dependencies.storage]
 git = "https://github.com/dashevo/grovedb"
-branch = "fix/dontCacheDeleteTrees"
+branch = "master"
