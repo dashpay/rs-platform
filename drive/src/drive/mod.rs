@@ -444,7 +444,7 @@ impl Drive {
             let index_path_slices: Vec<&[u8]> = index_path.iter().map(|x| x.as_slice()).collect();
 
             // here we are inserting an empty tree that will have a subtree of all other index properties
-            let a = self.grove.insert_if_not_exists(
+            self.grove.insert_if_not_exists(
                 index_path_slices,
                 document_top_field.as_slice(),
                 Element::empty_tree(),
@@ -742,14 +742,12 @@ impl Drive {
                     index_path.iter().map(|x| x.as_slice()).collect();
 
                 // here we should return an error if the element already exists
-                let a = self.grove.delete_up_tree_while_empty(
+                self.grove.delete_up_tree_while_empty(
                     index_path_slices,
                     &[0],
                     Some(CONTRACT_DOCUMENTS_PATH_HEIGHT),
                     transaction,
                 )?;
-
-                let b = a;
             }
         }
         Ok(0)
