@@ -1622,7 +1622,6 @@ mod tests {
             .expect("should update alice profile");
     }
 
-
     #[test]
     fn test_create_two_documents_with_the_same_index_in_different_transactions() {
         let tmp_dir = TempDir::new("dpns").unwrap();
@@ -1660,7 +1659,10 @@ mod tests {
             )
             .expect("should create dash tld");
 
-        drive.grove.commit_transaction(db_transaction).expect("should commit transaction");
+        drive
+            .grove
+            .commit_transaction(db_transaction)
+            .expect("should commit transaction");
 
         let db_transaction = storage.transaction();
         drive
