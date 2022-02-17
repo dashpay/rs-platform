@@ -1659,7 +1659,10 @@ mod tests {
             )
             .expect("should create alice profile");
 
-        drive.grove.commit_transaction(db_transaction).expect("should commit transaction");
+        drive
+            .grove
+            .commit_transaction(db_transaction)
+            .expect("should commit transaction");
 
         let db_transaction = storage.transaction();
         drive
