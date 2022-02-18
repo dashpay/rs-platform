@@ -451,6 +451,8 @@ impl Drive {
                 transaction,
             )?;
 
+            let mut last_field_null = document_top_field.is_empty();
+
             // we push the actual value of the index path
             index_path.push(document_top_field);
             // the index path is now something like Contracts/ContractID/Documents(1)/$ownerId/<ownerId>
@@ -496,6 +498,8 @@ impl Drive {
                     transaction,
                 )?;
 
+                last_field_null = document_index_field.is_empty();
+
                 // we push the actual value of the index path
                 index_path.push(document_index_field);
                 // Iteration 1. the index path is now something like Contracts/ContractID/Documents(1)/$ownerId/<ownerId>/toUserId/<ToUserId>/
@@ -514,7 +518,7 @@ impl Drive {
 
             // unique indexes will be stored under key "0"
             // non unique indices should have a tree at key "0" that has all elements based off of primary key
-            if !index.unique {
+            if !index.unique || last_field_null {
                 // here we are inserting an empty tree that will have a subtree of all other index properties
                 self.grove.insert_if_not_exists(
                     index_path_slices,
