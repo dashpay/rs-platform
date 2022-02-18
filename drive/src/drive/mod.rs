@@ -240,12 +240,20 @@ impl Drive {
 
         let contract_documents_path = contract_documents_path(&contract.id);
         for (type_key, document_type) in &contract.document_types {
+            self.grove.insert_if_not_exists(
+                contract_documents_path,
+                type_key.as_bytes(),
+                Element::empty_tree(),
+                transaction,
+            )?;
+
             let type_path = [
                 contract_documents_path[0],
                 contract_documents_path[1],
                 contract_documents_path[2],
                 type_key.as_bytes(),
             ];
+
             // for each type we should insert the indices that are top level
             for index in document_type.top_level_indices()? {
                 // toDo: change this to be a reference by index
