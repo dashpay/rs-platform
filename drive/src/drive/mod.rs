@@ -1952,7 +1952,7 @@ mod tests {
                 true,
                 Some(&db_transaction),
             )
-            .expect("should update alice profile");
+            .expect("should add random tld");
     }
 
     #[test]
