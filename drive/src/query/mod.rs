@@ -1275,17 +1275,14 @@ impl<'a> DriveQuery<'a> {
                         Ok(element) => element,
                         Err(error) => {
                             return match error {
-                                Error::PathKeyNotFound(e) => {
-                                    let start_field_name = if self.start_at_included {
-                                        "startAt"
+                                Error::PathKeyNotFound(_) => {
+                                    let error_message = if self.start_at_included {
+                                        "startAt document not found"
                                     } else {
-                                        "startAfter"
+                                        "startAfter document not found"
                                     };
 
-                                    Err(Error::CorruptedData(format!(
-                                        "{} document not found",
-                                        start_field_name
-                                    )))
+                                    Err(Error::InvalidQuery(error_message))
                                 }
                                 _ => Err(error),
                             }
