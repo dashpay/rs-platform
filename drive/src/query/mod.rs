@@ -1269,7 +1269,29 @@ impl<'a> DriveQuery<'a> {
                 let document_holding_path = self
                     .contract
                     .documents_primary_key_path(self.document_type.name.as_str());
-                let start_at_document = grove.get(document_holding_path, starts_at, transaction)?;
+
+                let start_at_document =
+                    match grove.get(document_holding_path, starts_at, transaction) {
+                        Ok(element) => element,
+                        Err(error) => {
+                            return match error {
+                                Error::PathKeyNotFound(e) => {
+                                    let start_field_name = if self.start_at_included {
+                                        "startAt"
+                                    } else {
+                                        "startAfter"
+                                    };
+
+                                    Err(Error::CorruptedData(format!(
+                                        "{} document is not found",
+                                        start_field_name
+                                    )))
+                                }
+                                _ => Err(error),
+                            }
+                        }
+                    };
+
                 if let Element::Item(item) = start_at_document {
                     let document = Document::from_cbor(item.as_slice(), None, None)?;
                     Ok(Some((document, self.start_at_included)))
