@@ -1283,7 +1283,7 @@ impl<'a> DriveQuery<'a> {
                                     };
 
                                     Err(Error::CorruptedData(format!(
-                                        "{} document is not found",
+                                        "{} document not found",
                                         start_field_name
                                     )))
                                 }

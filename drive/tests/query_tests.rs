@@ -1165,7 +1165,7 @@ fn test_query() {
     );
 
     assert!(
-        matches!(result, Err(Error::CorruptedData(message)) if message == "startAt document is not found")
+        matches!(result, Err(Error::CorruptedData(message)) if message == "startAt document not found")
     );
 
     // using non existing document in startAfter
@@ -1193,7 +1193,7 @@ fn test_query() {
     );
 
     assert!(
-        matches!(result, Err(Error::CorruptedData(message)) if message == "startAfter document is not found")
+        matches!(result, Err(Error::CorruptedData(message)) if message == "startAfter document not found")
     );
 
     // validate eventual root hash
