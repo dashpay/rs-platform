@@ -1270,8 +1270,9 @@ impl<'a> DriveQuery<'a> {
                     .contract
                     .documents_primary_key_path(self.document_type.name.as_str());
 
-                let start_at_document = grove.get(document_holding_path, starts_at, transaction).map_err(|e| {
-                    match e {
+                let start_at_document = grove
+                    .get(document_holding_path, starts_at, transaction)
+                    .map_err(|e| match e {
                         Error::PathKeyNotFound(_) => {
                             let error_message = if self.start_at_included {
                                 "startAt document not found"
@@ -1282,8 +1283,7 @@ impl<'a> DriveQuery<'a> {
                             Error::InvalidQuery(error_message)
                         }
                         _ => e,
-                    }
-                })?;
+                    })?;
 
                 if let Element::Item(item) = start_at_document {
                     let document = Document::from_cbor(item.as_slice(), None, None)?;
