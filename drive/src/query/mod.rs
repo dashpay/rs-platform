@@ -188,7 +188,7 @@ pub struct WhereClause {
 
 impl<'a> WhereClause {
     pub fn is_identifier(&self) -> bool {
-        return self.field == "$id";
+        self.field == "$id"
     }
 
     pub fn from_components(clause_components: &'a [Value]) -> Result<Self, Error> {
@@ -201,7 +201,7 @@ impl<'a> WhereClause {
         let field_value = clause_components
             .get(0)
             .expect("check above enforces it exists");
-        let field_ref = field_value.as_text().ok_or_else(|| {
+        let field_ref = field_value.as_text().ok_or({
             Error::InvalidQuery("first field of where component should be a string")
         })?;
         let field = String::from(field_ref);
@@ -209,17 +209,16 @@ impl<'a> WhereClause {
         let operator_value = clause_components
             .get(1)
             .expect("check above enforces it exists");
-        let operator_string = operator_value.as_text().ok_or_else(|| {
+        let operator_string = operator_value.as_text().ok_or({
             Error::InvalidQuery("second field of where component should be a string")
         })?;
 
-        let operator = operator_from_string(operator_string).ok_or_else(|| {
+        let operator = operator_from_string(operator_string).ok_or({
             Error::InvalidQuery("second field of where component should be a known operator")
         })?;
 
         let value = clause_components
-            .get(2)
-            .ok_or_else(|| Error::InvalidQuery("third field of where component should exist"))?
+            .get(2).ok_or(Error::InvalidQuery("third field of where component should exist"))?
             .clone();
 
         Ok(WhereClause {
@@ -361,8 +360,7 @@ impl<'a> WhereClause {
         let in_values = match &self.value {
             Value::Array(array) => Some(array),
             _ => None,
-        }
-        .ok_or_else(|| {
+        }.ok_or({
             Error::InvalidQuery(
                 "when using between operator you must provide a tuple array of values",
             )
@@ -684,7 +682,7 @@ impl<'a> WhereClause {
                 let left_key =
                     document_type.serialize_value_for_key(self.field.as_str(), &self.value)?;
                 let mut right_key = left_key.clone();
-                let last_char = right_key.last_mut().ok_or_else(|| {
+                let last_char = right_key.last_mut().ok_or({
                     Error::InvalidQuery("starts with must have at least one character")
                 })?;
                 *last_char += 1;
@@ -739,7 +737,7 @@ impl<'a> OrderClause {
         let field_value = clause_components
             .get(0)
             .expect("check above enforces it exists");
-        let field_ref = field_value.as_text().ok_or_else(|| {
+        let field_ref = field_value.as_text().ok_or({
             Error::InvalidQuery("first field of where component should be a string")
         })?;
         let field = String::from(field_ref);
@@ -748,8 +746,7 @@ impl<'a> OrderClause {
         let asc_string = match asc_string_value {
             Value::Text(asc_string) => Some(asc_string.as_str()),
             _ => None,
-        }
-        .ok_or_else(|| Error::InvalidQuery("orderBy right component must be a string"))?;
+        }.ok_or(Error::InvalidQuery("orderBy right component must be a string"))?;
         let ascending = match asc_string {
             "asc" => true,
             "desc" => false,
@@ -809,12 +806,10 @@ impl<'a> DriveQuery<'a> {
                 } else {
                     None
                 }
-            })
-            .ok_or_else(|| Error::InvalidQuery("limit should be a integer from 1 to 100"))?;
+            }).ok_or(Error::InvalidQuery("limit should be a integer from 1 to 100"))?;
 
         let block_time: Option<f64> = query_document
-            .get("blockTime")
-            .map_or(None, |id_cbor| {
+            .get("blockTime").and_then(|id_cbor| {
                 if let CborValue::Float(b) = id_cbor {
                     Some(*b)
                 } else if let CborValue::Integer(b) = id_cbor {
@@ -912,14 +907,12 @@ impl<'a> DriveQuery<'a> {
 
         // Should ideally iterate over each statement
         let first_statement = statements
-            .get(0)
-            .ok_or_else(|| Error::InvalidQuery("Issue parsing SQL"))?;
+            .get(0).ok_or(Error::InvalidQuery("Issue parsing SQL"))?;
 
         let query: &ast::Query = match first_statement {
             ast::Statement::Query(query_struct) => Some(query_struct),
             _ => None,
-        }
-        .ok_or_else(|| Error::InvalidQuery("Issue parsing sql"))?;
+        }.ok_or(Error::InvalidQuery("Issue parsing sql"))?;
 
         let limit : u16 = if let Some(limit_expr) = &query.limit {
             match limit_expr {
@@ -928,8 +921,7 @@ impl<'a> DriveQuery<'a> {
                     cast_num_string.parse::<u16>().ok()
                 },
                 _ => None,
-            }
-            .ok_or_else(|| Error::InvalidQuery("Issue parsing sql: invalid limit value"))?
+            }.ok_or(Error::InvalidQuery("Issue parsing sql: invalid limit value"))?
         } else {
             defaults::DEFAULT_QUERY_LIMIT
         };
@@ -948,8 +940,7 @@ impl<'a> DriveQuery<'a> {
         let select: &Select = match &query.body {
             ast::SetExpr::Select(select) => Some(select),
             _ => None,
-        }
-        .ok_or_else(|| Error::InvalidQuery("Issue parsing sql"))?;
+        }.ok_or(Error::InvalidQuery("Issue parsing sql"))?;
 
         // Get the document type from the 'from' section
         let document_type_name = match &select
@@ -965,8 +956,7 @@ impl<'a> DriveQuery<'a> {
                 with_hints: _,
             } => name.0.get(0).as_ref().map(|identifier| &identifier.value),
             _ => None,
-        }
-        .ok_or_else(|| Error::InvalidQuery("Issue parsing sql: invalid from value"))?;
+        }.ok_or(Error::InvalidQuery("Issue parsing sql: invalid from value"))?;
 
         let document_type = contract
             .document_types
@@ -1607,8 +1597,7 @@ impl<'a> DriveQuery<'a> {
 
         // Now we should construct the path
         let last_index = last_indexes
-            .first()
-            .ok_or_else(|| Error::InvalidQuery("document query has no index with fields"))?;
+            .first().ok_or(Error::InvalidQuery("document query has no index with fields"))?;
 
         let mut path = document_type_path;
 
