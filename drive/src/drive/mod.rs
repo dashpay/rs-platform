@@ -118,6 +118,38 @@ fn contract_documents_primary_key_path<'a>(
     ]
 }
 
+fn contract_documents_keeping_history_primary_key_path_for_document_id<'a>(
+    contract_id: &'a [u8],
+    document_type_name: &'a str,
+    document_id: &'a [u8],
+) -> [&'a [u8]; 6] {
+    [
+        Into::<&[u8; 1]>::into(RootTree::ContractDocuments),
+        contract_id,
+        &[1],
+        document_type_name.as_bytes(),
+        &[0],
+        document_id,
+    ]
+}
+
+fn contract_documents_keeping_history_storage_time_reference_path(
+    contract_id: &[u8],
+    document_type_name: &str,
+    document_id: &[u8],
+    encoded_time: Vec<u8>,
+) -> Vec<Vec<u8>> {
+    vec![
+        Into::<&[u8; 1]>::into(RootTree::ContractDocuments).to_vec(),
+        contract_id.to_vec(),
+        vec![1],
+        document_type_name.as_bytes().to_vec(),
+        vec![0],
+        document_id.to_vec(),
+        encoded_time,
+    ]
+}
+
 impl Drive {
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
         match GroveDb::open(path) {
@@ -374,93 +406,56 @@ impl Drive {
         }
     }
 
-    pub fn add_document(&mut self, document_cbor: &[u8]) -> Result<(), Error> {
-        todo!()
-    }
-
-    pub fn add_document_for_contract_cbor(
+    fn add_document_to_primary_storage(
         &mut self,
         document_cbor: &[u8],
-        contract_cbor: &[u8],
-        document_type_name: &str,
-        owner_id: Option<&[u8]>,
-        override_document: bool,
-        transaction: Option<&OptimisticTransactionDBTransaction>,
-    ) -> Result<u64, Error> {
-        let contract = Contract::from_cbor(contract_cbor)?;
-
-        let document = Document::from_cbor(document_cbor, None, owner_id)?;
-
-        self.add_document_for_contract(
-            &document,
-            document_cbor,
-            &contract,
-            document_type_name,
-            owner_id,
-            override_document,
-            transaction,
-        )
-    }
-
-    pub fn add_document_cbor_for_contract(
-        &mut self,
-        document_cbor: &[u8],
-        contract: &Contract,
-        document_type_name: &str,
-        owner_id: Option<&[u8]>,
-        override_document: bool,
-        transaction: Option<&OptimisticTransactionDBTransaction>,
-    ) -> Result<u64, Error> {
-        let document = Document::from_cbor(document_cbor, None, owner_id)?;
-
-        self.add_document_for_contract(
-            &document,
-            document_cbor,
-            contract,
-            document_type_name,
-            owner_id,
-            override_document,
-            transaction,
-        )
-    }
-
-    pub fn add_document_for_contract(
-        &mut self,
         document: &Document,
-        document_cbor: &[u8],
+        document_type: &DocumentType,
         contract: &Contract,
-        document_type_name: &str,
-        owner_id: Option<&[u8]>,
-        override_document: bool,
+        block_time: f64,
+        insert_without_check: bool,
         transaction: Option<&OptimisticTransactionDBTransaction>,
     ) -> Result<u64, Error> {
-        // second we need to construct the path for documents on the contract
-        // the path is
-        //  * Document and Contract root tree
-        //  * Contract ID recovered from document
-        //  * 0 to signify Documents and not Contract
-        let contract_document_type_path =
-            contract_document_type_path(&contract.id, document_type_name);
-
-        // third we need to store the document for it's primary key
-        let primary_key_path =
-            contract_documents_primary_key_path(&contract.id, document_type_name);
         let document_element = Element::Item(Vec::from(document_cbor));
-        if override_document {
-            if self
-                .grove
-                .get(primary_key_path, document.id.as_slice(), transaction)
-                .is_ok()
-            {
-                return self.update_document_for_contract(
-                    document,
-                    document_cbor,
-                    contract,
-                    document_type_name,
-                    owner_id,
-                    transaction,
+        let primary_key_path =
+            contract_documents_primary_key_path(&contract.id, document_type.name.as_str());
+        if document_type.documents_keep_history {
+            // we first insert an empty tree if the document is new
+            self.grove.insert_if_not_exists(
+                primary_key_path,
+                document.id.as_slice(),
+                Element::empty_tree(),
+                transaction,
+            )?;
+            let document_id_in_primary_path =
+                contract_documents_keeping_history_primary_key_path_for_document_id(
+                    &contract.id,
+                    document_type.name.as_str(),
+                    document.id.as_slice(),
                 );
-            }
+            let encoded_time = crate::contract::types::encode_float(block_time)?;
+            self.grove.insert(
+                document_id_in_primary_path,
+                encoded_time.as_slice(),
+                document_element,
+                transaction,
+            )?;
+
+            // we should also insert a reference at 0 to the current value
+            let contract_storage_path =
+                contract_documents_keeping_history_storage_time_reference_path(
+                    &contract.id,
+                    document_type.name.as_str(),
+                    document.id.as_slice(),
+                    encoded_time,
+                );
+            self.grove.insert(
+                document_id_in_primary_path,
+                &[0],
+                Element::Reference(contract_storage_path),
+                transaction,
+            )?;
+        } else if insert_without_check {
             self.grove.insert(
                 primary_key_path,
                 document.id.as_slice(),
@@ -478,6 +473,84 @@ impl Drive {
                 return Err(Error::CorruptedData(String::from("item already exists")));
             }
         }
+        Ok(0)
+    }
+
+    pub fn add_document(&mut self, document_cbor: &[u8]) -> Result<(), Error> {
+        todo!()
+    }
+
+    pub fn add_document_for_contract_cbor(
+        &mut self,
+        document_cbor: &[u8],
+        contract_cbor: &[u8],
+        document_type_name: &str,
+        owner_id: Option<&[u8]>,
+        override_document: bool,
+        block_time: f64,
+        transaction: Option<&OptimisticTransactionDBTransaction>,
+    ) -> Result<u64, Error> {
+        let contract = Contract::from_cbor(contract_cbor)?;
+
+        let document = Document::from_cbor(document_cbor, None, owner_id)?;
+
+        self.add_document_for_contract(
+            &document,
+            document_cbor,
+            &contract,
+            document_type_name,
+            owner_id,
+            override_document,
+            block_time,
+            transaction,
+        )
+    }
+
+    pub fn add_document_cbor_for_contract(
+        &mut self,
+        document_cbor: &[u8],
+        contract: &Contract,
+        document_type_name: &str,
+        owner_id: Option<&[u8]>,
+        override_document: bool,
+        block_time: f64,
+        transaction: Option<&OptimisticTransactionDBTransaction>,
+    ) -> Result<u64, Error> {
+        let document = Document::from_cbor(document_cbor, None, owner_id)?;
+
+        self.add_document_for_contract(
+            &document,
+            document_cbor,
+            contract,
+            document_type_name,
+            owner_id,
+            override_document,
+            block_time,
+            transaction,
+        )
+    }
+
+    pub fn add_document_for_contract(
+        &mut self,
+        document: &Document,
+        document_cbor: &[u8],
+        contract: &Contract,
+        document_type_name: &str,
+        owner_id: Option<&[u8]>,
+        override_document: bool,
+        block_time: f64,
+        transaction: Option<&OptimisticTransactionDBTransaction>,
+    ) -> Result<u64, Error> {
+        // second we need to construct the path for documents on the contract
+        // the path is
+        //  * Document and Contract root tree
+        //  * Contract ID recovered from document
+        //  * 0 to signify Documents and not Contract
+        let contract_document_type_path =
+            contract_document_type_path(&contract.id, document_type_name);
+
+        let primary_key_path =
+            contract_documents_primary_key_path(&contract.id, document_type_name);
 
         let document_type = contract
             .document_types
@@ -485,6 +558,36 @@ impl Drive {
             .ok_or_else(|| {
                 Error::CorruptedData(String::from("can not get document type from contract"))
             })?;
+
+        // third we need to store the document for it's primary key
+        // if we are set to override and the document already exists, we need to do an update instead
+        if override_document
+            && self
+                .grove
+                .get(primary_key_path, document.id.as_slice(), transaction)
+                .is_ok()
+        {
+            return self.update_document_for_contract(
+                document,
+                document_cbor,
+                contract,
+                document_type.name.as_str(),
+                Some(document.owner_id.as_slice()),
+                block_time,
+                transaction,
+            );
+        } else {
+            // if we have override_document set that means we already checked if it exists
+            self.add_document_to_primary_storage(
+                document_cbor,
+                document,
+                document_type,
+                contract,
+                block_time,
+                override_document,
+                transaction,
+            )?;
+        }
 
         // fourth we need to store a reference to the document for each index
         for index in &document_type.indices {
@@ -634,6 +737,7 @@ impl Drive {
         contract_cbor: &[u8],
         document_type: &str,
         owner_id: Option<&[u8]>,
+        block_time: f64,
         transaction: Option<&OptimisticTransactionDBTransaction>,
     ) -> Result<u64, Error> {
         let contract = Contract::from_cbor(contract_cbor)?;
@@ -646,6 +750,7 @@ impl Drive {
             &contract,
             document_type,
             owner_id,
+            block_time,
             transaction,
         )
     }
@@ -657,6 +762,7 @@ impl Drive {
         contract: &Contract,
         document_type: &str,
         owner_id: Option<&[u8]>,
+        block_time: f64,
         transaction: Option<&OptimisticTransactionDBTransaction>,
     ) -> Result<u64, Error> {
         // for now updating a document will delete the document, then insert a new document
@@ -674,6 +780,7 @@ impl Drive {
             document_type,
             owner_id,
             false,
+            block_time,
             transaction,
         )
     }
@@ -909,6 +1016,7 @@ mod tests {
                 "contactRequest",
                 Some(&random_owner_id),
                 false,
+                0f64,
                 None,
             )
             .expect("expected to insert a document successfully");
@@ -920,6 +1028,7 @@ mod tests {
                 "contactRequest",
                 Some(&random_owner_id),
                 false,
+                0f64,
                 None,
             )
             .expect_err("expected not to be able to insert same document twice");
@@ -931,6 +1040,7 @@ mod tests {
                 "contactRequest",
                 Some(&random_owner_id),
                 true,
+                0f64,
                 None,
             )
             .expect("expected to override a document successfully");
@@ -967,6 +1077,7 @@ mod tests {
                 "contactRequest",
                 Some(&random_owner_id),
                 false,
+                0f64,
                 Some(&db_transaction),
             )
             .expect("expected to insert a document successfully");
@@ -978,6 +1089,7 @@ mod tests {
                 "contactRequest",
                 Some(&random_owner_id),
                 false,
+                0f64,
                 Some(&db_transaction),
             )
             .expect_err("expected not to be able to insert same document twice");
@@ -989,6 +1101,7 @@ mod tests {
                 "contactRequest",
                 Some(&random_owner_id),
                 true,
+                0f64,
                 Some(&db_transaction),
             )
             .expect("expected to override a document successfully");
@@ -1011,6 +1124,7 @@ mod tests {
                 "contactRequest",
                 Some(&random_owner_id),
                 false,
+                0f64,
                 None,
             )
             .expect("expected to insert a document successfully");
@@ -1061,6 +1175,7 @@ mod tests {
                 "contactRequest",
                 Some(&random_owner_id),
                 false,
+                0f64,
                 Some(&db_transaction),
             )
             .expect("expected to insert a document successfully");
@@ -1115,6 +1230,7 @@ mod tests {
                 "domain",
                 None,
                 false,
+                0f64,
                 Some(&db_transaction),
             )
             .expect("expected to insert a document successfully");
@@ -1165,6 +1281,7 @@ mod tests {
                 "person",
                 None,
                 false,
+                0f64,
                 Some(&db_transaction),
             )
             .expect("expected to insert a document successfully");
@@ -1267,6 +1384,7 @@ mod tests {
                 "person",
                 None,
                 false,
+                0f64,
                 Some(&db_transaction),
             )
             .expect("expected to insert a document successfully");
@@ -1289,6 +1407,7 @@ mod tests {
                 "person",
                 None,
                 false,
+                0f64,
                 Some(&db_transaction),
             )
             .expect("expected to insert a document successfully");
@@ -1419,6 +1538,7 @@ mod tests {
                 "person",
                 None,
                 false,
+                0f64,
                 Some(&db_transaction),
             )
             .expect("expected to insert a document successfully");
@@ -1441,6 +1561,7 @@ mod tests {
                 "person",
                 None,
                 false,
+                0f64,
                 Some(&db_transaction),
             )
             .expect("expected to insert a document successfully");
@@ -1504,6 +1625,7 @@ mod tests {
                 "person",
                 None,
                 false,
+                0f64,
                 Some(&db_transaction),
             )
             .expect("expected to insert a document successfully");
@@ -1588,6 +1710,7 @@ mod tests {
                 "contactRequest",
                 Some(&random_owner_id),
                 false,
+                0f64,
                 None,
             )
             .expect("expected to insert a document successfully");
@@ -1598,6 +1721,7 @@ mod tests {
                 "contactRequest",
                 Some(&random_owner_id),
                 false,
+                0f64,
                 None,
             )
             .expect("expected to insert a document successfully");
@@ -1608,6 +1732,7 @@ mod tests {
                 "contactRequest",
                 Some(&random_owner_id),
                 false,
+                0f64,
                 None,
             )
             .expect("expected to insert a document successfully");
@@ -1635,6 +1760,7 @@ mod tests {
                 "contactRequest",
                 Some(&random_owner_id),
                 false,
+                0f64,
                 None,
             )
             .expect("expected to insert a document successfully");
@@ -1645,6 +1771,7 @@ mod tests {
                 "contactRequest",
                 Some(&random_owner_id),
                 false,
+                0f64,
                 None,
             )
             .expect_err(
@@ -1685,6 +1812,7 @@ mod tests {
                 "profile",
                 None,
                 true,
+                0f64,
                 Some(&db_transaction),
             )
             .expect("should create alice profile");
@@ -1699,6 +1827,7 @@ mod tests {
                 contract_cbor.as_slice(),
                 "profile",
                 None,
+                0f64,
                 Some(&db_transaction),
             )
             .expect("should update alice profile");
@@ -1735,6 +1864,7 @@ mod tests {
                 "profile",
                 None,
                 true,
+                0f64,
                 None,
             )
             .expect("should create alice profile");
@@ -1758,6 +1888,7 @@ mod tests {
                 contract_cbor.as_slice(),
                 "profile",
                 None,
+                0f64,
                 None,
             )
             .expect("should update alice profile");
@@ -1807,6 +1938,7 @@ mod tests {
                 "profile",
                 None,
                 true,
+                0f64,
                 Some(&db_transaction),
             )
             .expect("should create alice profile");
@@ -1847,6 +1979,7 @@ mod tests {
                 contract_cbor.as_slice(),
                 "profile",
                 None,
+                0f64,
                 Some(&db_transaction),
             )
             .expect("should update alice profile");
@@ -1901,6 +2034,7 @@ mod tests {
                 "profile",
                 None,
                 true,
+                0f64,
                 Some(&db_transaction),
             )
             .expect("should create alice profile");
@@ -1968,6 +2102,7 @@ mod tests {
                 contract_cbor.as_slice(),
                 "profile",
                 None,
+                0f64,
                 Some(&db_transaction),
             )
             .expect("should update alice profile");
@@ -2006,6 +2141,7 @@ mod tests {
                 "domain",
                 None,
                 true,
+                0f64,
                 Some(&db_transaction),
             )
             .expect("should create dash tld");
@@ -2032,6 +2168,7 @@ mod tests {
                 "domain",
                 None,
                 true,
+                0f64,
                 Some(&db_transaction),
             )
             .expect("should add random tld");

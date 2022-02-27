@@ -86,6 +86,7 @@ pub fn setup(count: u32, seed: u64) -> (Drive, Contract, TempDir) {
                 "person",
                 None,
                 true,
+                0f64,
                 Some(&db_transaction),
             )
             .expect("document should be inserted");
@@ -117,6 +118,7 @@ fn test_query_many() {
                 "person",
                 None,
                 true,
+                0f64,
                 Some(&db_transaction),
             )
             .expect("document should be inserted");
@@ -855,6 +857,7 @@ fn test_query() {
             "person",
             None,
             true,
+            0f64,
             Some(&db_transaction),
         )
         .expect("document should be inserted");
@@ -889,6 +892,7 @@ fn test_query() {
             "person",
             None,
             true,
+            0f64,
             Some(&db_transaction),
         )
         .expect("document should be inserted");

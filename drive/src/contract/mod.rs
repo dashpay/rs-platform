@@ -867,10 +867,17 @@ mod tests {
         );
         let contract = Contract::from_cbor(&dashpay_cbor).unwrap();
 
+        assert!(contract.documents_mutable_contract_default);
+        assert!(!contract.keeps_history);
+        assert!(contract.mutable);
+        assert!(!contract.documents_keep_history_contract_default);
         assert_eq!(contract.document_types.len(), 3);
         assert!(contract.document_types.get("profile").is_some());
+        assert!(contract.document_types.get("profile").unwrap().documents_mutable);
         assert!(contract.document_types.get("contactInfo").is_some());
+        assert!(contract.document_types.get("contactInfo").unwrap().documents_mutable);
         assert!(contract.document_types.get("contactRequest").is_some());
+        assert!(!contract.document_types.get("contactRequest").unwrap().documents_mutable);
         assert!(contract.document_types.get("non_existent_key").is_none());
 
         let contact_info_indices = &contract.document_types.get("contactInfo").unwrap().indices;

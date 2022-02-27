@@ -322,9 +322,10 @@ impl DriveWrapper {
         let js_contract_cbor = cx.argument::<JsBuffer>(1)?;
         let js_document_type_name = cx.argument::<JsString>(2)?;
         let js_owner_id = cx.argument::<JsBuffer>(3)?;
-        let js_override_document = cx.argument::<JsBoolean>(4)?;
-        let js_using_transaction = cx.argument::<JsBoolean>(5)?;
-        let js_callback = cx.argument::<JsFunction>(6)?.root(&mut cx);
+        let js_block_time = cx.argument::<JsDate>(4)?;
+        let js_override_document = cx.argument::<JsBoolean>(5)?;
+        let js_using_transaction = cx.argument::<JsBoolean>(6)?;
+        let js_callback = cx.argument::<JsFunction>(7)?.root(&mut cx);
 
         let drive = cx
             .this()
@@ -334,7 +335,8 @@ impl DriveWrapper {
         let contract_cbor = converter::js_buffer_to_vec_u8(js_contract_cbor, &mut cx);
         let document_type_name = js_document_type_name.value(&mut cx);
         let owner_id = converter::js_buffer_to_vec_u8(js_owner_id, &mut cx);
-        let js_override_document = js_override_document.value(&mut cx);
+        let override_document = js_override_document.value(&mut cx);
+        let block_time = js_block_time.value(&mut cx);
         let using_transaction = js_using_transaction.value(&mut cx);
 
         drive
@@ -344,7 +346,8 @@ impl DriveWrapper {
                     &contract_cbor,
                     &document_type_name,
                     Some(&owner_id),
-                    js_override_document,
+                    override_document,
+                    block_time,
                     using_transaction.then(|| transaction).flatten(),
                 );
 
@@ -380,8 +383,9 @@ impl DriveWrapper {
         let js_contract_cbor = cx.argument::<JsBuffer>(1)?;
         let js_document_type_name = cx.argument::<JsString>(2)?;
         let js_owner_id = cx.argument::<JsBuffer>(3)?;
-        let js_using_transaction = cx.argument::<JsBoolean>(4)?;
-        let js_callback = cx.argument::<JsFunction>(5)?.root(&mut cx);
+        let js_block_time = cx.argument::<JsDate>(4)?;
+        let js_using_transaction = cx.argument::<JsBoolean>(5)?;
+        let js_callback = cx.argument::<JsFunction>(6)?.root(&mut cx);
 
         let drive = cx
             .this()
@@ -391,6 +395,7 @@ impl DriveWrapper {
         let contract_cbor = converter::js_buffer_to_vec_u8(js_contract_cbor, &mut cx);
         let document_type_name = js_document_type_name.value(&mut cx);
         let owner_id = converter::js_buffer_to_vec_u8(js_owner_id, &mut cx);
+        let block_time = js_block_time.value(&mut cx);
         let using_transaction = js_using_transaction.value(&mut cx);
 
         drive
@@ -400,6 +405,7 @@ impl DriveWrapper {
                     &contract_cbor,
                     &document_type_name,
                     Some(&owner_id),
+                    block_time,
                     using_transaction.then(|| transaction).flatten(),
                 );
 
