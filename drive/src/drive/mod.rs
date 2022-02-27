@@ -764,7 +764,6 @@ impl Drive {
         block_time: f64,
         transaction: Option<&OptimisticTransactionDBTransaction>,
     ) -> Result<u64, Error> {
-
         let document = Document::from_cbor(document_cbor, None, owner_id)?;
 
         self.update_document_for_contract(
@@ -783,29 +782,290 @@ impl Drive {
         document: &Document,
         document_cbor: &[u8],
         contract: &Contract,
-        document_type: &str,
+        document_type_name: &str,
         owner_id: Option<&[u8]>,
         block_time: f64,
         transaction: Option<&OptimisticTransactionDBTransaction>,
     ) -> Result<u64, Error> {
-        // for now updating a document will delete the document, then insert a new document
-        self.delete_document_for_contract(
-            document.id.clone().as_slice(),
-            contract,
+        let document_type = contract
+            .document_types
+            .get(document_type_name)
+            .ok_or_else(|| {
+                Error::CorruptedData(String::from("can not get document type from contract"))
+            })?;
+
+        if !document_type.documents_mutable {
+            return Err(Error::InternalError(
+                "documents for this contract are not mutable",
+            ));
+        }
+
+        // we need to construct the path for documents on the contract
+        // the path is
+        //  * Document and Contract root tree
+        //  * Contract ID recovered from document
+        //  * 0 to signify Documents and not Contract
+        let contract_document_type_path =
+            contract_document_type_path(&contract.id, document_type_name);
+
+        let contract_documents_primary_key_path =
+            contract_documents_primary_key_path(&contract.id, document_type_name);
+
+        // we need to store the document for it's primary key
+        // we should be overriding if the document_type does not have history enabled
+        self.add_document_to_primary_storage(
+            document_cbor,
+            document,
             document_type,
-            owner_id,
+            contract,
+            block_time,
+            true,
             transaction,
         )?;
-        self.add_document_for_contract(
-            document,
-            document_cbor,
-            contract,
-            document_type,
-            owner_id,
-            false,
-            block_time,
-            transaction,
-        )
+
+        // we need to construct the reference to the original document
+        let mut reference_path = contract_documents_primary_key_path
+            .iter()
+            .map(|x| x.to_vec())
+            .collect::<Vec<Vec<u8>>>();
+        reference_path.push(Vec::from(document.id));
+        if document_type.documents_keep_history {
+            // if the document keeps history the value will at 0 will always point to the most recent version
+            reference_path.push(vec![0]);
+        }
+        let document_reference = Element::Reference(reference_path);
+
+        // next we need to get the old document from storage
+        let old_document_element: Element = if document_type.documents_keep_history {
+            let contract_documents_keeping_history_primary_key_path_for_document_id =
+                contract_documents_keeping_history_primary_key_path_for_document_id(
+                    &contract.id,
+                    document_type_name,
+                    document.id.as_slice(),
+                );
+            self.grove.get(
+                contract_documents_keeping_history_primary_key_path_for_document_id,
+                &[0],
+                transaction,
+            )?
+        } else {
+            self.grove.get(
+                contract_documents_primary_key_path,
+                document.id.as_slice(),
+                transaction,
+            )?
+        };
+
+        let old_document = if let Element::Item(old_document_cbor) = old_document_element {
+            Ok(Document::from_cbor(
+                old_document_cbor.as_slice(),
+                None,
+                owner_id,
+            )?)
+        } else {
+            Err(Error::CorruptedData(String::from(
+                "old document is not an item",
+            )))
+        }?;
+
+        // fourth we need to store a reference to the document for each index
+        for index in &document_type.indices {
+            // at this point the contract path is to the contract documents
+            // for each index the top index component will already have been added
+            // when the contract itself was created
+            let mut index_path: Vec<Vec<u8>> = contract_document_type_path
+                .iter()
+                .map(|&x| Vec::from(x))
+                .collect();
+            let top_index_property = index
+                .properties
+                .get(0)
+                .ok_or_else(|| Error::CorruptedData(String::from("invalid contract indices")))?;
+            index_path.push(Vec::from(top_index_property.name.as_bytes()));
+
+            // with the example of the dashpay contract's first index
+            // the index path is now something like Contracts/ContractID/Documents(1)/$ownerId
+            let document_top_field = document
+                .get_raw_for_contract(
+                    &top_index_property.name,
+                    document_type_name,
+                    contract,
+                    owner_id,
+                )?
+                .unwrap_or_default();
+
+            let old_document_top_field = old_document
+                .get_raw_for_contract(
+                    &top_index_property.name,
+                    document_type_name,
+                    contract,
+                    owner_id,
+                )?
+                .unwrap_or_default();
+
+            let mut change_occured_on_index = document_top_field != old_document_top_field;
+
+            if change_occured_on_index {
+                let index_path_slices: Vec<&[u8]> =
+                    index_path.iter().map(|x| x.as_slice()).collect();
+
+                // here we are inserting an empty tree that will have a subtree of all other index properties
+                self.grove.insert_if_not_exists(
+                    index_path_slices,
+                    document_top_field.as_slice(),
+                    Element::empty_tree(),
+                    transaction,
+                )?;
+            }
+
+            let mut all_fields_null = document_top_field.is_empty();
+
+            // we push the actual value of the index path
+            index_path.push(document_top_field);
+            // the index path is now something like Contracts/ContractID/Documents(1)/$ownerId/<ownerId>
+
+            let mut old_index_path = index_path.clone();
+
+            for i in 1..index.properties.len() {
+                let index_property = index.properties.get(i).ok_or_else(|| {
+                    Error::CorruptedData(String::from("invalid contract indices"))
+                })?;
+
+                let document_index_field = document
+                    .get_raw_for_contract(
+                        &index_property.name,
+                        document_type_name,
+                        contract,
+                        owner_id,
+                    )?
+                    .unwrap_or_default();
+
+                let old_document_index_field = old_document
+                    .get_raw_for_contract(
+                        &index_property.name,
+                        document_type_name,
+                        contract,
+                        owner_id,
+                    )?
+                    .unwrap_or_default();
+
+                change_occured_on_index |= document_index_field != old_document_index_field;
+
+                if change_occured_on_index {
+                    let index_path_slices: Vec<&[u8]> =
+                        index_path.iter().map(|x| x.as_slice()).collect();
+
+                    // here we are inserting an empty tree that will have a subtree of all other index properties
+                    self.grove.insert_if_not_exists(
+                        index_path_slices,
+                        index_property.name.as_bytes(),
+                        Element::empty_tree(),
+                        transaction,
+                    )?;
+                }
+
+                index_path.push(Vec::from(index_property.name.as_bytes()));
+                old_index_path.push(Vec::from(index_property.name.as_bytes()));
+
+                // Iteration 1. the index path is now something like Contracts/ContractID/Documents(1)/$ownerId/<ownerId>/toUserId
+                // Iteration 2. the index path is now something like Contracts/ContractID/Documents(1)/$ownerId/<ownerId>/toUserId/<ToUserId>/accountReference
+
+                if change_occured_on_index {
+                    let index_path_slices: Vec<&[u8]> =
+                        index_path.iter().map(|x| x.as_slice()).collect();
+
+                    // here we are inserting an empty tree that will have a subtree of all other index properties
+                    self.grove.insert_if_not_exists(
+                        index_path_slices,
+                        document_index_field.as_slice(),
+                        Element::empty_tree(),
+                        transaction,
+                    )?;
+                }
+
+                all_fields_null &= document_index_field.is_empty();
+
+                // we push the actual value of the index path, both for the new and the old
+                index_path.push(document_index_field);
+                old_index_path.push(old_document_index_field);
+                // Iteration 1. the index path is now something like Contracts/ContractID/Documents(1)/$ownerId/<ownerId>/toUserId/<ToUserId>/
+                // Iteration 2. the index path is now something like Contracts/ContractID/Documents(1)/$ownerId/<ownerId>/toUserId/<ToUserId>/accountReference/<accountReference>
+            }
+
+            if change_occured_on_index {
+                // we first need to delete the old values
+                // unique indexes will be stored under key "0"
+                // non unique indices should have a tree at key "0" that has all elements based off of primary key
+                if !index.unique {
+                    old_index_path.push(vec![0]);
+
+                    let old_index_path_slices: Vec<&[u8]> =
+                        old_index_path.iter().map(|x| x.as_slice()).collect();
+
+                    // here we should return an error if the element already exists
+                    self.grove.delete_up_tree_while_empty(
+                        old_index_path_slices,
+                        document.id.as_slice(),
+                        Some(CONTRACT_DOCUMENTS_PATH_HEIGHT),
+                        transaction,
+                    )?;
+                } else {
+                    let old_index_path_slices: Vec<&[u8]> =
+                        old_index_path.iter().map(|x| x.as_slice()).collect();
+
+                    // here we should return an error if the element already exists
+                    self.grove.delete_up_tree_while_empty(
+                        old_index_path_slices,
+                        &[0],
+                        Some(CONTRACT_DOCUMENTS_PATH_HEIGHT),
+                        transaction,
+                    )?;
+                }
+
+                // now we need to insert the new element
+                let index_path_slices: Vec<&[u8]> =
+                    index_path.iter().map(|x| x.as_slice()).collect();
+
+                // unique indexes will be stored under key "0"
+                // non unique indices should have a tree at key "0" that has all elements based off of primary key
+                if !index.unique || all_fields_null {
+                    // here we are inserting an empty tree that will have a subtree of all other index properties
+                    self.grove.insert_if_not_exists(
+                        index_path_slices,
+                        &[0],
+                        Element::empty_tree(),
+                        transaction,
+                    )?;
+                    index_path.push(vec![0]);
+
+                    let index_path_slices: Vec<&[u8]> =
+                        index_path.iter().map(|x| x.as_slice()).collect();
+
+                    // here we should return an error if the element already exists
+                    self.grove.insert(
+                        index_path_slices,
+                        document.id.as_slice(),
+                        document_reference.clone(),
+                        transaction,
+                    )?;
+                } else {
+                    let index_path_slices: Vec<&[u8]> =
+                        index_path.iter().map(|x| x.as_slice()).collect();
+
+                    // here we should return an error if the element already exists
+                    let inserted = self.grove.insert_if_not_exists(
+                        index_path_slices,
+                        &[0],
+                        document_reference.clone(),
+                        transaction,
+                    )?;
+                    if !inserted {
+                        return Err(Error::CorruptedData(String::from("index already exists")));
+                    }
+                }
+            }
+        }
+        Ok(0)
     }
 
     pub fn delete_document_for_contract_cbor(
@@ -1002,7 +1262,7 @@ mod tests {
     use std::{collections::HashMap, fs::File, io::BufReader, path::Path};
     use tempdir::TempDir;
 
-    fn setup_dashpay(prefix: &str) -> (Drive, Vec<u8>) {
+    fn setup_dashpay(prefix: &str, mutable_contact_requests: bool) -> (Drive, Vec<u8>) {
         let tmp_dir = TempDir::new(prefix).unwrap();
         let mut drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
 
@@ -1010,9 +1270,15 @@ mod tests {
             .create_root_tree(None)
             .expect("expected to create root tree successfully");
 
+        let dashpay_path = if mutable_contact_requests {
+            "tests/supporting_files/contract/dashpay/dashpay-contract-all-mutable.json"
+        } else {
+            "tests/supporting_files/contract/dashpay/dashpay-contract.json"
+        };
+
         // let's construct the grovedb structure for the dashpay data contract
         let dashpay_cbor = json_document_to_cbor(
-            "tests/supporting_files/contract/dashpay/dashpay-contract.json",
+            dashpay_path,
             Some(1),
         );
         drive
@@ -1024,7 +1290,7 @@ mod tests {
 
     #[test]
     fn test_add_dashpay_documents_no_transaction() {
-        let (mut drive, dashpay_cbor) = setup_dashpay("add");
+        let (mut drive, dashpay_cbor) = setup_dashpay("add", true);
 
         let dashpay_cr_document_cbor = json_document_to_cbor(
             "tests/supporting_files/contract/dashpay/contact-request0.json",
@@ -1083,7 +1349,7 @@ mod tests {
 
         let contract = setup_contract(
             &mut drive,
-            "tests/supporting_files/contract/dashpay/dashpay-contract.json",
+            "tests/supporting_files/contract/dashpay/dashpay-contract-all-mutable.json",
             Some(&db_transaction),
         );
 
@@ -1191,20 +1457,73 @@ mod tests {
     }
 
     #[test]
-    fn test_delete_dashpay_documents_no_transaction() {
-        let (mut drive, dashpay_cbor) = setup_dashpay("delete");
+    fn test_update_dashpay_profile_with_history() {
+        let tmp_dir = TempDir::new("modify_contact_request").unwrap();
+        let mut drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
 
-        let dashpay_cr_document_cbor = json_document_to_cbor(
-            "tests/supporting_files/contract/dashpay/contact-request0.json",
+        let storage = drive.grove.storage();
+        let db_transaction = storage.transaction();
+
+        drive
+            .create_root_tree(Some(&db_transaction))
+            .expect("expected to create root tree successfully");
+
+        let contract = setup_contract(
+            &mut drive,
+            "tests/supporting_files/contract/dashpay/dashpay-contract-with-profile-history.json",
+            Some(&db_transaction),
+        );
+
+        let dashpay_profile_document_cbor = json_document_to_cbor(
+            "tests/supporting_files/contract/dashpay/profile0.json",
+            Some(1),
+        );
+
+        let dashpay_profile_updated_public_message_document_cbor = json_document_to_cbor(
+            "tests/supporting_files/contract/dashpay/profile0-updated-public-message.json",
+            Some(1),
+        );
+
+        let random_owner_id = rand::thread_rng().gen::<[u8; 32]>();
+        drive
+            .add_document_cbor_for_contract(
+                &dashpay_profile_document_cbor,
+                &contract,
+                "profile",
+                Some(&random_owner_id),
+                false,
+                0f64,
+                Some(&db_transaction),
+            )
+            .expect("expected to insert a document successfully");
+
+        drive
+            .update_document_cbor_for_contract(
+                &dashpay_profile_updated_public_message_document_cbor,
+                &contract,
+                "profile",
+                Some(&random_owner_id),
+                0f64,
+                Some(&db_transaction),
+            )
+            .expect("expected to update a document with history successfully");
+    }
+
+    #[test]
+    fn test_delete_dashpay_documents_no_transaction() {
+        let (mut drive, dashpay_cbor) = setup_dashpay("delete", false);
+
+        let dashpay_profile_document_cbor = json_document_to_cbor(
+            "tests/supporting_files/contract/dashpay/profile0.json",
             Some(1),
         );
 
         let random_owner_id = rand::thread_rng().gen::<[u8; 32]>();
         drive
             .add_document_for_contract_cbor(
-                &dashpay_cr_document_cbor,
+                &dashpay_profile_document_cbor,
                 &dashpay_cbor,
-                "contactRequest",
+                "profile",
                 Some(&random_owner_id),
                 false,
                 0f64,
@@ -1212,7 +1531,7 @@ mod tests {
             )
             .expect("expected to insert a document successfully");
 
-        let document_id = bs58::decode("AYjYxDqLy2hvGQADqE6FAkBnQEpJSzNd3CRw1tpS6vZ7")
+        let document_id = bs58::decode("AM47xnyLfTAC9f61ZQPGfMK5Datk2FeYZwgYvcAnzqFY")
             .into_vec()
             .expect("this should decode");
 
@@ -1220,7 +1539,7 @@ mod tests {
             .delete_document_for_contract_cbor(
                 &document_id,
                 &dashpay_cbor,
-                "contactRequest",
+                "profile",
                 Some(&random_owner_id),
                 None,
             )
@@ -1245,17 +1564,17 @@ mod tests {
             Some(&db_transaction),
         );
 
-        let dashpay_cr_document_cbor = json_document_to_cbor(
-            "tests/supporting_files/contract/dashpay/contact-request0.json",
+        let dashpay_profile_document_cbor = json_document_to_cbor(
+            "tests/supporting_files/contract/dashpay/profile0.json",
             Some(1),
         );
 
         let random_owner_id = rand::thread_rng().gen::<[u8; 32]>();
         drive
             .add_document_cbor_for_contract(
-                &dashpay_cr_document_cbor,
+                &dashpay_profile_document_cbor,
                 &contract,
-                "contactRequest",
+                "profile",
                 Some(&random_owner_id),
                 false,
                 0f64,
@@ -1263,7 +1582,7 @@ mod tests {
             )
             .expect("expected to insert a document successfully");
 
-        let document_id = bs58::decode("AYjYxDqLy2hvGQADqE6FAkBnQEpJSzNd3CRw1tpS6vZ7")
+        let document_id = bs58::decode("AM47xnyLfTAC9f61ZQPGfMK5Datk2FeYZwgYvcAnzqFY")
             .into_vec()
             .expect("this should decode");
 
@@ -1271,7 +1590,7 @@ mod tests {
             .delete_document_for_contract(
                 &document_id,
                 &contract,
-                "contactRequest",
+                "profile",
                 Some(&random_owner_id),
                 Some(&db_transaction),
             )
@@ -1768,7 +2087,7 @@ mod tests {
 
     #[test]
     fn test_add_dashpay_many_non_conflicting_documents() {
-        let (mut drive, dashpay_cbor) = setup_dashpay("add_no_conflict");
+        let (mut drive, dashpay_cbor) = setup_dashpay("add_no_conflict", true);
 
         let dashpay_cr_document_cbor_0 = json_document_to_cbor(
             "tests/supporting_files/contract/dashpay/contact-request0.json",
@@ -1823,7 +2142,7 @@ mod tests {
 
     #[test]
     fn test_add_dashpay_conflicting_unique_index_documents() {
-        let (mut drive, dashpay_cbor) = setup_dashpay("add_conflict");
+        let (mut drive, dashpay_cbor) = setup_dashpay("add_conflict", true);
 
         let dashpay_cr_document_cbor_0 = json_document_to_cbor(
             "tests/supporting_files/contract/dashpay/contact-request0.json",
