@@ -755,6 +755,29 @@ impl Drive {
         )
     }
 
+    pub fn update_document_cbor_for_contract(
+        &mut self,
+        document_cbor: &[u8],
+        contract: &Contract,
+        document_type: &str,
+        owner_id: Option<&[u8]>,
+        block_time: f64,
+        transaction: Option<&OptimisticTransactionDBTransaction>,
+    ) -> Result<u64, Error> {
+
+        let document = Document::from_cbor(document_cbor, None, owner_id)?;
+
+        self.update_document_for_contract(
+            &document,
+            document_cbor,
+            contract,
+            document_type,
+            owner_id,
+            block_time,
+            transaction,
+        )
+    }
+
     pub fn update_document_for_contract(
         &mut self,
         document: &Document,
@@ -1105,6 +1128,66 @@ mod tests {
                 Some(&db_transaction),
             )
             .expect("expected to override a document successfully");
+    }
+
+    #[test]
+    fn test_modify_dashpay_contact_request() {
+        let tmp_dir = TempDir::new("modify_contact_request").unwrap();
+        let mut drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+
+        let storage = drive.grove.storage();
+        let db_transaction = storage.transaction();
+
+        drive
+            .create_root_tree(Some(&db_transaction))
+            .expect("expected to create root tree successfully");
+
+        let contract = setup_contract(
+            &mut drive,
+            "tests/supporting_files/contract/dashpay/dashpay-contract.json",
+            Some(&db_transaction),
+        );
+
+        let dashpay_cr_document_cbor = json_document_to_cbor(
+            "tests/supporting_files/contract/dashpay/contact-request0.json",
+            Some(1),
+        );
+
+        let random_owner_id = rand::thread_rng().gen::<[u8; 32]>();
+        drive
+            .add_document_cbor_for_contract(
+                &dashpay_cr_document_cbor,
+                &contract,
+                "contactRequest",
+                Some(&random_owner_id),
+                false,
+                0f64,
+                Some(&db_transaction),
+            )
+            .expect("expected to insert a document successfully");
+
+        drive
+            .update_document_cbor_for_contract(
+                &dashpay_cr_document_cbor,
+                &contract,
+                "contactRequest",
+                Some(&random_owner_id),
+                0f64,
+                Some(&db_transaction),
+            )
+            .expect_err("expected not to be able to update a non mutable document");
+
+        drive
+            .add_document_cbor_for_contract(
+                &dashpay_cr_document_cbor,
+                &contract,
+                "contactRequest",
+                Some(&random_owner_id),
+                true,
+                0f64,
+                Some(&db_transaction),
+            )
+            .expect_err("expected not to be able to override a non mutable document");
     }
 
     #[test]
