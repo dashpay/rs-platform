@@ -1277,10 +1277,7 @@ mod tests {
         };
 
         // let's construct the grovedb structure for the dashpay data contract
-        let dashpay_cbor = json_document_to_cbor(
-            dashpay_path,
-            Some(1),
-        );
+        let dashpay_cbor = json_document_to_cbor(dashpay_path, Some(1));
         drive
             .apply_contract(dashpay_cbor.clone(), 0f64, None)
             .expect("expected to apply contract successfully");
