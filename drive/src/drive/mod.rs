@@ -306,7 +306,11 @@ impl Drive {
 
         if already_exists {
             if different_contract_data {
-                self.update_contract(contract_element, &contract, transaction)
+                if contract.mutable {
+                    self.update_contract(contract_element, &contract, transaction)
+                } else {
+                    Err(Error::InternalError("contract is not mutable"))
+                }
             } else {
                 Ok(0)
             }
@@ -651,6 +655,11 @@ impl Drive {
             .ok_or_else(|| {
                 Error::CorruptedData(String::from("can not get document type from contract"))
             })?;
+
+        if !document_type.documents_mutable {
+            return Err(Error::InternalError("documents for this contract are not mutable"))
+        }
+
         // first we need to construct the path for documents on the contract
         // the path is
         //  * Document and Contract root tree
