@@ -56,7 +56,7 @@ impl Person {
         let mut people_for_blocks: BTreeMap<u64, Vec<Person>> = BTreeMap::new();
 
         for block_time in block_times {
-            let mut block_vec: Vec<Person> = people
+            let block_vec: Vec<Person> = people
                 .iter()
                 .map(|person| Person {
                     id: person.id.clone(),
@@ -1058,6 +1058,68 @@ fn test_query_historical() {
             107, 252, 199, 227, 154, 105, 89, 57, 38, 85, 236, 192, 254, 88
         ]
         .as_slice()
+    );
+
+    let message_value = last_person.properties.get("message").unwrap();
+
+    let message = message_value
+        .as_text()
+        .expect("the message should be a string")
+        .to_string();
+
+    assert_eq!(
+        message,
+        String::from("“Since it’s the customer that pays our salary, our responsibility is to make the product they want, when they want it, and deliver quality that satisfies them.” Retired factory worker, Kiyoshi Tsutsumi (Osono et al 2008, 136)")
+    );
+
+    //
+    // // fetching with empty where and orderBy $id desc with a blockTime
+    //
+    let query_value = json!({
+        "orderBy": [["$id", "desc"]],
+        "blockTime": 300
+    });
+
+    let query_cbor = common::value_to_cbor(query_value, None);
+
+    let person_document_type = contract
+        .document_types
+        .get("person")
+        .expect("contract should have a person document type");
+
+    let (results, _) = drive
+        .query_documents_from_contract(
+            &contract,
+            person_document_type,
+            query_cbor.as_slice(),
+            Some(&db_transaction),
+        )
+        .expect("query should be executed");
+
+    assert_eq!(results.len(), 12);
+
+    let last_person = Document::from_cbor(results.first().unwrap().as_slice(), None, None)
+        .expect("we should be able to deserialize the cbor");
+
+    assert_eq!(
+        last_person.id,
+        vec![
+            249, 170, 70, 122, 181, 31, 35, 176, 175, 131, 70, 150, 250, 223, 194, 203, 175, 200,
+            107, 252, 199, 227, 154, 105, 89, 57, 38, 85, 236, 192, 254, 88
+        ]
+            .as_slice()
+    );
+
+    let message_value = last_person.properties.get("message").unwrap();
+
+    let message = message_value
+        .as_text()
+        .expect("the message should be a string")
+        .to_string();
+
+    assert_eq!(
+        message,
+        String::from("“Since it’s the customer that pays our salary, our responsibility is to make the product they want, when they want it, and deliver quality that satisfies them.” Retired factory worker, Kiyoshi Tsutsumi (Osono et al 2008, 136)")
     );
 
     //

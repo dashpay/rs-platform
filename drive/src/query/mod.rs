@@ -774,6 +774,7 @@ pub struct DriveQuery<'a> {
     pub order_by: IndexMap<String, OrderClause>,
     pub start_at: Option<Vec<u8>>,
     pub start_at_included: bool,
+    pub block_time: Option<f64>,
 }
 
 impl<'a> DriveQuery<'a> {
@@ -810,6 +811,18 @@ impl<'a> DriveQuery<'a> {
                 }
             })
             .ok_or_else(|| Error::InvalidQuery("limit should be a integer from 1 to 100"))?;
+
+        let block_time: Option<f64> = query_document
+            .get("blockTime")
+            .map_or(None, |id_cbor| {
+                if let CborValue::Float(b) = id_cbor {
+                    Some(*b)
+                } else if let CborValue::Integer(b) = id_cbor {
+                    Some(i128::from(*b) as f64)
+                } else {
+                    None
+                }
+            });
 
         let all_where_clauses: Vec<WhereClause> =
             query_document.get("where").map_or(Ok(vec![]), |id_cbor| {
@@ -888,6 +901,7 @@ impl<'a> DriveQuery<'a> {
             order_by,
             start_at,
             start_at_included,
+            block_time,
         })
     }
 
@@ -907,9 +921,12 @@ impl<'a> DriveQuery<'a> {
         }
         .ok_or_else(|| Error::InvalidQuery("Issue parsing sql"))?;
 
-        let limit = if let Some(limit_expr) = &query.limit {
+        let limit : u16 = if let Some(limit_expr) = &query.limit {
             match limit_expr {
-                ast::Expr::Value(Number(num_string, _)) => num_string.parse::<u16>().ok(),
+                ast::Expr::Value(Number(num_string , _)) => {
+                    let cast_num_string : &String = num_string;
+                    cast_num_string.parse::<u16>().ok()
+                },
                 _ => None,
             }
             .ok_or_else(|| Error::InvalidQuery("Issue parsing sql: invalid limit value"))?
@@ -1113,6 +1130,7 @@ impl<'a> DriveQuery<'a> {
             order_by,
             start_at,
             start_at_included,
+            block_time: None
         })
     }
 
