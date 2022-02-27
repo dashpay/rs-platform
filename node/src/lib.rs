@@ -4,6 +4,7 @@ use std::{option::Option::None, path::Path, sync::mpsc, thread};
 
 use grovedb::{PrefixedRocksDbStorage, Storage};
 use neon::prelude::*;
+use neon::types::JsDate;
 use rs_drive::drive::Drive;
 
 type DriveCallback = Box<
@@ -270,7 +271,8 @@ impl DriveWrapper {
     fn js_apply_contract(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         let js_contract_cbor = cx.argument::<JsBuffer>(0)?;
         let js_using_transaction = cx.argument::<JsBoolean>(1)?;
-        let js_callback = cx.argument::<JsFunction>(2)?.root(&mut cx);
+        let js_block_time = cx.argument::<JsDate>(2)?;
+        let js_callback = cx.argument::<JsFunction>(3)?.root(&mut cx);
 
         let drive = cx
             .this()
@@ -278,11 +280,13 @@ impl DriveWrapper {
 
         let contract_cbor = converter::js_buffer_to_vec_u8(js_contract_cbor, &mut cx);
         let using_transaction = js_using_transaction.value(&mut cx);
+        let block_time = js_block_time.value(&mut cx);
 
         drive
             .send_to_drive_thread(move |drive: &mut Drive, transaction, channel| {
                 let result = drive.apply_contract(
                     contract_cbor,
+                    block_time,
                     using_transaction.then(|| transaction).flatten(),
                 );
 

@@ -1,5 +1,5 @@
 mod defaults;
-mod types;
+pub mod types;
 
 use crate::drive::{Drive, RootTree};
 use ciborium::value::{Value as CborValue, Value};
