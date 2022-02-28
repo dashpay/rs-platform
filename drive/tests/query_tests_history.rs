@@ -58,14 +58,28 @@ impl Person {
         for block_time in block_times {
             let block_vec: Vec<Person> = people
                 .iter()
-                .map(|person| Person {
-                    id: person.id.clone(),
-                    owner_id: person.owner_id.clone(),
-                    first_name: person.first_name.clone(),
-                    middle_name: person.middle_name.clone(),
-                    last_name: person.last_name.clone(),
-                    message: Some(quotes.choose(&mut rng).unwrap().clone()),
-                    age: person.age + ((block_time / 100) as u8),
+                .map(|person| {
+                    let mut quote = quotes.choose(&mut rng).unwrap().clone();
+                    if quote.len() > 128 {
+                        let quote_str = quote.as_str();
+                        let mut end: usize = 0;
+                        quote
+                            .chars()
+                            .into_iter()
+                            .take(128)
+                            .for_each(|x| end += x.len_utf8());
+                        let sub_quote = &quote_str[..end];
+                        quote = String::from(sub_quote);
+                    }
+                    Person {
+                        id: person.id.clone(),
+                        owner_id: person.owner_id.clone(),
+                        first_name: person.first_name.clone(),
+                        middle_name: person.middle_name.clone(),
+                        last_name: person.last_name.clone(),
+                        message: Some(quote),
+                        age: person.age + ((block_time / 100) as u8),
+                    }
                 })
                 .collect();
             people_for_blocks.insert(block_time, block_vec);
@@ -92,11 +106,11 @@ pub fn setup(count: u32, seed: u64) -> (Drive, Contract, TempDir) {
     // setup code
     let contract = common::setup_contract(
         &mut drive,
-        "tests/supporting_files/contract/family/family-contract.json",
+        "tests/supporting_files/contract/family/family-contract-with-history.json",
         Some(&db_transaction),
     );
 
-    let block_times = vec![0u64, 15u64, 100u64, 1000u64];
+    let block_times: Vec<u64> = vec![0, 15, 100, 1000];
 
     let people_at_block_times = Person::random_people_for_block_times(count, seed, block_times);
     for (block_time, people) in people_at_block_times {
@@ -145,8 +159,8 @@ fn test_query_historical() {
     assert_eq!(
         root_hash.as_slice(),
         vec![
-            142, 72, 40, 124, 103, 200, 122, 252, 186, 91, 67, 24, 66, 217, 59, 163, 41, 36, 190,
-            118, 193, 138, 86, 52, 96, 187, 64, 59, 13, 37, 240, 198
+            162, 211, 9, 100, 26, 109, 177, 43, 115, 47, 94, 8, 172, 18, 204, 127, 183, 131, 63,
+            119, 102, 31, 9, 208, 136, 172, 94, 118, 35, 21, 55, 216
         ]
     );
 
@@ -919,7 +933,55 @@ fn test_query_historical() {
         )
         .expect("query should be executed");
 
-    // dbg!(&results);
+    assert_eq!(results.len(), 1);
+
+    let query_value = json!({
+        "where": [
+            ["$id", "==", "6A8SGgdmj2NtWCYoYDPDpbsYkq2MCbgi6Lx4ALLfF179"]
+        ]
+    });
+
+    let query_cbor = common::value_to_cbor(query_value, None);
+
+    let person_document_type = contract
+        .document_types
+        .get("person")
+        .expect("contract should have a person document type");
+
+    let (results, _) = drive
+        .query_documents_from_contract(
+            &contract,
+            person_document_type,
+            query_cbor.as_slice(),
+            Some(&db_transaction),
+        )
+        .expect("query should be executed");
+
+    assert_eq!(results.len(), 1);
+
+    let query_value = json!({
+        "where": [
+            ["$id", "==", "6A8SGgdmj2NtWCYoYDPDpbsYkq2MCbgi6Lx4ALLfF179"]
+        ],
+        "blockTime": 300
+    });
+
+    let query_cbor = common::value_to_cbor(query_value, None);
+
+    let person_document_type = contract
+        .document_types
+        .get("person")
+        .expect("contract should have a person document type");
+
+    let (results, _) = drive
+        .query_documents_from_contract(
+            &contract,
+            person_document_type,
+            query_cbor.as_slice(),
+            Some(&db_transaction),
+        )
+        .expect("query should be executed");
+
     assert_eq!(results.len(), 1);
 
     // fetching by $id with order by
@@ -1069,7 +1131,7 @@ fn test_query_historical() {
 
     assert_eq!(
         message,
-        String::from("“Since it’s the customer that pays our salary, our responsibility is to make the product they want, when they want it, and deliver quality that satisfies them.” Retired factory worker, Kiyoshi Tsutsumi (Osono et al 2008, 136)")
+        String::from("“Since it’s the customer that pays our salary, our responsibility is to make the product they want, when they want it, and deliv")
     );
 
     //
@@ -1087,40 +1149,40 @@ fn test_query_historical() {
         .get("person")
         .expect("contract should have a person document type");
 
-    let (results, _) = drive
+    drive
         .query_documents_from_contract(
             &contract,
             person_document_type,
             query_cbor.as_slice(),
             Some(&db_transaction),
         )
-        .expect("query should be executed");
+        .expect_err("not yet implemented");
 
-    assert_eq!(results.len(), 12);
-
-    let last_person = Document::from_cbor(results.first().unwrap().as_slice(), None, None)
-        .expect("we should be able to deserialize the cbor");
-
-    assert_eq!(
-        last_person.id,
-        vec![
-            249, 170, 70, 122, 181, 31, 35, 176, 175, 131, 70, 150, 250, 223, 194, 203, 175, 200,
-            107, 252, 199, 227, 154, 105, 89, 57, 38, 85, 236, 192, 254, 88
-        ]
-            .as_slice()
-    );
-
-    let message_value = last_person.properties.get("message").unwrap();
-
-    let message = message_value
-        .as_text()
-        .expect("the message should be a string")
-        .to_string();
-
-    assert_eq!(
-        message,
-        String::from("“Since it’s the customer that pays our salary, our responsibility is to make the product they want, when they want it, and deliver quality that satisfies them.” Retired factory worker, Kiyoshi Tsutsumi (Osono et al 2008, 136)")
-    );
+    // assert_eq!(results.len(), 12);
+    //
+    // let last_person = Document::from_cbor(results.first().unwrap().as_slice(), None, None)
+    //     .expect("we should be able to deserialize the cbor");
+    //
+    // assert_eq!(
+    //     last_person.id,
+    //     vec![
+    //         249, 170, 70, 122, 181, 31, 35, 176, 175, 131, 70, 150, 250, 223, 194, 203, 175, 200,
+    //         107, 252, 199, 227, 154, 105, 89, 57, 38, 85, 236, 192, 254, 88
+    //     ]
+    //         .as_slice()
+    // );
+    //
+    // let message_value = last_person.properties.get("message").unwrap();
+    //
+    // let message = message_value
+    //     .as_text()
+    //     .expect("the message should be a string")
+    //     .to_string();
+    //
+    // assert_eq!(
+    //     message,
+    //     String::from("“Since it’s the customer that pays our salary, our responsibility is to make the product they want, when they want it, and deliver quality that satisfies them.” Retired factory worker, Kiyoshi Tsutsumi (Osono et al 2008, 136)")
+    // );
 
     //
     // // fetching with ownerId in a set of values
@@ -1271,8 +1333,8 @@ fn test_query_historical() {
     assert_eq!(
         root_hash.as_slice(),
         vec![
-            174, 161, 145, 171, 233, 222, 37, 17, 170, 100, 242, 53, 78, 37, 88, 3, 194, 201, 182,
-            184, 134, 112, 139, 206, 1, 11, 100, 216, 119, 80, 150, 43
+            143, 243, 198, 147, 171, 20, 85, 55, 252, 106, 198, 125, 151, 171, 124, 118, 159, 146,
+            53, 219, 60, 130, 3, 246, 121, 246, 96, 106, 166, 185, 58, 180
         ]
     );
 }

@@ -260,6 +260,21 @@ impl Contract {
             &[0],
         ]
     }
+
+    pub fn documents_with_history_primary_key_path<'a>(
+        &'a self,
+        document_type_name: &'a str,
+        id: &'a Vec<u8>,
+    ) -> [&'a [u8]; 6] {
+        [
+            Into::<&[u8; 1]>::into(RootTree::ContractDocuments),
+            &self.id,
+            &[1],
+            document_type_name.as_bytes(),
+            &[0],
+            id,
+        ]
+    }
 }
 
 impl DocumentType {
