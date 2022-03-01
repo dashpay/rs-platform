@@ -100,7 +100,7 @@ pub fn setup(count: u32, seed: u64) -> (Drive, Contract, TempDir) {
 
 #[test]
 fn test_query_many() {
-    let (mut drive, contract, tmp_dir) = setup(1600, 73509);
+    let (mut drive, contract, _tmp_dir) = setup(1600, 73509);
     let storage = drive.grove.storage();
     let db_transaction = storage.transaction();
     let people = Person::random_people(10, 73409);
@@ -131,7 +131,7 @@ fn test_query_many() {
 
 #[test]
 fn test_query() {
-    let (mut drive, contract, tmp_dir) = setup(10, 73509);
+    let (mut drive, contract, _tmp_dir) = setup(10, 73509);
 
     let storage = drive.grove.storage();
     let db_transaction = storage.transaction();
@@ -537,7 +537,7 @@ fn test_query() {
         .document_types
         .get("person")
         .expect("contract should have a person document type");
-    let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &person_document_type)
+    let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
         .expect("query should be built");
     let (results, _) = query
         .execute_no_proof(&mut drive.grove, None)
@@ -586,7 +586,7 @@ fn test_query() {
         .document_types
         .get("person")
         .expect("contract should have a person document type");
-    let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &person_document_type)
+    let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
         .expect("query should be built");
     let (results, _) = query
         .execute_no_proof(&mut drive.grove, None)
@@ -1220,7 +1220,7 @@ fn test_sql_query() {
     // These tests confirm that sql statements produce the same drive query
     // as their json counterparts, tests above confirm that the json queries
     // produce the correct result set
-    let (_, contract, tmp_dir) = setup(10, 73509);
+    let (_, contract, _tmp_dir) = setup(10, 73509);
     let person_document_type = contract
         .document_types
         .get("person")
@@ -1237,7 +1237,7 @@ fn test_sql_query() {
         }),
         None,
     );
-    let query1 = DriveQuery::from_cbor(query_cbor.as_slice(), &contract, &person_document_type)
+    let query1 = DriveQuery::from_cbor(query_cbor.as_slice(), &contract, person_document_type)
         .expect("should build query");
 
     let sql_string = "select * from person order by firstName asc limit 100";
@@ -1254,7 +1254,7 @@ fn test_sql_query() {
         }),
         None,
     );
-    let query1 = DriveQuery::from_cbor(query_cbor.as_slice(), &contract, &person_document_type)
+    let query1 = DriveQuery::from_cbor(query_cbor.as_slice(), &contract, person_document_type)
         .expect("should build query");
 
     let sql_string = "select * from person where firstName = 'Chris'";
@@ -1275,7 +1275,7 @@ fn test_sql_query() {
         }),
         None,
     );
-    let query1 = DriveQuery::from_cbor(query_cbor.as_slice(), &contract, &person_document_type)
+    let query1 = DriveQuery::from_cbor(query_cbor.as_slice(), &contract, person_document_type)
         .expect("should build query");
 
     let sql_string =
@@ -1297,7 +1297,7 @@ fn test_sql_query() {
         }),
         None,
     );
-    let query1 = DriveQuery::from_cbor(query_cbor.as_slice(), &contract, &person_document_type)
+    let query1 = DriveQuery::from_cbor(query_cbor.as_slice(), &contract, person_document_type)
         .expect("should build query");
 
     let sql_string =
@@ -1320,7 +1320,7 @@ fn test_sql_query() {
         }),
         None,
     );
-    let query1 = DriveQuery::from_cbor(query_cbor.as_slice(), &contract, &person_document_type)
+    let query1 = DriveQuery::from_cbor(query_cbor.as_slice(), &contract, person_document_type)
         .expect("should build query");
 
     let sql_string = "select * from person where firstName > 'Chris' and firstName <= 'Noellyn' order by firstName asc limit 100";
@@ -1342,7 +1342,7 @@ fn test_sql_query() {
         }),
         None,
     );
-    let query1 = DriveQuery::from_cbor(query_cbor.as_slice(), &contract, &person_document_type)
+    let query1 = DriveQuery::from_cbor(query_cbor.as_slice(), &contract, person_document_type)
         .expect("should build query");
 
     let sql_string =

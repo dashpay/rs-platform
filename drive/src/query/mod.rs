@@ -741,9 +741,9 @@ impl<'a> OrderClause {
         let field_value = clause_components
             .get(0)
             .expect("check above enforces it exists");
-        let field_ref = field_value
-            .as_text()
-            .ok_or({ Error::InvalidQuery("first field of where component should be a string") })?;
+        let field_ref = field_value.as_text().ok_or(Error::InvalidQuery(
+            "first field of where component should be a string",
+        ))?;
         let field = String::from(field_ref);
 
         let asc_string_value = clause_components.get(1).unwrap();
@@ -1399,7 +1399,7 @@ impl<'a> DriveQuery<'a> {
 
                 if self.document_type.documents_keep_history {
                     // if the documents keep history then we should insert a subquery
-                    if let Some(block_time) = self.block_time {
+                    if let Some(_block_time) = self.block_time {
                         return Err(Error::InternalError("Not yet implemented"));
                         // in order to be able to do this we would need limited subqueries
                         // as we only want the first element before the block_time
@@ -1437,7 +1437,7 @@ impl<'a> DriveQuery<'a> {
 
                 if self.document_type.documents_keep_history {
                     // if the documents keep history then we should insert a subquery
-                    if let Some(block_time) = self.block_time {
+                    if let Some(_block_time) = self.block_time {
                         return Err(Error::InternalError("Not yet implemented"));
                         // in order to be able to do this we would need limited subqueries
                         // as we only want the first element before the block_time

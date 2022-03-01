@@ -476,7 +476,7 @@ impl Drive {
         Ok(0)
     }
 
-    pub fn add_document(&mut self, document_cbor: &[u8]) -> Result<(), Error> {
+    pub fn add_document(&mut self, _document_cbor: &[u8]) -> Result<(), Error> {
         todo!()
     }
 

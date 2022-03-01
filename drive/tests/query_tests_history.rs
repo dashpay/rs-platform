@@ -143,7 +143,7 @@ pub fn setup(count: u32, seed: u64) -> (Drive, Contract, TempDir) {
 
 #[test]
 fn test_query_historical() {
-    let (mut drive, contract, tmp_dir) = setup(10, 73509);
+    let (mut drive, contract, _tmp_dir) = setup(10, 73509);
 
     let storage = drive.grove.storage();
     let db_transaction = storage.transaction();
@@ -549,7 +549,7 @@ fn test_query_historical() {
         .document_types
         .get("person")
         .expect("contract should have a person document type");
-    let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &person_document_type)
+    let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
         .expect("query should be built");
     let (results, _) = query
         .execute_no_proof(&mut drive.grove, None)
@@ -598,7 +598,7 @@ fn test_query_historical() {
         .document_types
         .get("person")
         .expect("contract should have a person document type");
-    let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &person_document_type)
+    let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
         .expect("query should be built");
     let (results, _) = query
         .execute_no_proof(&mut drive.grove, None)
