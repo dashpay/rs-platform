@@ -81,7 +81,7 @@ describe('Drive', () => {
       it('should create a document', async () => {
         const documentWithoutIndices = documents[0];
 
-        const result = await drive.createDocument(documentWithoutIndices);
+        const result = await drive.createDocument(documentWithoutIndices, blockTime);
 
         expect(result).to.equals(0);
       });
@@ -91,7 +91,7 @@ describe('Drive', () => {
       it('should create a document', async () => {
         const documentWithIndices = documents[3];
 
-        const result = await drive.createDocument(documentWithIndices);
+        const result = await drive.createDocument(documentWithIndices, blockTime);
 
         expect(result).to.equals(0);
       });

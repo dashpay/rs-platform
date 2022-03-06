@@ -90,7 +90,7 @@ class Drive {
       document.getType(),
       document.getOwnerId().toBuffer(),
       true,
-      blockTime.getTime(),
+      blockTime,
       useTransaction,
     );
   }
@@ -108,7 +108,7 @@ class Drive {
       document.getDataContract().toBuffer(),
       document.getType(),
       document.getOwnerId().toBuffer(),
-      blockTime.getTime(),
+      blockTime,
       useTransaction,
     );
   }
