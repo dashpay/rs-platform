@@ -844,9 +844,9 @@ fn bool_for_system_value_from_hash_map(
     default: bool,
 ) -> Result<bool, Error> {
     let value = document.get(key);
-    if value.is_some() {
-        if let Value::Bool(bool_value) = value.unwrap() {
-            return Ok(*bool_value);
+    if let Some(value) = value {
+        if let Value::Bool(bool_value) = value {
+            Ok(*bool_value)
         } else {
             Err(Error::CorruptedData(String::from(
                 "value is expected to be a boolean",
