@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use crate::contract::{Contract, Document, DocumentType};
 use crate::drive::defaults::CONTRACT_DOCUMENTS_PATH_HEIGHT;
 use crate::query::DriveQuery;
-use crate::fee::op::{InsertOperation, Op};
+use crate::fee::op::{InsertOperation, Op, QueryOperation};
 use grovedb::{Element, Error, GroveDb};
 use std::path::Path;
 use storage::rocksdb_storage::OptimisticTransactionDBTransaction;
@@ -177,6 +177,31 @@ impl Drive {
         )
     }
 
+    fn grove_insert_empty_tree_if_not_exists<'a: 'b, 'b, 'c, P>(
+        &'a mut self,
+        path: P,
+        key: &'c [u8],
+        transaction: Option<&'b OptimisticTransactionDBTransaction>,
+        query_operations: &mut Vec<QueryOperation>,
+        insert_operations: &mut Vec<InsertOperation>,
+    ) -> Result<bool, Error>
+        where
+            P: IntoIterator<Item = &'c [u8]>,
+            <P as IntoIterator>::IntoIter: ExactSizeIterator + DoubleEndedIterator + Clone,
+    {
+        let inserted = self.grove.insert_if_not_exists(
+            path,
+            key,
+            Element::empty_tree(),
+            transaction,
+        )?;
+        if inserted {
+            insert_operations.push(InsertOperation::for_empty_tree(key.len()));
+            query_operations.push(QueryOperation::for_key(key));
+        }
+        Ok(inserted)
+    }
+
     fn grove_insert<'a: 'b, 'b, 'c, P>(
         &'a mut self,
         path: P,
@@ -189,13 +214,41 @@ impl Drive {
     P: IntoIterator<Item = &'c [u8]>,
     <P as IntoIterator>::IntoIter: ExactSizeIterator + DoubleEndedIterator + Clone,
     {
-        insert_operations.push(InsertOperation::for_key_value(key));
+        insert_operations.push(InsertOperation::for_key_value(key.len(), &element));
         self.grove.insert(
             path,
             key,
             element,
             transaction,
         )
+    }
+
+    fn grove_insert_if_not_exists<'a: 'b, 'b, 'c, P>(
+        &'a mut self,
+        path: P,
+        key: &'c [u8],
+        element: Element,
+        transaction: Option<&'b OptimisticTransactionDBTransaction>,
+        query_operations: &mut Vec<QueryOperation>,
+        insert_operations: &mut Vec<InsertOperation>,
+    ) -> Result<bool, Error>
+        where
+            P: IntoIterator<Item = &'c [u8]>,
+            <P as IntoIterator>::IntoIter: ExactSizeIterator + DoubleEndedIterator + Clone,
+    {
+        let insert_operation = InsertOperation::for_key_value(key.len(), &element);
+        let query_operation = QueryOperation::for_key_in_path(key, path);
+        let inserted = self.grove.insert_if_not_exists(
+            path,
+            key,
+            element,
+            transaction,
+        )?;
+        if inserted {
+            insert_operations.push(insert_operation);
+        }
+        query_operations.push(query_operation);
+        Ok(inserted)
     }
 
     fn insert_contract(
@@ -222,12 +275,10 @@ impl Drive {
         // }
 
         // the contract
-        self.grove
-            .insert(contract_root_path, &[0], contract_bytes, transaction)?;
+        self.grove_insert(contract_root_path, &[0], contract_bytes, transaction, &mut insert_operations)?;
 
         // the documents
-        self.grove
-            .insert(contract_root_path, &[1], Element::empty_tree(), transaction)?;
+        self.grove_insert_empty_tree(contract_root_path, &[1], transaction, &mut insert_operations)?;
 
         // next we should store each document type
         // right now we are referring them by name
@@ -235,11 +286,11 @@ impl Drive {
         let contract_documents_path = contract_documents_path(&contract.id);
 
         for (type_key, document_type) in &contract.document_types {
-            self.grove.insert(
+            self.grove_insert_empty_tree(
                 contract_documents_path,
                 type_key.as_bytes(),
-                Element::empty_tree(),
                 transaction,
+                &mut insert_operations,
             )?;
 
             let type_path = [
@@ -250,17 +301,17 @@ impl Drive {
             ];
 
             // primary key tree
-            self.grove
-                .insert(type_path, &[0], Element::empty_tree(), transaction)?;
+            self.grove_insert_empty_tree(type_path, &[0], transaction, &mut insert_operations)?;
 
             // for each type we should insert the indices that are top level
             for index in document_type.top_level_indices()? {
                 // toDo: change this to be a reference by index
-                self.grove.insert(
+                self.grove_insert(
                     type_path,
                     index.name.as_bytes(),
                     Element::empty_tree(),
                     transaction,
+                    &mut insert_operations,
                 )?;
             }
         }
@@ -274,22 +325,25 @@ impl Drive {
         contract: &Contract,
         transaction: Option<&OptimisticTransactionDBTransaction>,
     ) -> Result<u64, Error> {
+        let mut base_operations : EnumMap<Op, u64> = EnumMap::default();
+        let mut query_operations: Vec<QueryOperation> = vec![];
+        let mut insert_operations: Vec<InsertOperation> = vec![];
         let contract_root_path = contract_root_path(&contract.id);
 
         // todo handle cost calculation
         let cost: u64 = 0;
 
         // this will override the previous contract
-        self.grove
-            .insert(contract_root_path, &[0], contract_bytes, transaction)?;
+        self.grove_insert(contract_root_path, &[0], contract_bytes, transaction, &mut insert_operations)?;
 
         let contract_documents_path = contract_documents_path(&contract.id);
         for (type_key, document_type) in &contract.document_types {
-            self.grove.insert_if_not_exists(
+            self.grove_insert_empty_tree_if_not_exists(
                 contract_documents_path,
                 type_key.as_bytes(),
-                Element::empty_tree(),
                 transaction,
+                &mut query_operations,
+                &mut insert_operations
             )?;
 
             let type_path = [
@@ -300,17 +354,17 @@ impl Drive {
             ];
 
             // primary key tree
-            self.grove
-                .insert_if_not_exists(type_path, &[0], Element::empty_tree(), transaction)?;
+            self.grove_insert_empty_tree_if_not_exists(type_path, &[0], transaction, &mut query_operations, &mut insert_operations)?;
 
             // for each type we should insert the indices that are top level
             for index in document_type.top_level_indices()? {
                 // toDo: change this to be a reference by index
-                self.grove.insert_if_not_exists(
+                self.grove_insert_empty_tree_if_not_exists(
                     type_path,
                     index.name.as_bytes(),
-                    Element::empty_tree(),
                     transaction,
+                    &mut query_operations,
+                    &mut insert_operations,
                 )?;
             }
         }
@@ -420,6 +474,10 @@ impl Drive {
         override_document: bool,
         transaction: Option<&OptimisticTransactionDBTransaction>,
     ) -> Result<u64, Error> {
+        let mut base_operations : EnumMap<Op, u64> = EnumMap::default();
+        let mut query_operations: Vec<QueryOperation> = vec![];
+        let mut insert_operations: Vec<InsertOperation> = vec![];
+
         // second we need to construct the path for documents on the contract
         // the path is
         //  * Document and Contract root tree
@@ -433,6 +491,7 @@ impl Drive {
             contract_documents_primary_key_path(&contract.id, document_type_name);
         let document_element = Element::Item(Vec::from(document_cbor));
         if override_document {
+            query_operations.push(QueryOperation::for_key_in_path(document.id.as_slice(), primary_key_path.as_slice()));
             if self
                 .grove
                 .get(primary_key_path, document.id.as_slice(), transaction)
@@ -447,18 +506,21 @@ impl Drive {
                     transaction,
                 );
             }
-            self.grove.insert(
+            self.grove_insert(
                 primary_key_path,
                 document.id.as_slice(),
                 document_element,
                 transaction,
+                &mut insert_operations,
             )?;
         } else {
-            let inserted = self.grove.insert_if_not_exists(
+            let inserted = self.grove_insert_if_not_exists(
                 primary_key_path,
                 document.id.as_slice(),
                 document_element,
                 transaction,
+                &mut query_operations,
+                &mut insert_operations,
             )?;
             if !inserted {
                 return Err(Error::CorruptedData(String::from("item already exists")));
@@ -501,11 +563,12 @@ impl Drive {
             let index_path_slices: Vec<&[u8]> = index_path.iter().map(|x| x.as_slice()).collect();
 
             // here we are inserting an empty tree that will have a subtree of all other index properties
-            self.grove.insert_if_not_exists(
+            self.grove_insert_empty_tree_if_not_exists(
                 index_path_slices,
                 document_top_field.as_slice(),
-                Element::empty_tree(),
                 transaction,
+                &mut query_operations,
+                &mut insert_operations,
             )?;
 
             let mut all_fields_null = document_top_field.is_empty();
@@ -532,11 +595,12 @@ impl Drive {
                     index_path.iter().map(|x| x.as_slice()).collect();
 
                 // here we are inserting an empty tree that will have a subtree of all other index properties
-                self.grove.insert_if_not_exists(
+                self.grove_insert_empty_tree_if_not_exists(
                     index_path_slices,
                     index_property.name.as_bytes(),
-                    Element::empty_tree(),
                     transaction,
+                    &mut query_operations,
+                    &mut insert_operations,
                 )?;
 
                 index_path.push(Vec::from(index_property.name.as_bytes()));
@@ -548,11 +612,12 @@ impl Drive {
                     index_path.iter().map(|x| x.as_slice()).collect();
 
                 // here we are inserting an empty tree that will have a subtree of all other index properties
-                self.grove.insert_if_not_exists(
+                self.grove_insert_empty_tree_if_not_exists(
                     index_path_slices,
                     document_index_field.as_slice(),
-                    Element::empty_tree(),
                     transaction,
+                    &mut query_operations,
+                    &mut insert_operations,
                 )?;
 
                 all_fields_null &= document_index_field.is_empty();
@@ -577,11 +642,12 @@ impl Drive {
             // non unique indices should have a tree at key "0" that has all elements based off of primary key
             if !index.unique || all_fields_null {
                 // here we are inserting an empty tree that will have a subtree of all other index properties
-                self.grove.insert_if_not_exists(
+                self.grove_insert_empty_tree_if_not_exists(
                     index_path_slices,
                     &[0],
-                    Element::empty_tree(),
                     transaction,
+                    &mut query_operations,
+                    &mut insert_operations,
                 )?;
                 index_path.push(vec![0]);
 
@@ -589,22 +655,25 @@ impl Drive {
                     index_path.iter().map(|x| x.as_slice()).collect();
 
                 // here we should return an error if the element already exists
-                self.grove.insert(
+                self.grove_insert(
                     index_path_slices,
                     document.id.as_slice(),
                     document_reference,
                     transaction,
+                    &mut insert_operations,
                 )?;
             } else {
                 let index_path_slices: Vec<&[u8]> =
                     index_path.iter().map(|x| x.as_slice()).collect();
 
                 // here we should return an error if the element already exists
-                let inserted = self.grove.insert_if_not_exists(
+                let inserted = self.grove_insert_if_not_exists(
                     index_path_slices,
                     &[0],
                     document_reference,
                     transaction,
+                    &mut query_operations,
+                    &mut insert_operations,
                 )?;
                 if !inserted {
                     return Err(Error::CorruptedData(String::from("index already exists")));
