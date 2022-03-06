@@ -831,8 +831,8 @@ fn bytes_for_system_value_from_hash_map(
     key: &str,
 ) -> Result<Option<Vec<u8>>, Error> {
     let value = document.get(key);
-    if value.is_some() {
-        bytes_for_system_value(value.unwrap())
+    if let Some(value) = value {
+        bytes_for_system_value(value)
     } else {
         Ok(None)
     }
