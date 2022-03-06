@@ -73,7 +73,12 @@ class Drive {
    * @returns {Promise<void>}
    */
   async applyContract(dataContract, blockTime, useTransaction = false) {
-    return driveApplyContractAsync.call(this.drive, dataContract.toBuffer(), blockTime, useTransaction);
+    return driveApplyContractAsync.call(
+      this.drive,
+      dataContract.toBuffer(),
+      blockTime,
+      useTransaction,
+    );
   }
 
   /**
