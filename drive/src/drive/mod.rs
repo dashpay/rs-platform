@@ -1,11 +1,14 @@
 pub mod defaults;
 
+use std::collections::HashMap;
 use crate::contract::{Contract, Document, DocumentType};
 use crate::drive::defaults::CONTRACT_DOCUMENTS_PATH_HEIGHT;
 use crate::query::DriveQuery;
+use crate::fee::op::{InsertOperation, Op};
 use grovedb::{Element, Error, GroveDb};
 use std::path::Path;
 use storage::rocksdb_storage::OptimisticTransactionDBTransaction;
+use enum_map::EnumMap;
 
 pub struct Drive {
     pub grove: GroveDb,
@@ -154,19 +157,61 @@ impl Drive {
         Ok(())
     }
 
+    fn grove_insert_empty_tree<'a: 'b, 'b, 'c, P>(
+        &'a mut self,
+        path: P,
+        key: &'c [u8],
+        transaction: Option<&'b OptimisticTransactionDBTransaction>,
+        insert_operations: &mut Vec<InsertOperation>,
+    ) -> Result<(), Error>
+        where
+            P: IntoIterator<Item = &'c [u8]>,
+            <P as IntoIterator>::IntoIter: ExactSizeIterator + DoubleEndedIterator + Clone,
+    {
+        insert_operations.push(InsertOperation::for_empty_tree(key.len()));
+        self.grove.insert(
+            path,
+            key,
+            Element::empty_tree(),
+            transaction,
+        )
+    }
+
+    fn grove_insert<'a: 'b, 'b, 'c, P>(
+        &'a mut self,
+        path: P,
+        key: &'c [u8],
+        element: Element,
+        transaction: Option<&'b OptimisticTransactionDBTransaction>,
+        insert_operations: &mut Vec<InsertOperation>,
+    ) -> Result<(), Error>
+    where
+    P: IntoIterator<Item = &'c [u8]>,
+    <P as IntoIterator>::IntoIter: ExactSizeIterator + DoubleEndedIterator + Clone,
+    {
+        insert_operations.push(InsertOperation::for_key_value(key));
+        self.grove.insert(
+            path,
+            key,
+            element,
+            transaction,
+        )
+    }
+
     fn insert_contract(
         &mut self,
         contract_bytes: Element,
         contract: &Contract,
         transaction: Option<&OptimisticTransactionDBTransaction>,
     ) -> Result<u64, Error> {
+        let mut base_operations : EnumMap<Op, u64> = EnumMap::default();
+        let mut insert_operations: Vec<InsertOperation> = vec![];
         let contract_root_path = contract_root_path(&contract.id);
-
-        self.grove.insert(
+        self.grove_insert_empty_tree(
             [Into::<&[u8; 1]>::into(RootTree::ContractDocuments).as_slice()],
             contract.id.as_slice(),
-            Element::empty_tree(),
             transaction,
+            &mut insert_operations,
         )?;
 
         // todo handle cost calculation
