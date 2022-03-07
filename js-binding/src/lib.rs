@@ -1,17 +1,17 @@
-use wasm_bindgen::prelude::*;
 use dpp::identifier;
+use wasm_bindgen::prelude::*;
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use wasm_bindgen::JsCast;
 
 #[derive(Serialize, Deserialize)]
 enum IdentifierSource {
     String(String),
-    Buffer(Vec<u8>)
+    Buffer(Vec<u8>),
 }
 
 #[wasm_bindgen]
-extern {
+extern "C" {
     fn alert(s: &str);
 
     #[wasm_bindgen(js_namespace = console, js_name = log)]
@@ -20,7 +20,7 @@ extern {
 
 #[wasm_bindgen(js_name = Identifier)]
 pub struct IdentifierWrapper {
-    wrapped: identifier::Identifier
+    wrapped: identifier::Identifier,
 }
 
 #[wasm_bindgen(js_class = Identifier)]
@@ -30,7 +30,9 @@ impl IdentifierWrapper {
         // TODO: remove unwrap
         let identifier = identifier::Identifier::from_bytes(&buffer).unwrap();
 
-        IdentifierWrapper { wrapped: identifier }
+        IdentifierWrapper {
+            wrapped: identifier,
+        }
     }
 
     pub fn from(value: JsValue, encoding: Option<String>) -> Result<IdentifierWrapper, JsValue> {
@@ -41,16 +43,24 @@ impl IdentifierWrapper {
             let vec = value.dyn_into::<js_sys::Uint8Array>()?.to_vec();
             Ok(IdentifierWrapper::new(vec))
         } else {
-            Err(JsValue::from("Identifier.from received an unexpected value"))
+            Err(JsValue::from(
+                "Identifier.from received an unexpected value",
+            ))
         }
     }
 
     #[wasm_bindgen(js_name = fromString)]
     pub fn from_string(value: String, encoding: Option<String>) -> IdentifierWrapper {
         // TODO: remove unwrap
-        let identifier = identifier::Identifier::from_string_with_encoding_string(&value[..], encoding.as_deref()).unwrap();
+        let identifier = identifier::Identifier::from_string_with_encoding_string(
+            &value[..],
+            encoding.as_deref(),
+        )
+        .unwrap();
 
-        IdentifierWrapper { wrapped: identifier }
+        IdentifierWrapper {
+            wrapped: identifier,
+        }
     }
 
     #[wasm_bindgen(js_name = toBuffer)]
@@ -70,7 +80,8 @@ impl IdentifierWrapper {
         // as_deref dereferences value in the Option
         // dereferencing is accessing the underlying value of the reference, which in
         // case of the string would be a string slice
-        self.wrapped.to_string_with_encoding_string(encoding.as_deref())
+        self.wrapped
+            .to_string_with_encoding_string(encoding.as_deref())
     }
 
     #[wasm_bindgen(js_name = encodeCBOR)]
