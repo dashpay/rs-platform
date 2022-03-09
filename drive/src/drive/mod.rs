@@ -189,16 +189,17 @@ impl Drive {
             P: IntoIterator<Item = &'c [u8]>,
             <P as IntoIterator>::IntoIter: ExactSizeIterator + DoubleEndedIterator + Clone,
     {
+        let path = path.into_iter();
         let inserted = self.grove.insert_if_not_exists(
-            path,
+            path.clone(),
             key,
             Element::empty_tree(),
             transaction,
         )?;
         if inserted {
             insert_operations.push(InsertOperation::for_empty_tree(key.len()));
-            query_operations.push(QueryOperation::for_key(key));
         }
+        query_operations.push(QueryOperation::for_key_in_path(key, path));
         Ok(inserted)
     }
 
@@ -236,10 +237,11 @@ impl Drive {
             P: IntoIterator<Item = &'c [u8]>,
             <P as IntoIterator>::IntoIter: ExactSizeIterator + DoubleEndedIterator + Clone,
     {
+        let path_iter = path.into_iter();
         let insert_operation = InsertOperation::for_key_value(key.len(), &element);
-        let query_operation = QueryOperation::for_key_in_path(key, path);
+        let query_operation = QueryOperation::for_key_in_path(key, path_iter.clone());
         let inserted = self.grove.insert_if_not_exists(
-            path,
+            path_iter,
             key,
             element,
             transaction,
@@ -249,6 +251,26 @@ impl Drive {
         }
         query_operations.push(query_operation);
         Ok(inserted)
+    }
+
+    fn grove_get<'a: 'b, 'b, 'c, P>(
+        &'a mut self,
+        path: P,
+        key: &'c [u8],
+        transaction: Option<&'b OptimisticTransactionDBTransaction>,
+        query_operations: &mut Vec<QueryOperation>,
+    ) -> Result<Element, Error>
+        where
+            P: IntoIterator<Item = &'c [u8]>,
+            <P as IntoIterator>::IntoIter: ExactSizeIterator + DoubleEndedIterator + Clone,
+    {
+        let path_iter = path.into_iter();
+        query_operations.push(QueryOperation::for_key_in_path(key, path_iter.clone()));
+        self.grove.get(
+            path_iter,
+            key,
+            transaction,
+        )
     }
 
     fn insert_contract(
@@ -377,6 +399,8 @@ impl Drive {
         contract_cbor: Vec<u8>,
         transaction: Option<&OptimisticTransactionDBTransaction>,
     ) -> Result<u64, Error> {
+        let mut query_operations: Vec<QueryOperation> = vec![];
+        let mut insert_operations: Vec<InsertOperation> = vec![];
         // first we need to deserialize the contract
         let contract = Contract::from_cbor(&contract_cbor)?;
 
@@ -385,8 +409,7 @@ impl Drive {
         let mut different_contract_data = false;
 
         if let Ok(stored_element) =
-            self.grove
-                .get(contract_root_path(&contract.id), &[0], transaction)
+            self.grove_get(contract_root_path(&contract.id), &[0], transaction, &mut query_operations)
         {
             already_exists = true;
             match stored_element {
@@ -405,12 +428,14 @@ impl Drive {
 
         if already_exists {
             if different_contract_data {
-                self.update_contract(contract_element, &contract, transaction)
+                let cost = self.update_contract(contract_element, &contract, transaction)?;
+                Ok(cost)
             } else {
                 Ok(0)
             }
         } else {
-            self.insert_contract(contract_element, &contract, transaction)
+            let cost = self.insert_contract(contract_element, &contract, transaction)?;
+            Ok(cost)
         }
     }
 
@@ -491,20 +516,20 @@ impl Drive {
             contract_documents_primary_key_path(&contract.id, document_type_name);
         let document_element = Element::Item(Vec::from(document_cbor));
         if override_document {
-            query_operations.push(QueryOperation::for_key_in_path(document.id.as_slice(), primary_key_path.as_slice()));
+            query_operations.push(QueryOperation::for_key_in_path(document.id.as_slice(), primary_key_path.clone()));
             if self
-                .grove
-                .get(primary_key_path, document.id.as_slice(), transaction)
+                .grove_get(primary_key_path, document.id.as_slice(), transaction, &mut query_operations)
                 .is_ok()
             {
-                return self.update_document_for_contract(
+                let cost = self.update_document_for_contract(
                     document,
                     document_cbor,
                     contract,
                     document_type_name,
                     owner_id,
                     transaction,
-                );
+                )?;
+                return Ok(cost);
             }
             self.grove_insert(
                 primary_key_path,

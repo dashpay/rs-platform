@@ -1,5 +1,9 @@
+use std::iter::Sum;
 use enum_map::{enum_map, Enum, EnumMap};
 use grovedb::{Element, Error};
+
+pub(crate) const STORAGE_CREDIT_PER_BYTE: u32 = 5000;
+pub(crate) const QUERY_CREDIT_PER_BYTE: u32 = 10;
 
 #[derive(Debug, Enum)]
 pub enum Op {
@@ -41,14 +45,22 @@ pub struct QueryOperation {
 impl QueryOperation {
     pub fn for_key_in_path<'a: 'b, 'b, 'c, P>(key: &[u8], path: P) -> Self
         where
-        P: Iterator<Item = &'c [u8]>,
-        <P as Iterator> : ExactSizeIterator + DoubleEndedIterator + Clone,
-        {
-        let a = path.iter().map(| inner| inner.len()).sum();
+            P: IntoIterator<Item = &'c [u8]>,
+            <P as IntoIterator>::IntoIter: ExactSizeIterator + DoubleEndedIterator + Clone,
+    {
+        let path_size: u32 = path.into_iter().map(| inner: &[u8] | inner.len() as u32).sum();
         QueryOperation {
             key_size: key.len() as u16,
-            path_size: a,
+            path_size,
         }
+    }
+
+    pub fn data_size(&self) -> u32 {
+        self.path_size + self.key_size as u32
+    }
+
+    pub fn cost(&self) -> u32 {
+        self.data_size() * QUERY_CREDIT_PER_BYTE
     }
 }
 
@@ -78,5 +90,9 @@ impl InsertOperation {
 
     pub fn data_size(&self) -> u32 {
         self.value_size + self.key_size as u32
+    }
+
+    pub fn cost(&self) -> u32 {
+        self.data_size() * STORAGE_CREDIT_PER_BYTE
     }
 }
