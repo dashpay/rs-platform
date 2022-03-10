@@ -1,11 +1,7 @@
-pub use serde::{Deserialize, Serialize};
-use wasm_bindgen::prelude::*;
-use wasm_bindgen::JsCast;
-
-use dpp::identifier::Identifier;
 use dpp::identity::IdentityPublicKey;
 use dpp::identity::{AssetLockProof, Identity, KeyID};
 use dpp::metadata::Metadata;
+use wasm_bindgen::prelude::*;
 
 use crate::identifier::IdentifierWrapper;
 use crate::IdentityPublicKeyWasm;
@@ -14,7 +10,7 @@ use crate::MetadataWasm;
 #[wasm_bindgen(js_name=Identity)]
 pub struct IdentityWasm(Identity);
 
-#[wasm_bindgen(js_name=Identity)]
+#[wasm_bindgen(js_name=AssetLockProof)]
 pub struct AssetLockProofWasm(AssetLockProof);
 impl std::convert::From<AssetLockProof> for AssetLockProofWasm {
     fn from(v: AssetLockProof) -> Self {
