@@ -2,7 +2,7 @@
   "$id": "AcYUCSvAmUwryNsQqkqqD1o3BnFuzepGtR3Mhh2swLk6",
   "documents": {
     "profile": {
-      "$documentsKeepHistory": true,
+      "documentsKeepHistory": true,
       "indices": [{
         "properties": [{
           "$ownerId": "asc"
@@ -77,7 +77,7 @@
       "additionalProperties": false
     },
     "contactRequest": {
-      "$documentsMutable": false,
+      "documentsMutable": false,
       "indices": [{
         "properties": [{
           "$ownerId": "asc"

@@ -23,7 +23,7 @@ pub struct Contract {
     pub id: [u8; 32],
     pub document_types: BTreeMap<String, DocumentType>,
     pub keeps_history: bool,
-    pub mutable: bool,
+    pub readonly: bool,
     pub documents_keep_history_contract_default: bool,
     pub documents_mutable_contract_default: bool,
 }
@@ -156,28 +156,28 @@ impl Contract {
         // Does the contract keep history when the contract itself changes?
         let keeps_history: bool = bool_for_system_value_from_hash_map(
             &contract,
-            "$keepsHistory",
+            "keepsHistory",
             crate::contract::defaults::DEFAULT_CONTRACT_KEEPS_HISTORY,
         )?;
 
         // Is the contract mutable?
-        let mutable: bool = bool_for_system_value_from_hash_map(
+        let readonly: bool = bool_for_system_value_from_hash_map(
             &contract,
-            "$mutable",
-            crate::contract::defaults::DEFAULT_CONTRACT_MUTABILITY,
+            "readonly",
+            !crate::contract::defaults::DEFAULT_CONTRACT_MUTABILITY,
         )?;
 
         // Do documents in the contract keep history?
         let documents_keep_history_contract_default: bool = bool_for_system_value_from_hash_map(
             &contract,
-            "$documentsKeepHistoryContractDefault",
+            "documentsKeepHistoryContractDefault",
             crate::contract::defaults::DEFAULT_CONTRACT_DOCUMENTS_KEEPS_HISTORY,
         )?;
 
         // Are documents in the contract mutable?
         let documents_mutable_contract_default: bool = bool_for_system_value_from_hash_map(
             &contract,
-            "$documentsMutableContractDefault",
+            "documentsMutableContractDefault",
             crate::contract::defaults::DEFAULT_CONTRACT_DOCUMENT_MUTABILITY,
         )?;
 
@@ -221,7 +221,7 @@ impl Contract {
             id: contract_id,
             document_types: contract_document_types,
             keeps_history,
-            mutable,
+            readonly,
             documents_keep_history_contract_default,
             documents_mutable_contract_default,
         })
@@ -331,14 +331,14 @@ impl DocumentType {
         // Do documents of this type keep history? (Overrides contract value)
         let documents_keep_history: bool = cbor_inner_bool_value_with_default(
             document_type_value_map,
-            "$documentsKeepHistory",
+            "documentsKeepHistory",
             default_keeps_history,
         );
 
         // Are documents of this type mutable? (Overrides contract value)
         let documents_mutable: bool = cbor_inner_bool_value_with_default(
             document_type_value_map,
-            "$documentsMutable",
+            "documentsMutable",
             default_mutability,
         );
 
@@ -884,7 +884,7 @@ mod tests {
 
         assert!(contract.documents_mutable_contract_default);
         assert!(!contract.keeps_history);
-        assert!(contract.mutable);
+        assert!(!contract.readonly); // the contract shouldn't be readonly
         assert!(!contract.documents_keep_history_contract_default);
         assert_eq!(contract.document_types.len(), 3);
         assert!(contract.document_types.get("profile").is_some());

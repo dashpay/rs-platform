@@ -314,11 +314,40 @@ impl Drive {
         &mut self,
         contract_bytes: Element,
         contract: &Contract,
+        original_contract: &Contract,
         block_time: f64,
         transaction: Option<&OptimisticTransactionDBTransaction>,
     ) -> Result<u64, Error> {
-        if !contract.mutable {
-            return Err(Error::InternalError("contract is not mutable"));
+        if original_contract.readonly {
+            return Err(Error::InternalError("contract is readonly"));
+        }
+
+        if contract.readonly {
+            return Err(Error::InternalError(
+                "contract can not be changed to readonly",
+            ));
+        }
+
+        if contract.keeps_history ^ original_contract.keeps_history {
+            return Err(Error::InternalError(
+                "contract can not change whether it keeps history",
+            ));
+        }
+
+        if contract.documents_keep_history_contract_default
+            ^ original_contract.documents_keep_history_contract_default
+        {
+            return Err(Error::InternalError(
+                "contract can not change the default of whether documents keeps history",
+            ));
+        }
+
+        if contract.documents_mutable_contract_default
+            ^ original_contract.documents_mutable_contract_default
+        {
+            return Err(Error::InternalError(
+                "contract can not change the default of whether documents are mutable",
+            ));
         }
 
         // todo handle cost calculation
@@ -329,33 +358,68 @@ impl Drive {
 
         let contract_documents_path = contract_documents_path(&contract.id);
         for (type_key, document_type) in &contract.document_types {
-            self.grove.insert_if_not_exists(
-                contract_documents_path,
-                type_key.as_bytes(),
-                Element::empty_tree(),
-                transaction,
-            )?;
+            let original_document_type = &original_contract.document_types.get(type_key);
+            if let Some(original_document_type) = original_document_type {
+                if original_document_type.documents_mutable ^ document_type.documents_mutable {
+                    return Err(Error::InternalError(
+                        "contract can not change whether a specific document type is mutable",
+                    ));
+                }
+                if original_document_type.documents_keep_history
+                    ^ document_type.documents_keep_history
+                {
+                    return Err(Error::InternalError(
+                        "contract can not change whether a specific document type keeps history",
+                    ));
+                }
 
-            let type_path = [
-                contract_documents_path[0],
-                contract_documents_path[1],
-                contract_documents_path[2],
-                type_key.as_bytes(),
-            ];
+                let type_path = [
+                    contract_documents_path[0],
+                    contract_documents_path[1],
+                    contract_documents_path[2],
+                    type_key.as_bytes(),
+                ];
 
-            // primary key tree
-            self.grove
-                .insert_if_not_exists(type_path, &[0], Element::empty_tree(), transaction)?;
-
-            // for each type we should insert the indices that are top level
-            for index in document_type.top_level_indices()? {
-                // toDo: change this to be a reference by index
-                self.grove.insert_if_not_exists(
-                    type_path,
-                    index.name.as_bytes(),
+                // for each type we should insert the indices that are top level
+                for index in document_type.top_level_indices()? {
+                    // toDo: we can save a little by only inserting on new indexes
+                    self.grove.insert_if_not_exists(
+                        type_path,
+                        index.name.as_bytes(),
+                        Element::empty_tree(),
+                        transaction,
+                    )?;
+                }
+            } else {
+                // We can just insert this directly because the original document type already exists
+                self.grove.insert(
+                    contract_documents_path,
+                    type_key.as_bytes(),
                     Element::empty_tree(),
                     transaction,
                 )?;
+
+                let type_path = [
+                    contract_documents_path[0],
+                    contract_documents_path[1],
+                    contract_documents_path[2],
+                    type_key.as_bytes(),
+                ];
+
+                // primary key tree
+                self.grove
+                    .insert(type_path, &[0], Element::empty_tree(), transaction)?;
+
+                // for each type we should insert the indices that are top level
+                for index in document_type.top_level_indices()? {
+                    // toDo: change this to be a reference by index
+                    self.grove.insert(
+                        type_path,
+                        index.name.as_bytes(),
+                        Element::empty_tree(),
+                        transaction,
+                    )?;
+                }
             }
         }
 
@@ -373,7 +437,7 @@ impl Drive {
 
         // overlying structure
         let mut already_exists = false;
-        let mut different_contract_data = false;
+        let mut original_contract_stored_data = vec![];
 
         if let Ok(stored_element) =
             self.grove
@@ -383,7 +447,7 @@ impl Drive {
             match stored_element {
                 Element::Item(stored_contract_bytes) => {
                     if contract_cbor != stored_contract_bytes {
-                        different_contract_data = true;
+                        original_contract_stored_data = stored_contract_bytes;
                     }
                 }
                 _ => {
@@ -395,9 +459,16 @@ impl Drive {
         let contract_element = Element::Item(contract_cbor);
 
         if already_exists {
-            if different_contract_data {
+            if !original_contract_stored_data.is_empty() {
+                let original_contract = Contract::from_cbor(&original_contract_stored_data)?;
                 // if the contract is not mutable update_contract will return an error
-                self.update_contract(contract_element, &contract, block_time, transaction)
+                self.update_contract(
+                    contract_element,
+                    &contract,
+                    &original_contract,
+                    block_time,
+                    transaction,
+                )
             } else {
                 Ok(0)
             }

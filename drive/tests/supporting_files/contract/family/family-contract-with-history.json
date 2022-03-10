@@ -2,7 +2,7 @@
   "$id":"94zNLp7A1ZcYG3Egqf2YmQk4DQr9P8D543GwXyCJRz4",
   "documents":{
     "person":{
-      "$documentsKeepHistory": true,
+      "documentsKeepHistory": true,
       "indices":[
         {
           "properties":[
