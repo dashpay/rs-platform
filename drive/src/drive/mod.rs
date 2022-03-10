@@ -812,8 +812,8 @@ impl Drive {
             .ok_or_else(|| {
                 Error::CorruptedData(String::from("can not get document type from contract"))
             })?;
-        if override_document {
-            if self
+        if override_document
+            && self
                 .grove_get(
                     primary_key_path,
                     document.id.as_slice(),
@@ -821,20 +821,20 @@ impl Drive {
                     query_operations,
                 )
                 .is_ok()
-            {
-                self.update_document_for_contract_operations(
-                    document,
-                    document_cbor,
-                    contract,
-                    document_type_name,
-                    owner_id,
-                    block_time,
-                    transaction,
-                    query_operations,
-                    insert_operations,
-                )?;
-                return Ok(());
-            }
+        {
+            self.update_document_for_contract_operations(
+                document,
+                document_cbor,
+                contract,
+                document_type_name,
+                owner_id,
+                block_time,
+                transaction,
+                query_operations,
+                insert_operations,
+            )?;
+            return Ok(());
+        } else {
             // if we have override_document set that means we already checked if it exists
             self.add_document_to_primary_storage(
                 document_cbor,
@@ -847,20 +847,7 @@ impl Drive {
                 query_operations,
                 insert_operations,
             )?;
-        } else {
-            let inserted = self.grove_insert_if_not_exists(
-                primary_key_path,
-                document.id.as_slice(),
-                document_element,
-                transaction,
-                query_operations,
-                insert_operations,
-            )?;
-            if !inserted {
-                return Err(Error::CorruptedData(String::from("item already exists")));
-            }
         }
-
         // fourth we need to store a reference to the document for each index
         for index in &document_type.indices {
             // at this point the contract path is to the contract documents
