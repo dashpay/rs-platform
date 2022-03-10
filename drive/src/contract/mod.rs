@@ -163,7 +163,7 @@ impl Contract {
         // Is the contract mutable?
         let readonly: bool = bool_for_system_value_from_hash_map(
             &contract,
-            "readonly",
+            "readOnly",
             !crate::contract::defaults::DEFAULT_CONTRACT_MUTABILITY,
         )?;
 
