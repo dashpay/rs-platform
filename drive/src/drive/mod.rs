@@ -2,7 +2,7 @@ pub mod defaults;
 
 use crate::contract::{Contract, Document, DocumentType};
 use crate::drive::defaults::CONTRACT_DOCUMENTS_PATH_HEIGHT;
-use crate::fee::op::{InsertOperation, Op, QueryOperation};
+use crate::fee::op::{DeleteOperation, InsertOperation, Op, QueryOperation};
 use crate::query::DriveQuery;
 use enum_map::EnumMap;
 use grovedb::{Element, Error, GroveDb};
@@ -316,7 +316,7 @@ impl Drive {
         block_time: f64,
         transaction: Option<&OptimisticTransactionDBTransaction>,
         insert_operations: &mut Vec<InsertOperation>,
-    ) -> Result<u64, Error> {
+    ) -> Result<(), Error> {
         let contract_root_path = contract_root_path(&contract.id);
         if contract.keeps_history {
             self.grove_insert(
@@ -357,7 +357,7 @@ impl Drive {
                 insert_operations,
             )?;
         }
-        Ok(0)
+        Ok(())
     }
 
     fn insert_contract(
@@ -367,7 +367,7 @@ impl Drive {
         block_time: f64,
         transaction: Option<&OptimisticTransactionDBTransaction>,
         insert_operations: &mut Vec<InsertOperation>,
-    ) -> Result<u64, Error> {
+    ) -> Result<(), Error> {
         self.grove_insert_empty_tree(
             [Into::<&[u8; 1]>::into(RootTree::ContractDocuments).as_slice()],
             contract.id.as_slice(),
@@ -375,13 +375,7 @@ impl Drive {
             insert_operations,
         )?;
 
-        // todo handle cost calculation
-        let mut cost: u64 = 0;
-
-        // unsafe {
-        //     cost += contract_cbor.size_of() * STORAGE_COST;
-        // }
-        cost += self.add_contract_to_storage(
+        self.add_contract_to_storage(
             contract_bytes,
             contract,
             block_time,
@@ -1394,13 +1388,15 @@ impl Drive {
         )
     }
 
-    pub fn delete_document_for_contract(
+    pub fn delete_document_for_contract_operations(
         &mut self,
         document_id: &[u8],
         contract: &Contract,
         document_type_name: &str,
         owner_id: Option<&[u8]>,
         transaction: Option<&OptimisticTransactionDBTransaction>,
+        query_operations: &mut Vec<QueryOperation>,
+        delete_operations: &mut Vec<DeleteOperation>,
     ) -> Result<u64, Error> {
         let document_type = contract
             .document_types
@@ -1424,10 +1420,11 @@ impl Drive {
             contract_documents_primary_key_path(&contract.id, document_type_name);
 
         // next we need to get the document from storage
-        let document_element: Element = self.grove.get(
+        let document_element: Element = self.grove_get(
             contract_documents_primary_key_path,
             document_id,
             transaction,
+            query_operations,
         )?;
 
         let document_bytes: Vec<u8> = match document_element {

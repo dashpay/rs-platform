@@ -99,3 +99,36 @@ impl InsertOperation {
         self.data_size() * STORAGE_CREDIT_PER_BYTE
     }
 }
+
+pub struct DeleteOperation {
+    pub key_size: u16,
+    pub value_size: u32,
+}
+
+impl DeleteOperation {
+    pub fn for_empty_tree(key_size: usize) -> Self {
+        DeleteOperation {
+            key_size: key_size as u16,
+            value_size: 0,
+        }
+    }
+    pub fn for_key_value(key_size: usize, element: &Element) -> Self {
+        let value_size = match element {
+            Element::Item(item) => item.len(),
+            Element::Reference(path) => path.iter().map(|inner| inner.len()).sum(),
+            Element::Tree(_) => 32,
+        };
+        DeleteOperation {
+            key_size: key_size as u16,
+            value_size: value_size as u32,
+        }
+    }
+
+    pub fn data_size(&self) -> u32 {
+        self.value_size + self.key_size as u32
+    }
+
+    pub fn cost(&self) -> u32 {
+        self.data_size() * STORAGE_CREDIT_PER_BYTE
+    }
+}
