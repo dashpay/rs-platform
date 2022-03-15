@@ -1774,7 +1774,7 @@ fn test_dpns_query() {
 
     assert_eq!(record_id_base64, a_record_id_base64);
 
-    // A query getting one element by the dashUniqueIdentityId
+    // A query getting elements by the dashUniqueIdentityId desc
 
     let query_value = json!({
         "where": [
@@ -1815,6 +1815,50 @@ fn test_dpns_query() {
         "anna-diane".to_string(),
         "marilyn".to_string(),
         "minna".to_string(),
+    ];
+
+    assert_eq!(names, a_names);
+
+    // A query getting 2 elements asc by the dashUniqueIdentityId
+
+    let query_value = json!({
+        "where": [
+            ["records.dashUniqueIdentityId", "<=", "RdBiF9ph2C6C4dRhT9C/xVSoOxb+uvduuLlT/0EEDZA="],
+        ],
+        "limit": 2,
+        "orderBy": [
+            ["records.dashUniqueIdentityId", "asc"]
+        ]
+    });
+    let where_cbor = common::value_to_cbor(query_value, None);
+    let domain_document_type = contract
+        .document_types
+        .get("domain")
+        .expect("contract should have a domain document type");
+    let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &domain_document_type)
+        .expect("query should be built");
+    let (results, _) = query
+        .execute_no_proof(&mut drive.grove, Some(&db_transaction))
+        .expect("proof should be executed");
+    let names: Vec<String> = results
+        .into_iter()
+        .map(|result| {
+            let document = Document::from_cbor(result.as_slice(), None, None)
+                .expect("we should be able to deserialize the cbor");
+            let normalized_label_value = document
+                .properties
+                .get("normalizedLabel")
+                .expect("we should be able to get the first name");
+            let normalized_label = normalized_label_value
+                .as_text()
+                .expect("the normalized label should be a string");
+            String::from(normalized_label)
+        })
+        .collect();
+
+    let a_names = [
+        "minna".to_string(),
+        "marilyn".to_string(),
     ];
 
     assert_eq!(names, a_names);
