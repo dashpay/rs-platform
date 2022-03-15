@@ -1,5 +1,4 @@
 use dpp::document::Document;
-use dpp::identity::AssetLockProof;
 use std::convert::TryInto;
 use wasm_bindgen::prelude::*;
 
@@ -9,15 +8,9 @@ use crate::{DataContractWasm, MetadataWasm};
 #[wasm_bindgen(js_name=Document)]
 pub struct DocumentWasm(Document);
 
-#[wasm_bindgen(js_name=AssetLockProof)]
-pub struct AssetLockProofWasm(AssetLockProof);
-impl std::convert::From<AssetLockProof> for AssetLockProofWasm {
-    fn from(v: AssetLockProof) -> Self {
-        AssetLockProofWasm(v)
-    }
-}
+// TODO error handling
 
-#[wasm_bindgen(js_class=Identity)]
+#[wasm_bindgen(js_class=Document)]
 impl DocumentWasm {
     #[wasm_bindgen(js_name=getProtocolVersion)]
     pub fn get_protocol_version(&self) -> u32 {
@@ -60,26 +53,16 @@ impl DocumentWasm {
     }
 
     #[wasm_bindgen(js_name=setUntropy)]
-    pub fn set_entropy(&mut self, v: Vec<JsValue>) {
-        let entropy: Vec<u8> = v
-            .into_iter()
-            .map(|v| JsValue::into_serde(&v).expect("unable to convert entropy to u8"))
-            .collect();
-        self.0.entropy = Some(
-            entropy
-                .try_into()
-                .expect("unable to convert entropy to array"),
-        )
+    pub fn set_entropy(&mut self, e: Vec<u8>) {
+        self.0.entropy = Some(e.try_into().expect("unable to convert entropy to u8;32"));
     }
 
-    #[wasm_bindgen(js_name=getUntropy)]
-    pub fn get_entropy(&mut self) -> Vec<JsValue> {
-        self.0
-            .entropy
-            .clone()
-            .into_iter()
-            .map(|v| JsValue::from_serde(&v).expect("unable to convert"))
-            .collect()
+    #[wasm_bindgen(js_name=getEntropy)]
+    pub fn get_entropy(&mut self) -> Option<Vec<u8>> {
+        match self.0.entropy {
+            Some(e) => Some(e.to_vec()),
+            None => None,
+        }
     }
 
     #[wasm_bindgen(js_name=setData)]
