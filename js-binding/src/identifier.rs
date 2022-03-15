@@ -1,9 +1,10 @@
 use dpp::identifier;
+
 pub use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, PartialEq, Eq)]
 enum IdentifierSource {
     String(String),
     Buffer(Vec<u8>),
