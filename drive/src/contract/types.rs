@@ -74,11 +74,18 @@ pub fn encode_document_field_type(
         DocumentFieldType::ByteArray => {
             // Byte array could either be raw bytes or encoded as a base64 string
             if value.is_text() {
-                // Decode base64 string
-                let base64_value = value.as_text().expect("confirmed as text");
-                let value_as_bytes = base64::decode(base64_value).map_err(|_| {
-                    Error::CorruptedData(String::from("bytearray: invalid base64 value"))
-                })?;
+                // Decode base64 or base58 string
+                let base_value = value.as_text().expect("confirmed as text");
+                let value_as_bytes = match base64::decode(base_value) {
+                    Err(_) => {
+                        // Try to decode base58
+                        bs58::decode(base_value).into_vec().map_err(|_| {
+                            Error::CorruptedData(String::from("bytearray: invalid base64 or base58 encoding"))
+                        })?
+                    }
+                    Ok(bytes) => bytes,
+                };
+
                 Ok(value_as_bytes)
             } else {
                 let value_as_bytes = value.as_bytes().ok_or_else(get_field_type_matching_error)?;

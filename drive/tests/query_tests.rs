@@ -2,12 +2,15 @@ use grovedb::Error;
 use rand::seq::SliceRandom;
 use rand::{Rng, SeedableRng};
 use rs_drive::common;
+use rs_drive::common::setup_contract;
 use rs_drive::contract::{Contract, Document};
 use rs_drive::drive::Drive;
 use rs_drive::query::DriveQuery;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashMap;
+use std::fs::File;
+use std::io::{self, BufRead};
 use tempdir::TempDir;
 
 #[derive(Serialize, Deserialize)]
@@ -146,7 +149,7 @@ fn test_query() {
         root_hash.as_slice(),
         vec![
             164, 56, 26, 188, 12, 251, 247, 43, 109, 153, 109, 110, 78, 131, 37, 79, 19, 178, 159,
-            69, 35, 250, 159, 210, 2, 125, 12, 103, 50, 40, 108, 114
+            69, 35, 250, 159, 210, 2, 125, 12, 103, 50, 40, 108, 114,
         ]
     );
 
@@ -915,7 +918,6 @@ fn test_query() {
         )
         .expect("query should be executed");
 
-    // dbg!(&results);
     assert_eq!(results.len(), 1);
 
     // fetching by $id with order by
@@ -952,9 +954,9 @@ fn test_query() {
         last_person.id,
         vec![
             76, 161, 17, 201, 152, 232, 129, 48, 168, 13, 49, 10, 218, 53, 118, 136, 165, 198, 189,
-            116, 116, 22, 133, 92, 104, 165, 186, 249, 94, 81, 45, 20
+            116, 116, 22, 133, 92, 104, 165, 186, 249, 94, 81, 45, 20,
         ]
-        .as_slice()
+            .as_slice()
     );
 
     // fetching by $id with order by desc
@@ -991,9 +993,9 @@ fn test_query() {
         last_person.id,
         vec![
             140, 161, 17, 201, 152, 232, 129, 48, 168, 13, 49, 10, 218, 53, 118, 136, 165, 198,
-            189, 116, 116, 22, 133, 92, 104, 165, 186, 249, 94, 81, 45, 20
+            189, 116, 116, 22, 133, 92, 104, 165, 186, 249, 94, 81, 45, 20,
         ]
-        .as_slice()
+            .as_slice()
     );
 
     //
@@ -1051,9 +1053,9 @@ fn test_query() {
         last_person.id,
         vec![
             249, 170, 70, 122, 181, 31, 35, 176, 175, 131, 70, 150, 250, 223, 194, 203, 175, 200,
-            107, 252, 199, 227, 154, 105, 89, 57, 38, 85, 236, 192, 254, 88
+            107, 252, 199, 227, 154, 105, 89, 57, 38, 85, 236, 192, 254, 88,
         ]
-        .as_slice()
+            .as_slice()
     );
 
     //
@@ -1222,6 +1224,68 @@ fn test_query() {
     assert!(
         matches!(result, Err(Error::InvalidQuery(message)) if message == "startAfter document not found")
     );
+
+    // using ascending order with rangeTo operators
+
+    let contract = setup_contract(
+        &mut drive,
+        "tests/supporting_files/contract/dpns/dpns-contract.json",
+        Some(&db_transaction),
+    );
+
+    let file = File::open("tests/supporting_files/contract/dpns/domains.json").expect("should read domains from file");
+
+    let mut ids : Vec<String> = Vec::new();
+
+    for line in io::BufReader::new(file).lines() {
+        if let Ok(domain_json) = line {
+            let domain_json: serde_json::Value = serde_json::from_str(&domain_json).expect("should parse json");
+
+            let domain_cbor = common::value_to_cbor(
+                domain_json,
+                Some(rs_drive::drive::defaults::PROTOCOL_VERSION),
+            );
+
+            let domain = Document::from_cbor(&domain_cbor, None, None)
+                .expect("expected to deserialize the document");
+
+            drive
+                .add_document_for_contract(
+                    &domain,
+                    &domain_cbor,
+                    &contract,
+                    "domain",
+                    None,
+                    false,
+                    Some(&db_transaction),
+                )
+                .expect("expected to insert a document successfully");
+
+            let id = bs58::encode(domain.id).into_string();
+
+            ids.push(id);
+        }
+    }
+
+    let query_value = json!({
+        "orderBy": [["records.dashUniqueIdentityId", "desc"]],
+    });
+
+    let query_cbor = common::value_to_cbor(query_value, None);
+
+    let domain_document_type = contract
+        .document_types
+        .get("domain")
+        .expect("contract should have a domain document type");
+
+    let result = drive.query_documents_from_contract(
+        &contract,
+        domain_document_type,
+        query_cbor.as_slice(),
+        Some(&db_transaction),
+    ).expect("should perform query");
+
+    assert_eq!(result.0.len(), 24);
 
     // validate eventual root hash
 
