@@ -1062,7 +1062,7 @@ mod tests {
 
     #[test]
     fn test_unknown_data_bug() {
-        let tmp_dir = TempDir::new("family").unwrap();
+        let tmp_dir = TempDir::new("unknown_bug").unwrap();
         let mut drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
 
         let storage = drive.grove.storage();
@@ -1077,7 +1077,6 @@ mod tests {
             None,
         );
 
-        let document_types = ["niceDocument", "prettyDocument", "prettyDocument", "indexedDocument", "indexedDocument"];
         let document_hexes = [
             "01000000a86324696458208fcfbce88a219c6e6f4cca4aa55c1ba08303d62985d94084a28d3c298753b8a6646e616d656543757469656524747970656c6e696365446f63756d656e74656f726465720068246f776e657249645820cac675648b485d2606a53fca9942cb7bfdf34e08cee1ebe6e0e74e8502ac6c8069247265766973696f6e016a246372656174656441741b0000017f9334371f6f2464617461436f6e747261637449645820e8f72680f2e3910c95e1497a2b0029d9f7374891ac1f39ab1cfe3ae63336b9a9",
             "01000000a863246964582067a18898a8bfdd139353359d907d487b45d62ab4694a63ad1fe34a34cd8c42116524747970656c6e696365446f63756d656e74656f726465720168246f776e657249645820cac675648b485d2606a53fca9942cb7bfdf34e08cee1ebe6e0e74e8502ac6c80686c6173744e616d65655368696e7969247265766973696f6e016a247570646174656441741b0000017f9334371f6f2464617461436f6e747261637449645820e8f72680f2e3910c95e1497a2b0029d9f7374891ac1f39ab1cfe3ae63336b9a9",
@@ -1086,20 +1085,22 @@ mod tests {
             "01000000aa6324696458208d2a661748268018725cf0dc612c74cf1e8621dc86c5e9cc64d2bbe17a2f855a6524747970656c6e696365446f63756d656e74656f726465720468246f776e657249645820cac675648b485d2606a53fca9942cb7bfdf34e08cee1ebe6e0e74e8502ac6c80686c6173744e616d65674b656e6e65647969247265766973696f6e016966697273744e616d65644c656f6e6a246372656174656441741b0000017f933437206a247570646174656441741b0000017f933437206f2464617461436f6e747261637449645820e8f72680f2e3910c95e1497a2b0029d9f7374891ac1f39ab1cfe3ae63336b9a9"
         ];
 
-        let documents: Vec<Document> = document_types.iter().enumerate().map(|(i, document_type)| {
+        let documents: Vec<Document> = document_hexes.iter().map(|document_hex| {
             let document_cbor = cbor_from_hex(
-                document_hexes[i].to_string(),
+                document_hex.to_string(),
             );
 
             let document = Document::from_cbor(&document_cbor, None, None)
                 .expect("expected to deserialize the document");
+
+            // println!("\n\n\n {:?} \n\n\n", document);
 
             drive
                 .add_document_for_contract(
                     &document,
                     &document_cbor,
                     &contract,
-                    document_type,
+                    "niceDocument",
                     None,
                     false,
                     None,
@@ -1110,9 +1111,13 @@ mod tests {
         })
         .collect();
 
+        // println!("app hash is {:?}", hex::encode(drive.grove.root_hash(None).unwrap()));
+
+        let document_id = "AgP2Tx2ayfobSQ6xZCEVLzfmmLD4YR3CNAJcfgZfBcY5";
+
         let query_json = json!({
             "where": [
-                ["$id", "==", String::from("AgP2Tx2ayfobSQ6xZCEVLzfmmLD4YR3CNAJcfgZfBcY5")]
+                ["$id", "==", String::from(document_id)]
             ],
         });
 
@@ -1126,19 +1131,21 @@ mod tests {
 
         let db_transaction = storage.transaction();
 
+        drive.grove.start_transaction().expect("expected to start a transaction");
+
         drive
             .delete_document_for_contract(
-                &documents.get(0).unwrap().id,
+                &documents.get(1).unwrap().id,
                 &contract,
                 "niceDocument",
-                Some(&documents.get(0).unwrap().owner_id),
+                Some(&documents.get(1).unwrap().owner_id),
                 Some(&db_transaction),
             )
             .expect("expected to be able to delete the document");
 
         let query_json = json!({
             "where": [
-                ["$id", "==", String::from("AgP2Tx2ayfobSQ6xZCEVLzfmmLD4YR3CNAJcfgZfBcY5")]
+                ["$id", "==", String::from(document_id)]
             ],
         });
 
