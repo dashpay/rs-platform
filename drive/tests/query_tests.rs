@@ -1225,6 +1225,23 @@ fn test_query() {
         matches!(result, Err(Error::InvalidQuery(message)) if message == "startAfter document not found")
     );
 
+    // validate eventual root hash
+
+    let root_hash = drive
+        .grove
+        .root_hash(Some(&db_transaction))
+        .expect("there is always a root hash");
+    assert_eq!(
+        root_hash.as_slice(),
+        vec![
+            10, 188, 94, 203, 19, 207, 167, 237, 34, 159, 113, 240, 54, 221, 246, 234, 48, 238, 82,
+            222, 228, 119, 192, 92, 57, 3, 28, 78, 115, 35, 133, 50
+        ]
+    );
+}
+
+#[test]
+fn test_dpns_insertion() {
     // using ascending order with rangeTo operators
 
     let contract = setup_contract(
@@ -1286,20 +1303,6 @@ fn test_query() {
     ).expect("should perform query");
 
     assert_eq!(result.0.len(), 24);
-
-    // validate eventual root hash
-
-    let root_hash = drive
-        .grove
-        .root_hash(Some(&db_transaction))
-        .expect("there is always a root hash");
-    assert_eq!(
-        root_hash.as_slice(),
-        vec![
-            10, 188, 94, 203, 19, 207, 167, 237, 34, 159, 113, 240, 54, 221, 246, 234, 48, 238, 82,
-            222, 228, 119, 192, 92, 57, 3, 28, 78, 115, 35, 133, 50
-        ]
-    );
 }
 
 #[test]
