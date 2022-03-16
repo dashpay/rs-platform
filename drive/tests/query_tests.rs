@@ -8,7 +8,7 @@ use rs_drive::query::DriveQuery;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashMap;
-use tempdir::TempDir;
+use tempfile::TempDir;
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -50,15 +50,10 @@ impl Person {
 }
 
 pub fn setup(count: u32, seed: u64) -> (Drive, Contract, TempDir) {
-    let tmp_dir = TempDir::new("family").unwrap();
-    let mut drive: Drive = Drive::open(&tmp_dir).expect("expected to open Drive successfully");
+    let tmp_dir = TempDir::new().unwrap();
+    let drive: Drive = Drive::open(&tmp_dir).expect("expected to open Drive successfully");
 
-    let storage = drive.grove.storage();
-    let db_transaction = storage.transaction();
-    drive
-        .grove
-        .start_transaction()
-        .expect("expected to start transaction successfully");
+    let db_transaction = drive.grove.start_transaction();
 
     drive
         .create_root_tree(Some(&db_transaction))
@@ -66,7 +61,7 @@ pub fn setup(count: u32, seed: u64) -> (Drive, Contract, TempDir) {
 
     // setup code
     let contract = common::setup_contract(
-        &mut drive,
+        &drive,
         "tests/supporting_files/contract/family/family-contract.json",
         Some(&db_transaction),
     );
@@ -100,9 +95,8 @@ pub fn setup(count: u32, seed: u64) -> (Drive, Contract, TempDir) {
 
 #[test]
 fn test_query_many() {
-    let (mut drive, contract, _tmp_dir) = setup(1600, 73509);
-    let storage = drive.grove.storage();
-    let db_transaction = storage.transaction();
+    let (drive, contract, _tmp_dir) = setup(1600, 73509);
+    let db_transaction = drive.grove.start_transaction();
     let people = Person::random_people(10, 73409);
     for person in people {
         let value = serde_json::to_value(&person).expect("serialized person");
@@ -131,21 +125,16 @@ fn test_query_many() {
 
 #[test]
 fn test_query() {
-    let (mut drive, contract, _tmp_dir) = setup(10, 73509);
+    let (drive, contract, _tmp_dir) = setup(10, 73509);
 
-    let storage = drive.grove.storage();
-    let db_transaction = storage.transaction();
-    drive
-        .grove
-        .start_transaction()
-        .expect("expected to start transaction");
+    let db_transaction = drive.grove.start_transaction();
 
     let root_hash = drive
         .grove
         .root_hash(Some(&db_transaction))
         .expect("there is always a root hash");
     assert_eq!(
-        root_hash.as_slice(),
+        root_hash.expect("cannot get root hash").as_slice(),
         vec![
             164, 56, 26, 188, 12, 251, 247, 43, 109, 153, 109, 110, 78, 131, 37, 79, 19, 178, 159,
             69, 35, 250, 159, 210, 2, 125, 12, 103, 50, 40, 108, 114
@@ -170,7 +159,7 @@ fn test_query() {
     let query_value = json!({
         "where": [
         ],
-        "limit": 100,
+        "limit": 100i64,
         "orderBy": [
             ["firstName", "asc"]
         ]
@@ -183,7 +172,7 @@ fn test_query() {
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &person_document_type)
         .expect("query should be built");
     let (results, _) = query
-        .execute_no_proof(&mut drive.grove, Some(&db_transaction))
+        .execute_no_proof(&drive.grove, Some(&db_transaction))
         .expect("proof should be executed");
     let names: Vec<String> = results
         .into_iter()
@@ -366,7 +355,7 @@ fn test_query() {
         "where": [
             ["firstName", "<", "Chris"]
         ],
-        "limit": 100,
+        "limit": 100i64,
         "orderBy": [
             ["firstName", "asc"]
         ]
@@ -379,7 +368,7 @@ fn test_query() {
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
         .expect("query should be built");
     let (results, _) = query
-        .execute_no_proof(&mut drive.grove, None)
+        .execute_no_proof(&drive.grove, None)
         .expect("proof should be executed");
     let names: Vec<String> = results
         .into_iter()
@@ -411,7 +400,7 @@ fn test_query() {
         "where": [
             ["firstName", "StartsWith", "C"]
         ],
-        "limit": 100,
+        "limit": 100i64,
         "orderBy": [
             ["firstName", "asc"]
         ]
@@ -424,7 +413,7 @@ fn test_query() {
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
         .expect("query should be built");
     let (results, _) = query
-        .execute_no_proof(&mut drive.grove, None)
+        .execute_no_proof(&drive.grove, None)
         .expect("proof should be executed");
     let names: Vec<String> = results
         .into_iter()
@@ -452,7 +441,7 @@ fn test_query() {
             ["firstName", ">", "Chris"],
             ["firstName", "<=", "Noellyn"]
         ],
-        "limit": 100,
+        "limit": 100i64,
         "orderBy": [
             ["firstName", "asc"]
         ]
@@ -465,7 +454,7 @@ fn test_query() {
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
         .expect("query should be built");
     let (results, _) = query
-        .execute_no_proof(&mut drive.grove, None)
+        .execute_no_proof(&drive.grove, None)
         .expect("proof should be executed");
     assert_eq!(results.len(), 5);
 
@@ -527,7 +516,7 @@ fn test_query() {
             ["firstName", "<=", "Noellyn"]
         ],
         "startAt": kevina_encoded_id, //Kevina
-        "limit": 100,
+        "limit": 100i64,
         "orderBy": [
             ["firstName", "asc"]
         ]
@@ -540,7 +529,7 @@ fn test_query() {
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
         .expect("query should be built");
     let (results, _) = query
-        .execute_no_proof(&mut drive.grove, None)
+        .execute_no_proof(&drive.grove, None)
         .expect("proof should be executed");
     assert_eq!(results.len(), 3);
 
@@ -576,7 +565,7 @@ fn test_query() {
             ["firstName", "<=", "Noellyn"]
         ],
         "startAfter": kevina_encoded_id, //Kevina
-        "limit": 100,
+        "limit": 100i64,
         "orderBy": [
             ["firstName", "asc"]
         ]
@@ -589,7 +578,7 @@ fn test_query() {
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
         .expect("query should be built");
     let (results, _) = query
-        .execute_no_proof(&mut drive.grove, None)
+        .execute_no_proof(&drive.grove, None)
         .expect("proof should be executed");
     assert_eq!(results.len(), 2);
 
@@ -619,7 +608,7 @@ fn test_query() {
         "where": [
             ["firstName", "in", names]
         ],
-        "limit": 100,
+        "limit": 100i64,
         "orderBy": [
             ["firstName", "asc"]
         ]
@@ -632,7 +621,7 @@ fn test_query() {
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
         .expect("query should be built");
     let (results, _) = query
-        .execute_no_proof(&mut drive.grove, None)
+        .execute_no_proof(&drive.grove, None)
         .expect("proof should be executed");
     let names: Vec<String> = results
         .into_iter()
@@ -656,7 +645,7 @@ fn test_query() {
         "where": [
             ["firstName", "in", names]
         ],
-        "limit": 100,
+        "limit": 100i64,
         "orderBy": [
             ["firstName", "desc"]
         ]
@@ -669,7 +658,7 @@ fn test_query() {
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
         .expect("query should be built");
     let (results, _) = query
-        .execute_no_proof(&mut drive.grove, None)
+        .execute_no_proof(&drive.grove, None)
         .expect("proof should be executed");
     let names: Vec<String> = results
         .into_iter()
@@ -702,9 +691,9 @@ fn test_query() {
     let query_value = json!({
         "where": [
             ["firstName", "in", names],
-            ["age", ">=", 45]
+            ["age", ">=", 45i64]
         ],
-        "limit": 100,
+        "limit": 100i64,
         "orderBy": [
             ["firstName", "asc"],
             ["age", "desc"]
@@ -718,7 +707,7 @@ fn test_query() {
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
         .expect("query should be built");
     let (results, _) = query
-        .execute_no_proof(&mut drive.grove, None)
+        .execute_no_proof(&drive.grove, None)
         .expect("proof should be executed");
     let names: Vec<String> = results
         .iter()
@@ -750,9 +739,9 @@ fn test_query() {
     let query_value = json!({
         "where": [
             ["firstName", "in", names],
-            ["age", ">", 48]
+            ["age", ">", 48i64]
         ],
-        "limit": 100,
+        "limit": 100i64,
         "orderBy": [
             ["firstName", "asc"],
             ["age", "desc"]
@@ -766,7 +755,7 @@ fn test_query() {
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
         .expect("query should be built");
     let (results, _) = query
-        .execute_no_proof(&mut drive.grove, None)
+        .execute_no_proof(&drive.grove, None)
         .expect("proof should be executed");
     let names: Vec<String> = results
         .iter()
@@ -1234,7 +1223,7 @@ fn test_query() {
         .root_hash(Some(&db_transaction))
         .expect("there is always a root hash");
     assert_eq!(
-        root_hash.as_slice(),
+        root_hash.expect("cannot get root hash").as_slice(),
         vec![
             10, 188, 94, 203, 19, 207, 167, 237, 34, 159, 113, 240, 54, 221, 246, 234, 48, 238, 82,
             222, 228, 119, 192, 92, 57, 3, 28, 78, 115, 35, 133, 50
@@ -1257,7 +1246,7 @@ fn test_sql_query() {
     let query_cbor = common::value_to_cbor(
         json!({
             "where": [],
-            "limit": 100,
+            "limit": 100i64,
             "orderBy": [
                 ["firstName", "asc"]
             ]
@@ -1295,7 +1284,7 @@ fn test_sql_query() {
             "where": [
                 ["firstName", "<", "Chris"]
             ],
-            "limit": 100,
+            "limit": 100i64,
             "orderBy": [
                 ["firstName", "asc"]
             ]
@@ -1317,7 +1306,7 @@ fn test_sql_query() {
             "where": [
                 ["firstName", "StartsWith", "C"]
             ],
-            "limit": 100,
+            "limit": 100i64,
             "orderBy": [
                 ["firstName", "asc"]
             ]
@@ -1340,7 +1329,7 @@ fn test_sql_query() {
                 ["firstName", ">", "Chris"],
                 ["firstName", "<=", "Noellyn"]
             ],
-            "limit": 100,
+            "limit": 100i64,
             "orderBy": [
                 ["firstName", "asc"]
             ]
@@ -1362,7 +1351,7 @@ fn test_sql_query() {
             "where": [
                 ["firstName", "in", names]
             ],
-            "limit": 100,
+            "limit": 100i64,
             "orderBy": [
                 ["firstName", "asc"]
             ],
