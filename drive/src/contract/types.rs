@@ -71,27 +71,30 @@ pub fn encode_document_field_type(
 
             encode_float(value_as_f64)
         }
-        DocumentFieldType::ByteArray => {
-            // Byte array could either be raw bytes or encoded as a base64 string
-            if value.is_text() {
-                // Decode base64 or base58 string
-                let base_value = value.as_text().expect("confirmed as text");
-                let value_as_bytes = match base64::decode(base_value) {
-                    Err(_) => {
-                        // Try to decode base58
-                        bs58::decode(base_value).into_vec().map_err(|_| {
-                            Error::CorruptedData(String::from("bytearray: invalid base64 or base58 encoding"))
-                        })?
-                    }
-                    Ok(bytes) => bytes,
-                };
-
+        DocumentFieldType::ByteArray => match value {
+            Value::Bytes(bytes) => Ok(bytes.clone()),
+            Value::Text(text) => {
+                let value_as_bytes = base64::decode(text).map_err(|_| {
+                    Error::CorruptedData(String::from("bytearray: invalid base64 value"))
+                })?;
                 Ok(value_as_bytes)
-            } else {
-                let value_as_bytes = value.as_bytes().ok_or_else(get_field_type_matching_error)?;
-                Ok(value_as_bytes.clone())
             }
-        }
+            Value::Array(array) => array
+                .iter()
+                .map(|byte| match byte {
+                    Value::Integer(int) => {
+                        let value_as_u8: u8 = (*int)
+                            .try_into()
+                            .map_err(|_| Error::CorruptedData(String::from("expected u8 value")))?;
+                        Ok(value_as_u8)
+                    }
+                    _ => Err(Error::CorruptedData(String::from(
+                        "not an array of integers",
+                    ))),
+                })
+                .collect::<Result<Vec<u8>, Error>>(),
+            _ => Err(get_field_type_matching_error()),
+        },
         DocumentFieldType::Boolean => {
             let value_as_boolean = value.as_bool().ok_or_else(get_field_type_matching_error)?;
             if value_as_boolean {
