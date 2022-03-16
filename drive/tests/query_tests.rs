@@ -225,8 +225,6 @@ pub fn setup_dpns_test_with_data(path: &str) -> (Drive, Contract, TempDir) {
 
     let file = File::open(path).expect("should read domains from file");
 
-    let mut ids : Vec<String> = Vec::new();
-
     for line in io::BufReader::new(file).lines() {
         if let Ok(domain_json) = line {
             let domain_json: serde_json::Value = serde_json::from_str(&domain_json).expect("should parse json");
@@ -252,8 +250,6 @@ pub fn setup_dpns_test_with_data(path: &str) -> (Drive, Contract, TempDir) {
                 .expect("expected to insert a document successfully");
 
             let id = bs58::encode(domain.id).into_string();
-
-            ids.push(id);
         }
     }
     drive
