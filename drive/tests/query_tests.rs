@@ -227,7 +227,8 @@ pub fn setup_dpns_test_with_data(path: &str) -> (Drive, Contract, TempDir) {
 
     for line in io::BufReader::new(file).lines() {
         if let Ok(domain_json) = line {
-            let domain_json: serde_json::Value = serde_json::from_str(&domain_json).expect("should parse json");
+            let domain_json: serde_json::Value =
+                serde_json::from_str(&domain_json).expect("should parse json");
 
             let domain_cbor = common::value_to_cbor(
                 domain_json,
@@ -1156,7 +1157,7 @@ fn test_family_query() {
             76, 161, 17, 201, 152, 232, 129, 48, 168, 13, 49, 10, 218, 53, 118, 136, 165, 198, 189,
             116, 116, 22, 133, 92, 104, 165, 186, 249, 94, 81, 45, 20,
         ]
-            .as_slice()
+        .as_slice()
     );
 
     // fetching by $id with order by desc
@@ -1195,7 +1196,7 @@ fn test_family_query() {
             140, 161, 17, 201, 152, 232, 129, 48, 168, 13, 49, 10, 218, 53, 118, 136, 165, 198,
             189, 116, 116, 22, 133, 92, 104, 165, 186, 249, 94, 81, 45, 20,
         ]
-            .as_slice()
+        .as_slice()
     );
 
     //
@@ -1255,7 +1256,7 @@ fn test_family_query() {
             249, 170, 70, 122, 181, 31, 35, 176, 175, 131, 70, 150, 250, 223, 194, 203, 175, 200,
             107, 252, 199, 227, 154, 105, 89, 57, 38, 85, 236, 192, 254, 88,
         ]
-            .as_slice()
+        .as_slice()
     );
 
     //
@@ -1945,7 +1946,8 @@ fn test_dpns_query() {
 #[test]
 fn test_dpns_insertion_no_aliases() {
     // using ascending order with rangeTo operators
-    let (mut drive, contract, _tmp_dir) = setup_dpns_test_with_data("tests/supporting_files/contract/dpns/domains-no-alias.json");
+    let (mut drive, contract, _tmp_dir) =
+        setup_dpns_test_with_data("tests/supporting_files/contract/dpns/domains-no-alias.json");
 
     let storage = drive.grove.storage();
     let db_transaction = storage.transaction();
@@ -1965,12 +1967,14 @@ fn test_dpns_insertion_no_aliases() {
         .get("domain")
         .expect("contract should have a domain document type");
 
-    let result = drive.query_documents_from_contract(
-        &contract,
-        domain_document_type,
-        query_cbor.as_slice(),
-        Some(&db_transaction),
-    ).expect("should perform query");
+    let result = drive
+        .query_documents_from_contract(
+            &contract,
+            domain_document_type,
+            query_cbor.as_slice(),
+            Some(&db_transaction),
+        )
+        .expect("should perform query");
 
     assert_eq!(result.0.len(), 15);
 }
@@ -1978,7 +1982,8 @@ fn test_dpns_insertion_no_aliases() {
 #[test]
 fn test_dpns_insertion_with_aliases() {
     // using ascending order with rangeTo operators
-    let (mut drive, contract, _tmp_dir) = setup_dpns_test_with_data("tests/supporting_files/contract/dpns/domains.json");
+    let (mut drive, contract, _tmp_dir) =
+        setup_dpns_test_with_data("tests/supporting_files/contract/dpns/domains.json");
 
     let storage = drive.grove.storage();
     let db_transaction = storage.transaction();
@@ -1998,12 +2003,14 @@ fn test_dpns_insertion_with_aliases() {
         .get("domain")
         .expect("contract should have a domain document type");
 
-    let result = drive.query_documents_from_contract(
-        &contract,
-        domain_document_type,
-        query_cbor.as_slice(),
-        Some(&db_transaction),
-    ).expect("should perform query");
+    let result = drive
+        .query_documents_from_contract(
+            &contract,
+            domain_document_type,
+            query_cbor.as_slice(),
+            Some(&db_transaction),
+        )
+        .expect("should perform query");
 
     assert_eq!(result.0.len(), 24);
 }
