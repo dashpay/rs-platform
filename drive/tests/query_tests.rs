@@ -11,6 +11,8 @@ use serde_json::json;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{self, BufRead};
+use storage::rocksdb_storage::OptimisticTransactionDB;
+use storage::Transaction;
 use tempdir::TempDir;
 
 #[derive(Serialize, Deserialize)]
@@ -192,6 +194,67 @@ pub fn setup_dpns_tests(count: u32, seed: u64) -> (Drive, Contract, TempDir) {
                 Some(&db_transaction),
             )
             .expect("document should be inserted");
+    }
+    drive
+        .grove
+        .commit_transaction(db_transaction)
+        .expect("transaction should be committed");
+    (drive, contract, tmp_dir)
+}
+
+pub fn setup_dpns_test_with_data(path: &str) -> (Drive, Contract, TempDir) {
+    let tmp_dir = TempDir::new("dpns_test").unwrap();
+    let mut drive: Drive = Drive::open(&tmp_dir).expect("expected to open Drive successfully");
+
+    let storage = drive.grove.storage();
+    let db_transaction = storage.transaction();
+    drive
+        .grove
+        .start_transaction()
+        .expect("expected to start transaction successfully");
+
+    drive
+        .create_root_tree(Some(&db_transaction))
+        .expect("expected to create root tree successfully");
+
+    let contract = setup_contract(
+        &mut drive,
+        "tests/supporting_files/contract/dpns/dpns-contract.json",
+        Some(&db_transaction),
+    );
+
+    let file = File::open(path).expect("should read domains from file");
+
+    let mut ids : Vec<String> = Vec::new();
+
+    for line in io::BufReader::new(file).lines() {
+        if let Ok(domain_json) = line {
+            let domain_json: serde_json::Value = serde_json::from_str(&domain_json).expect("should parse json");
+
+            let domain_cbor = common::value_to_cbor(
+                domain_json,
+                Some(rs_drive::drive::defaults::PROTOCOL_VERSION),
+            );
+
+            let domain = Document::from_cbor(&domain_cbor, None, None)
+                .expect("expected to deserialize the document");
+
+            drive
+                .add_document_for_contract(
+                    &domain,
+                    &domain_cbor,
+                    &contract,
+                    "domain",
+                    None,
+                    false,
+                    Some(&db_transaction),
+                )
+                .expect("expected to insert a document successfully");
+
+            let id = bs58::encode(domain.id).into_string();
+
+            ids.push(id);
+        }
     }
     drive
         .grove
@@ -1382,71 +1445,6 @@ fn test_family_query() {
 }
 
 #[test]
-fn test_dpns_insertion() {
-    // using ascending order with rangeTo operators
-
-    let contract = setup_contract(
-        &mut drive,
-        "tests/supporting_files/contract/dpns/dpns-contract.json",
-        Some(&db_transaction),
-    );
-
-    let file = File::open("tests/supporting_files/contract/dpns/domains.json").expect("should read domains from file");
-
-    let mut ids : Vec<String> = Vec::new();
-
-    for line in io::BufReader::new(file).lines() {
-        if let Ok(domain_json) = line {
-            let domain_json: serde_json::Value = serde_json::from_str(&domain_json).expect("should parse json");
-
-            let domain_cbor = common::value_to_cbor(
-                domain_json,
-                Some(rs_drive::drive::defaults::PROTOCOL_VERSION),
-            );
-
-            let domain = Document::from_cbor(&domain_cbor, None, None)
-                .expect("expected to deserialize the document");
-
-            drive
-                .add_document_for_contract(
-                    &domain,
-                    &domain_cbor,
-                    &contract,
-                    "domain",
-                    None,
-                    false,
-                    Some(&db_transaction),
-                )
-                .expect("expected to insert a document successfully");
-
-            let id = bs58::encode(domain.id).into_string();
-
-            ids.push(id);
-        }
-    }
-
-    let query_value = json!({
-        "orderBy": [["records.dashUniqueIdentityId", "desc"]],
-    });
-
-    let query_cbor = common::value_to_cbor(query_value, None);
-
-    let domain_document_type = contract
-        .document_types
-        .get("domain")
-        .expect("contract should have a domain document type");
-
-    let result = drive.query_documents_from_contract(
-        &contract,
-        domain_document_type,
-        query_cbor.as_slice(),
-        Some(&db_transaction),
-    ).expect("should perform query");
-
-    assert_eq!(result.0.len(), 24);
-}
-
-#[test]
 fn test_sql_query() {
     // These tests confirm that sql statements produce the same drive query
     // as their json counterparts, tests above confirm that the json queries
@@ -1926,4 +1924,37 @@ fn test_dpns_query() {
     let a_names = ["minna".to_string(), "marilyn".to_string()];
 
     assert_eq!(names, a_names);
+}
+
+#[test]
+fn test_dpns_insertion() {
+    // using ascending order with rangeTo operators
+    let (mut drive, contract, tmp_dir) = setup_dpns_test_with_data("tests/supporting_files/contract/dpns/domains.json");
+
+    let storage = drive.grove.storage();
+    let db_transaction = storage.transaction();
+    drive
+        .grove
+        .start_transaction()
+        .expect("expected to start transaction successfully");
+
+    let query_value = json!({
+        "orderBy": [["records.dashUniqueIdentityId", "desc"]],
+    });
+
+    let query_cbor = common::value_to_cbor(query_value, None);
+
+    let domain_document_type = contract
+        .document_types
+        .get("domain")
+        .expect("contract should have a domain document type");
+
+    let result = drive.query_documents_from_contract(
+        &contract,
+        domain_document_type,
+        query_cbor.as_slice(),
+        Some(&db_transaction),
+    ).expect("should perform query");
+
+    assert_eq!(result.0.len(), 24);
 }
