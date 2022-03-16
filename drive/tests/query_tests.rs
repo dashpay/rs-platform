@@ -1924,12 +1924,65 @@ fn test_dpns_query() {
     let a_names = ["minna".to_string(), "marilyn".to_string()];
 
     assert_eq!(names, a_names);
+
+    // A query getting all elements
+
+    let query_value = json!({
+        "orderBy": [
+            ["records.dashUniqueIdentityId", "desc"]
+        ]
+    });
+    let where_cbor = common::value_to_cbor(query_value, None);
+    let domain_document_type = contract
+        .document_types
+        .get("domain")
+        .expect("contract should have a domain document type");
+    let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &domain_document_type)
+        .expect("query should be built");
+    let (results, _) = query
+        .execute_no_proof(&mut drive.grove, Some(&db_transaction))
+        .expect("proof should be executed");
+
+    assert_eq!(results.len(), 10);
 }
 
 #[test]
-fn test_dpns_insertion() {
+fn test_dpns_insertion_no_aliases() {
     // using ascending order with rangeTo operators
-    let (mut drive, contract, tmp_dir) = setup_dpns_test_with_data("tests/supporting_files/contract/dpns/domains.json");
+    let (mut drive, contract, _tmp_dir) = setup_dpns_test_with_data("tests/supporting_files/contract/dpns/domains-no-alias.json");
+
+    let storage = drive.grove.storage();
+    let db_transaction = storage.transaction();
+    drive
+        .grove
+        .start_transaction()
+        .expect("expected to start transaction successfully");
+
+    let query_value = json!({
+        "orderBy": [["records.dashUniqueIdentityId", "desc"]],
+    });
+
+    let query_cbor = common::value_to_cbor(query_value, None);
+
+    let domain_document_type = contract
+        .document_types
+        .get("domain")
+        .expect("contract should have a domain document type");
+
+    let result = drive.query_documents_from_contract(
+        &contract,
+        domain_document_type,
+        query_cbor.as_slice(),
+        Some(&db_transaction),
+    ).expect("should perform query");
+
+    assert_eq!(result.0.len(), 15);
+}
+
+#[test]
+fn test_dpns_insertion_with_aliases() {
+    // using ascending order with rangeTo operators
+    let (mut drive, contract, _tmp_dir) = setup_dpns_test_with_data("tests/supporting_files/contract/dpns/domains.json");
 
     let storage = drive.grove.storage();
     let db_transaction = storage.transaction();
