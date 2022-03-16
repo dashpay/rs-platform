@@ -1856,10 +1856,7 @@ fn test_dpns_query() {
         })
         .collect();
 
-    let a_names = [
-        "minna".to_string(),
-        "marilyn".to_string(),
-    ];
+    let a_names = ["minna".to_string(), "marilyn".to_string()];
 
     assert_eq!(names, a_names);
 }
