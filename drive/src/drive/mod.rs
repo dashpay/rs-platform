@@ -1135,10 +1135,10 @@ mod tests {
 
         drive
             .delete_document_for_contract(
-                &documents.get(1).unwrap().id,
+                &documents.get(0).unwrap().id,
                 &contract,
                 "niceDocument",
-                Some(&documents.get(1).unwrap().owner_id),
+                Some(&documents.get(0).unwrap().owner_id),
                 Some(&db_transaction),
             )
             .expect("expected to be able to delete the document");
