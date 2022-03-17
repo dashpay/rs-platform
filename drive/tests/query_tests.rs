@@ -159,7 +159,7 @@ fn test_query() {
     let query_value = json!({
         "where": [
         ],
-        "limit": 100i64,
+        "limit": 100,
         "orderBy": [
             ["firstName", "asc"]
         ]
@@ -355,7 +355,7 @@ fn test_query() {
         "where": [
             ["firstName", "<", "Chris"]
         ],
-        "limit": 100i64,
+        "limit": 100,
         "orderBy": [
             ["firstName", "asc"]
         ]
@@ -400,7 +400,7 @@ fn test_query() {
         "where": [
             ["firstName", "StartsWith", "C"]
         ],
-        "limit": 100i64,
+        "limit": 100,
         "orderBy": [
             ["firstName", "asc"]
         ]
@@ -441,7 +441,7 @@ fn test_query() {
             ["firstName", ">", "Chris"],
             ["firstName", "<=", "Noellyn"]
         ],
-        "limit": 100i64,
+        "limit": 100,
         "orderBy": [
             ["firstName", "asc"]
         ]
@@ -516,7 +516,7 @@ fn test_query() {
             ["firstName", "<=", "Noellyn"]
         ],
         "startAt": kevina_encoded_id, //Kevina
-        "limit": 100i64,
+        "limit": 100,
         "orderBy": [
             ["firstName", "asc"]
         ]
@@ -565,7 +565,7 @@ fn test_query() {
             ["firstName", "<=", "Noellyn"]
         ],
         "startAfter": kevina_encoded_id, //Kevina
-        "limit": 100i64,
+        "limit": 100,
         "orderBy": [
             ["firstName", "asc"]
         ]
@@ -608,7 +608,7 @@ fn test_query() {
         "where": [
             ["firstName", "in", names]
         ],
-        "limit": 100i64,
+        "limit": 100,
         "orderBy": [
             ["firstName", "asc"]
         ]
@@ -645,7 +645,7 @@ fn test_query() {
         "where": [
             ["firstName", "in", names]
         ],
-        "limit": 100i64,
+        "limit": 100,
         "orderBy": [
             ["firstName", "desc"]
         ]
@@ -691,9 +691,9 @@ fn test_query() {
     let query_value = json!({
         "where": [
             ["firstName", "in", names],
-            ["age", ">=", 45i64]
+            ["age", ">=", 45]
         ],
-        "limit": 100i64,
+        "limit": 100,
         "orderBy": [
             ["firstName", "asc"],
             ["age", "desc"]
@@ -739,9 +739,9 @@ fn test_query() {
     let query_value = json!({
         "where": [
             ["firstName", "in", names],
-            ["age", ">", 48i64]
+            ["age", ">", 48]
         ],
-        "limit": 100i64,
+        "limit": 100,
         "orderBy": [
             ["firstName", "asc"],
             ["age", "desc"]
@@ -1246,7 +1246,7 @@ fn test_sql_query() {
     let query_cbor = common::value_to_cbor(
         json!({
             "where": [],
-            "limit": 100i64,
+            "limit": 100,
             "orderBy": [
                 ["firstName", "asc"]
             ]
@@ -1284,7 +1284,7 @@ fn test_sql_query() {
             "where": [
                 ["firstName", "<", "Chris"]
             ],
-            "limit": 100i64,
+            "limit": 100,
             "orderBy": [
                 ["firstName", "asc"]
             ]
@@ -1306,7 +1306,7 @@ fn test_sql_query() {
             "where": [
                 ["firstName", "StartsWith", "C"]
             ],
-            "limit": 100i64,
+            "limit": 100,
             "orderBy": [
                 ["firstName", "asc"]
             ]
@@ -1329,7 +1329,7 @@ fn test_sql_query() {
                 ["firstName", ">", "Chris"],
                 ["firstName", "<=", "Noellyn"]
             ],
-            "limit": 100i64,
+            "limit": 100,
             "orderBy": [
                 ["firstName", "asc"]
             ]
@@ -1351,7 +1351,7 @@ fn test_sql_query() {
             "where": [
                 ["firstName", "in", names]
             ],
-            "limit": 100i64,
+            "limit": 100,
             "orderBy": [
                 ["firstName", "asc"]
             ],

@@ -172,7 +172,7 @@ fn test_query_historical() {
     let query_value = json!({
         "where": [
         ],
-        "limit": 100i64,
+        "limit": 100,
         "orderBy": [
             ["firstName", "asc"]
         ]
@@ -368,7 +368,7 @@ fn test_query_historical() {
         "where": [
             ["firstName", "<", "Chris"]
         ],
-        "limit": 100i64,
+        "limit": 100,
         "orderBy": [
             ["firstName", "asc"]
         ]
@@ -413,7 +413,7 @@ fn test_query_historical() {
         "where": [
             ["firstName", "StartsWith", "C"]
         ],
-        "limit": 100i64,
+        "limit": 100,
         "orderBy": [
             ["firstName", "asc"]
         ]
@@ -454,7 +454,7 @@ fn test_query_historical() {
             ["firstName", ">", "Chris"],
             ["firstName", "<=", "Noellyn"]
         ],
-        "limit": 100i64,
+        "limit": 100,
         "orderBy": [
             ["firstName", "asc"]
         ]
@@ -529,7 +529,7 @@ fn test_query_historical() {
             ["firstName", "<=", "Noellyn"]
         ],
         "startAt": kevina_encoded_id, //Kevina
-        "limit": 100i64,
+        "limit": 100,
         "orderBy": [
             ["firstName", "asc"]
         ]
@@ -578,7 +578,7 @@ fn test_query_historical() {
             ["firstName", "<=", "Noellyn"]
         ],
         "startAfter": kevina_encoded_id, //Kevina
-        "limit": 100i64,
+        "limit": 100,
         "orderBy": [
             ["firstName", "asc"]
         ]
@@ -621,7 +621,7 @@ fn test_query_historical() {
         "where": [
             ["firstName", "in", names]
         ],
-        "limit": 100i64,
+        "limit": 100,
         "orderBy": [
             ["firstName", "asc"]
         ]
@@ -658,7 +658,7 @@ fn test_query_historical() {
         "where": [
             ["firstName", "in", names]
         ],
-        "limit": 100i64,
+        "limit": 100,
         "orderBy": [
             ["firstName", "desc"]
         ]
@@ -704,9 +704,9 @@ fn test_query_historical() {
     let query_value = json!({
         "where": [
             ["firstName", "in", names],
-            ["age", ">=", 45i64]
+            ["age", ">=", 45]
         ],
-        "limit": 100i64,
+        "limit": 100,
         "orderBy": [
             ["firstName", "asc"],
             ["age", "desc"]
@@ -752,9 +752,9 @@ fn test_query_historical() {
     let query_value = json!({
         "where": [
             ["firstName", "in", names],
-            ["age", ">", 48i64]
+            ["age", ">", 48]
         ],
-        "limit": 100i64,
+        "limit": 100,
         "orderBy": [
             ["firstName", "asc"],
             ["age", "desc"]
@@ -953,7 +953,7 @@ fn test_query_historical() {
         "where": [
             ["$id", "==", "6A8SGgdmj2NtWCYoYDPDpbsYkq2MCbgi6Lx4ALLfF179"]
         ],
-        "blockTime": 300i64
+        "blockTime": 300
     });
 
     let query_cbor = common::value_to_cbor(query_value, None);
@@ -1129,7 +1129,7 @@ fn test_query_historical() {
     //
     let query_value = json!({
         "orderBy": [["$id", "desc"]],
-        "blockTime": 300i64
+        "blockTime": 300
     });
 
     let query_cbor = common::value_to_cbor(query_value, None);
