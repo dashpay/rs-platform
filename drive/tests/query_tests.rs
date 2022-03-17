@@ -52,6 +52,58 @@ impl Person {
     }
 }
 
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PersonWithOptionalValues {
+    #[serde(rename = "$id")]
+    id: Vec<u8>,
+    #[serde(rename = "$ownerId")]
+    owner_id: Vec<u8>,
+    first_name: Option<String>,
+    middle_name: Option<String>,
+    last_name: Option<String>,
+    age: u8,
+}
+
+impl PersonWithOptionalValues {
+    fn random_people(count: u32, seed: u64) -> Vec<Self> {
+        let first_names =
+            common::text_file_strings("tests/supporting_files/contract/family/first-names.txt");
+        let middle_names =
+            common::text_file_strings("tests/supporting_files/contract/family/middle-names.txt");
+        let last_names =
+            common::text_file_strings("tests/supporting_files/contract/family/last-names.txt");
+        let mut vec: Vec<PersonWithOptionalValues> = Vec::with_capacity(count as usize);
+
+        let mut rng = rand::rngs::StdRng::seed_from_u64(seed);
+        for _ in 0..count {
+            let value = rng.gen::<u8>();
+            let person = PersonWithOptionalValues {
+                id: Vec::from(rng.gen::<[u8; 32]>()),
+                owner_id: Vec::from(rng.gen::<[u8; 32]>()),
+                first_name: if value & 1 != 0 {
+                    Some(first_names.choose(&mut rng).unwrap().clone())
+                } else {
+                    None
+                },
+                middle_name: if value & 2 != 0 {
+                    Some(middle_names.choose(&mut rng).unwrap().clone())
+                } else {
+                    None
+                },
+                last_name: if value & 4 != 0 {
+                    Some(last_names.choose(&mut rng).unwrap().clone())
+                } else {
+                    None
+                },
+                age: rng.gen_range(0..85),
+            };
+            vec.push(person);
+        }
+        vec
+    }
+}
+
 pub fn setup_family_tests(count: u32, seed: u64) -> (Drive, Contract, TempDir) {
     let tmp_dir = TempDir::new().unwrap();
     let drive: Drive = Drive::open(&tmp_dir).expect("expected to open Drive successfully");
@@ -70,6 +122,50 @@ pub fn setup_family_tests(count: u32, seed: u64) -> (Drive, Contract, TempDir) {
     );
 
     let people = Person::random_people(count, seed);
+    for person in people {
+        let value = serde_json::to_value(&person).expect("serialized person");
+        let document_cbor =
+            common::value_to_cbor(value, Some(rs_drive::drive::defaults::PROTOCOL_VERSION));
+        let document = Document::from_cbor(document_cbor.as_slice(), None, None)
+            .expect("document should be properly deserialized");
+        drive
+            .add_document_for_contract(
+                &document,
+                &document_cbor,
+                &contract,
+                "person",
+                None,
+                true,
+                0f64,
+                Some(&db_transaction),
+            )
+            .expect("document should be inserted");
+    }
+    drive
+        .grove
+        .commit_transaction(db_transaction)
+        .expect("transaction should be committed");
+    (drive, contract, tmp_dir)
+}
+
+pub fn setup_family_tests_with_nulls(count: u32, seed: u64) -> (Drive, Contract, TempDir) {
+    let tmp_dir = TempDir::new().unwrap();
+    let drive: Drive = Drive::open(&tmp_dir).expect("expected to open Drive successfully");
+
+    let db_transaction = drive.grove.start_transaction();
+
+    drive
+        .create_root_tree(Some(&db_transaction))
+        .expect("expected to create root tree successfully");
+
+    // setup code
+    let contract = common::setup_contract(
+        &drive,
+        "tests/supporting_files/contract/family/family-contract.json",
+        Some(&db_transaction),
+    );
+
+    let people = PersonWithOptionalValues::random_people(count, seed);
     for person in people {
         let value = serde_json::to_value(&person).expect("serialized person");
         let document_cbor =
@@ -1423,7 +1519,7 @@ fn test_family_query() {
 }
 
 #[test]
-fn test_sql_query() {
+fn test_family_sql_query() {
     // These tests confirm that sql statements produce the same drive query
     // as their json counterparts, tests above confirm that the json queries
     // produce the correct result set
@@ -1557,6 +1653,109 @@ fn test_sql_query() {
     let query2 = DriveQuery::from_sql_expr(sql_string, &contract).expect("should build query");
 
     assert_eq!(query1, query2);
+}
+
+#[test]
+fn test_family_with_nulls_query() {
+    let (drive, contract, _tmp_dir) = setup_family_tests_with_nulls(10, 30004);
+
+    let db_transaction = drive.grove.start_transaction();
+
+    let root_hash = drive
+        .grove
+        .root_hash(Some(&db_transaction))
+        .expect("there is always a root hash");
+    assert_eq!(
+        root_hash.expect("cannot get root hash").as_slice(),
+        vec![
+            30, 92, 251, 92, 87, 126, 170, 38, 203, 108, 135, 63, 111, 8, 47, 139, 66, 200, 131,
+            138, 14, 100, 152, 43, 233, 142, 148, 45, 42, 81, 202, 176
+        ]
+    );
+
+    let all_names = [
+        "".to_string(),
+        "".to_string(),
+        "".to_string(),
+        "".to_string(),
+        "".to_string(),
+        "".to_string(),
+        "Alexia".to_string(),
+        "Gerti".to_string(),
+        "Latisha".to_string(),
+        "Norry".to_string(),
+    ];
+
+    // A query getting all elements by firstName
+
+    let query_value = json!({
+        "where": [
+        ],
+        "limit": 100,
+        "orderBy": [
+            ["firstName", "asc"]
+        ]
+    });
+    let where_cbor = common::value_to_cbor(query_value, None);
+    let person_document_type = contract
+        .document_types
+        .get("person")
+        .expect("contract should have a person document type");
+    let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &person_document_type)
+        .expect("query should be built");
+    let (results, _) = query
+        .execute_no_proof(&drive.grove, Some(&db_transaction))
+        .expect("proof should be executed");
+    let names: Vec<String> = results
+        .clone()
+        .into_iter()
+        .map(|result| {
+            let document = Document::from_cbor(result.as_slice(), None, None)
+                .expect("we should be able to deserialize the cbor");
+            let first_name_value = document
+                .properties
+                .get("firstName")
+                .expect("we should be able to get the first name");
+            if first_name_value.is_null() {
+                String::from("")
+            } else {
+                let first_name = first_name_value
+                    .as_text()
+                    .expect("the first name should be a string");
+                String::from(first_name)
+            }
+        })
+        .collect();
+
+    assert_eq!(names, all_names);
+
+    let ids: Vec<String> = results
+        .into_iter()
+        .map(|result| {
+            let document = Document::from_cbor(result.as_slice(), None, None)
+                .expect("we should be able to deserialize the cbor");
+            base64::encode(document.id)
+        })
+        .collect();
+
+    for i in 0..10 {
+        drive
+            .delete_document_for_contract(
+                base64::decode(ids.get(i).unwrap())
+                    .expect("expected to decode from base64")
+                    .as_slice(),
+                &contract,
+                "person",
+                None,
+                Some(&db_transaction),
+            )
+            .expect("expected to be able to delete the document");
+    }
+
+    drive
+        .grove
+        .commit_transaction(db_transaction)
+        .expect("unable to commit transaction");
 }
 
 #[test]
