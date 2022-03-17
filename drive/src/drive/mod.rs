@@ -1711,7 +1711,7 @@ mod tests {
     }
 
     #[test]
-    fn test_unknown_data_bug() {
+    fn test_deletion_real_data() {
         let tmp_dir = TempDir::new().unwrap();
         let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
 
@@ -1743,8 +1743,6 @@ mod tests {
                 let document = Document::from_cbor(&document_cbor, None, None)
                     .expect("expected to deserialize the document");
 
-                // println!("\n\n\n {:?} \n\n\n", document);
-
                 drive
                     .add_document_for_contract(
                         &document,
@@ -1761,8 +1759,6 @@ mod tests {
                 document
             })
             .collect();
-
-        // println!("app hash is {:?}", hex::encode(drive.grove.root_hash(None).unwrap()));
 
         let document_id = "AgP2Tx2ayfobSQ6xZCEVLzfmmLD4YR3CNAJcfgZfBcY5";
 
