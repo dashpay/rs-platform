@@ -96,8 +96,7 @@ impl DataContractWasm {
 
     #[wasm_bindgen(js_name=getDocuments)]
     pub fn get_documents(&self) -> JsValue {
-        JsValue::from_serde(&self.0.document_schemas)
-            .expect("unable to convert documents to JSValue")
+        JsValue::from_serde(&self.0.documents).expect("unable to convert documents to JSValue")
     }
 
     #[wasm_bindgen(js_name=isDocumentDefined)]
@@ -109,7 +108,7 @@ impl DataContractWasm {
     pub fn set_document_schema(&mut self, doc_type: String, schema: JsValue) {
         let json_schema: Value =
             JsValue::into_serde(&schema).expect("unable to convert schema into JSON Value");
-        self.0.document_schemas.insert(doc_type, json_schema);
+        self.0.documents.insert(doc_type, json_schema);
     }
 
     #[wasm_bindgen(js_name=getDocumentSchema)]
