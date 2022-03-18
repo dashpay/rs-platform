@@ -2,11 +2,11 @@ use enum_map::{enum_map, Enum, EnumMap};
 use grovedb::{Element, Error};
 use std::iter::Sum;
 
-pub(crate) const STORAGE_CREDIT_PER_BYTE: u32 = 5000;
-pub(crate) const QUERY_CREDIT_PER_BYTE: u32 = 10;
+pub(crate) const STORAGE_CREDIT_PER_BYTE: u64 = 5000;
+pub(crate) const QUERY_CREDIT_PER_BYTE: u64 = 10;
 
 #[derive(Debug, Enum)]
-pub enum Op {
+pub enum BaseOp {
     Stop,
     Add,
     Mul,
@@ -29,21 +29,59 @@ pub enum Op {
     Xor,
     Not,
     Byte,
+}
+
+impl BaseOp {
+    pub fn cost(&self) -> u64 {
+        match self {
+            BaseOp::Stop => { 0 }
+            BaseOp::Add => { 12 }
+            BaseOp::Mul => { 20 }
+            BaseOp::Sub => { 12 }
+            BaseOp::Div => { 20 }
+            BaseOp::Sdiv => { 20 }
+            BaseOp::Mod => { 20 }
+            BaseOp::Smod => { 20 }
+            BaseOp::Addmod => { 32 }
+            BaseOp::Mulmod => { 32 }
+            BaseOp::Signextend => { 20 }
+            BaseOp::Lt => { 12 }
+            BaseOp::Gt => { 12 }
+            BaseOp::Slt => { 12 }
+            BaseOp::Sgt => { 12 }
+            BaseOp::Eq => { 12 }
+            BaseOp::Iszero => { 12 }
+            BaseOp::And => { 12 }
+            BaseOp::Or => { 12 }
+            BaseOp::Xor => { 12 }
+            BaseOp::Not => { 12 }
+            BaseOp::Byte => { 12 }
+        }
+    }
+}
+
+#[derive(Debug, Enum)]
+pub enum FunctionOp {
     Exp,
     Sha256,
     Sha256_2,
     Blake3,
-    Read,
-    Store,
+}
+
+impl FunctionOp {
+    pub fn cost(&self, word_count: u32) {
+
+    }
 }
 
 pub struct QueryOperation {
     pub key_size: u16,
     pub path_size: u32,
+    pub value_size: u32,
 }
 
 impl QueryOperation {
-    pub fn for_key_in_path<'a: 'b, 'b, 'c, P>(key: &[u8], path: P) -> Self
+    pub fn for_key_check_in_path<'a: 'b, 'b, 'c, P>(key: &[u8], path: P) -> Self
     where
         P: IntoIterator<Item = &'c [u8]>,
         <P as IntoIterator>::IntoIter: ExactSizeIterator + DoubleEndedIterator + Clone,
@@ -55,6 +93,7 @@ impl QueryOperation {
         QueryOperation {
             key_size: key.len() as u16,
             path_size,
+            value_size: 0,
         }
     }
 
@@ -62,8 +101,12 @@ impl QueryOperation {
         self.path_size + self.key_size as u32
     }
 
-    pub fn cost(&self) -> u32 {
-        self.data_size() * QUERY_CREDIT_PER_BYTE
+    pub fn cpu_cost(&self) -> u64 {
+        self.data_size() as u64 * QUERY_CREDIT_PER_BYTE
+    }
+
+    pub fn storage_cost(&self) -> u64 {
+        self.data_size() as u64 * QUERY_CREDIT_PER_BYTE
     }
 }
 
@@ -95,8 +138,12 @@ impl InsertOperation {
         self.value_size + self.key_size as u32
     }
 
-    pub fn cost(&self) -> u32 {
-        self.data_size() * STORAGE_CREDIT_PER_BYTE
+    pub fn cpu_cost(&self) -> u64 {
+        self.data_size() as u64 * STORAGE_CREDIT_PER_BYTE
+    }
+
+    pub fn storage_cost(&self) -> u64 {
+        self.data_size() as u64 * STORAGE_CREDIT_PER_BYTE
     }
 }
 

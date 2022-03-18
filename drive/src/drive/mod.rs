@@ -2,7 +2,7 @@ pub mod defaults;
 
 use crate::contract::{Contract, Document, DocumentType};
 use crate::drive::defaults::CONTRACT_DOCUMENTS_PATH_HEIGHT;
-use crate::fee::op::{DeleteOperation, InsertOperation, Op, QueryOperation};
+use crate::fee::op::{DeleteOperation, InsertOperation, BaseOp, QueryOperation};
 use crate::query::DriveQuery;
 use enum_map::EnumMap;
 use grovedb::{Element, Error, GroveDb};
@@ -247,7 +247,7 @@ impl Drive {
         if inserted {
             insert_operations.push(InsertOperation::for_empty_tree(key.len()));
         }
-        query_operations.push(QueryOperation::for_key_in_path(key, path));
+        query_operations.push(QueryOperation::for_key_check_in_path(key, path));
         Ok(inserted)
     }
 
@@ -282,7 +282,7 @@ impl Drive {
     {
         let path_iter = path.into_iter();
         let insert_operation = InsertOperation::for_key_value(key.len(), &element);
-        let query_operation = QueryOperation::for_key_in_path(key, path_iter.clone());
+        let query_operation = QueryOperation::for_key_check_in_path(key, path_iter.clone());
         let inserted = self
             .grove
             .insert_if_not_exists(path_iter, key, element, transaction)?;
@@ -305,7 +305,10 @@ impl Drive {
         <P as IntoIterator>::IntoIter: ExactSizeIterator + DoubleEndedIterator + Clone,
     {
         let path_iter = path.into_iter();
-        query_operations.push(QueryOperation::for_key_in_path(key, path_iter.clone()));
+        query_operations.push(QueryOperation::for_key_check_in_path(
+            key,
+            path_iter.clone(),
+        ));
         self.grove.get(path_iter, key, transaction)
     }
 
