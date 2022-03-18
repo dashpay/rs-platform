@@ -149,8 +149,8 @@ fn test_query_historical() {
     assert_eq!(
         root_hash.expect("cannot get root hash").as_slice(),
         vec![
-            125, 137, 75, 199, 156, 47, 45, 33, 28, 176, 102, 223, 138, 123, 160, 249, 12, 238,
-            111, 104, 25, 38, 11, 25, 64, 11, 66, 16, 39, 66, 53, 118
+            58, 65, 51, 105, 31, 125, 172, 208, 15, 85, 121, 141, 95, 68, 204, 10, 39, 30, 219,
+            140, 0, 102, 215, 168, 76, 101, 191, 251, 31, 127, 73, 79
         ]
     );
 
@@ -674,6 +674,7 @@ fn test_query_historical() {
         .execute_no_proof(&drive.grove, None)
         .expect("proof should be executed");
     let names: Vec<String> = results
+        .clone()
         .into_iter()
         .map(|result| {
             let document = Document::from_cbor(result.as_slice(), None, None)
@@ -689,15 +690,37 @@ fn test_query_historical() {
         })
         .collect();
 
+    let ages: Vec<u64> = results
+        .into_iter()
+        .map(|result| {
+            let document = Document::from_cbor(result.as_slice(), None, None)
+                .expect("we should be able to deserialize the cbor");
+            let age_value = document
+                .properties
+                .get("age")
+                .expect("we should be able to get the age");
+            let age: u64 = age_value
+                .as_integer()
+                .expect("the age should be an integer")
+                .try_into()
+                .expect("the age should be put in an u64");
+            age
+        })
+        .collect();
+
     let expected_reversed_between_names = [
-        "Noellyn".to_string(),
-        "Meta".to_string(),
-        "Kevina".to_string(),
-        "Gilligan".to_string(),
-        "Dalia".to_string(),
+        "Noellyn".to_string(),  // 40
+        "Meta".to_string(),     // 69
+        "Kevina".to_string(),   // 58
+        "Gilligan".to_string(), // 59
+        "Dalia".to_string(),    // 78
     ];
 
     assert_eq!(names, expected_reversed_between_names);
+
+    let expected_ages = [40, 69, 58, 59, 78];
+
+    assert_eq!(ages, expected_ages);
 
     // A query getting back elements having specific names and over a certain age
 
@@ -738,6 +761,7 @@ fn test_query_historical() {
         })
         .collect();
 
+    // Kevina is 55, and is excluded from this test
     let expected_names_45_over = [
         "Dalia".to_string(),
         "Gilligan".to_string(),
@@ -752,7 +776,7 @@ fn test_query_historical() {
     let query_value = json!({
         "where": [
             ["firstName", "in", names],
-            ["age", ">", 48]
+            ["age", ">", 58]
         ],
         "limit": 100,
         "orderBy": [
@@ -1323,8 +1347,8 @@ fn test_query_historical() {
     assert_eq!(
         root_hash.expect("cannot get root hash").as_slice(),
         vec![
-            221, 95, 96, 231, 160, 120, 76, 199, 100, 155, 238, 231, 184, 168, 157, 198, 13, 181,
-            98, 234, 67, 93, 211, 112, 14, 115, 235, 31, 184, 234, 157, 131
+            140, 170, 175, 201, 163, 219, 143, 90, 195, 151, 49, 194, 20, 167, 45, 14, 39, 51, 20,
+            138, 75, 9, 90, 8, 176, 219, 130, 3, 118, 75, 165, 232
         ]
     );
 }
