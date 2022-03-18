@@ -881,18 +881,6 @@ impl Drive {
         let contract_documents_primary_key_path =
             contract_documents_primary_key_path(&contract.id, document_type_name);
 
-        // we need to store the document for it's primary key
-        // we should be overriding if the document_type does not have history enabled
-        self.add_document_to_primary_storage(
-            document_cbor,
-            document,
-            document_type,
-            contract,
-            block_time,
-            true,
-            transaction,
-        )?;
-
         // we need to construct the reference to the original document
         let mut reference_path = contract_documents_primary_key_path
             .iter()
@@ -925,6 +913,18 @@ impl Drive {
                 transaction,
             )?
         };
+
+        // we need to store the document for it's primary key
+        // we should be overriding if the document_type does not have history enabled
+        self.add_document_to_primary_storage(
+            document_cbor,
+            document,
+            document_type,
+            contract,
+            block_time,
+            true,
+            transaction,
+        )?;
 
         let old_document = if let Element::Item(old_document_cbor) = old_document_element {
             Ok(Document::from_cbor(
@@ -990,11 +990,12 @@ impl Drive {
 
             let mut all_fields_null = document_top_field.is_empty();
 
+            let mut old_index_path = index_path.clone();
             // we push the actual value of the index path
             index_path.push(document_top_field);
             // the index path is now something like Contracts/ContractID/Documents(1)/$ownerId/<ownerId>
 
-            let mut old_index_path = index_path.clone();
+            old_index_path.push(old_document_top_field);
 
             for i in 1..index.properties.len() {
                 let index_property = index.properties.get(i).ok_or_else(|| {
@@ -1329,11 +1330,11 @@ mod tests {
         value_to_cbor,
     };
     use crate::contract::{Contract, Document};
-    use crate::drive::Drive;
+    use crate::drive::{defaults, Drive};
     use crate::query::DriveQuery;
     use rand::Rng;
     use serde_json::json;
-    use std::{collections::HashMap, fs::File, io::BufReader, path::Path};
+    use std::collections::HashMap;
     use tempfile::TempDir;
 
     fn setup_dashpay(_prefix: &str, mutable_contact_requests: bool) -> (Drive, Vec<u8>) {
@@ -2696,6 +2697,128 @@ mod tests {
         drive
             .apply_contract(updated_contract_cbor, 0f64, None)
             .expect("should update initial contract");
+    }
+
+    #[test]
+    fn test_create_update_and_delete_document() {
+        let tmp_dir = TempDir::new().unwrap();
+        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+
+        drive
+            .create_root_tree(None)
+            .expect("should create root tree");
+
+        let contract = json!({
+            "protocolVersion": 1,
+            "$id": "BZUodcFoFL6KvnonehrnMVggTvCe8W5MiRnZuqLb6M54",
+            "$schema": "https://schema.dash.org/dpp-0-4-0/meta/data-contract",
+            "version": 1,
+            "ownerId": "GZVdTnLFAN2yE9rLeCHBDBCr7YQgmXJuoExkY347j7Z5",
+            "documents": {
+                "indexedDocument": {
+                    "type": "object",
+                    "indices": [
+                        {"name":"index1", "properties": [{"$ownerId":"asc"}, {"firstName":"desc"}], "unique":true},
+                        {"name":"index2", "properties": [{"$ownerId":"asc"}, {"lastName":"desc"}], "unique":true},
+                        {"name":"index3", "properties": [{"lastName":"asc"}]},
+                        {"name":"index4", "properties": [{"$createdAt":"asc"}, {"$updatedAt":"asc"}]},
+                        {"name":"index5", "properties": [{"$updatedAt":"asc"}]},
+                        {"name":"index6", "properties": [{"$createdAt":"asc"}]}
+                    ],
+                    "properties":{
+                        "firstName": {
+                            "type": "string",
+                            "maxLength": 63,
+                        },
+                        "lastName": {
+                            "type": "string",
+                            "maxLength": 63,
+                        }
+                    },
+                    "required": ["firstName", "$createdAt", "$updatedAt", "lastName"],
+                    "additionalProperties": false,
+                },
+            },
+        });
+
+        let contract = value_to_cbor(contract, Some(defaults::PROTOCOL_VERSION));
+
+        drive
+            .apply_contract(contract.clone(), 0f64, None)
+            .expect("should create a contract");
+
+        // Create document
+
+        let document = json!({
+           "$protocolVersion": 1,
+           "$id": "DLRWw2eRbLAW5zDU2c7wwsSFQypTSZPhFYzpY48tnaXN",
+           "$type": "indexedDocument",
+           "$dataContractId": "BZUodcFoFL6KvnonehrnMVggTvCe8W5MiRnZuqLb6M54",
+           "$ownerId": "GZVdTnLFAN2yE9rLeCHBDBCr7YQgmXJuoExkY347j7Z5",
+           "$revision": 1,
+           "firstName": "myName",
+           "lastName": "lastName",
+           "$createdAt":1647535750329 as u64,
+           "$updatedAt":1647535750329 as u64,
+        });
+
+        let document_cbor = value_to_cbor(document, Some(defaults::PROTOCOL_VERSION));
+
+        drive
+            .add_document_for_contract_cbor(
+                document_cbor.as_slice(),
+                &contract.as_slice(),
+                "indexedDocument",
+                None,
+                true,
+                0f64,
+                None,
+            )
+            .expect("should add document");
+
+        // Update document
+
+        let document = json!({
+           "$protocolVersion": 1,
+           "$id": "DLRWw2eRbLAW5zDU2c7wwsSFQypTSZPhFYzpY48tnaXN",
+           "$type": "indexedDocument",
+           "$dataContractId": "BZUodcFoFL6KvnonehrnMVggTvCe8W5MiRnZuqLb6M54",
+           "$ownerId": "GZVdTnLFAN2yE9rLeCHBDBCr7YQgmXJuoExkY347j7Z5",
+           "$revision": 2,
+           "firstName": "updatedName",
+           "lastName": "lastName",
+           "$createdAt":1647535750329 as u64,
+           "$updatedAt":1647535754556 as u64,
+        });
+
+        let document_cbor = value_to_cbor(document, Some(defaults::PROTOCOL_VERSION));
+
+        drive
+            .update_document_for_contract_cbor(
+                document_cbor.as_slice(),
+                &contract.as_slice(),
+                "indexedDocument",
+                None,
+                0f64,
+                None,
+            )
+            .expect("should update document");
+
+        let document_id = bs58::decode("DLRWw2eRbLAW5zDU2c7wwsSFQypTSZPhFYzpY48tnaXN")
+            .into_vec()
+            .expect("should decode base58");
+
+        // Delete document
+
+        drive
+            .delete_document_for_contract_cbor(
+                document_id.as_slice(),
+                &contract,
+                "indexedDocument",
+                None,
+                None,
+            )
+            .expect("should delete document");
     }
 
     #[test]
