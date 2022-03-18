@@ -99,11 +99,7 @@ impl QueryOperation {
         self.path_size + self.key_size as u32
     }
 
-    pub fn cpu_cost(&self) -> u64 {
-        self.data_size() as u64 * QUERY_CREDIT_PER_BYTE
-    }
-
-    pub fn storage_cost(&self) -> u64 {
+    pub fn ephemeral_cost(&self) -> u64 {
         self.data_size() as u64 * QUERY_CREDIT_PER_BYTE
     }
 }
@@ -136,12 +132,12 @@ impl InsertOperation {
         self.value_size + self.key_size as u32
     }
 
-    pub fn cpu_cost(&self) -> u64 {
+    pub fn ephemeral_cost(&self) -> u64 {
         self.data_size() as u64 * STORAGE_CREDIT_PER_BYTE
     }
 
-    pub fn storage_cost(&self) -> u64 {
-        self.data_size() as u64 * STORAGE_CREDIT_PER_BYTE
+    pub fn storage_cost(&self) -> i64 {
+        self.data_size() as i64 * STORAGE_CREDIT_PER_BYTE
     }
 }
 
@@ -173,7 +169,11 @@ impl DeleteOperation {
         self.value_size + self.key_size as u32
     }
 
-    pub fn cost(&self) -> u32 {
-        self.data_size() * STORAGE_CREDIT_PER_BYTE
+    pub fn ephemeral_cost(&self) -> u64 {
+        self.data_size() as u64 * STORAGE_CREDIT_PER_BYTE
+    }
+
+    pub fn storage_cost(&self) -> i64 {
+        -self.data_size() as i64 * STORAGE_CREDIT_PER_BYTE
     }
 }

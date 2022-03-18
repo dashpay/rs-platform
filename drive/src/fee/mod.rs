@@ -9,8 +9,8 @@ pub fn calculate_fee(
     query_operations: Option<Vec<QueryOperation>>,
     insert_operations: Option<Vec<InsertOperation>>,
     delete_operations: Option<Vec<DeleteOperation>>,
-) -> Result<(u64, u64), Error> {
-    let mut storage_cost = 0u64;
+) -> Result<(i64, u64), Error> {
+    let mut storage_cost = 0i64;
     let mut cpu_cost = 0u64;
     if let Some(base_operations) = base_operations {
         for (base_op, count) in base_operations.iter() {
@@ -26,7 +26,7 @@ pub fn calculate_fee(
     }
     if let Some(query_operations) = query_operations {
         for query_operation in query_operations {
-            match cpu_cost.checked_add(query_operation.cpu_cost()) {
+            match cpu_cost.checked_add(query_operation.ephemeral_cost()) {
                 None => return Err(Error::InternalError("overflow error")),
                 Some(value) => cpu_cost = value,
             }
@@ -35,14 +35,29 @@ pub fn calculate_fee(
 
     if let Some(insert_operations) = insert_operations {
         for insert_operation in insert_operations {
-            match cpu_cost.checked_add(insert_operation.cpu_cost()) {
+            match cpu_cost.checked_add(insert_operation.ephemeral_cost()) {
                 None => return Err(Error::InternalError("overflow error")),
                 Some(value) => cpu_cost = value,
             }
 
-            match storage_cost.checked_add(insert_operation.cpu_cost()) {
+            match storage_cost.checked_add(insert_operation.storage_cost()) {
+                None => return Err(Error::InternalError("overflow error")),
+                Some(value) => storage_cost = value,
+            }
+        }
+    }
+
+    if let Some(delete_operations) = delete_operations {
+        for delete_operation in delete_operations {
+            match cpu_cost.checked_add(delete_operation.ephemeral_cost()) {
                 None => return Err(Error::InternalError("overflow error")),
                 Some(value) => cpu_cost = value,
+            }
+
+            // the storage cost will always be negative on a deletion
+            match storage_cost.checked_add(delete_operation.storage_cost()) {
+                None => return Err(Error::InternalError("overflow error")),
+                Some(value) => storage_cost = value,
             }
         }
     }
