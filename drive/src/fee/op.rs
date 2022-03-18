@@ -34,28 +34,28 @@ pub enum BaseOp {
 impl BaseOp {
     pub fn cost(&self) -> u64 {
         match self {
-            BaseOp::Stop => { 0 }
-            BaseOp::Add => { 12 }
-            BaseOp::Mul => { 20 }
-            BaseOp::Sub => { 12 }
-            BaseOp::Div => { 20 }
-            BaseOp::Sdiv => { 20 }
-            BaseOp::Mod => { 20 }
-            BaseOp::Smod => { 20 }
-            BaseOp::Addmod => { 32 }
-            BaseOp::Mulmod => { 32 }
-            BaseOp::Signextend => { 20 }
-            BaseOp::Lt => { 12 }
-            BaseOp::Gt => { 12 }
-            BaseOp::Slt => { 12 }
-            BaseOp::Sgt => { 12 }
-            BaseOp::Eq => { 12 }
-            BaseOp::Iszero => { 12 }
-            BaseOp::And => { 12 }
-            BaseOp::Or => { 12 }
-            BaseOp::Xor => { 12 }
-            BaseOp::Not => { 12 }
-            BaseOp::Byte => { 12 }
+            BaseOp::Stop => 0,
+            BaseOp::Add => 12,
+            BaseOp::Mul => 20,
+            BaseOp::Sub => 12,
+            BaseOp::Div => 20,
+            BaseOp::Sdiv => 20,
+            BaseOp::Mod => 20,
+            BaseOp::Smod => 20,
+            BaseOp::Addmod => 32,
+            BaseOp::Mulmod => 32,
+            BaseOp::Signextend => 20,
+            BaseOp::Lt => 12,
+            BaseOp::Gt => 12,
+            BaseOp::Slt => 12,
+            BaseOp::Sgt => 12,
+            BaseOp::Eq => 12,
+            BaseOp::Iszero => 12,
+            BaseOp::And => 12,
+            BaseOp::Or => 12,
+            BaseOp::Xor => 12,
+            BaseOp::Not => 12,
+            BaseOp::Byte => 12,
         }
     }
 }
@@ -69,9 +69,7 @@ pub enum FunctionOp {
 }
 
 impl FunctionOp {
-    pub fn cost(&self, word_count: u32) {
-
-    }
+    pub fn cost(&self, word_count: u32) {}
 }
 
 pub struct QueryOperation {

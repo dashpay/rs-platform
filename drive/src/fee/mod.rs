@@ -1,4 +1,4 @@
-use crate::fee::op::{InsertOperation, BaseOp, QueryOperation, DeleteOperation};
+use crate::fee::op::{BaseOp, DeleteOperation, InsertOperation, QueryOperation};
 use enum_map::EnumMap;
 use grovedb::Error;
 
@@ -16,21 +16,19 @@ pub fn calculate_fee(
         for (base_op, count) in base_operations.iter() {
             match base_op.cost().checked_mul(*count) {
                 // Todo: This should be made into an overflow error
-                None => { return Err(Error::InternalError("overflow error")) }
-                Some(cost) => {
-                    match cpu_cost.checked_add(cost) {
-                        None => { return Err(Error::InternalError("overflow error")) }
-                        Some(value) => { cpu_cost = value}
-                    }
-                }
+                None => return Err(Error::InternalError("overflow error")),
+                Some(cost) => match cpu_cost.checked_add(cost) {
+                    None => return Err(Error::InternalError("overflow error")),
+                    Some(value) => cpu_cost = value,
+                },
             }
         }
     }
     if let Some(query_operations) = query_operations {
         for query_operation in query_operations {
             match cpu_cost.checked_add(query_operation.cpu_cost()) {
-                None => { return Err(Error::InternalError("overflow error")) }
-                Some(value) => { cpu_cost = value}
+                None => return Err(Error::InternalError("overflow error")),
+                Some(value) => cpu_cost = value,
             }
         }
     }
@@ -38,13 +36,13 @@ pub fn calculate_fee(
     if let Some(insert_operations) = insert_operations {
         for insert_operation in insert_operations {
             match cpu_cost.checked_add(insert_operation.cpu_cost()) {
-                None => { return Err(Error::InternalError("overflow error")) }
-                Some(value) => { cpu_cost = value}
+                None => return Err(Error::InternalError("overflow error")),
+                Some(value) => cpu_cost = value,
             }
 
             match storage_cost.checked_add(insert_operation.cpu_cost()) {
-                None => { return Err(Error::InternalError("overflow error")) }
-                Some(value) => { cpu_cost = value}
+                None => return Err(Error::InternalError("overflow error")),
+                Some(value) => cpu_cost = value,
             }
         }
     }

@@ -2,7 +2,7 @@ pub mod defaults;
 
 use crate::contract::{Contract, Document, DocumentType};
 use crate::drive::defaults::CONTRACT_DOCUMENTS_PATH_HEIGHT;
-use crate::fee::op::{DeleteOperation, InsertOperation, BaseOp, QueryOperation};
+use crate::fee::op::{BaseOp, DeleteOperation, InsertOperation, QueryOperation};
 use crate::query::DriveQuery;
 use enum_map::EnumMap;
 use grovedb::{Element, Error, GroveDb};
