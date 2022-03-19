@@ -1,14 +1,16 @@
 pub mod defaults;
 
 use crate::contract::{Contract, Document, DocumentType};
-use crate::drive::defaults::CONTRACT_DOCUMENTS_PATH_HEIGHT;
+use crate::drive::defaults::{CONTRACT_DOCUMENTS_PATH_HEIGHT, DEFAULT_HASH_SIZE};
 use crate::fee::op::{BaseOp, DeleteOperation, InsertOperation, QueryOperation};
 use crate::query::DriveQuery;
 use enum_map::EnumMap;
-use grovedb::{Element, Error, GroveDb};
+use grovedb::{Element, Error, GroveDb, TransactionArg};
 use std::collections::HashMap;
 use std::path::Path;
-use storage::rocksdb_storage::OptimisticTransactionDBTransaction;
+use crate::drive::DocumentInfo::DocumentSerialization;
+use crate::drive::KeyElementInfo::{KeyElement, KeyElementSize};
+use crate::drive::KeyInfo::{Key, KeySize};
 
 pub struct Drive {
     pub grove: GroveDb,
@@ -22,6 +24,50 @@ pub enum RootTree {
     PublicKeyHashesToIdentities = 2,
     Misc = 3,
 }
+
+pub enum KeyInfo<'a> {
+    /// An ordinary key
+    Key(&'a [u8]),
+    /// A key size
+    KeySize(usize),
+}
+
+impl<'a> KeyInfo<'a>  {
+    pub fn len(&'a self) -> usize {
+        match self {
+            KeyInfo::Key(key) => { key.len()}
+            KeyInfo::KeySize(key_size) => {*key_size}
+        }
+    }
+}
+
+pub enum ElementInfo {
+    /// An element
+    Element(Element),
+    /// An element size
+    ElementSize(usize),
+}
+
+pub enum KeyElementInfo<'a> {
+    /// An element
+    KeyElement((&'a [u8], Element)),
+    /// An element size
+    KeyElementSize((usize,usize)),
+}
+
+pub struct DocumentAndContractInfo<'a> {
+    pub document_info: DocumentInfo<'a>,
+    pub contract: &'a Contract,
+    pub document_type: &'a DocumentType,
+}
+
+pub enum DocumentInfo<'a> {
+    /// An element
+    DocumentSerialization((&'a Document, &'a [u8])),
+    /// An element size
+    DocumentSize(usize),
+}
+
 
 pub const STORAGE_COST: i32 = 50;
 
@@ -47,19 +93,6 @@ impl From<RootTree> for &'static [u8; 1] {
         }
     }
 }
-
-// // split_contract_indices will take an array of indices and construct an array of group indices
-// // grouped indices will group on identical first indices then on identical second indices
-// // if the first index is common and so forth
-// pub fn split_contract_indices(contract_indices : Vec<Vec<Vec<u8>>>) -> HashMap<&[u8], &[u8]> {
-// //    [firstName, lastName]
-// //    [firstName]
-// //    [firstName, lastName, age]
-// //    [age]
-// //    =>
-// //    [firstName : [&[0], {lastName : [&[0], {age : &[0] }]}], age: &[0]],
-// //
-// }
 
 fn contract_root_path(contract_id: &[u8]) -> [&[u8]; 2] {
     [
@@ -143,13 +176,13 @@ fn contract_documents_keeping_history_storage_time_reference_path(
     encoded_time: Vec<u8>,
 ) -> Vec<Vec<u8>> {
     vec![
-        Into::<&[u8; 1]>::into(RootTree::ContractDocuments).to_vec(),
-        contract_id.to_vec(),
-        vec![1],
+        Into::<&[u8; 1]>::into(RootTree::ContractDocuments).to_vec(), // 1 byte
+        contract_id.to_vec(), // 32 bytes
+        vec![1], // 1
         document_type_name.as_bytes().to_vec(),
-        vec![0],
-        document_id.to_vec(),
-        encoded_time,
+        vec![0], // 1
+        document_id.to_vec(), // 32 bytes
+        encoded_time, // 8 bytes
     ]
 }
 
@@ -180,7 +213,7 @@ impl Drive {
 
     pub fn create_root_tree(
         &mut self,
-        transaction: Option<&OptimisticTransactionDBTransaction>,
+        transaction: TransactionArg,
     ) -> Result<(), Error> {
         self.grove.insert(
             [],
@@ -212,24 +245,32 @@ impl Drive {
     fn grove_insert_empty_tree<'a: 'b, 'b, 'c, P>(
         &'a mut self,
         path: P,
-        key: &'c [u8],
-        transaction: Option<&'b OptimisticTransactionDBTransaction>,
+        key_info: KeyInfo,
+        transaction: TransactionArg,
         insert_operations: &mut Vec<InsertOperation>,
     ) -> Result<(), Error>
     where
         P: IntoIterator<Item = &'c [u8]>,
         <P as IntoIterator>::IntoIter: ExactSizeIterator + DoubleEndedIterator + Clone,
     {
-        insert_operations.push(InsertOperation::for_empty_tree(key.len()));
-        self.grove
-            .insert(path, key, Element::empty_tree(), transaction)
+        match key_info {
+            KeyInfo::Key(key) => {
+                insert_operations.push(InsertOperation::for_empty_tree(key.len()));
+                self.grove
+                    .insert(path, key, Element::empty_tree(), transaction)
+            }
+            KeyInfo::KeySize(key_max_length) => {
+                insert_operations.push(InsertOperation::for_empty_tree(key_max_length));
+                Ok(())
+            }
+        }
     }
 
     fn grove_insert_empty_tree_if_not_exists<'a: 'b, 'b, 'c, P>(
         &'a mut self,
         path: P,
-        key: &'c [u8],
-        transaction: Option<&'b OptimisticTransactionDBTransaction>,
+        key_info: KeyInfo,
+        transaction: TransactionArg,
         query_operations: &mut Vec<QueryOperation>,
         insert_operations: &mut Vec<InsertOperation>,
     ) -> Result<bool, Error>
@@ -237,42 +278,57 @@ impl Drive {
         P: IntoIterator<Item = &'c [u8]>,
         <P as IntoIterator>::IntoIter: ExactSizeIterator + DoubleEndedIterator + Clone,
     {
-        let path = path.into_iter();
-        let inserted = self.grove.insert_if_not_exists(
-            path.clone(),
-            key,
-            Element::empty_tree(),
-            transaction,
-        )?;
-        if inserted {
-            insert_operations.push(InsertOperation::for_empty_tree(key.len()));
+        match key_info {
+            KeyInfo::Key(key) => {
+                let path = path.into_iter();
+                let inserted = self.grove.insert_if_not_exists(
+                    path.clone(),
+                    key,
+                    Element::empty_tree(),
+                    transaction,
+                )?;
+                if inserted {
+                    insert_operations.push(InsertOperation::for_empty_tree(key.len()));
+                }
+                query_operations.push(QueryOperation::for_key_check_in_path(key.len(), path));
+                Ok(inserted)
+            }
+            KeyInfo::KeySize(key_max_length) => {
+                insert_operations.push(InsertOperation::for_empty_tree(key_max_length));
+                query_operations.push(QueryOperation::for_key_check_in_path(key_max_length, path));
+                Ok(true)
+            }
         }
-        query_operations.push(QueryOperation::for_key_check_in_path(key, path));
-        Ok(inserted)
     }
 
     fn grove_insert<'a: 'b, 'b, 'c, P>(
         &'a mut self,
         path: P,
-        key: &'c [u8],
-        element: Element,
-        transaction: Option<&'b OptimisticTransactionDBTransaction>,
+        key_element_info: KeyElementInfo,
+        transaction: TransactionArg,
         insert_operations: &mut Vec<InsertOperation>,
     ) -> Result<(), Error>
     where
         P: IntoIterator<Item = &'c [u8]>,
         <P as IntoIterator>::IntoIter: ExactSizeIterator + DoubleEndedIterator + Clone,
     {
-        insert_operations.push(InsertOperation::for_key_value(key.len(), &element));
-        self.grove.insert(path, key, element, transaction)
+        match key_element_info {
+            KeyElementInfo::KeyElement((key, element)) => {
+                insert_operations.push(InsertOperation::for_key_value(key.len(), &element));
+                self.grove.insert(path, key, element, transaction)
+            }
+            KeyElementInfo::KeyElementSize((key_max_length, element_max_size)) => {
+                insert_operations.push(InsertOperation::for_key_value_size(key_max_length, element_max_size));
+                Ok(())
+            }
+        }
     }
 
     fn grove_insert_if_not_exists<'a: 'b, 'b, 'c, P>(
         &'a mut self,
         path: P,
-        key: &'c [u8],
-        element: Element,
-        transaction: Option<&'b OptimisticTransactionDBTransaction>,
+        key_element_info: KeyElementInfo,
+        transaction: TransactionArg,
         query_operations: &mut Vec<QueryOperation>,
         insert_operations: &mut Vec<InsertOperation>,
     ) -> Result<bool, Error>
@@ -280,36 +336,52 @@ impl Drive {
         P: IntoIterator<Item = &'c [u8]>,
         <P as IntoIterator>::IntoIter: ExactSizeIterator + DoubleEndedIterator + Clone,
     {
-        let path_iter = path.into_iter();
-        let insert_operation = InsertOperation::for_key_value(key.len(), &element);
-        let query_operation = QueryOperation::for_key_check_in_path(key, path_iter.clone());
-        let inserted = self
-            .grove
-            .insert_if_not_exists(path_iter, key, element, transaction)?;
-        if inserted {
-            insert_operations.push(insert_operation);
+        match key_element_info {
+            KeyElementInfo::KeyElement((key, element)) => {
+                let path_iter = path.into_iter();
+                let insert_operation = InsertOperation::for_key_value(key.len(), &element);
+                let query_operation = QueryOperation::for_key_check_in_path(key, path_iter.clone());
+                let inserted = self
+                    .grove
+                    .insert_if_not_exists(path_iter, key, element, transaction)?;
+                if inserted {
+                    insert_operations.push(insert_operation);
+                }
+                query_operations.push(query_operation);
+                Ok(inserted)
+            }
+            KeyElementInfo::KeyElementSize((key_max_length, element_max_size)) => {
+                let path_iter = path.into_iter();
+                let insert_operation = InsertOperation::for_key_value_size(key_max_length, element_max_size);
+                let query_operation = QueryOperation::for_key_check_in_path(key_max_length, path_iter.clone());
+                insert_operations.push(insert_operation);
+                query_operations.push(query_operation);
+                Ok(true)
+            }
         }
-        query_operations.push(query_operation);
-        Ok(inserted)
     }
 
     fn grove_get<'a: 'b, 'b, 'c, P>(
         &'a mut self,
         path: P,
-        key: &'c [u8],
-        transaction: Option<&'b OptimisticTransactionDBTransaction>,
+        key_info: KeyInfo,
+        transaction: TransactionArg,
         query_operations: &mut Vec<QueryOperation>,
-    ) -> Result<Element, Error>
+    ) -> Result<Option<Element>, Error>
     where
         P: IntoIterator<Item = &'c [u8]>,
         <P as IntoIterator>::IntoIter: ExactSizeIterator + DoubleEndedIterator + Clone,
     {
         let path_iter = path.into_iter();
         query_operations.push(QueryOperation::for_key_check_in_path(
-            key,
+            key_info.len(),
             path_iter.clone(),
         ));
-        self.grove.get(path_iter, key, transaction)
+        if let Key(key) = key_info {
+            Ok(Some(self.grove.get(path_iter, key, transaction)?))
+        } else {
+            Ok(None)
+        }
     }
 
     fn add_contract_to_storage(
@@ -317,15 +389,14 @@ impl Drive {
         contract_bytes: Element,
         contract: &Contract,
         block_time: f64,
-        transaction: Option<&OptimisticTransactionDBTransaction>,
+        transaction: TransactionArg,
         insert_operations: &mut Vec<InsertOperation>,
     ) -> Result<(), Error> {
         let contract_root_path = contract_root_path(&contract.id);
         if contract.keeps_history {
-            self.grove_insert(
+            self.grove_insert_empty_tree(
                 contract_root_path,
-                &[0],
-                Element::empty_tree(),
+                Key(&[0]),
                 transaction,
                 insert_operations,
             )?;
@@ -334,8 +405,7 @@ impl Drive {
                 contract_keeping_history_storage_path(&contract.id);
             self.grove_insert(
                 contract_keeping_history_storage_path,
-                encoded_time.as_slice(),
-                contract_bytes,
+                KeyElement((encoded_time.as_slice(), contract_bytes)),
                 transaction,
                 insert_operations,
             )?;
@@ -345,8 +415,7 @@ impl Drive {
                 contract_keeping_history_storage_time_reference_path(&contract.id, encoded_time);
             self.grove_insert(
                 contract_keeping_history_storage_path,
-                &[0],
-                Element::Reference(contract_storage_path),
+                KeyElement((&[0], Element::Reference(contract_storage_path))),
                 transaction,
                 insert_operations,
             )?;
@@ -354,8 +423,7 @@ impl Drive {
             // the contract is just stored at key 0
             self.grove_insert(
                 contract_root_path,
-                &[0],
-                contract_bytes,
+                KeyElement((&[0], contract_bytes)),
                 transaction,
                 insert_operations,
             )?;
@@ -368,12 +436,12 @@ impl Drive {
         contract_bytes: Element,
         contract: &Contract,
         block_time: f64,
-        transaction: Option<&OptimisticTransactionDBTransaction>,
+        transaction: TransactionArg,
         insert_operations: &mut Vec<InsertOperation>,
     ) -> Result<(), Error> {
         self.grove_insert_empty_tree(
             [Into::<&[u8; 1]>::into(RootTree::ContractDocuments).as_slice()],
-            contract.id.as_slice(),
+            Key(contract.id.as_slice()),
             transaction,
             insert_operations,
         )?;
@@ -388,7 +456,7 @@ impl Drive {
 
         // the documents
         let contract_root_path = contract_root_path(&contract.id);
-        self.grove_insert_empty_tree(contract_root_path, &[1], transaction, insert_operations)?;
+        self.grove_insert_empty_tree(contract_root_path, Key(&[1]), transaction, insert_operations)?;
 
         // next we should store each document type
         // right now we are referring them by name
@@ -398,7 +466,7 @@ impl Drive {
         for (type_key, document_type) in &contract.document_types {
             self.grove_insert_empty_tree(
                 contract_documents_path,
-                type_key.as_bytes(),
+                Key(type_key.as_bytes()),
                 transaction,
                 insert_operations,
             )?;
@@ -411,21 +479,21 @@ impl Drive {
             ];
 
             // primary key tree
-            self.grove_insert_empty_tree(type_path, &[0], transaction, insert_operations)?;
+            self.grove_insert_empty_tree(type_path, Key(&[0]), transaction, insert_operations)?;
 
             // for each type we should insert the indices that are top level
             for index in document_type.top_level_indices()? {
                 // toDo: change this to be a reference by index
                 self.grove_insert_empty_tree(
                     type_path,
-                    index.name.as_bytes(),
+                    Key(index.name.as_bytes()),
                     transaction,
                     insert_operations,
                 )?;
             }
         }
 
-        Ok(cost)
+        Ok(())
     }
 
     fn update_contract(
@@ -434,7 +502,7 @@ impl Drive {
         contract: &Contract,
         original_contract: &Contract,
         block_time: f64,
-        transaction: Option<&OptimisticTransactionDBTransaction>,
+        transaction: TransactionArg,
         query_operations: &mut Vec<QueryOperation>,
         insert_operations: &mut Vec<InsertOperation>,
     ) -> Result<(), Error> {
@@ -511,10 +579,9 @@ impl Drive {
                 // for each type we should insert the indices that are top level
                 for index in document_type.top_level_indices()? {
                     // toDo: we can save a little by only inserting on new indexes
-                    self.grove_insert_if_not_exists(
+                    self.grove_insert_empty_tree_if_not_exists(
                         type_path,
-                        index.name.as_bytes(),
-                        Element::empty_tree(),
+                        Key(index.name.as_bytes()),
                         transaction,
                         query_operations,
                         insert_operations,
@@ -524,7 +591,7 @@ impl Drive {
                 // We can just insert this directly because the original document type already exists
                 self.grove_insert_empty_tree(
                     contract_documents_path,
-                    type_key.as_bytes(),
+                    Key(type_key.as_bytes()),
                     transaction,
                     insert_operations,
                 )?;
@@ -537,14 +604,14 @@ impl Drive {
                 ];
 
                 // primary key tree
-                self.grove_insert_empty_tree(type_path, &[0], transaction, insert_operations)?;
+                self.grove_insert_empty_tree(type_path, Key(&[0]), transaction, insert_operations)?;
 
                 // for each type we should insert the indices that are top level
                 for index in document_type.top_level_indices()? {
                     // toDo: change this to be a reference by index
                     self.grove_insert_empty_tree(
                         type_path,
-                        index.name.as_bytes(),
+                        Key(index.name.as_bytes()),
                         transaction,
                         insert_operations,
                     )?;
@@ -559,7 +626,7 @@ impl Drive {
         &mut self,
         contract_cbor: Vec<u8>,
         block_time: f64,
-        transaction: Option<&OptimisticTransactionDBTransaction>,
+        transaction: TransactionArg,
     ) -> Result<u64, Error> {
         let mut query_operations: Vec<QueryOperation> = vec![];
         let mut insert_operations: Vec<InsertOperation> = vec![];
@@ -572,7 +639,7 @@ impl Drive {
 
         if let Ok(stored_element) = self.grove_get(
             contract_root_path(&contract.id),
-            &[0],
+            Key(&[0]),
             transaction,
             &mut query_operations,
         ) {
@@ -617,28 +684,32 @@ impl Drive {
         Ok(0)
     }
 
+    // If a document isn't sent to this function then we are just calling to know the query and
+    // insert operations
     fn add_document_to_primary_storage(
         &mut self,
-        document_cbor: &[u8],
-        document: &Document,
-        document_type: &DocumentType,
-        contract: &Contract,
+        document_and_contract_info: DocumentAndContractInfo,
         block_time: f64,
         insert_without_check: bool,
-        transaction: Option<&OptimisticTransactionDBTransaction>,
+        transaction: TransactionArg,
         query_operations: &mut Vec<QueryOperation>,
         insert_operations: &mut Vec<InsertOperation>,
     ) -> Result<(), Error> {
         //let mut base_operations : EnumMap<Op, u64> = EnumMap::default();
-
-        let document_element = Element::Item(Vec::from(document_cbor));
+        let contract = document_and_contract_info.contract;
+        let document_type = document_and_contract_info.document_type;
         let primary_key_path =
             contract_documents_primary_key_path(&contract.id, document_type.name.as_str());
         if document_type.documents_keep_history {
+            let key_info = if let DocumentSerialization((document, _)) = document_and_contract_info.document_info {
+                Key(document.id.as_slice())
+            } else {
+                KeySize(32 as usize)
+            };
             // we first insert an empty tree if the document is new
             self.grove_insert_empty_tree_if_not_exists(
                 primary_key_path,
-                document.id.as_slice(),
+                key_info,
                 transaction,
                 query_operations,
                 insert_operations,
@@ -650,34 +721,55 @@ impl Drive {
                     document.id.as_slice(),
                 );
             let encoded_time = crate::contract::types::encode_float(block_time)?;
+            let key_element_info = match document_and_contract_info.document_info {
+                DocumentSerialization((document, document_cbor)) => {
+                    KeyElement((encoded_time.as_slice(), Element::Item(Vec::from(document_cbor))))
+                }
+                DocumentInfo::DocumentSize(max_size) => {
+                    KeyElementSize((8 as usize, max_size))
+                }
+            };
+            let key_element_info = if let Some(document_element) = document_and_contract_info. {
+
+            } else {
+                KeyElementSize((8 as usize, document_type.max_size))
+            };
             self.grove_insert(
                 document_id_in_primary_path,
-                encoded_time.as_slice(),
-                document_element,
+                key_element_info,
                 transaction,
                 insert_operations,
             )?;
 
-            // we should also insert a reference at 0 to the current value
-            let contract_storage_path =
-                contract_documents_keeping_history_storage_time_reference_path(
-                    &contract.id,
-                    document_type.name.as_str(),
-                    document.id.as_slice(),
-                    encoded_time,
-                );
+            let key_element_info = if let Some(document) = document {
+                // we should also insert a reference at 0 to the current value
+                let contract_storage_path =
+                    contract_documents_keeping_history_storage_time_reference_path(
+                        &contract.id,
+                        document_type.name.as_str(),
+                        document.id.as_slice(),
+                        encoded_time,
+                    );
+                KeyElement((&[0], Element::Reference(contract_storage_path)))
+            } else {
+                KeyElementSize((1, crate::drive::defaults::BASE_CONTRACT_DOCUMENTS_KEEPING_HISTORY_STORAGE_TIME_REFERENCE_PATH + document_type.name.len()))
+            };
+
             self.grove_insert(
                 document_id_in_primary_path,
-                &[0],
-                Element::Reference(contract_storage_path),
+                key_element_info,
                 transaction,
                 insert_operations,
             )?;
         } else if insert_without_check {
+            let key_element_info = if let Some(document_element) = document_element {
+                KeyElement((document.id.as_slice(), document_element))
+            } else {
+                KeyElementSize((DEFAULT_HASH_SIZE, crate::drive::defaults::BASE_CONTRACT_DOCUMENTS_KEEPING_HISTORY_STORAGE_TIME_REFERENCE_PATH + document_type.name.len()))
+            };
             self.grove_insert(
                 primary_key_path,
-                document.id.as_slice(),
-                document_element,
+                key_element_info,
                 transaction,
                 insert_operations,
             )?;
@@ -709,7 +801,7 @@ impl Drive {
         owner_id: Option<&[u8]>,
         override_document: bool,
         block_time: f64,
-        transaction: Option<&OptimisticTransactionDBTransaction>,
+        transaction: TransactionArg,
     ) -> Result<u64, Error> {
         let contract = Contract::from_cbor(contract_cbor)?;
 
@@ -735,7 +827,7 @@ impl Drive {
         owner_id: Option<&[u8]>,
         override_document: bool,
         block_time: f64,
-        transaction: Option<&OptimisticTransactionDBTransaction>,
+        transaction: TransactionArg,
     ) -> Result<u64, Error> {
         let document = Document::from_cbor(document_cbor, None, owner_id)?;
 
@@ -760,7 +852,7 @@ impl Drive {
         owner_id: Option<&[u8]>,
         override_document: bool,
         block_time: f64,
-        transaction: Option<&OptimisticTransactionDBTransaction>,
+        transaction: TransactionArg,
     ) -> Result<u64, Error> {
         let mut query_operations: Vec<QueryOperation> = vec![];
         let mut insert_operations: Vec<InsertOperation> = vec![];
@@ -788,7 +880,7 @@ impl Drive {
         owner_id: Option<&[u8]>,
         override_document: bool,
         block_time: f64,
-        transaction: Option<&OptimisticTransactionDBTransaction>,
+        transaction: TransactionArg,
         query_operations: &mut Vec<QueryOperation>,
         insert_operations: &mut Vec<InsertOperation>,
     ) -> Result<(), Error> {
@@ -1004,7 +1096,7 @@ impl Drive {
         document_type: &str,
         owner_id: Option<&[u8]>,
         block_time: f64,
-        transaction: Option<&OptimisticTransactionDBTransaction>,
+        transaction: TransactionArg,
     ) -> Result<u64, Error> {
         let contract = Contract::from_cbor(contract_cbor)?;
 
@@ -1028,7 +1120,7 @@ impl Drive {
         document_type: &str,
         owner_id: Option<&[u8]>,
         block_time: f64,
-        transaction: Option<&OptimisticTransactionDBTransaction>,
+        transaction: TransactionArg,
     ) -> Result<u64, Error> {
         let document = Document::from_cbor(document_cbor, None, owner_id)?;
 
@@ -1051,7 +1143,7 @@ impl Drive {
         document_type_name: &str,
         owner_id: Option<&[u8]>,
         block_time: f64,
-        transaction: Option<&OptimisticTransactionDBTransaction>,
+        transaction: TransactionArg,
     ) -> Result<u64, Error> {
         let mut query_operations: Vec<QueryOperation> = vec![];
         let mut insert_operations: Vec<InsertOperation> = vec![];
@@ -1071,13 +1163,13 @@ impl Drive {
 
     fn update_document_for_contract_operations(
         &mut self,
-        document: &Document,
+        document: Option<&Document>,
         document_cbor: &[u8],
         contract: &Contract,
         document_type_name: &str,
         owner_id: Option<&[u8]>,
         block_time: f64,
-        transaction: Option<&OptimisticTransactionDBTransaction>,
+        transaction: TransactionArg,
         query_operations: &mut Vec<QueryOperation>,
         insert_operations: &mut Vec<InsertOperation>,
     ) -> Result<(), Error> {
@@ -1379,7 +1471,7 @@ impl Drive {
         contract_cbor: &[u8],
         document_type_name: &str,
         owner_id: Option<&[u8]>,
-        transaction: Option<&OptimisticTransactionDBTransaction>,
+        transaction: TransactionArg,
     ) -> Result<u64, Error> {
         let contract = Contract::from_cbor(contract_cbor)?;
         self.delete_document_for_contract(
@@ -1397,7 +1489,7 @@ impl Drive {
         contract: &Contract,
         document_type_name: &str,
         owner_id: Option<&[u8]>,
-        transaction: Option<&OptimisticTransactionDBTransaction>,
+        transaction: TransactionArg,
         query_operations: &mut Vec<QueryOperation>,
         delete_operations: &mut Vec<DeleteOperation>,
     ) -> Result<u64, Error> {
@@ -1538,7 +1630,7 @@ impl Drive {
         contract_cbor: &[u8],
         document_type_name: String,
         query_cbor: &[u8],
-        transaction: Option<&OptimisticTransactionDBTransaction>,
+        transaction: TransactionArg,
     ) -> Result<(Vec<Vec<u8>>, u16), Error> {
         let contract = Contract::from_cbor(contract_cbor)?;
 
@@ -1552,7 +1644,7 @@ impl Drive {
         contract: &Contract,
         document_type: &DocumentType,
         query_cbor: &[u8],
-        transaction: Option<&OptimisticTransactionDBTransaction>,
+        transaction: TransactionArg,
     ) -> Result<(Vec<Vec<u8>>, u16), Error> {
         let query = DriveQuery::from_cbor(query_cbor, contract, document_type)?;
 
