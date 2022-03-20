@@ -206,10 +206,10 @@ impl Drive {
     }
 
     fn grove_insert_empty_tree<'a: 'b, 'b, 'c, P>(
-        &'a mut self,
+        &'a self,
         path: P,
         key: &'c [u8],
-        transaction: Option<&'b OptimisticTransactionDBTransaction>,
+        transaction: TransactionArg,
         insert_operations: &mut Vec<InsertOperation>,
     ) -> Result<(), Error>
     where
@@ -222,10 +222,10 @@ impl Drive {
     }
 
     fn grove_insert_empty_tree_if_not_exists<'a: 'b, 'b, 'c, P>(
-        &'a mut self,
+        &'a self,
         path: P,
         key: &'c [u8],
-        transaction: Option<&'b OptimisticTransactionDBTransaction>,
+        transaction: TransactionArg,
         query_operations: &mut Vec<QueryOperation>,
         insert_operations: &mut Vec<InsertOperation>,
     ) -> Result<bool, Error>
@@ -248,11 +248,11 @@ impl Drive {
     }
 
     fn grove_insert<'a: 'b, 'b, 'c, P>(
-        &'a mut self,
+        &'a self,
         path: P,
         key: &'c [u8],
         element: Element,
-        transaction: Option<&'b OptimisticTransactionDBTransaction>,
+        transaction: TransactionArg,
         insert_operations: &mut Vec<InsertOperation>,
     ) -> Result<(), Error>
     where
@@ -264,11 +264,11 @@ impl Drive {
     }
 
     fn grove_insert_if_not_exists<'a: 'b, 'b, 'c, P>(
-        &'a mut self,
+        &'a self,
         path: P,
         key: &'c [u8],
         element: Element,
-        transaction: Option<&'b OptimisticTransactionDBTransaction>,
+        transaction: TransactionArg,
         query_operations: &mut Vec<QueryOperation>,
         insert_operations: &mut Vec<InsertOperation>,
     ) -> Result<bool, Error>
@@ -290,10 +290,10 @@ impl Drive {
     }
 
     fn grove_get<'a: 'b, 'b, 'c, P>(
-        &'a mut self,
+        &'a self,
         path: P,
         key: &'c [u8],
-        transaction: Option<&'b OptimisticTransactionDBTransaction>,
+        transaction: TransactionArg,
         query_operations: &mut Vec<QueryOperation>,
     ) -> Result<Element, Error>
     where
@@ -421,7 +421,7 @@ impl Drive {
             }
         }
 
-        Ok(cost)
+        Ok(())
     }
 
     fn update_contract(
@@ -466,13 +466,8 @@ impl Drive {
             ));
         }
 
-        let contract_root_path = contract_root_path(&contract.id);
-
-        // todo handle cost calculation
-        let mut cost: u64 = 0;
-
         // this will override the previous contract if we do not keep history
-        cost += self.add_contract_to_storage(
+        self.add_contract_to_storage(
             contract_bytes,
             contract,
             block_time,
@@ -775,7 +770,7 @@ impl Drive {
     }
 
     fn add_document_for_contract_operations(
-        &mut self,
+        &self,
         document: &Document,
         document_cbor: &[u8],
         contract: &Contract,
@@ -783,7 +778,7 @@ impl Drive {
         owner_id: Option<&[u8]>,
         override_document: bool,
         block_time: f64,
-        transaction: Option<&OptimisticTransactionDBTransaction>,
+        transaction: TransactionArg,
         query_operations: &mut Vec<QueryOperation>,
         insert_operations: &mut Vec<InsertOperation>,
     ) -> Result<(), Error> {
@@ -1065,14 +1060,14 @@ impl Drive {
     }
 
     fn update_document_for_contract_operations(
-        &mut self,
+        &self,
         document: &Document,
         document_cbor: &[u8],
         contract: &Contract,
         document_type_name: &str,
         owner_id: Option<&[u8]>,
         block_time: f64,
-        transaction: Option<&OptimisticTransactionDBTransaction>,
+        transaction: TransactionArg,
         query_operations: &mut Vec<QueryOperation>,
         insert_operations: &mut Vec<InsertOperation>,
     ) -> Result<(), Error> {
@@ -1377,13 +1372,17 @@ impl Drive {
         owner_id: Option<&[u8]>,
         transaction: TransactionArg,
     ) -> Result<u64, Error> {
+        let mut query_operations: Vec<QueryOperation> = vec![];
+        let mut delete_operations: Vec<DeleteOperation> = vec![];
         let contract = Contract::from_cbor(contract_cbor)?;
-        self.delete_document_for_contract(
+        self.delete_document_for_contract_operations(
             document_id,
             &contract,
             document_type_name,
             owner_id,
             transaction,
+            &mut query_operations,
+            &mut delete_operations,
         )
     }
 

@@ -137,7 +137,7 @@ impl InsertOperation {
     }
 
     pub fn storage_cost(&self) -> i64 {
-        self.data_size() as i64 * STORAGE_CREDIT_PER_BYTE
+        self.data_size() as i64 * STORAGE_CREDIT_PER_BYTE as i64
     }
 }
 
@@ -174,6 +174,6 @@ impl DeleteOperation {
     }
 
     pub fn storage_cost(&self) -> i64 {
-        -self.data_size() as i64 * STORAGE_CREDIT_PER_BYTE
+        -(self.data_size() as i64 * STORAGE_CREDIT_PER_BYTE as i64)
     }
 }
