@@ -5,7 +5,7 @@ use std::fs::File;
 use std::io;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
-use storage::rocksdb_storage::OptimisticTransactionDBTransaction;
+use grovedb::TransactionArg;
 
 pub fn setup_contract(
     drive: &mut Drive,
@@ -13,6 +13,19 @@ pub fn setup_contract(
     transaction: TransactionArg,
 ) -> Contract {
     let contract_cbor = json_document_to_cbor(path, Some(crate::drive::defaults::PROTOCOL_VERSION));
+    let contract = Contract::from_cbor(&contract_cbor).expect("contract should be deserialized");
+    drive
+        .apply_contract(contract_cbor, 0f64, transaction)
+        .expect("contract should be applied");
+    contract
+}
+
+pub fn setup_contract_from_hex(
+    drive: &Drive,
+    hex_string: String,
+    transaction: TransactionArg,
+) -> Contract {
+    let contract_cbor = cbor_from_hex(hex_string);
     let contract = Contract::from_cbor(&contract_cbor).expect("contract should be deserialized");
     drive
         .apply_contract(contract_cbor, 0f64, transaction)
@@ -34,6 +47,12 @@ pub fn value_to_cbor(value: serde_json::Value, protocol_version: Option<u32>) ->
     }
     ciborium::ser::into_writer(&value, &mut buffer).expect("unable to serialize into cbor");
     buffer
+}
+
+pub fn cbor_from_hex(hex_string: String) -> Vec<u8> {
+    let decoded = hex::decode(hex_string).expect("Decoding failed");
+
+    decoded
 }
 
 pub fn text_file_strings(path: impl AsRef<Path>) -> Vec<String> {
