@@ -1364,6 +1364,27 @@ impl Drive {
         Ok(())
     }
 
+    pub fn delete_document_for_contract(
+        &self,
+        document_id: &[u8],
+        contract: &Contract,
+        document_type_name: &str,
+        owner_id: Option<&[u8]>,
+        transaction: TransactionArg,
+    ) -> Result<u64, Error> {
+        let mut query_operations: Vec<QueryOperation> = vec![];
+        let mut delete_operations: Vec<DeleteOperation> = vec![];
+        self.delete_document_for_contract_operations(
+            document_id,
+            &contract,
+            document_type_name,
+            owner_id,
+            transaction,
+            &mut query_operations,
+            &mut delete_operations,
+        )
+    }
+
     pub fn delete_document_for_contract_cbor(
         &self,
         document_id: &[u8],
