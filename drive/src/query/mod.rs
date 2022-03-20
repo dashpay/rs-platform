@@ -6,7 +6,7 @@ use crate::query::WhereOperator::{
     GreaterThanOrEquals, In, LessThan, LessThanOrEquals, StartsWith,
 };
 use ciborium::value::{Integer, Value as CborValue, Value};
-use grovedb::{Element, Error, GroveDb, PathQuery, Query, SizedQuery};
+use grovedb::{Element, Error, GroveDb, PathQuery, Query, QueryItem, SizedQuery, TransactionArg};
 use indexmap::IndexMap;
 use sqlparser::ast;
 use sqlparser::ast::TableFactor::Table;
@@ -16,7 +16,6 @@ use sqlparser::dialect::GenericDialect;
 use sqlparser::parser::Parser;
 use std::collections::HashMap;
 use std::ops::BitXor;
-use storage::rocksdb_storage::OptimisticTransactionDBTransaction;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum WhereOperator {
@@ -1246,7 +1245,7 @@ impl<'a> DriveQuery<'a> {
     pub fn construct_path_query(
         &self,
         grove: &GroveDb,
-        transaction: Option<&OptimisticTransactionDBTransaction>,
+        transaction: TransactionArg,
     ) -> Result<PathQuery, Error> {
         // First we should get the overall document_type_path
         let document_type_path = self
@@ -1579,6 +1578,16 @@ impl<'a> DriveQuery<'a> {
                         match unique {
                             true => {
                                 query.set_subquery_key(vec![0]);
+
+                                // In the case things are NULL we allow to have multiple values
+                                let mut full_query = Query::new();
+                                full_query.insert_all();
+
+                                query.add_conditional_subquery(
+                                    QueryItem::Key(b"".to_vec()),
+                                    Some(vec![0]),
+                                    Some(full_query),
+                                );
                             }
                             false => {
                                 query.set_subquery_key(vec![0]);
@@ -1692,16 +1701,16 @@ impl<'a> DriveQuery<'a> {
 
     pub fn execute_with_proof(
         self,
-        _grove: &mut GroveDb,
-        _transaction: Option<&OptimisticTransactionDBTransaction>,
+        _grove: &GroveDb,
+        _transaction: TransactionArg,
     ) -> Result<Vec<u8>, Error> {
         todo!()
     }
 
     pub fn execute_no_proof(
         &self,
-        grove: &mut GroveDb,
-        transaction: Option<&OptimisticTransactionDBTransaction>,
+        grove: &GroveDb,
+        transaction: TransactionArg,
     ) -> Result<(Vec<Vec<u8>>, u16), Error> {
         let path_query = self.construct_path_query(grove, transaction)?;
 

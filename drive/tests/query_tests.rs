@@ -2,13 +2,16 @@ use grovedb::Error;
 use rand::seq::SliceRandom;
 use rand::{Rng, SeedableRng};
 use rs_drive::common;
+use rs_drive::common::setup_contract;
 use rs_drive::contract::{Contract, Document};
 use rs_drive::drive::Drive;
 use rs_drive::query::DriveQuery;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashMap;
-use tempdir::TempDir;
+use std::fs::File;
+use std::io::{self, BufRead};
+use tempfile::TempDir;
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -49,16 +52,63 @@ impl Person {
     }
 }
 
-pub fn setup_family_tests(count: u32, seed: u64) -> (Drive, Contract, TempDir) {
-    let tmp_dir = TempDir::new("family").unwrap();
-    let mut drive: Drive = Drive::open(&tmp_dir).expect("expected to open Drive successfully");
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PersonWithOptionalValues {
+    #[serde(rename = "$id")]
+    id: Vec<u8>,
+    #[serde(rename = "$ownerId")]
+    owner_id: Vec<u8>,
+    first_name: Option<String>,
+    middle_name: Option<String>,
+    last_name: Option<String>,
+    age: u8,
+}
 
-    let storage = drive.grove.storage();
-    let db_transaction = storage.transaction();
-    drive
-        .grove
-        .start_transaction()
-        .expect("expected to start transaction successfully");
+impl PersonWithOptionalValues {
+    fn random_people(count: u32, seed: u64) -> Vec<Self> {
+        let first_names =
+            common::text_file_strings("tests/supporting_files/contract/family/first-names.txt");
+        let middle_names =
+            common::text_file_strings("tests/supporting_files/contract/family/middle-names.txt");
+        let last_names =
+            common::text_file_strings("tests/supporting_files/contract/family/last-names.txt");
+        let mut vec: Vec<PersonWithOptionalValues> = Vec::with_capacity(count as usize);
+
+        let mut rng = rand::rngs::StdRng::seed_from_u64(seed);
+        for _ in 0..count {
+            let value = rng.gen::<u8>();
+            let person = PersonWithOptionalValues {
+                id: Vec::from(rng.gen::<[u8; 32]>()),
+                owner_id: Vec::from(rng.gen::<[u8; 32]>()),
+                first_name: if value & 1 != 0 {
+                    Some(first_names.choose(&mut rng).unwrap().clone())
+                } else {
+                    None
+                },
+                middle_name: if value & 2 != 0 {
+                    Some(middle_names.choose(&mut rng).unwrap().clone())
+                } else {
+                    None
+                },
+                last_name: if value & 4 != 0 {
+                    Some(last_names.choose(&mut rng).unwrap().clone())
+                } else {
+                    None
+                },
+                age: rng.gen_range(0..85),
+            };
+            vec.push(person);
+        }
+        vec
+    }
+}
+
+pub fn setup_family_tests(count: u32, seed: u64) -> (Drive, Contract, TempDir) {
+    let tmp_dir = TempDir::new().unwrap();
+    let drive: Drive = Drive::open(&tmp_dir).expect("expected to open Drive successfully");
+
+    let db_transaction = drive.grove.start_transaction();
 
     drive
         .create_root_tree(Some(&db_transaction))
@@ -66,12 +116,56 @@ pub fn setup_family_tests(count: u32, seed: u64) -> (Drive, Contract, TempDir) {
 
     // setup code
     let contract = common::setup_contract(
-        &mut drive,
+        &drive,
         "tests/supporting_files/contract/family/family-contract.json",
         Some(&db_transaction),
     );
 
     let people = Person::random_people(count, seed);
+    for person in people {
+        let value = serde_json::to_value(&person).expect("serialized person");
+        let document_cbor =
+            common::value_to_cbor(value, Some(rs_drive::drive::defaults::PROTOCOL_VERSION));
+        let document = Document::from_cbor(document_cbor.as_slice(), None, None)
+            .expect("document should be properly deserialized");
+        drive
+            .add_document_for_contract(
+                &document,
+                &document_cbor,
+                &contract,
+                "person",
+                None,
+                true,
+                0f64,
+                Some(&db_transaction),
+            )
+            .expect("document should be inserted");
+    }
+    drive
+        .grove
+        .commit_transaction(db_transaction)
+        .expect("transaction should be committed");
+    (drive, contract, tmp_dir)
+}
+
+pub fn setup_family_tests_with_nulls(count: u32, seed: u64) -> (Drive, Contract, TempDir) {
+    let tmp_dir = TempDir::new().unwrap();
+    let drive: Drive = Drive::open(&tmp_dir).expect("expected to open Drive successfully");
+
+    let db_transaction = drive.grove.start_transaction();
+
+    drive
+        .create_root_tree(Some(&db_transaction))
+        .expect("expected to create root tree successfully");
+
+    // setup code
+    let contract = common::setup_contract(
+        &drive,
+        "tests/supporting_files/contract/family/family-contract.json",
+        Some(&db_transaction),
+    );
+
+    let people = PersonWithOptionalValues::random_people(count, seed);
     for person in people {
         let value = serde_json::to_value(&person).expect("serialized person");
         let document_cbor =
@@ -130,7 +224,7 @@ impl Domain {
         let mut vec: Vec<Domain> = Vec::with_capacity(count as usize);
 
         let mut rng = rand::rngs::StdRng::seed_from_u64(seed);
-        for i in 0..count {
+        for _i in 0..count {
             let label = first_names.choose(&mut rng).unwrap();
             let domain = Domain {
                 id: Vec::from(rng.gen::<[u8; 32]>()),
@@ -151,15 +245,10 @@ impl Domain {
 }
 
 pub fn setup_dpns_tests(count: u32, seed: u64) -> (Drive, Contract, TempDir) {
-    let tmp_dir = TempDir::new("dpns").unwrap();
-    let mut drive: Drive = Drive::open(&tmp_dir).expect("expected to open Drive successfully");
+    let tmp_dir = TempDir::new().unwrap();
+    let drive: Drive = Drive::open(&tmp_dir).expect("expected to open Drive successfully");
 
-    let storage = drive.grove.storage();
-    let db_transaction = storage.transaction();
-    drive
-        .grove
-        .start_transaction()
-        .expect("expected to start transaction successfully");
+    let db_transaction = drive.grove.start_transaction();
 
     drive
         .create_root_tree(Some(&db_transaction))
@@ -167,7 +256,7 @@ pub fn setup_dpns_tests(count: u32, seed: u64) -> (Drive, Contract, TempDir) {
 
     // setup code
     let contract = common::setup_contract(
-        &mut drive,
+        &drive,
         "tests/supporting_files/contract/dpns/dpns-contract.json",
         Some(&db_transaction),
     );
@@ -187,6 +276,7 @@ pub fn setup_dpns_tests(count: u32, seed: u64) -> (Drive, Contract, TempDir) {
                 "domain",
                 None,
                 true,
+                0f64,
                 Some(&db_transaction),
             )
             .expect("document should be inserted");
@@ -198,12 +288,63 @@ pub fn setup_dpns_tests(count: u32, seed: u64) -> (Drive, Contract, TempDir) {
     (drive, contract, tmp_dir)
 }
 
+pub fn setup_dpns_test_with_data(path: &str) -> (Drive, Contract, TempDir) {
+    let tmp_dir = TempDir::new().unwrap();
+    let drive: Drive = Drive::open(&tmp_dir).expect("expected to open Drive successfully");
+
+    let db_transaction = drive.grove.start_transaction();
+
+    drive
+        .create_root_tree(Some(&db_transaction))
+        .expect("expected to create root tree successfully");
+
+    let contract = setup_contract(
+        &drive,
+        "tests/supporting_files/contract/dpns/dpns-contract.json",
+        Some(&db_transaction),
+    );
+
+    let file = File::open(path).expect("should read domains from file");
+
+    for line in io::BufReader::new(file).lines() {
+        if let Ok(domain_json) = line {
+            let domain_json: serde_json::Value =
+                serde_json::from_str(&domain_json).expect("should parse json");
+
+            let domain_cbor = common::value_to_cbor(
+                domain_json,
+                Some(rs_drive::drive::defaults::PROTOCOL_VERSION),
+            );
+
+            let domain = Document::from_cbor(&domain_cbor, None, None)
+                .expect("expected to deserialize the document");
+
+            drive
+                .add_document_for_contract(
+                    &domain,
+                    &domain_cbor,
+                    &contract,
+                    "domain",
+                    None,
+                    false,
+                    0f64,
+                    Some(&db_transaction),
+                )
+                .expect("expected to insert a document successfully");
+        }
+    }
+    drive
+        .grove
+        .commit_transaction(db_transaction)
+        .expect("transaction should be committed");
+    (drive, contract, tmp_dir)
+}
+
 #[test]
 #[ignore]
 fn test_query_many() {
-    let (mut drive, contract, _tmp_dir) = setup(1600, 73509);
-    let storage = drive.grove.storage();
-    let db_transaction = storage.transaction();
+    let (drive, contract, _tmp_dir) = setup_family_tests(1600, 73509);
+    let db_transaction = drive.grove.start_transaction();
     let people = Person::random_people(10, 73409);
     for person in people {
         let value = serde_json::to_value(&person).expect("serialized person");
@@ -232,24 +373,19 @@ fn test_query_many() {
 
 #[test]
 fn test_family_query() {
-    let (mut drive, contract, _tmp_dir) = setup_family_tests(10, 73509);
+    let (drive, contract, _tmp_dir) = setup_family_tests(10, 73509);
 
-    let storage = drive.grove.storage();
-    let db_transaction = storage.transaction();
-    drive
-        .grove
-        .start_transaction()
-        .expect("expected to start transaction");
+    let db_transaction = drive.grove.start_transaction();
 
     let root_hash = drive
         .grove
         .root_hash(Some(&db_transaction))
         .expect("there is always a root hash");
     assert_eq!(
-        root_hash.as_slice(),
+        root_hash.expect("cannot get root hash").as_slice(),
         vec![
             164, 56, 26, 188, 12, 251, 247, 43, 109, 153, 109, 110, 78, 131, 37, 79, 19, 178, 159,
-            69, 35, 250, 159, 210, 2, 125, 12, 103, 50, 40, 108, 114
+            69, 35, 250, 159, 210, 2, 125, 12, 103, 50, 40, 108, 114,
         ]
     );
 
@@ -284,7 +420,7 @@ fn test_family_query() {
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &person_document_type)
         .expect("query should be built");
     let (results, _) = query
-        .execute_no_proof(&mut drive.grove, Some(&db_transaction))
+        .execute_no_proof(&drive.grove, Some(&db_transaction))
         .expect("proof should be executed");
     let names: Vec<String> = results
         .into_iter()
@@ -480,7 +616,7 @@ fn test_family_query() {
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
         .expect("query should be built");
     let (results, _) = query
-        .execute_no_proof(&mut drive.grove, None)
+        .execute_no_proof(&drive.grove, None)
         .expect("proof should be executed");
     let names: Vec<String> = results
         .into_iter()
@@ -525,7 +661,7 @@ fn test_family_query() {
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
         .expect("query should be built");
     let (results, _) = query
-        .execute_no_proof(&mut drive.grove, None)
+        .execute_no_proof(&drive.grove, None)
         .expect("proof should be executed");
     let names: Vec<String> = results
         .into_iter()
@@ -565,7 +701,7 @@ fn test_family_query() {
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
         .expect("query should be built");
     let (results, _) = query
-        .execute_no_proof(&mut drive.grove, None)
+        .execute_no_proof(&drive.grove, None)
         .expect("proof should be executed");
     let names: Vec<String> = results
         .into_iter()
@@ -606,7 +742,7 @@ fn test_family_query() {
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
         .expect("query should be built");
     let (results, _) = query
-        .execute_no_proof(&mut drive.grove, None)
+        .execute_no_proof(&drive.grove, None)
         .expect("proof should be executed");
     assert_eq!(results.len(), 5);
 
@@ -681,7 +817,7 @@ fn test_family_query() {
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
         .expect("query should be built");
     let (results, _) = query
-        .execute_no_proof(&mut drive.grove, None)
+        .execute_no_proof(&drive.grove, None)
         .expect("proof should be executed");
     assert_eq!(results.len(), 3);
 
@@ -730,7 +866,7 @@ fn test_family_query() {
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
         .expect("query should be built");
     let (results, _) = query
-        .execute_no_proof(&mut drive.grove, None)
+        .execute_no_proof(&drive.grove, None)
         .expect("proof should be executed");
     assert_eq!(results.len(), 2);
 
@@ -773,7 +909,7 @@ fn test_family_query() {
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
         .expect("query should be built");
     let (results, _) = query
-        .execute_no_proof(&mut drive.grove, None)
+        .execute_no_proof(&drive.grove, None)
         .expect("proof should be executed");
     let names: Vec<String> = results
         .into_iter()
@@ -810,7 +946,7 @@ fn test_family_query() {
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
         .expect("query should be built");
     let (results, _) = query
-        .execute_no_proof(&mut drive.grove, None)
+        .execute_no_proof(&drive.grove, None)
         .expect("proof should be executed");
     let names: Vec<String> = results
         .into_iter()
@@ -859,7 +995,7 @@ fn test_family_query() {
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
         .expect("query should be built");
     let (results, _) = query
-        .execute_no_proof(&mut drive.grove, None)
+        .execute_no_proof(&drive.grove, None)
         .expect("proof should be executed");
     let names: Vec<String> = results
         .iter()
@@ -907,7 +1043,7 @@ fn test_family_query() {
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
         .expect("query should be built");
     let (results, _) = query
-        .execute_no_proof(&mut drive.grove, None)
+        .execute_no_proof(&drive.grove, None)
         .expect("proof should be executed");
     let names: Vec<String> = results
         .iter()
@@ -1060,7 +1196,6 @@ fn test_family_query() {
         )
         .expect("query should be executed");
 
-    // dbg!(&results);
     assert_eq!(results.len(), 1);
 
     // fetching by $id with order by
@@ -1097,7 +1232,7 @@ fn test_family_query() {
         last_person.id,
         vec![
             76, 161, 17, 201, 152, 232, 129, 48, 168, 13, 49, 10, 218, 53, 118, 136, 165, 198, 189,
-            116, 116, 22, 133, 92, 104, 165, 186, 249, 94, 81, 45, 20
+            116, 116, 22, 133, 92, 104, 165, 186, 249, 94, 81, 45, 20,
         ]
         .as_slice()
     );
@@ -1136,7 +1271,7 @@ fn test_family_query() {
         last_person.id,
         vec![
             140, 161, 17, 201, 152, 232, 129, 48, 168, 13, 49, 10, 218, 53, 118, 136, 165, 198,
-            189, 116, 116, 22, 133, 92, 104, 165, 186, 249, 94, 81, 45, 20
+            189, 116, 116, 22, 133, 92, 104, 165, 186, 249, 94, 81, 45, 20,
         ]
         .as_slice()
     );
@@ -1196,7 +1331,7 @@ fn test_family_query() {
         last_person.id,
         vec![
             249, 170, 70, 122, 181, 31, 35, 176, 175, 131, 70, 150, 250, 223, 194, 203, 175, 200,
-            107, 252, 199, 227, 154, 105, 89, 57, 38, 85, 236, 192, 254, 88
+            107, 252, 199, 227, 154, 105, 89, 57, 38, 85, 236, 192, 254, 88,
         ]
         .as_slice()
     );
@@ -1375,7 +1510,7 @@ fn test_family_query() {
         .root_hash(Some(&db_transaction))
         .expect("there is always a root hash");
     assert_eq!(
-        root_hash.as_slice(),
+        root_hash.expect("cannot get root hash").as_slice(),
         vec![
             10, 188, 94, 203, 19, 207, 167, 237, 34, 159, 113, 240, 54, 221, 246, 234, 48, 238, 82,
             222, 228, 119, 192, 92, 57, 3, 28, 78, 115, 35, 133, 50
@@ -1384,7 +1519,7 @@ fn test_family_query() {
 }
 
 #[test]
-fn test_sql_query() {
+fn test_family_sql_query() {
     // These tests confirm that sql statements produce the same drive query
     // as their json counterparts, tests above confirm that the json queries
     // produce the correct result set
@@ -1521,22 +1656,120 @@ fn test_sql_query() {
 }
 
 #[test]
-fn test_dpns_query() {
-    let (mut drive, contract, tmp_dir) = setup_dpns_tests(10, 11456);
+fn test_family_with_nulls_query() {
+    let (drive, contract, _tmp_dir) = setup_family_tests_with_nulls(10, 30004);
 
-    let storage = drive.grove.storage();
-    let db_transaction = storage.transaction();
-    drive
-        .grove
-        .start_transaction()
-        .expect("expected to start transaction");
+    let db_transaction = drive.grove.start_transaction();
 
     let root_hash = drive
         .grove
         .root_hash(Some(&db_transaction))
         .expect("there is always a root hash");
     assert_eq!(
-        root_hash.as_slice(),
+        root_hash.expect("cannot get root hash").as_slice(),
+        vec![
+            30, 92, 251, 92, 87, 126, 170, 38, 203, 108, 135, 63, 111, 8, 47, 139, 66, 200, 131,
+            138, 14, 100, 152, 43, 233, 142, 148, 45, 42, 81, 202, 176
+        ]
+    );
+
+    let all_names = [
+        "".to_string(),
+        "".to_string(),
+        "".to_string(),
+        "".to_string(),
+        "".to_string(),
+        "".to_string(),
+        "Alexia".to_string(),
+        "Gerti".to_string(),
+        "Latisha".to_string(),
+        "Norry".to_string(),
+    ];
+
+    // A query getting all elements by firstName
+
+    let query_value = json!({
+        "where": [
+        ],
+        "limit": 100,
+        "orderBy": [
+            ["firstName", "asc"]
+        ]
+    });
+    let where_cbor = common::value_to_cbor(query_value, None);
+    let person_document_type = contract
+        .document_types
+        .get("person")
+        .expect("contract should have a person document type");
+    let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &person_document_type)
+        .expect("query should be built");
+    let (results, _) = query
+        .execute_no_proof(&drive.grove, Some(&db_transaction))
+        .expect("proof should be executed");
+    let names: Vec<String> = results
+        .clone()
+        .into_iter()
+        .map(|result| {
+            let document = Document::from_cbor(result.as_slice(), None, None)
+                .expect("we should be able to deserialize the cbor");
+            let first_name_value = document
+                .properties
+                .get("firstName")
+                .expect("we should be able to get the first name");
+            if first_name_value.is_null() {
+                String::from("")
+            } else {
+                let first_name = first_name_value
+                    .as_text()
+                    .expect("the first name should be a string");
+                String::from(first_name)
+            }
+        })
+        .collect();
+
+    assert_eq!(names, all_names);
+
+    let ids: Vec<String> = results
+        .into_iter()
+        .map(|result| {
+            let document = Document::from_cbor(result.as_slice(), None, None)
+                .expect("we should be able to deserialize the cbor");
+            base64::encode(document.id)
+        })
+        .collect();
+
+    for i in 0..10 {
+        drive
+            .delete_document_for_contract(
+                base64::decode(ids.get(i).unwrap())
+                    .expect("expected to decode from base64")
+                    .as_slice(),
+                &contract,
+                "person",
+                None,
+                Some(&db_transaction),
+            )
+            .expect("expected to be able to delete the document");
+    }
+
+    drive
+        .grove
+        .commit_transaction(db_transaction)
+        .expect("unable to commit transaction");
+}
+
+#[test]
+fn test_dpns_query() {
+    let (drive, contract, _tmp_dir) = setup_dpns_tests(10, 11456);
+
+    let db_transaction = drive.grove.start_transaction();
+
+    let root_hash = drive
+        .grove
+        .root_hash(Some(&db_transaction))
+        .expect("there is always a root hash");
+    assert_eq!(
+        root_hash.expect("cannot get root hash").as_slice(),
         vec![
             57, 11, 30, 250, 150, 197, 183, 79, 207, 232, 221, 217, 161, 151, 74, 66, 129, 31, 126,
             111, 232, 47, 94, 84, 246, 13, 195, 76, 72, 6, 229, 33
@@ -1575,7 +1808,7 @@ fn test_dpns_query() {
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &domain_document_type)
         .expect("query should be built");
     let (results, _) = query
-        .execute_no_proof(&mut drive.grove, Some(&db_transaction))
+        .execute_no_proof(&drive.grove, Some(&db_transaction))
         .expect("proof should be executed");
     let names: Vec<String> = results
         .into_iter()
@@ -1615,7 +1848,7 @@ fn test_dpns_query() {
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &domain_document_type)
         .expect("query should be built");
     let (results, _) = query
-        .execute_no_proof(&mut drive.grove, Some(&db_transaction))
+        .execute_no_proof(&drive.grove, Some(&db_transaction))
         .expect("proof should be executed");
     let names: Vec<String> = results
         .clone()
@@ -1684,7 +1917,7 @@ fn test_dpns_query() {
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &domain_document_type)
         .expect("query should be built");
     let (results, _) = query
-        .execute_no_proof(&mut drive.grove, Some(&db_transaction))
+        .execute_no_proof(&drive.grove, Some(&db_transaction))
         .expect("proof should be executed");
     let names: Vec<String> = results
         .into_iter()
@@ -1731,7 +1964,7 @@ fn test_dpns_query() {
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &domain_document_type)
         .expect("query should be built");
     let (results, _) = query
-        .execute_no_proof(&mut drive.grove, Some(&db_transaction))
+        .execute_no_proof(&drive.grove, Some(&db_transaction))
         .expect("proof should be executed");
     let names: Vec<String> = results
         .clone()
@@ -1797,7 +2030,7 @@ fn test_dpns_query() {
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &domain_document_type)
         .expect("query should be built");
     let (results, _) = query
-        .execute_no_proof(&mut drive.grove, Some(&db_transaction))
+        .execute_no_proof(&drive.grove, Some(&db_transaction))
         .expect("proof should be executed");
     let names: Vec<String> = results
         .into_iter()
@@ -1842,7 +2075,7 @@ fn test_dpns_query() {
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &domain_document_type)
         .expect("query should be built");
     let (results, _) = query
-        .execute_no_proof(&mut drive.grove, Some(&db_transaction))
+        .execute_no_proof(&drive.grove, Some(&db_transaction))
         .expect("proof should be executed");
     let names: Vec<String> = results
         .into_iter()
@@ -1863,4 +2096,86 @@ fn test_dpns_query() {
     let a_names = ["minna".to_string(), "marilyn".to_string()];
 
     assert_eq!(names, a_names);
+
+    // A query getting all elements
+
+    let query_value = json!({
+        "orderBy": [
+            ["records.dashUniqueIdentityId", "desc"]
+        ]
+    });
+    let where_cbor = common::value_to_cbor(query_value, None);
+    let domain_document_type = contract
+        .document_types
+        .get("domain")
+        .expect("contract should have a domain document type");
+    let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &domain_document_type)
+        .expect("query should be built");
+    let (results, _) = query
+        .execute_no_proof(&drive.grove, Some(&db_transaction))
+        .expect("proof should be executed");
+
+    assert_eq!(results.len(), 10);
+}
+
+#[test]
+fn test_dpns_insertion_no_aliases() {
+    // using ascending order with rangeTo operators
+    let (drive, contract, _tmp_dir) =
+        setup_dpns_test_with_data("tests/supporting_files/contract/dpns/domains-no-alias.json");
+
+    let db_transaction = drive.grove.start_transaction();
+
+    let query_value = json!({
+        "orderBy": [["records.dashUniqueIdentityId", "desc"]],
+    });
+
+    let query_cbor = common::value_to_cbor(query_value, None);
+
+    let domain_document_type = contract
+        .document_types
+        .get("domain")
+        .expect("contract should have a domain document type");
+
+    let result = drive
+        .query_documents_from_contract(
+            &contract,
+            domain_document_type,
+            query_cbor.as_slice(),
+            Some(&db_transaction),
+        )
+        .expect("should perform query");
+
+    assert_eq!(result.0.len(), 15);
+}
+
+#[test]
+fn test_dpns_insertion_with_aliases() {
+    // using ascending order with rangeTo operators
+    let (drive, contract, _tmp_dir) =
+        setup_dpns_test_with_data("tests/supporting_files/contract/dpns/domains.json");
+
+    let db_transaction = drive.grove.start_transaction();
+
+    let query_value = json!({
+        "orderBy": [["records.dashUniqueIdentityId", "desc"]],
+    });
+
+    let query_cbor = common::value_to_cbor(query_value, None);
+
+    let domain_document_type = contract
+        .document_types
+        .get("domain")
+        .expect("contract should have a domain document type");
+
+    let result = drive
+        .query_documents_from_contract(
+            &contract,
+            domain_document_type,
+            query_cbor.as_slice(),
+            Some(&db_transaction),
+        )
+        .expect("should perform query");
+
+    assert_eq!(result.0.len(), 24);
 }
