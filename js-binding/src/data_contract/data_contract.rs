@@ -1,3 +1,6 @@
+use crate::errors;
+use crate::errors::RustConversionError;
+use crate::{bail_js, with_js_error};
 use dpp::data_contract::DataContract;
 use dpp::util::string_encoding::Encoding;
 pub use serde::{Deserialize, Serialize};
@@ -10,6 +13,7 @@ use crate::identifier::IdentifierWrapper;
 use crate::metadata::MetadataWasm;
 
 #[wasm_bindgen(js_name=DataContract)]
+#[derive(Debug, Clone)]
 pub struct DataContractWasm(DataContract);
 
 impl std::convert::From<DataContract> for DataContractWasm {
@@ -22,8 +26,6 @@ impl std::convert::Into<DataContract> for DataContractWasm {
         self.0
     }
 }
-
-// TODO errors handling
 
 #[wasm_bindgen(js_class=DataContract)]
 impl DataContractWasm {
@@ -77,26 +79,26 @@ impl DataContractWasm {
         self.0.schema.clone()
     }
     #[wasm_bindgen(js_name=setDocuments)]
-    pub fn set_documents(&self, documents: JsValue) {
-        let json_value: Value =
-            JsValue::into_serde(&documents).expect("unable to convert into JSON Value");
+    pub fn set_documents(&self, documents: JsValue) -> Result<(), JsValue> {
+        let json_value: Value = with_js_error!(JsValue::into_serde(&documents))?;
+
         let mut docs: BTreeMap<String, Value> = BTreeMap::new();
         if let Value::Object(o) = json_value {
             for (k, v) in o.into_iter() {
-                // v must be a Object
                 if !v.is_object() {
-                    panic!("{:?} is not an Object", v);
+                    bail_js!("is not an object")
                 }
                 docs.insert(k, v);
             }
         } else {
-            panic!("the parameter is not an Object")
+            bail_js!("the parameter 'documents' is not an JS object")
         }
+        Ok(())
     }
 
     #[wasm_bindgen(js_name=getDocuments)]
-    pub fn get_documents(&self) -> JsValue {
-        JsValue::from_serde(&self.0.documents).expect("unable to convert documents to JSValue")
+    pub fn get_documents(&self) -> Result<JsValue, JsValue> {
+        with_js_error!(JsValue::from_serde(&self.0.documents))
     }
 
     #[wasm_bindgen(js_name=isDocumentDefined)]
@@ -105,53 +107,65 @@ impl DataContractWasm {
     }
 
     #[wasm_bindgen(js_name=setDocumentSchema)]
-    pub fn set_document_schema(&mut self, doc_type: String, schema: JsValue) {
-        let json_schema: Value =
-            JsValue::into_serde(&schema).expect("unable to convert schema into JSON Value");
+    pub fn set_document_schema(
+        &mut self,
+        doc_type: String,
+        schema: JsValue,
+    ) -> Result<(), JsValue> {
+        let json_schema: Value = with_js_error!(JsValue::into_serde(&schema))?;
         self.0.documents.insert(doc_type, json_schema);
+        Ok(())
     }
 
     #[wasm_bindgen(js_name=getDocumentSchema)]
-    pub fn get_document_schema(&mut self, doc_type: &str) -> JsValue {
-        JsValue::from_serde(
-            self.0
-                .get_document_schema(doc_type)
-                .expect("unable to find document schema"),
-        )
-        .expect("unable to create JsValue from JSON Value")
+    pub fn get_document_schema(&mut self, doc_type: &str) -> Result<JsValue, JsValue> {
+        let doc_schema = self.0.get_document_schema(doc_type).map_err(errors::from)?;
+        with_js_error!(JsValue::from_serde(doc_schema))
     }
 
     #[wasm_bindgen(js_name=getDocumentSchemaRef)]
-    pub fn get_document_schema_ref(&self, doc_type: &str) -> JsValue {
-        JsValue::from_serde(&self.0.get_document_schema_ref(doc_type).unwrap()).unwrap()
+    pub fn get_document_schema_ref(&self, doc_type: &str) -> Result<JsValue, JsValue> {
+        with_js_error!(JsValue::from_serde(
+            &self
+                .0
+                .get_document_schema_ref(doc_type)
+                .map_err(errors::from)?
+        ))
     }
 
     #[wasm_bindgen(js_name=setDefinitions)]
-    pub fn set_definitions(&self, definitions: JsValue) {
-        let json_value: Value =
-            JsValue::into_serde(&definitions).expect("unable to convert into JSON Value");
+    pub fn set_definitions(&self, definitions: JsValue) -> Result<(), JsValue> {
+        let json_value: Value = with_js_error!(JsValue::into_serde(&definitions))?;
         let mut docs: BTreeMap<String, Value> = BTreeMap::new();
         if let Value::Object(o) = json_value {
             for (k, v) in o.into_iter() {
                 // v must be a Object
                 if !v.is_object() {
-                    panic!("{:?} is not an Object", v);
+                    bail_js!("{:?} is not an object", v);
                 }
                 docs.insert(k, v);
             }
         } else {
-            panic!("the parameter is not an Object")
+            bail_js!("the parameter 'definitions' is not an JS object");
         }
+        Ok(())
     }
 
     #[wasm_bindgen(js_name=getDefinitions)]
-    pub fn get_definitions(&self) -> JsValue {
-        JsValue::from_serde(&self.0.defs).expect("unable to convert to JsValue")
+    pub fn get_definitions(&self) -> Result<JsValue, JsValue> {
+        with_js_error!(JsValue::from_serde(&self.0.defs))
     }
 
     #[wasm_bindgen(js_name=setEntropy)]
-    pub fn set_entropy(&mut self, e: Vec<u8>) {
-        self.0.entropy = Some(e.try_into().expect("unable to convert entropy to u8;32"));
+    pub fn set_entropy(&mut self, e: Vec<u8>) -> Result<(), JsValue> {
+        let entropy: [u8; 32] = e.try_into().map_err(|_| {
+            RustConversionError::Error(String::from(
+                "unable to turn the data into 32 bytes array of bytes",
+            ))
+            .to_js_value()
+        })?;
+        self.0.entropy = Some(entropy);
+        Ok(())
     }
 
     #[wasm_bindgen(js_name=getEntropy)]
@@ -163,9 +177,8 @@ impl DataContractWasm {
     }
 
     #[wasm_bindgen(js_name=getBinaryProperties)]
-    pub fn get_binary_properties(&self, doc_type: &str) -> JsValue {
-        JsValue::from_serde(&self.0.get_binary_properties(doc_type))
-            .expect("unable to convert to JsValue")
+    pub fn get_binary_properties(&self, doc_type: &str) -> Result<JsValue, JsValue> {
+        with_js_error!(JsValue::from_serde(&self.0.get_binary_properties(doc_type)))
     }
 
     #[wasm_bindgen(js_name=getMetadata)]
@@ -180,50 +193,45 @@ impl DataContractWasm {
     }
 
     #[wasm_bindgen(js_name=toObject)]
-    pub fn to_object(&self) -> JsValue {
-        return JsValue::from_serde(&self.0).expect("unable to convert Data Contract to JS object");
+    pub fn to_object(&self) -> Result<JsValue, JsValue> {
+        with_js_error!(JsValue::from_serde(&self.0))
     }
 
     #[wasm_bindgen(js_name=toJSON)]
-    pub fn to_json(&self) -> JsValue {
+    pub fn to_json(&self) -> Result<JsValue, JsValue> {
         return self.to_object();
     }
 
     #[wasm_bindgen(js_name=toString)]
-    pub fn to_string(&self) -> String {
-        return serde_json::to_string(&self.0).expect("unable to convert Data Contract to string");
+    pub fn to_string(&self) -> Result<String, JsValue> {
+        return with_js_error!(serde_json::to_string(&self.0));
     }
 
     #[wasm_bindgen(js_name=toBuffer)]
-    pub fn to_buffer(&self) -> Vec<u8> {
-        self.0
-            .to_buffer()
-            .expect("unable to serialize the Data Contract to buffer")
+    pub fn to_buffer(&self) -> Result<Vec<u8>, JsValue> {
+        self.0.to_buffer().map_err(errors::from)
     }
 
     #[wasm_bindgen(js_name=hash)]
-    pub fn hash(&self) -> Vec<u8> {
-        self.0
-            .hash()
-            .expect("unable generate hash from Data Contract")
+    pub fn hash(&self) -> Result<Vec<u8>, JsValue> {
+        self.0.hash().map_err(errors::from)
     }
 
     #[wasm_bindgen(js_name=from)]
-    pub fn from(v: JsValue) -> DataContractWasm {
-        let json_contract: Value = v.into_serde().unwrap();
-
-        DataContract::try_from(json_contract)
-            .expect("unable to convert to contract")
-            .into()
+    pub fn from(v: JsValue) -> Result<DataContractWasm, JsValue> {
+        let json_contract: Value = with_js_error!(v.into_serde())?;
+        Ok(DataContract::try_from(json_contract)
+            .map_err(errors::from)?
+            .into())
     }
 
     #[wasm_bindgen(js_name=from_buffer)]
-    pub fn from_buffer(b: Vec<u8>) -> DataContractWasm {
-        DataContract::from_buffer(b).unwrap().into()
+    pub fn from_buffer(b: Vec<u8>) -> Result<DataContractWasm, JsValue> {
+        Ok(DataContract::from_buffer(b).map_err(errors::from)?.into())
     }
 
     #[wasm_bindgen(js_name=from_string)]
-    pub fn from_string(v: &str) -> DataContractWasm {
-        DataContract::try_from(v).unwrap().into()
+    pub fn from_string(v: &str) -> Result<DataContractWasm, JsValue> {
+        Ok(DataContract::try_from(v).map_err(errors::from)?.into())
     }
 }
