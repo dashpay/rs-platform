@@ -1,4 +1,5 @@
 pub mod defaults;
+mod object_size_info;
 
 use crate::contract::{Contract, Document, DocumentType};
 use crate::drive::defaults::{CONTRACT_DOCUMENTS_PATH_HEIGHT, DEFAULT_HASH_SIZE};
@@ -8,9 +9,10 @@ use enum_map::EnumMap;
 use grovedb::{Element, Error, GroveDb, TransactionArg};
 use std::collections::HashMap;
 use std::path::Path;
-use crate::drive::DocumentInfo::DocumentSerialization;
-use crate::drive::KeyElementInfo::{KeyElement, KeyElementSize};
-use crate::drive::KeyInfo::{Key, KeySize};
+use crate::drive::object_size_info::DocumentInfo::DocumentAndSerialization;
+use crate::drive::object_size_info::KeyElementInfo::{KeyElement, KeyElementSize};
+use crate::drive::object_size_info::{DocumentAndContractInfo, DocumentInfo, KeyElementInfo, KeyInfo, PathInfo, PathKeyInfo};
+use crate::drive::object_size_info::KeyInfo::{Key, KeySize};
 
 pub struct Drive {
     pub grove: GroveDb,
@@ -25,48 +27,6 @@ pub enum RootTree {
     Misc = 3,
 }
 
-pub enum KeyInfo<'a> {
-    /// An ordinary key
-    Key(&'a [u8]),
-    /// A key size
-    KeySize(usize),
-}
-
-impl<'a> KeyInfo<'a>  {
-    pub fn len(&'a self) -> usize {
-        match self {
-            KeyInfo::Key(key) => { key.len()}
-            KeyInfo::KeySize(key_size) => {*key_size}
-        }
-    }
-}
-
-pub enum ElementInfo {
-    /// An element
-    Element(Element),
-    /// An element size
-    ElementSize(usize),
-}
-
-pub enum KeyElementInfo<'a> {
-    /// An element
-    KeyElement((&'a [u8], Element)),
-    /// An element size
-    KeyElementSize((usize,usize)),
-}
-
-pub struct DocumentAndContractInfo<'a> {
-    pub document_info: DocumentInfo<'a>,
-    pub contract: &'a Contract,
-    pub document_type: &'a DocumentType,
-}
-
-pub enum DocumentInfo<'a> {
-    /// An element
-    DocumentSerialization((&'a Document, &'a [u8])),
-    /// An element size
-    DocumentSize(usize),
-}
 
 
 pub const STORAGE_COST: i32 = 50;
@@ -268,8 +228,7 @@ impl Drive {
 
     fn grove_insert_empty_tree_if_not_exists<'a: 'b, 'b, 'c, P>(
         &'a self,
-        path: P,
-        key_info: KeyInfo,
+        path_key_info: PathKeyInfo<P>,
         transaction: TransactionArg,
         query_operations: &mut Vec<QueryOperation>,
         insert_operations: &mut Vec<InsertOperation>,
@@ -278,8 +237,8 @@ impl Drive {
         P: IntoIterator<Item = &'c [u8]>,
         <P as IntoIterator>::IntoIter: ExactSizeIterator + DoubleEndedIterator + Clone,
     {
-        match key_info {
-            KeyInfo::Key(key) => {
+        match path_key_info {
+            PathKeyInfo::PathKey((path, key)) => {
                 let path = path.into_iter();
                 let inserted = self.grove.insert_if_not_exists(
                     path.clone(),
@@ -293,9 +252,9 @@ impl Drive {
                 query_operations.push(QueryOperation::for_key_check_in_path(key.len(), path));
                 Ok(inserted)
             }
-            KeyInfo::KeySize(key_max_length) => {
+            PathKeyInfo::PathKeySize((path_max_length, key_max_length)) => {
                 insert_operations.push(InsertOperation::for_empty_tree(key_max_length));
-                query_operations.push(QueryOperation::for_key_check_in_path(key_max_length, path));
+                query_operations.push(QueryOperation::for_key_check_with_path_length(key_max_length, path_max_length));
                 Ok(true)
             }
         }
@@ -340,7 +299,7 @@ impl Drive {
             KeyElementInfo::KeyElement((key, element)) => {
                 let path_iter = path.into_iter();
                 let insert_operation = InsertOperation::for_key_value(key.len(), &element);
-                let query_operation = QueryOperation::for_key_check_in_path(key, path_iter.clone());
+                let query_operation = QueryOperation::for_key_check_in_path(key.len(), path_iter.clone());
                 let inserted = self
                     .grove
                     .insert_if_not_exists(path_iter, key, element, transaction)?;
@@ -696,10 +655,10 @@ impl Drive {
         let primary_key_path =
             contract_documents_primary_key_path(&contract.id, document_type.name.as_str());
         if document_type.documents_keep_history {
-            let key_info = if let DocumentSerialization((document, _)) = document_and_contract_info.document_info {
+            let key_info = if let DocumentAndSerialization((document, _)) = document_and_contract_info.document_info {
                 Key(document.id.as_slice())
             } else {
-                KeySize(32 as usize)
+                KeySize(DEFAULT_HASH_SIZE)
             };
             // we first insert an empty tree if the document is new
             self.grove_insert_empty_tree_if_not_exists(
@@ -713,11 +672,11 @@ impl Drive {
                 contract_documents_keeping_history_primary_key_path_for_document_id(
                     &contract.id,
                     document_type.name.as_str(),
-                    document.id.as_slice(),
+                    document_and_contract_info.document_info.id.as_slice(),
                 );
             let encoded_time = crate::contract::types::encode_float(block_time)?;
             let key_element_info = match document_and_contract_info.document_info {
-                DocumentSerialization((document, document_cbor)) => {
+                DocumentAndSerialization((document, document_cbor)) => {
                     KeyElement((encoded_time.as_slice(), Element::Item(Vec::from(document_cbor))))
                 }
                 DocumentInfo::DocumentSize(max_size) => {
@@ -840,11 +799,7 @@ impl Drive {
 
     pub fn add_document_for_contract(
         &self,
-        document: &Document,
-        document_cbor: &[u8],
-        contract: &Contract,
-        document_type_name: &str,
-        owner_id: Option<&[u8]>,
+        document_and_contract_info: DocumentAndContractInfo,
         override_document: bool,
         block_time: f64,
         transaction: TransactionArg,
@@ -852,11 +807,7 @@ impl Drive {
         let mut query_operations: Vec<QueryOperation> = vec![];
         let mut insert_operations: Vec<InsertOperation> = vec![];
         self.add_document_for_contract_operations(
-            document,
-            document_cbor,
-            contract,
-            document_type_name,
-            owner_id,
+            document_and_contract_info,
             override_document,
             block_time,
             transaction,
@@ -868,11 +819,7 @@ impl Drive {
 
     fn add_document_for_contract_operations(
         &self,
-        document: &Document,
-        document_cbor: &[u8],
-        contract: &Contract,
-        document_type_name: &str,
-        owner_id: Option<&[u8]>,
+        document_and_contract_info: DocumentAndContractInfo,
         override_document: bool,
         block_time: f64,
         transaction: TransactionArg,
@@ -885,7 +832,7 @@ impl Drive {
         //  * Contract ID recovered from document
         //  * 0 to signify Documents and not Contract
         let contract_document_type_path =
-            contract_document_type_path(&contract.id, document_type_name);
+            contract_document_type_path(&document_and_contract_info.contract.id, document_and_contract_info.document_type_name);
 
         let primary_key_path =
             contract_documents_primary_key_path(&contract.id, document_type_name);
@@ -1158,6 +1105,7 @@ impl Drive {
 
     fn update_document_for_contract_operations(
         &self,
+
         document: Option<&Document>,
         document_cbor: &[u8],
         contract: &Contract,
