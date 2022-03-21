@@ -9,10 +9,12 @@ use enum_map::EnumMap;
 use grovedb::{Element, Error, GroveDb, TransactionArg};
 use std::collections::HashMap;
 use std::path::Path;
-use crate::drive::object_size_info::DocumentInfo::DocumentAndSerialization;
+use crate::drive::object_size_info::DocumentInfo::{DocumentAndSerialization, DocumentSize};
 use crate::drive::object_size_info::KeyElementInfo::{KeyElement, KeyElementSize};
 use crate::drive::object_size_info::{DocumentAndContractInfo, DocumentInfo, KeyElementInfo, KeyInfo, PathInfo, PathKeyInfo};
 use crate::drive::object_size_info::KeyInfo::{Key, KeySize};
+use crate::drive::object_size_info::PathInfo::PathSize;
+use crate::drive::object_size_info::PathKeyInfo::{PathKey, PathKeySize};
 
 pub struct Drive {
     pub grove: GroveDb,
@@ -106,11 +108,11 @@ fn contract_documents_primary_key_path<'a>(
     document_type_name: &'a str,
 ) -> [&'a [u8]; 5] {
     [
-        Into::<&[u8; 1]>::into(RootTree::ContractDocuments),
-        contract_id,
-        &[1],
+        Into::<&[u8; 1]>::into(RootTree::ContractDocuments), // 1
+        contract_id, // 32
+        &[1], // 1
         document_type_name.as_bytes(),
-        &[0],
+        &[0], // 1
     ]
 }
 
@@ -534,8 +536,7 @@ impl Drive {
                 for index in document_type.top_level_indices()? {
                     // toDo: we can save a little by only inserting on new indexes
                     self.grove_insert_empty_tree_if_not_exists(
-                        type_path,
-                        Key(index.name.as_bytes()),
+                        PathKey((type_path, index.name.as_bytes())),
                         transaction,
                         query_operations,
                         insert_operations,
@@ -655,15 +656,14 @@ impl Drive {
         let primary_key_path =
             contract_documents_primary_key_path(&contract.id, document_type.name.as_str());
         if document_type.documents_keep_history {
-            let key_info = if let DocumentAndSerialization((document, _)) = document_and_contract_info.document_info {
-                Key(document.id.as_slice())
+            let path_key_info = if let DocumentAndSerialization((document, _)) = document_and_contract_info.document_info {
+                PathKey((primary_key_path, document.id.as_slice()))
             } else {
-                KeySize(DEFAULT_HASH_SIZE)
+                PathKeySize((crate::drive::defaults::BASE_CONTRACT_DOCUMENTS_PRIMARY_KEY_PATH + document_type.name.len(), DEFAULT_HASH_SIZE))
             };
             // we first insert an empty tree if the document is new
             self.grove_insert_empty_tree_if_not_exists(
-                primary_key_path,
-                key_info,
+                path_key_info,
                 transaction,
                 query_operations,
                 insert_operations,
@@ -679,14 +679,9 @@ impl Drive {
                 DocumentAndSerialization((document, document_cbor)) => {
                     KeyElement((encoded_time.as_slice(), Element::Item(Vec::from(document_cbor))))
                 }
-                DocumentInfo::DocumentSize(max_size) => {
+                DocumentSize(max_size) => {
                     KeyElementSize((8 as usize, max_size))
                 }
-            };
-            let key_element_info = if let Some(document_element) = document_and_contract_info. {
-
-            } else {
-                KeyElementSize((8 as usize, document_type.max_size))
             };
             self.grove_insert(
                 document_id_in_primary_path,
@@ -716,10 +711,13 @@ impl Drive {
                 insert_operations,
             )?;
         } else if insert_without_check {
-            let key_element_info = if let Some(document_element) = document_element {
-                KeyElement((document.id.as_slice(), document_element))
-            } else {
-                KeyElementSize((DEFAULT_HASH_SIZE, crate::drive::defaults::BASE_CONTRACT_DOCUMENTS_KEEPING_HISTORY_STORAGE_TIME_REFERENCE_PATH + document_type.name.len()))
+            let key_element_info = match document_and_contract_info.document_info {
+                DocumentAndSerialization((document, document_cbor)) => {
+                    KeyElement((document.id.as_slice(), Element::Item(Vec::from(document_cbor))))
+                }
+                DocumentSize(max_size) => {
+                    KeyElementSize((DEFAULT_HASH_SIZE, max_size))
+                }
             };
             self.grove_insert(
                 primary_key_path,
@@ -728,6 +726,14 @@ impl Drive {
                 insert_operations,
             )?;
         } else {
+            let key_element_info = match document_and_contract_info.document_info {
+                DocumentAndSerialization((document, document_cbor)) => {
+                    KeyElement((document.id.as_slice(), Element::Item(Vec::from(document_cbor))))
+                }
+                DocumentSize(max_size) => {
+                    KeyElementSize((DEFAULT_HASH_SIZE, max_size))
+                }
+            };
             let inserted = self.grove_insert_if_not_exists(
                 primary_key_path,
                 document.id.as_slice(),
