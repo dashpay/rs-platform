@@ -24,3 +24,5 @@ pub use dash_platform_protocol::*;
 
 pub mod errors;
 pub mod mocks;
+
+mod utils;

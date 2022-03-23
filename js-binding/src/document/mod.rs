@@ -6,9 +6,10 @@ use wasm_bindgen::prelude::*;
 
 use crate::identifier::IdentifierWrapper;
 use crate::{DataContractWasm, MetadataWasm};
+use serde::{Deserialize, Serialize};
 
 #[wasm_bindgen(js_name=Document)]
-#[derive(Debug)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DocumentWasm(Document);
 
 // TODO error handling
@@ -17,7 +18,7 @@ pub struct DocumentWasm(Document);
 impl DocumentWasm {
     #[wasm_bindgen(js_name=getProtocolVersion)]
     pub fn get_protocol_version(&self) -> u32 {
-        self.0.protocol_version.clone()
+        self.0.protocol_version
     }
 
     #[wasm_bindgen(js_name=getId)]

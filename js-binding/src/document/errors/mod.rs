@@ -1,108 +1,27 @@
-use thiserror::Error;
+use crate::utils::*;
+
 use wasm_bindgen::prelude::*;
 
-use crate::{mocks::DocumentTransitionWasm, DocumentWasm};
+mod document_already_exists_error;
+pub use document_already_exists_error::*;
 
-#[wasm_bindgen]
-#[derive(Error, Debug)]
-#[error("Document already exists")]
-pub struct DocumentAlreadyExistsError {
-    document_transition: DocumentTransitionWasm,
-}
+mod document_not_provided_error;
+pub use document_not_provided_error::*;
 
-#[wasm_bindgen]
-impl DocumentAlreadyExistsError {
-    #[wasm_bindgen]
-    pub fn new(document_transition: DocumentTransitionWasm) -> DocumentAlreadyExistsError {
-        Self {
-            document_transition,
-        }
-    }
+mod invalid_action_name_error;
+pub use invalid_action_name_error::*;
 
-    #[wasm_bindgen(js_name=getDocumentTransition)]
-    pub fn get_document_transition(&self) -> DocumentTransitionWasm {
-        self.document_transition.clone()
-    }
-}
+mod invalid_document_error;
+pub use invalid_document_error::*;
 
-#[wasm_bindgen]
-#[derive(Error, Debug)]
-#[error("Document was not provided for apply of state transition")]
-pub struct DocumentNotProvidedError {
-    document_transition: DocumentTransitionWasm,
-}
+mod invalid_document_action_error;
+pub use invalid_document_action_error::*;
 
-#[wasm_bindgen]
-impl DocumentNotProvidedError {
-    #[wasm_bindgen]
-    pub fn new(document_transition: DocumentTransitionWasm) -> DocumentNotProvidedError {
-        Self {
-            document_transition,
-        }
-    }
+mod invalid_initial_revision_error;
+pub use invalid_initial_revision_error::*;
 
-    #[wasm_bindgen(js_name=getDocumentTransition)]
-    pub fn get_document_transition(&self) -> DocumentTransitionWasm {
-        self.document_transition.clone()
-    }
-}
+mod mismatch_owners_ids_error;
+pub use mismatch_owners_ids_error::*;
 
-#[wasm_bindgen]
-#[derive(Error, Debug)]
-#[error("Invalid Document action submitted")]
-pub struct InvalidActionNameError {
-    actions: Vec<String>,
-}
-
-#[wasm_bindgen]
-#[derive(Error, Debug)]
-#[error("Invalid Document action '{}'", document_transition.get_action())]
-pub struct InvalidDocumentActionError {
-    document_transition: DocumentTransitionWasm,
-}
-
-#[wasm_bindgen]
-impl InvalidDocumentActionError {
-    #[wasm_bindgen]
-    pub fn new(document_transition: DocumentTransitionWasm) -> InvalidDocumentActionError {
-        Self {
-            document_transition,
-        }
-    }
-
-    #[wasm_bindgen(js_name=getDocumentTransition)]
-    pub fn get_document_transition(&self) -> DocumentTransitionWasm {
-        self.document_transition.clone()
-    }
-}
-
-#[wasm_bindgen]
-#[derive(Error, Debug)]
-#[error("Invalid document: {:?}", errors)]
-pub struct InvalidDocumentError {
-    // the point is how we hold all there different types in  the Vector
-    errors: Vec<JsValue>,
-    document: DocumentWasm,
-}
-
-#[wasm_bindgen]
-impl InvalidDocumentActionError {}
-
-#[wasm_bindgen]
-#[derive(Error, Debug)]
-#[error("Invalid Document Initial revision '{}'", document.get_revision())]
-pub struct InvalidInitialRevisionError {
-    document: DocumentWasm,
-}
-
-#[wasm_bindgen]
-#[derive(Error, Debug)]
-#[error("Documents have mixed owner ids")]
-pub struct MismatchOwnersIdsError {
-    documents: DocumentWasm,
-}
-
-#[wasm_bindgen]
-#[derive(Error, Debug)]
-#[error("No documents were supplied to state transition")]
-pub struct NotDocumentsSuppliedError {}
+mod no_documents_supplied_error;
+pub use no_documents_supplied_error::*;
