@@ -1,3 +1,5 @@
+pub mod errors;
+
 use dpp::document::Document;
 use std::convert::TryInto;
 use wasm_bindgen::prelude::*;
@@ -6,6 +8,7 @@ use crate::identifier::IdentifierWrapper;
 use crate::{DataContractWasm, MetadataWasm};
 
 #[wasm_bindgen(js_name=Document)]
+#[derive(Debug)]
 pub struct DocumentWasm(Document);
 
 // TODO error handling
@@ -48,7 +51,7 @@ impl DocumentWasm {
     }
 
     #[wasm_bindgen(js_name=getRevision)]
-    pub fn get_revision(&mut self) -> i64 {
+    pub fn get_revision(&self) -> i64 {
         self.0.revision
     }
 
