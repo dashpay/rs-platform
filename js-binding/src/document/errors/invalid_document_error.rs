@@ -23,7 +23,7 @@ impl InvalidDocumentError {
         self.errors.clone()
     }
 
-    #[wasm_bindgen(js_name=getErrors)]
+    #[wasm_bindgen(js_name=getDocument)]
     pub fn get_document(&self) -> DocumentWasm {
         self.document.clone()
     }

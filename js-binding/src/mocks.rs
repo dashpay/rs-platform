@@ -17,6 +17,7 @@ impl From<mocks::DocumentTransition> for DocumentTransitionWasm {
     }
 }
 
+#[derive(Debug)]
 pub struct ConsensusError {}
 
 pub fn from_consensus_to_js_error(_: mocks::ConsensusError) -> JsValue {

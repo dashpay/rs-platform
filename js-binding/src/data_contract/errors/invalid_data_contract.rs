@@ -1,34 +1,26 @@
-use dpp::data_contract::DataContract;
-use dpp::errors::AbstractConsensusErrorMock;
-use dpp::mocks;
 use thiserror::Error;
 use wasm_bindgen::prelude::*;
 
-use crate::errors::*;
 use crate::DataContractWasm;
 
 #[wasm_bindgen]
 #[derive(Error, Debug)]
 #[error("Invalid Data Contract")]
 pub struct InvalidDataContractError {
-    errors: Vec<AbstractConsensusError>,
+    // we have to store it as JsValue as the errors of 'class' Consensus are of different types
+    errors: Vec<JsValue>,
     raw_data_contract: DataContractWasm,
-}
-
-impl InvalidDataContractError {
-    pub fn new(errors: Vec<AbstractConsensusErrorMock>, raw_data_contract: DataContract) -> Self {
-        InvalidDataContractError {
-            errors: errors
-                .into_iter()
-                .map(AbstractConsensusError::from)
-                .collect(),
-            raw_data_contract: raw_data_contract.into(),
-        }
-    }
 }
 
 #[wasm_bindgen]
 impl InvalidDataContractError {
+    #[wasm_bindgen(constructor)]
+    pub fn new(errors: Vec<JsValue>, raw_data_contract: DataContractWasm) -> Self {
+        InvalidDataContractError {
+            errors,
+            raw_data_contract,
+        }
+    }
     #[wasm_bindgen]
     pub fn get_errors(&self) -> Vec<JsValue> {
         self.errors.clone().into_iter().map(JsValue::from).collect()
