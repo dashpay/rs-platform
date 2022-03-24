@@ -52,7 +52,7 @@ impl DocumentWasm {
         self.0.revision
     }
 
-    #[wasm_bindgen(js_name=setUntropy)]
+    #[wasm_bindgen(js_name=setEntropy)]
     pub fn set_entropy(&mut self, e: Vec<u8>) {
         self.0.entropy = Some(e.try_into().expect("unable to convert entropy to u8;32"));
     }
