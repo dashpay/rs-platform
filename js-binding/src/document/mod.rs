@@ -1,18 +1,17 @@
 pub mod errors;
-
 use dpp::document::Document;
 use std::convert::TryInto;
 use wasm_bindgen::prelude::*;
 
+use crate::errors::{from_dpp_err, RustConversionError};
 use crate::identifier::IdentifierWrapper;
+use crate::with_js_error;
 use crate::{DataContractWasm, MetadataWasm};
 use serde::{Deserialize, Serialize};
 
 #[wasm_bindgen(js_name=Document)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DocumentWasm(Document);
-
-// TODO error handling
 
 #[wasm_bindgen(js_class=Document)]
 impl DocumentWasm {
@@ -57,8 +56,15 @@ impl DocumentWasm {
     }
 
     #[wasm_bindgen(js_name=setEntropy)]
-    pub fn set_entropy(&mut self, e: Vec<u8>) {
-        self.0.entropy = Some(e.try_into().expect("unable to convert entropy to u8;32"));
+    pub fn set_entropy(&mut self, e: Vec<u8>) -> Result<(), JsValue> {
+        let entropy: [u8; 32] = e.try_into().map_err(|_| {
+            RustConversionError::Error(String::from(
+                "unable to turn the data into 32 bytes array of bytes",
+            ))
+            .to_js_value()
+        })?;
+        self.0.entropy = Some(entropy);
+        Ok(())
     }
 
     #[wasm_bindgen(js_name=getEntropy)]
@@ -67,23 +73,24 @@ impl DocumentWasm {
     }
 
     #[wasm_bindgen(js_name=setData)]
-    pub fn set_data(&mut self, d: JsValue) {
-        self.0.data = d.into_serde().expect("unable convert data to json object");
+    pub fn set_data(&mut self, d: JsValue) -> Result<(), JsValue> {
+        self.0.data = with_js_error!(d.into_serde())?;
+        Ok(())
     }
 
     #[wasm_bindgen(js_name=getData)]
-    pub fn get_data(&mut self) -> JsValue {
-        JsValue::from_serde(&self.0.data).expect("unable convert data to js object")
+    pub fn get_data(&mut self) -> Result<JsValue, JsValue> {
+        with_js_error!(JsValue::from_serde(&self.0.data))
     }
 
     #[wasm_bindgen(js_name=set)]
-    pub fn set(&mut self, path: String, d: JsValue) {
+    pub fn set(&mut self, _path: String, _d: JsValue) {
         // TODO use lodash via extern
         unimplemented!()
     }
 
     #[wasm_bindgen(js_name=get)]
-    pub fn get(&mut self, path: String) -> JsValue {
+    pub fn get(&mut self, _path: String) -> JsValue {
         // TODO use lodash via extern
         unimplemented!()
     }
@@ -120,29 +127,34 @@ impl DocumentWasm {
     }
 
     #[wasm_bindgen(js_name=toObject)]
-    pub fn to_object(&self) -> JsValue {
-        JsValue::from_serde(&self.0).expect("unable to convert Document to JS object")
+    pub fn to_object(&self) -> Result<JsValue, JsValue> {
+        with_js_error!(JsValue::from_serde(&self.0))
     }
 
     #[wasm_bindgen(js_name=toJSON)]
-    pub fn to_json(&self) -> JsValue {
+    pub fn to_json(&self) -> Result<JsValue, JsValue> {
         self.to_object()
     }
 
     #[wasm_bindgen(js_name=toString)]
-    pub fn to_string(&self) -> String {
-        serde_json::to_string(&self.0).expect("unable to convert Document to string")
+    pub fn to_string(&self) -> Result<String, JsValue> {
+        with_js_error!(serde_json::to_string(&self.0))
     }
 
     #[wasm_bindgen(js_name=toBuffer)]
-    pub fn to_buffer(&self) -> Vec<u8> {
-        self.0
-            .to_buffer()
-            .expect("unable to serialize the Document to buffer")
+    pub fn to_buffer(&self) -> Result<Vec<u8>, JsValue> {
+        let buffer = self.0.to_buffer().map_err(from_dpp_err)?;
+        Ok(buffer)
     }
 
     #[wasm_bindgen(js_name=hash)]
-    pub fn hash(&self) -> Vec<u8> {
-        self.0.hash().expect("unable generate hash from Document")
+    pub fn hash(&self) -> Result<Vec<u8>, JsValue> {
+        self.0.hash().map_err(from_dpp_err)
+    }
+}
+
+impl From<Document> for DocumentWasm {
+    fn from(d: Document) -> Self {
+        DocumentWasm(d)
     }
 }

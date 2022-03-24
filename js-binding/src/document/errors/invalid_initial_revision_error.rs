@@ -11,7 +11,7 @@ pub struct InvalidInitialRevisionError {
 
 #[wasm_bindgen]
 impl InvalidInitialRevisionError {
-    #[wasm_bindgen]
+    #[wasm_bindgen(constructor)]
     pub fn new(document: DocumentWasm) -> InvalidInitialRevisionError {
         Self { document }
     }

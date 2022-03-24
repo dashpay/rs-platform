@@ -1,5 +1,6 @@
 use dpp::data_contract::DataContract;
 use dpp::errors::AbstractConsensusErrorMock;
+use dpp::mocks;
 use thiserror::Error;
 use wasm_bindgen::prelude::*;
 

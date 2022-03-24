@@ -13,7 +13,7 @@ pub struct InvalidDocumentError {
 
 #[wasm_bindgen]
 impl InvalidDocumentError {
-    #[wasm_bindgen]
+    #[wasm_bindgen(constructor)]
     pub fn new(document: DocumentWasm, errors: Vec<JsValue>) -> InvalidDocumentError {
         Self { document, errors }
     }

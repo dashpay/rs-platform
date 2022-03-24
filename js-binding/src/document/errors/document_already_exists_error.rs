@@ -11,7 +11,7 @@ pub struct DocumentAlreadyExistsError {
 
 #[wasm_bindgen]
 impl DocumentAlreadyExistsError {
-    #[wasm_bindgen]
+    #[wasm_bindgen(constructor)]
     pub fn new(document_transition: DocumentTransitionWasm) -> DocumentAlreadyExistsError {
         Self {
             document_transition,

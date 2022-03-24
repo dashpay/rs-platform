@@ -13,7 +13,7 @@ pub struct InvalidDocumentActionError {
 #[wasm_bindgen]
 impl InvalidDocumentActionError {
     #[wasm_bindgen]
-    pub fn new(document_transition: DocumentTransitionWasm) -> InvalidDocumentActionError {
+    pub fn new(document_transition: DocumentTransitionWasm) -> Self {
         Self {
             document_transition,
         }

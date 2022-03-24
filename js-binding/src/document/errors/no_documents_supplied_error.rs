@@ -5,3 +5,11 @@ use thiserror::Error;
 #[derive(Error, Debug)]
 #[error("No documents were supplied to state transition")]
 pub struct NotDocumentsSuppliedError {}
+
+#[wasm_bindgen]
+impl NotDocumentsSuppliedError {
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> Self {
+        NotDocumentsSuppliedError {}
+    }
+}

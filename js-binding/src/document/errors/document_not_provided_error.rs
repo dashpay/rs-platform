@@ -11,7 +11,7 @@ pub struct DocumentNotProvidedError {
 
 #[wasm_bindgen]
 impl DocumentNotProvidedError {
-    #[wasm_bindgen]
+    #[wasm_bindgen(constructor)]
     pub fn new(document_transition: DocumentTransitionWasm) -> DocumentNotProvidedError {
         Self {
             document_transition,

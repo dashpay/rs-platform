@@ -1,7 +1,7 @@
 use super::*;
-use crate::mocks::DocumentTransitionWasm;
 use thiserror::Error;
 
+#[wasm_bindgen]
 #[derive(Error, Debug)]
 #[error("Invalid Document action submitted")]
 pub struct InvalidActionNameError {
@@ -9,8 +9,15 @@ pub struct InvalidActionNameError {
 }
 
 #[wasm_bindgen]
-#[derive(Error, Debug)]
-#[error("Invalid Document action '{}'", document_transition.get_action())]
-pub struct InvalidDocumentActionError {
-    document_transition: DocumentTransitionWasm,
+impl InvalidActionNameError {
+    #[wasm_bindgen(constructor)]
+    pub fn new(actions: Vec<JsValue>) -> Self {
+        let actions: Vec<String> = from_vec_js(&actions);
+        Self { actions }
+    }
+
+    #[wasm_bindgen(js_name=getActions)]
+    pub fn get_actions(&self) -> Vec<JsValue> {
+        to_vec_js(self.actions.clone())
+    }
 }

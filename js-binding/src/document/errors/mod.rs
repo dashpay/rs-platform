@@ -1,5 +1,6 @@
-use crate::utils::*;
+use crate::{utils::*, DocumentWasm};
 
+use dpp::document::errors::DocumentError;
 use wasm_bindgen::prelude::*;
 
 mod document_already_exists_error;
@@ -25,3 +26,40 @@ pub use mismatch_owners_ids_error::*;
 
 mod no_documents_supplied_error;
 pub use no_documents_supplied_error::*;
+
+use crate::mocks;
+
+pub fn from_document_to_js_error(e: DocumentError) -> JsValue {
+    match e {
+        DocumentError::DocumentAlreadyExists {
+            document_transition,
+        } => DocumentAlreadyExistsError::new(document_transition.into()).into(),
+        DocumentError::DocumentNotProvided {
+            document_transition,
+        } => DocumentNotProvidedError::new(document_transition.into()).into(),
+
+        DocumentError::InvalidActionName { actions } => {
+            InvalidActionNameError::new(to_vec_js(actions)).into()
+        }
+        DocumentError::InvalidDocument { errors, document } => InvalidDocumentError::new(
+            (*document).into(),
+            errors
+                .into_iter()
+                .map(mocks::from_consensus_to_js_error)
+                .collect(),
+        )
+        .into(),
+        DocumentError::InvalidDocumentAction {
+            document_transition,
+        } => InvalidDocumentActionError::new(document_transition.into()).into(),
+        DocumentError::InvalidInitialRevision { document } => {
+            InvalidInitialRevisionError::new((*document).into()).into()
+        }
+        DocumentError::MismatchOwnersIds { documents } => {
+            let documents_wasm: Vec<DocumentWasm> =
+                documents.into_iter().map(DocumentWasm::from).collect();
+            MismatchOwnersIdsError::new(to_vec_js(documents_wasm)).into()
+        }
+        DocumentError::NotDocumentsSupplied => NotDocumentsSuppliedError::new().into(),
+    }
+}

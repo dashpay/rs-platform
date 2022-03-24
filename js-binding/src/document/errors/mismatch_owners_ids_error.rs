@@ -11,7 +11,7 @@ pub struct MismatchOwnersIdsError {
 
 #[wasm_bindgen]
 impl MismatchOwnersIdsError {
-    #[wasm_bindgen]
+    #[wasm_bindgen(constructor)]
     pub fn new(documents: Vec<JsValue>) -> MismatchOwnersIdsError {
         Self {
             documents: from_vec_js(&documents),
