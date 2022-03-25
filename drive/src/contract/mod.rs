@@ -6,6 +6,7 @@ use ciborium::value::{Value as CborValue, Value};
 use grovedb::Error;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
+use crate::drive::defaults::DEFAULT_HASH_SIZE;
 
 // contract
 // - id
@@ -410,12 +411,13 @@ impl DocumentType {
 
             match type_value {
                 "array" => {
+
                     // Only handling bytearrays for v1
                     // Return an error if it is not a byte array
                     field_type = match cbor_inner_bool_value(inner_property_values, "byteArray") {
                         Some(inner_bool) => {
                             if inner_bool {
-                                types::DocumentFieldType::ByteArray
+                                types::DocumentFieldType::ByteArray(cbor_inner_size_value(inner_property_values, "minItems"),cbor_inner_size_value(inner_property_values, "maxItems"))
                             } else {
                                 return Err(Error::CorruptedData(String::from("invalid type")));
                             }
@@ -440,6 +442,10 @@ impl DocumentType {
                             object_property_value,
                         )?
                     }
+                }
+                "string" => {
+                    field_type = types::DocumentFieldType::String(cbor_inner_size_value(inner_property_values, "minLength"),cbor_inner_size_value(inner_property_values, "maxLength"));
+                    document_properties.insert(prefixed_property_key, field_type);
                 }
                 _ => {
                     field_type = types::string_to_field_type(type_value)
@@ -824,6 +830,18 @@ pub fn cbor_inner_bool_value(document_type: &[(Value, Value)], key: &str) -> Opt
     let key_value = get_key_from_cbor_map(document_type, key)?;
     if let Value::Bool(bool_value) = key_value {
         return Some(*bool_value);
+    }
+    None
+}
+
+pub fn cbor_inner_size_value(document_type: &[(Value, Value)], key: &str) -> Option<usize> {
+    let key_value = get_key_from_cbor_map(document_type, key)?;
+    if let Value::Integer(integer) = key_value {
+        let value_as_usize: Result<usize, Error> = (*integer).try_into().map_err(|_| Error::CorruptedData(String::from("expected u8 value")));
+        match value_as_usize {
+            Ok(size) => { size }
+            Err(_) => { None }
+        }
     }
     None
 }

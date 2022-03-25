@@ -7,22 +7,68 @@ use serde::{Deserialize, Serialize};
 pub enum DocumentFieldType {
     Integer,
     Number,
-    String,
-    ByteArray,
+    String(Option<usize>, Option<usize>),
+    ByteArray(Option<usize>, Option<usize>),
     Boolean,
     Date,
     Object,
     Array,
 }
 
+impl DocumentFieldType {
+    pub fn min_size(&self) -> Option<usize> {
+        match self {
+            DocumentFieldType::Integer => { Some(8) }
+            DocumentFieldType::Number => { Some(8) }
+            DocumentFieldType::String(min_length, _) => {
+                match min_length {
+                    None => { None }
+                    Some(size) => { Some(*size * 4) }
+                }
+            }
+            DocumentFieldType::ByteArray(min_size, _) => {
+                match min_size {
+                    None => { None }
+                    Some(size) => { Some(*size) }
+                }
+            }
+            DocumentFieldType::Boolean => { Some(1) }
+            DocumentFieldType::Date => { Some(8) }
+            DocumentFieldType::Object => { None }
+            DocumentFieldType::Array => { None }
+        }
+    }
+
+    pub fn max_size(&self) -> Option<usize> {
+        match self {
+            DocumentFieldType::Integer => { Some(8) }
+            DocumentFieldType::Number => { Some(8) }
+            DocumentFieldType::String(_, max_length) => {
+                match max_length {
+                    None => { None }
+                    Some(size) => { Some(*size * 4) }
+                }
+            }
+            DocumentFieldType::ByteArray(_, max_size) => {
+                match max_size {
+                    None => { None }
+                    Some(size) => { Some(*size) }
+                }
+            }
+            DocumentFieldType::Boolean => { Some(1) }
+            DocumentFieldType::Date => { Some(8) }
+            DocumentFieldType::Object => { None }
+            DocumentFieldType::Array => { None }
+        }
+    }
+}
+
 pub fn string_to_field_type(field_type_name: &str) -> Option<DocumentFieldType> {
     match field_type_name {
         "integer" => Some(DocumentFieldType::Integer),
         "number" => Some(DocumentFieldType::Number),
-        "string" => Some(DocumentFieldType::String),
         "boolean" => Some(DocumentFieldType::Boolean),
         "date" => Some(DocumentFieldType::Date),
-        "object" => Some(DocumentFieldType::Object),
         _ => None,
     }
 }
@@ -42,7 +88,7 @@ pub fn encode_document_field_type(
         return Ok(vec![]);
     }
     return match field_type {
-        DocumentFieldType::String => {
+        DocumentFieldType::String(_, _) => {
             let value_as_text = value.as_text().ok_or_else(get_field_type_matching_error)?;
             let vec = value_as_text.as_bytes().to_vec();
             if vec.is_empty() {
@@ -91,7 +137,7 @@ pub fn encode_document_field_type(
 
             encode_float(value_as_f64)
         }
-        DocumentFieldType::ByteArray => match value {
+        DocumentFieldType::ByteArray(_, _) => match value {
             Value::Bytes(bytes) => Ok(bytes.clone()),
             Value::Text(text) => {
                 let value_as_bytes = base64::decode(text).map_err(|_| {
