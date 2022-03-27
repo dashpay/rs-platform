@@ -1,12 +1,12 @@
 mod defaults;
 pub mod types;
 
+use crate::drive::defaults::DEFAULT_HASH_SIZE;
 use crate::drive::{Drive, RootTree};
 use ciborium::value::{Value as CborValue, Value};
 use grovedb::Error;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
-use crate::drive::defaults::DEFAULT_HASH_SIZE;
 
 // contract
 // - id
@@ -276,6 +276,12 @@ impl Contract {
             id,
         ]
     }
+
+    pub fn document_type_for_name(&self, document_type_name: &str) -> Result<&DocumentType, Error> {
+        self.document_types.get(document_type_name).ok_or_else(|| {
+            Error::CorruptedData(String::from("can not get document type from contract"))
+        })
+    }
 }
 
 impl DocumentType {
@@ -411,13 +417,15 @@ impl DocumentType {
 
             match type_value {
                 "array" => {
-
                     // Only handling bytearrays for v1
                     // Return an error if it is not a byte array
                     field_type = match cbor_inner_bool_value(inner_property_values, "byteArray") {
                         Some(inner_bool) => {
                             if inner_bool {
-                                types::DocumentFieldType::ByteArray(cbor_inner_size_value(inner_property_values, "minItems"),cbor_inner_size_value(inner_property_values, "maxItems"))
+                                types::DocumentFieldType::ByteArray(
+                                    cbor_inner_size_value(inner_property_values, "minItems"),
+                                    cbor_inner_size_value(inner_property_values, "maxItems"),
+                                )
                             } else {
                                 return Err(Error::CorruptedData(String::from("invalid type")));
                             }
@@ -444,7 +452,10 @@ impl DocumentType {
                     }
                 }
                 "string" => {
-                    field_type = types::DocumentFieldType::String(cbor_inner_size_value(inner_property_values, "minLength"),cbor_inner_size_value(inner_property_values, "maxLength"));
+                    field_type = types::DocumentFieldType::String(
+                        cbor_inner_size_value(inner_property_values, "minLength"),
+                        cbor_inner_size_value(inner_property_values, "maxLength"),
+                    );
                     document_properties.insert(prefixed_property_key, field_type);
                 }
                 _ => {
@@ -837,10 +848,12 @@ pub fn cbor_inner_bool_value(document_type: &[(Value, Value)], key: &str) -> Opt
 pub fn cbor_inner_size_value(document_type: &[(Value, Value)], key: &str) -> Option<usize> {
     let key_value = get_key_from_cbor_map(document_type, key)?;
     if let Value::Integer(integer) = key_value {
-        let value_as_usize: Result<usize, Error> = (*integer).try_into().map_err(|_| Error::CorruptedData(String::from("expected u8 value")));
+        let value_as_usize: Result<usize, Error> = (*integer)
+            .try_into()
+            .map_err(|_| Error::CorruptedData(String::from("expected u8 value")));
         match value_as_usize {
-            Ok(size) => { size }
-            Err(_) => { None }
+            Ok(size) => size,
+            Err(_) => None,
         }
     }
     None

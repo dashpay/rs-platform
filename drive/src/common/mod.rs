@@ -1,17 +1,13 @@
 use crate::contract::Contract;
 use crate::drive::Drive;
 use byteorder::{BigEndian, WriteBytesExt};
+use grovedb::TransactionArg;
 use std::fs::File;
 use std::io;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
-use grovedb::TransactionArg;
 
-pub fn setup_contract(
-    drive: &mut Drive,
-    path: &str,
-    transaction: TransactionArg,
-) -> Contract {
+pub fn setup_contract(drive: &Drive, path: &str, transaction: TransactionArg) -> Contract {
     let contract_cbor = json_document_to_cbor(path, Some(crate::drive::defaults::PROTOCOL_VERSION));
     let contract = Contract::from_cbor(&contract_cbor).expect("contract should be deserialized");
     drive

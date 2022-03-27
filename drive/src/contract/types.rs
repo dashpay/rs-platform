@@ -18,47 +18,39 @@ pub enum DocumentFieldType {
 impl DocumentFieldType {
     pub fn min_size(&self) -> Option<usize> {
         match self {
-            DocumentFieldType::Integer => { Some(8) }
-            DocumentFieldType::Number => { Some(8) }
-            DocumentFieldType::String(min_length, _) => {
-                match min_length {
-                    None => { None }
-                    Some(size) => { Some(*size * 4) }
-                }
-            }
-            DocumentFieldType::ByteArray(min_size, _) => {
-                match min_size {
-                    None => { None }
-                    Some(size) => { Some(*size) }
-                }
-            }
-            DocumentFieldType::Boolean => { Some(1) }
-            DocumentFieldType::Date => { Some(8) }
-            DocumentFieldType::Object => { None }
-            DocumentFieldType::Array => { None }
+            DocumentFieldType::Integer => Some(8),
+            DocumentFieldType::Number => Some(8),
+            DocumentFieldType::String(min_length, _) => match min_length {
+                None => None,
+                Some(size) => Some(*size * 4),
+            },
+            DocumentFieldType::ByteArray(min_size, _) => match min_size {
+                None => None,
+                Some(size) => Some(*size),
+            },
+            DocumentFieldType::Boolean => Some(1),
+            DocumentFieldType::Date => Some(8),
+            DocumentFieldType::Object => None,
+            DocumentFieldType::Array => None,
         }
     }
 
     pub fn max_size(&self) -> Option<usize> {
         match self {
-            DocumentFieldType::Integer => { Some(8) }
-            DocumentFieldType::Number => { Some(8) }
-            DocumentFieldType::String(_, max_length) => {
-                match max_length {
-                    None => { None }
-                    Some(size) => { Some(*size * 4) }
-                }
-            }
-            DocumentFieldType::ByteArray(_, max_size) => {
-                match max_size {
-                    None => { None }
-                    Some(size) => { Some(*size) }
-                }
-            }
-            DocumentFieldType::Boolean => { Some(1) }
-            DocumentFieldType::Date => { Some(8) }
-            DocumentFieldType::Object => { None }
-            DocumentFieldType::Array => { None }
+            DocumentFieldType::Integer => Some(8),
+            DocumentFieldType::Number => Some(8),
+            DocumentFieldType::String(_, max_length) => match max_length {
+                None => None,
+                Some(size) => Some(*size * 4),
+            },
+            DocumentFieldType::ByteArray(_, max_size) => match max_size {
+                None => None,
+                Some(size) => Some(*size),
+            },
+            DocumentFieldType::Boolean => Some(1),
+            DocumentFieldType::Date => Some(8),
+            DocumentFieldType::Object => None,
+            DocumentFieldType::Array => None,
         }
     }
 }

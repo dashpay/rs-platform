@@ -95,10 +95,13 @@ impl QueryOperation {
         }
     }
 
-    pub fn for_key_check_with_path_length<'a: 'b, 'b, 'c, P>(key_len: usize, path_len: usize) -> Self
-        where
-            P: IntoIterator<Item = &'c [u8]>,
-            <P as IntoIterator>::IntoIter: ExactSizeIterator + DoubleEndedIterator + Clone,
+    pub fn for_key_check_with_path_length<'a: 'b, 'b, 'c, P>(
+        key_len: usize,
+        path_len: usize,
+    ) -> Self
+    where
+        P: IntoIterator<Item = &'c [u8]>,
+        <P as IntoIterator>::IntoIter: ExactSizeIterator + DoubleEndedIterator + Clone,
     {
         QueryOperation {
             key_size: key_len as u32,
