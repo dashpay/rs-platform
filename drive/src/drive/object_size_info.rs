@@ -25,15 +25,6 @@ where
     P: IntoIterator<Item = &'a [u8]>,
     <P as IntoIterator>::IntoIter: ExactSizeIterator + DoubleEndedIterator + Clone,
 {
-    pub fn path_iterator(&self) -> Result<P, Error> {
-        match self {
-            PathFixedSizeIterator(path_iterator) => Ok(path_iterator),
-            PathIterator(path_iterator) => Ok(path_iterator),
-            PathSize(_) => Err(Error::CorruptedData(String::from(
-                "request for path iterator on path size",
-            ))),
-        }
-    }
 
     pub fn len(&self) -> usize {
         match self {
@@ -86,11 +77,7 @@ impl<'a> Default for KeyInfo<'a> {
     }
 }
 
-impl<'a, P> KeyInfo<'a>
-where
-    P: IntoIterator<Item = &'a [u8]>,
-    <P as IntoIterator>::IntoIter: ExactSizeIterator + DoubleEndedIterator + Clone,
-{
+impl<'a> KeyInfo<'a> {
     pub fn len(&'a self) -> usize {
         match self {
             Key(key) => key.len(),
@@ -99,15 +86,43 @@ where
         }
     }
 
-    pub fn add_path_info(self, path_info: &PathInfo<P>) -> Result<PathKeyInfo<'a, P>, Error> {
+    pub fn add_path_info<P>(self, path_info: &PathInfo<'a, P>) -> Result<PathKeyInfo<'a, P>, Error>
+        where
+            P: IntoIterator<Item = &'a [u8]>,
+            <P as IntoIterator>::IntoIter: ExactSizeIterator + DoubleEndedIterator + Clone,
+    {
         match self {
-            Key(key) => Ok(PathKey((path_info.path_iterator()?, key))),
-            KeyRef(key_ref) => Ok(PathKeyRef((path_info.path_iterator()?, key_ref))),
+            Key(key) => {
+                if let PathIterator(iter) = path_info {
+                    Ok(PathKey((iter.clone(), key)))
+                } else if let PathFixedSizeIterator(iter) = path_info {
+                    Ok(PathKey((iter.clone(), key)))
+                } else {
+                    Err(Error::CorruptedData(String::from(
+                        "request for path iterator on path size",
+                    )))
+                }
+            },
+            KeyRef(key_ref) => {
+                if let PathIterator(iter) = path_info {
+                    Ok(PathKeyRef((iter, key_ref)))
+                } else if let PathFixedSizeIterator(iter) = path_info {
+                    Ok(PathKeyRef((iter, key_ref)))
+                } else {
+                    Err(Error::CorruptedData(String::from(
+                        "request for path iterator on path size",
+                    )))
+                }
+            },
             KeySize(key_size) => Ok(PathKeySize((path_info.len(), key_size))),
         }
     }
 
-    pub fn add_path(self, path: P) -> PathKeyInfo<'a, P> {
+    pub fn add_path<P>(self, path: P) -> PathKeyInfo<'a, P>
+        where
+            P: IntoIterator<Item = &'a [u8]>,
+            <P as IntoIterator>::IntoIter: ExactSizeIterator + DoubleEndedIterator + Clone,
+    {
         match self {
             Key(key) => PathKey((path, key)),
             KeyRef(key_ref) => PathKeyRef((path, key_ref)),
@@ -178,7 +193,7 @@ where
     <P as IntoIterator>::IntoIter: ExactSizeIterator + DoubleEndedIterator + Clone,
 {
     pub fn from_path_info_and_key_element(
-        path_info: PathInfo<P>,
+        path_info: PathInfo<'a, P>,
         key_element: KeyElementInfo,
     ) -> Result<Self, Error> {
         match path_info {

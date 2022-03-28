@@ -247,7 +247,7 @@ impl Drive {
 
     fn grove_insert_empty_tree_if_not_exists<'a: 'b, 'b, 'c, P>(
         &'a self,
-        path_key_info: PathKeyInfo<P>,
+        path_key_info: PathKeyInfo<'c, P>,
         transaction: TransactionArg,
         query_operations: &mut Vec<QueryOperation>,
         insert_operations: &mut Vec<InsertOperation>,
@@ -298,7 +298,7 @@ impl Drive {
 
     fn grove_insert<'a: 'b, 'b, 'c, P>(
         &'a self,
-        path_key_element_info: PathKeyElementInfo<P>,
+        path_key_element_info: PathKeyElementInfo<'c, P>,
         transaction: TransactionArg,
         insert_operations: &mut Vec<InsertOperation>,
     ) -> Result<(), Error>
@@ -323,7 +323,7 @@ impl Drive {
 
     fn grove_insert_if_not_exists<'a: 'b, 'b, 'c, P>(
         &'a self,
-        path_key_element_info: PathKeyElementInfo<P>,
+        path_key_element_info: PathKeyElementInfo<'c, P>,
         transaction: TransactionArg,
         query_operations: &mut Vec<QueryOperation>,
         insert_operations: &mut Vec<InsertOperation>,
