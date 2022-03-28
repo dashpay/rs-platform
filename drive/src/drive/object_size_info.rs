@@ -94,7 +94,7 @@ impl<'a> KeyInfo<'a> {
         match self {
             Key(key) => {
                 if let PathIterator(iter) = path_info {
-                    Ok(PathKey((P::from(iter.into_iter()), key)))
+                    Ok(PathKey((iter, key)))
                 } else if let PathFixedSizeIterator(iter) = path_info {
                     Ok(PathKey((iter.clone(), key)))
                 } else {
