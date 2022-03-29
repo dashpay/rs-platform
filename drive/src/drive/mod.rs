@@ -7,8 +7,8 @@ use crate::drive::object_size_info::DocumentInfo::{DocumentAndSerialization, Doc
 use crate::drive::object_size_info::KeyElementInfo::{KeyElement, KeyElementSize};
 use crate::drive::object_size_info::KeyInfo::{Key, KeyRef, KeySize};
 use crate::drive::object_size_info::PathInfo::PathSize;
-use crate::drive::object_size_info::PathKeyElementInfo::{PathKeyElement, PathKeyElementSize};
-use crate::drive::object_size_info::PathKeyInfo::{PathKeyRef, PathKeySize};
+use crate::drive::object_size_info::PathKeyElementInfo::{PathFixedSizeKeyElement, PathKeyElement, PathKeyElementSize};
+use crate::drive::object_size_info::PathKeyInfo::{PathFixedSizeKeyRef, PathKeyRef, PathKeySize};
 use crate::drive::object_size_info::{
     DocumentAndContractInfo, DocumentInfo, KeyElementInfo, KeyInfo, PathInfo, PathKeyElementInfo,
     PathKeyInfo,
@@ -219,7 +219,7 @@ impl Drive {
     fn grove_insert_empty_tree<'a: 'b, 'b, 'c, P>(
         &'a self,
         path: P,
-        key_info: KeyInfo,
+        key_info: KeyInfo<'c>,
         transaction: TransactionArg,
         insert_operations: &mut Vec<InsertOperation>,
     ) -> Result<(), Error>
@@ -245,16 +245,13 @@ impl Drive {
         }
     }
 
-    fn grove_insert_empty_tree_if_not_exists<'a: 'b, 'b, 'c, P>(
+    fn grove_insert_empty_tree_if_not_exists<'a: 'b, 'b, 'c, const N:usize>(
         &'a self,
-        path_key_info: PathKeyInfo<'c, P>,
+        path_key_info: PathKeyInfo<'c, N>,
         transaction: TransactionArg,
         query_operations: &mut Vec<QueryOperation>,
         insert_operations: &mut Vec<InsertOperation>,
     ) -> Result<bool, Error>
-    where
-        P: IntoIterator<Item = &'c [u8]>,
-        <P as IntoIterator>::IntoIter: ExactSizeIterator + DoubleEndedIterator + Clone,
     {
         match path_key_info {
             PathKeyInfo::PathKeyRef((path, key)) => {
@@ -293,18 +290,43 @@ impl Drive {
                 query_operations.push(QueryOperation::for_key_check_in_path(key.len(), path));
                 Ok(inserted)
             }
+            PathKeyInfo::PathFixedSizeKey((path, key)) => {
+                let path = path.into_iter();
+                let inserted = self.grove.insert_if_not_exists(
+                    path.clone(),
+                    key.as_slice(),
+                    Element::empty_tree(),
+                    transaction,
+                )?;
+                if inserted {
+                    insert_operations.push(InsertOperation::for_empty_tree(key.len()));
+                }
+                query_operations.push(QueryOperation::for_key_check_in_path(key.len(), path));
+                Ok(inserted)
+            }
+            PathKeyInfo::PathFixedSizeKeyRef((path, key)) => {
+                let path = path.into_iter();
+                let inserted = self.grove.insert_if_not_exists(
+                    path.clone(),
+                    key,
+                    Element::empty_tree(),
+                    transaction,
+                )?;
+                if inserted {
+                    insert_operations.push(InsertOperation::for_empty_tree(key.len()));
+                }
+                query_operations.push(QueryOperation::for_key_check_in_path(key.len(), path));
+                Ok(inserted)
+            }
         }
     }
 
-    fn grove_insert<'a: 'b, 'b, 'c, P>(
+    fn grove_insert<'a: 'b, 'b, 'c, const N:usize>(
         &'a self,
-        path_key_element_info: PathKeyElementInfo<'c, P>,
+        path_key_element_info: PathKeyElementInfo<'c, N>,
         transaction: TransactionArg,
         insert_operations: &mut Vec<InsertOperation>,
     ) -> Result<(), Error>
-    where
-        P: IntoIterator<Item = &'c [u8]>,
-        <P as IntoIterator>::IntoIter: ExactSizeIterator + DoubleEndedIterator + Clone,
     {
         match path_key_element_info {
             PathKeyElement((path, key, element)) => {
@@ -318,19 +340,20 @@ impl Drive {
                 ));
                 Ok(())
             }
+            PathFixedSizeKeyElement((path, key, element)) => {
+                insert_operations.push(InsertOperation::for_key_value(key.len(), &element));
+                self.grove.insert(path, key, element, transaction)
+            }
         }
     }
 
-    fn grove_insert_if_not_exists<'a: 'b, 'b, 'c, P>(
+    fn grove_insert_if_not_exists<'a: 'b, 'b, 'c, const N:usize>(
         &'a self,
-        path_key_element_info: PathKeyElementInfo<'c, P>,
+        path_key_element_info: PathKeyElementInfo<'c, N>,
         transaction: TransactionArg,
         query_operations: &mut Vec<QueryOperation>,
         insert_operations: &mut Vec<InsertOperation>,
     ) -> Result<bool, Error>
-    where
-        P: IntoIterator<Item = &'c [u8]>,
-        <P as IntoIterator>::IntoIter: ExactSizeIterator + DoubleEndedIterator + Clone,
     {
         match path_key_element_info {
             PathKeyElement((path, key, element)) => {
@@ -356,13 +379,27 @@ impl Drive {
                 query_operations.push(query_operation);
                 Ok(true)
             }
+            PathKeyElementInfo::PathFixedSizeKeyElement((path, key, element)) => {
+                let path_iter = path.into_iter();
+                let insert_operation = InsertOperation::for_key_value(key.len(), &element);
+                let query_operation =
+                    QueryOperation::for_key_check_in_path(key.len(), path_iter.clone());
+                let inserted =
+                    self.grove
+                        .insert_if_not_exists(path_iter, key, element, transaction)?;
+                if inserted {
+                    insert_operations.push(insert_operation);
+                }
+                query_operations.push(query_operation);
+                Ok(inserted)
+            }
         }
     }
 
     fn grove_get<'a: 'b, 'b, 'c, P>(
         &'a self,
         path: P,
-        key_info: KeyInfo,
+        key_info: KeyInfo<'c>,
         transaction: TransactionArg,
         query_operations: &mut Vec<QueryOperation>,
     ) -> Result<Option<Element>, Error>
@@ -402,7 +439,7 @@ impl Drive {
             let contract_keeping_history_storage_path =
                 contract_keeping_history_storage_path(&contract.id);
             self.grove_insert(
-                PathKeyElement((
+                PathFixedSizeKeyElement((
                     contract_keeping_history_storage_path,
                     encoded_time.as_slice(),
                     contract_bytes,
@@ -415,7 +452,7 @@ impl Drive {
             let contract_storage_path =
                 contract_keeping_history_storage_time_reference_path(&contract.id, encoded_time);
             self.grove_insert(
-                PathKeyElement((
+                PathFixedSizeKeyElement((
                     contract_keeping_history_storage_path,
                     &[0],
                     Element::Reference(contract_storage_path),
@@ -426,7 +463,7 @@ impl Drive {
         } else {
             // the contract is just stored at key 0
             self.grove_insert(
-                PathKeyElement((contract_root_path, &[0], contract_bytes)),
+                PathFixedSizeKeyElement((contract_root_path, &[0], contract_bytes)),
                 transaction,
                 insert_operations,
             )?;
@@ -583,7 +620,7 @@ impl Drive {
                 for index in document_type.top_level_indices()? {
                     // toDo: we can save a little by only inserting on new indexes
                     self.grove_insert_empty_tree_if_not_exists(
-                        PathKeyRef((type_path, index.name.as_bytes())),
+                        PathFixedSizeKeyRef((type_path, index.name.as_bytes())),
                         transaction,
                         query_operations,
                         insert_operations,
@@ -644,7 +681,7 @@ impl Drive {
         let mut already_exists = false;
         let mut original_contract_stored_data = vec![];
 
-        if let Ok(stored_element) = self.grove_get(
+        if let Ok(Some(stored_element)) = self.grove_get(
             contract_root_path(&contract.id),
             KeyRef(&[0]),
             transaction,
@@ -711,7 +748,7 @@ impl Drive {
             let path_key_info = if let DocumentAndSerialization((document, _)) =
                 document_and_contract_info.document_info
             {
-                PathKeyRef((primary_key_path, document.id.as_slice()))
+                PathFixedSizeKeyRef((primary_key_path, document.id.as_slice()))
             } else {
                 PathKeySize((
                     crate::drive::defaults::BASE_CONTRACT_DOCUMENTS_PRIMARY_KEY_PATH
@@ -735,7 +772,7 @@ impl Drive {
                             document_type.name.as_str(),
                             document.id.as_slice(),
                         );
-                    PathKeyElement((
+                    PathFixedSizeKeyElement((
                         document_id_in_primary_path,
                         encoded_time.as_slice(),
                         Element::Item(Vec::from(document_cbor)),
@@ -769,7 +806,7 @@ impl Drive {
                         document.id.as_slice(),
                         encoded_time,
                     );
-                PathKeyElement((
+                PathFixedSizeKeyElement((
                     document_id_in_primary_path,
                     &[0],
                     Element::Reference(contract_storage_path),
@@ -789,7 +826,7 @@ impl Drive {
             self.grove_insert(path_key_element_info, transaction, insert_operations)?;
         } else if insert_without_check {
             let path_key_element_info = match document_and_contract_info.document_info {
-                DocumentAndSerialization((document, document_cbor)) => PathKeyElement((
+                DocumentAndSerialization((document, document_cbor)) => PathFixedSizeKeyElement((
                     primary_key_path,
                     document.id.as_slice(),
                     Element::Item(Vec::from(document_cbor)),
@@ -804,7 +841,7 @@ impl Drive {
             self.grove_insert(path_key_element_info, transaction, insert_operations)?;
         } else {
             let path_key_element_info = match document_and_contract_info.document_info {
-                DocumentAndSerialization((document, document_cbor)) => PathKeyElement((
+                DocumentAndSerialization((document, document_cbor)) => PathFixedSizeKeyElement((
                     primary_key_path,
                     document.id.as_slice().clone(),
                     Element::Item(Vec::from(document_cbor)),
@@ -922,11 +959,7 @@ impl Drive {
         query_operations: &mut Vec<QueryOperation>,
         insert_operations: &mut Vec<InsertOperation>,
     ) -> Result<(), Error> {
-        let contract = document_and_contract_info.contract;
-        let document_type_name = document_and_contract_info.document_type_name;
-        let document_type = document_and_contract_info.document_type;
-        let document_info = &document_and_contract_info.document_info;
-        let owner_id = document_and_contract_info.owner_id;
+
         // second we need to construct the path for documents on the contract
         // the path is
         //  * Document and Contract root tree
@@ -934,21 +967,21 @@ impl Drive {
         //  * 0 to signify Documents and not Contract
         let contract_document_type_path = contract_document_type_path(
             &document_and_contract_info.contract.id,
-            document_and_contract_info.document_type_name,
+            document_and_contract_info.document_type.name.as_str(),
         );
 
         let primary_key_path =
-            contract_documents_primary_key_path(&contract.id, document_type_name);
+            contract_documents_primary_key_path(&document_and_contract_info.contract.id, document_and_contract_info.document_type.name.as_str());
         if override_document
             && self
                 .grove_get(
                     primary_key_path,
-                    document_info.id_key_info(),
+                    document_and_contract_info.document_info.id_key_info(),
                     transaction,
                     query_operations,
                 )
                 .is_ok()
-            && document_info.is_document_and_serialization()
+            && document_and_contract_info.document_info.is_document_and_serialization()
         {
             self.update_document_for_contract_operations(
                 document_and_contract_info,
@@ -970,7 +1003,7 @@ impl Drive {
             )?;
         }
         // fourth we need to store a reference to the document for each index
-        for index in &document_type.indices {
+        for index in document_and_contract_info.document_type.indices {
             // at this point the contract path is to the contract documents
             // for each index the top index component will already have been added
             // when the contract itself was created
@@ -986,13 +1019,14 @@ impl Drive {
 
             // with the example of the dashpay contract's first index
             // the index path is now something like Contracts/ContractID/Documents(1)/$ownerId
-            let document_top_field = document_info
-                .get_raw_for_document_type(&top_index_property.name, document_type, owner_id)?
+            let document_top_field = document_and_contract_info.document_info
+                .get_raw_for_document_type(&top_index_property.name, &document_and_contract_info.document_type, document_and_contract_info.owner_id.clone())?
                 .unwrap_or_default();
 
             let index_path_slices: Vec<&[u8]> = index_path.iter().map(|x| x.as_slice()).collect();
 
-            let path_key_info = document_top_field.add_path(index_path_slices);
+            // The zero will not matter here, because the PathKeyInfo is variable
+            let path_key_info = document_top_field.add_path::<0>(index_path_slices);
 
             // here we are inserting an empty tree that will have a subtree of all other index properties
             self.grove_insert_empty_tree_if_not_exists(
@@ -1004,8 +1038,10 @@ impl Drive {
 
             let mut all_fields_null = document_top_field.is_empty();
 
-            let mut index_path_info = if document_info.is_document_and_serialization() {
-                PathInfo::PathIterator(index_path)
+            let mut index_path_info = if document_and_contract_info.document_info.is_document_and_serialization() {
+                let index_path_slices: Vec<&[u8]> =
+                    index_path.iter().map(|x| x.as_slice()).collect();
+                PathInfo::PathIterator::<0>(index_path_slices)
             } else {
                 PathInfo::PathSize(index_path.iter().map(|x| x.len()).sum())
             };
@@ -1021,11 +1057,11 @@ impl Drive {
 
                 let index_property_key = KeyRef(index_property.name.as_bytes());
 
-                let document_index_field = document_info
-                    .get_raw_for_document_type(&index_property.name, document_type, owner_id)?
+                let document_index_field = document_and_contract_info.document_info
+                    .get_raw_for_document_type(&index_property.name, &document_and_contract_info.document_type, document_and_contract_info.owner_id.clone())?
                     .unwrap_or_default();
 
-                let path_key_info = index_property_key.add_path_info(&index_path_info)?;
+                let path_key_info = index_property_key.add_path_info(index_path_info.clone())?;
 
                 // here we are inserting an empty tree that will have a subtree of all other index properties
                 self.grove_insert_empty_tree_if_not_exists(
@@ -1040,7 +1076,7 @@ impl Drive {
                 // Iteration 1. the index path is now something like Contracts/ContractID/Documents(1)/$ownerId/<ownerId>/toUserId
                 // Iteration 2. the index path is now something like Contracts/ContractID/Documents(1)/$ownerId/<ownerId>/toUserId/<ToUserId>/accountReference
 
-                let path_key_info = document_index_field.add_path_info(&index_path_info)?;
+                let path_key_info = document_index_field.add_path_info(index_path_info.clone())?;
 
                 // here we are inserting an empty tree that will have a subtree of all other index properties
                 self.grove_insert_empty_tree_if_not_exists(
@@ -1082,7 +1118,7 @@ impl Drive {
             if !index.unique || all_fields_null {
                 let key_path_info = KeyRef(&[0]);
 
-                let path_key_info = key_path_info.add_path_info(&index_path_info)?;
+                let path_key_info = key_path_info.add_path_info(index_path_info.clone())?;
                 // here we are inserting an empty tree that will have a subtree of all other index properties
                 self.grove_insert_empty_tree_if_not_exists(
                     path_key_info,
@@ -1093,10 +1129,10 @@ impl Drive {
 
                 index_path_info.push(Key(vec![0]));
 
-                let key_element_info = match document_info {
+                let key_element_info = match &document_and_contract_info.document_info {
                     DocumentAndSerialization((document, _)) => {
                         let document_reference =
-                            make_document_reference(primary_key_path, document, document_type);
+                            make_document_reference(primary_key_path, document, &document_and_contract_info.document_type);
                         KeyElement((document.id.as_slice(), document_reference))
                     }
                     DocumentSize(max_size) => KeyElementSize((8 as usize, *max_size)),
@@ -1110,10 +1146,10 @@ impl Drive {
                 // here we should return an error if the element already exists
                 self.grove_insert(path_key_element_info, transaction, insert_operations)?;
             } else {
-                let key_element_info = match document_info {
+                let key_element_info = match &document_and_contract_info.document_info {
                     DocumentAndSerialization((document, _)) => {
                         let document_reference =
-                            make_document_reference(primary_key_path, document, document_type);
+                            make_document_reference(primary_key_path, document, &document_and_contract_info.document_type);
                         KeyElement((&[0], document_reference))
                     }
                     DocumentSize(max_size) => KeyElementSize((1, *max_size)),
@@ -1250,7 +1286,7 @@ impl Drive {
         let owner_id = document_and_contract_info.owner_id;
 
         if let DocumentAndSerialization((document, document_cbor)) =
-            *document_and_contract_info.document_type
+            document_and_contract_info.document_info
         {
             // we need to construct the path for documents on the contract
             // the path is
@@ -1364,7 +1400,7 @@ impl Drive {
 
                     // here we are inserting an empty tree that will have a subtree of all other index properties
                     self.grove_insert_empty_tree_if_not_exists(
-                        PathKeyInfo::PathKeyRef((index_path_slices, document_top_field.as_slice())),
+                        PathKeyInfo::PathKeyRef::<0>((index_path_slices, document_top_field.as_slice())),
                         transaction,
                         query_operations,
                         insert_operations,
@@ -1411,7 +1447,7 @@ impl Drive {
 
                         // here we are inserting an empty tree that will have a subtree of all other index properties
                         self.grove_insert_empty_tree_if_not_exists(
-                            PathKeyInfo::PathKeyRef((
+                            PathKeyInfo::PathKeyRef::<0>((
                                 index_path_slices,
                                 index_property.name.as_bytes(),
                             )),
@@ -1433,7 +1469,7 @@ impl Drive {
 
                         // here we are inserting an empty tree that will have a subtree of all other index properties
                         self.grove_insert_empty_tree_if_not_exists(
-                            PathKeyInfo::PathKeyRef((
+                            PathKeyInfo::PathKeyRef::<0>((
                                 index_path_slices,
                                 document_index_field.as_slice(),
                             )),
@@ -1491,7 +1527,7 @@ impl Drive {
                     if !index.unique || all_fields_null {
                         // here we are inserting an empty tree that will have a subtree of all other index properties
                         self.grove_insert_empty_tree_if_not_exists(
-                            PathKeyInfo::PathKeyRef((index_path_slices, &[0])),
+                            PathKeyInfo::PathKeyRef::<0>((index_path_slices, &[0])),
                             transaction,
                             query_operations,
                             insert_operations,
@@ -1503,7 +1539,7 @@ impl Drive {
 
                         // here we should return an error if the element already exists
                         self.grove_insert(
-                            PathKeyElement((
+                            PathKeyElement::<0>((
                                 index_path_slices,
                                 document.id.as_slice(),
                                 document_reference.clone(),
@@ -1517,7 +1553,7 @@ impl Drive {
 
                         // here we should return an error if the element already exists
                         let inserted = self.grove_insert_if_not_exists(
-                            PathKeyElement((index_path_slices, &[0], document_reference.clone())),
+                            PathKeyElement::<0>((index_path_slices, &[0], document_reference.clone())),
                             transaction,
                             query_operations,
                             insert_operations,
@@ -1615,7 +1651,7 @@ impl Drive {
             ));
         }
 
-        let document_bytes: Vec<u8> = match document_element {
+        let document_bytes: Vec<u8> = match document_element.unwrap() {
             Element::Item(data) => data,
             _ => todo!(), // TODO: how should this be handled, possibility that document might not be in storage
         };
@@ -2115,7 +2151,7 @@ mod tests {
             Document::from_cbor(&dpns_domain_document_cbor, None, Some(&random_owner_id))
                 .expect("expected to deserialize the document");
 
-        let document_type = contract.document_type_for_name("domain")?;
+        let document_type = contract.document_type_for_name("domain").expect("expected to get a document type");
 
         drive
             .add_document_for_contract(
@@ -2173,7 +2209,7 @@ mod tests {
                 let document = Document::from_cbor(&document_cbor, None, None)
                     .expect("expected to deserialize the document");
 
-                let document_type = contract.document_type_for_name("niceDocument")?;
+                let document_type = contract.document_type_for_name("niceDocument").expect("expected to get a document type");
 
                 drive
                     .add_document_for_contract(
@@ -2281,7 +2317,7 @@ mod tests {
         let document = Document::from_cbor(&person_document_cbor, None, Some(&random_owner_id))
             .expect("expected to deserialize the document");
 
-        let document_type = contract.document_type_for_name("person")?;
+        let document_type = contract.document_type_for_name("person").expect("expected to get a document type");
 
         drive
             .add_document_for_contract(
@@ -2377,7 +2413,7 @@ mod tests {
         let document = Document::from_cbor(&person_document_cbor, None, Some(&random_owner_id))
             .expect("expected to deserialize the document");
 
-        let document_type = contract.document_type_for_name("person")?;
+        let document_type = contract.document_type_for_name("person").expect("expected to get a document type");
 
         drive
             .add_document_for_contract(
@@ -2406,7 +2442,7 @@ mod tests {
         let document = Document::from_cbor(&person_document_cbor, None, Some(&random_owner_id))
             .expect("expected to deserialize the document");
 
-        let document_type = contract.document_type_for_name("person")?;
+        let document_type = contract.document_type_for_name("person").expect("expected to get a document type");
 
         drive
             .add_document_for_contract(
@@ -2530,7 +2566,7 @@ mod tests {
         let document = Document::from_cbor(&person_document_cbor, None, Some(&random_owner_id))
             .expect("expected to deserialize the document");
 
-        let document_type = contract.document_type_for_name("person")?;
+        let document_type = contract.document_type_for_name("person").expect("expected to get a document type");
 
         drive
             .add_document_for_contract(
@@ -2559,7 +2595,7 @@ mod tests {
         let document = Document::from_cbor(&person_document_cbor, None, Some(&random_owner_id))
             .expect("expected to deserialize the document");
 
-        let document_type = contract.document_type_for_name("person")?;
+        let document_type = contract.document_type_for_name("person").expect("expected to get a document type");
 
         drive
             .add_document_for_contract(
@@ -2856,7 +2892,7 @@ mod tests {
         let alice_profile = Document::from_cbor(alice_profile_cbor.as_slice(), None, None)
             .expect("expected to get a document");
 
-        let document_type = contract.document_type_for_name("profile")?;
+        let document_type = contract.document_type_for_name("profile").expect("expected to get a document type");
 
         drive
             .add_document_for_contract(
@@ -2932,7 +2968,7 @@ mod tests {
         let alice_profile = Document::from_cbor(alice_profile_cbor.as_slice(), None, None)
             .expect("expected to get a document");
 
-        let document_type = contract.document_type_for_name("profile")?;
+        let document_type = contract.document_type_for_name("profile").expect("expected to get a document type");
 
         drive
             .add_document_for_contract(
@@ -3026,7 +3062,7 @@ mod tests {
         let alice_profile = Document::from_cbor(alice_profile_cbor.as_slice(), None, None)
             .expect("expected to get a document");
 
-        let document_type = contract.document_type_for_name("profile")?;
+        let document_type = contract.document_type_for_name("profile").expect("expected to get a document type");
 
         drive
             .add_document_for_contract(

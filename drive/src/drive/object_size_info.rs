@@ -1,29 +1,26 @@
+use std::array::TryFromSliceError;
+use std::borrow::BorrowMut;
 use crate::contract::{Contract, Document, DocumentType};
 use crate::drive::object_size_info::KeyInfo::{Key, KeyRef, KeySize};
 use crate::drive::object_size_info::PathInfo::{PathFixedSizeIterator, PathIterator, PathSize};
-use crate::drive::object_size_info::PathKeyElementInfo::{PathKeyElement, PathKeyElementSize};
-use crate::drive::object_size_info::PathKeyInfo::{PathKey, PathKeyRef, PathKeySize};
+use crate::drive::object_size_info::PathKeyElementInfo::{PathFixedSizeKeyElement, PathKeyElement, PathKeyElementSize};
+use crate::drive::object_size_info::PathKeyInfo::{PathFixedSizeKey, PathFixedSizeKeyRef, PathKey, PathKeyRef, PathKeySize};
 use grovedb::{Element, Error};
 
-pub enum PathInfo<'a, P>
-where
-    P: IntoIterator<Item = &'a [u8]>,
-    <P as IntoIterator>::IntoIter: ExactSizeIterator + DoubleEndedIterator + Clone,
+#[derive(Clone)]
+pub enum PathInfo<'a, const N: usize>
 {
     /// An into iter Path
-    PathFixedSizeIterator(P),
+    PathFixedSizeIterator([&'a [u8]; N]),
 
     /// An into iter Path
-    PathIterator(Vec<Vec<u8>>),
+    PathIterator(Vec<&'a [u8]>),
 
     /// A path size
     PathSize(usize),
 }
 
-impl<'a, P> PathInfo<'a, P>
-where
-    P: IntoIterator<Item = &'a [u8]>,
-    <P as IntoIterator>::IntoIter: ExactSizeIterator + DoubleEndedIterator + Clone,
+impl<'a, const N: usize> PathInfo<'a, N>
 {
 
     pub fn len(&self) -> usize {
@@ -36,16 +33,16 @@ where
         }
     }
 
-    pub fn push(&mut self, key_info: KeyInfo) -> Result<(), Error> {
+    pub fn push(&mut self, key_info: KeyInfo<'a>) -> Result<(), Error> {
         match self {
             PathFixedSizeIterator(_) => {
                 return Err(Error::CorruptedData(String::from(
-                    "can not add a key to a fixed sized path iterator",
+                    "can not add a key to a fixed size path iterator",
                 )))
             }
             PathIterator(path_iterator) => match key_info {
-                Key(key) => path_iterator.push(key),
-                KeyRef(key_ref) => path_iterator.push(Vec::from(key_ref)),
+                Key(key) => path_iterator.push(key.as_slice()),
+                KeyRef(key_ref) => path_iterator.push(key_ref),
                 KeySize(key_size) => {
                     return Err(Error::CorruptedData(String::from(
                         "can not add a key size to path iterator",
@@ -86,17 +83,22 @@ impl<'a> KeyInfo<'a> {
         }
     }
 
-    pub fn add_path_info<P>(self, path_info: &PathInfo<'a, P>) -> Result<PathKeyInfo<'a, P>, Error>
-        where
-            P: IntoIterator<Item = &'a [u8]>,
-            <P as IntoIterator>::IntoIter: ExactSizeIterator + DoubleEndedIterator + Clone,
+    pub fn is_empty(&'a self) -> bool {
+        match self {
+            Key(key) => key.is_empty(),
+            KeyRef(key) => key.is_empty(),
+            KeySize(key_size) => *key_size == 0,
+        }
+    }
+
+    pub fn add_path_info<const N: usize>(self, path_info: PathInfo<'a, N>) -> Result<PathKeyInfo<'a, N>, Error>
     {
         match self {
             Key(key) => {
                 if let PathIterator(iter) = path_info {
                     Ok(PathKey((iter, key)))
                 } else if let PathFixedSizeIterator(iter) = path_info {
-                    Ok(PathKey((iter.clone(), key)))
+                    Ok(PathFixedSizeKey((iter, key)))
                 } else {
                     Err(Error::CorruptedData(String::from(
                         "request for path iterator on path size",
@@ -107,7 +109,7 @@ impl<'a> KeyInfo<'a> {
                 if let PathIterator(iter) = path_info {
                     Ok(PathKeyRef((iter, key_ref)))
                 } else if let PathFixedSizeIterator(iter) = path_info {
-                    Ok(PathKeyRef((iter, key_ref)))
+                    Ok(PathFixedSizeKeyRef((iter, key_ref)))
                 } else {
                     Err(Error::CorruptedData(String::from(
                         "request for path iterator on path size",
@@ -118,10 +120,16 @@ impl<'a> KeyInfo<'a> {
         }
     }
 
-    pub fn add_path<P>(self, path: P) -> PathKeyInfo<'a, P>
-        where
-            P: IntoIterator<Item = &'a [u8]>,
-            <P as IntoIterator>::IntoIter: ExactSizeIterator + DoubleEndedIterator + Clone,
+    pub fn add_fixed_size_path<const N: usize>(self, path: [&'a [u8]; N]) -> PathKeyInfo<'a, N>
+    {
+        match self {
+            Key(key) => PathFixedSizeKey((path, key)),
+            KeyRef(key_ref) => PathFixedSizeKeyRef((path, key_ref)),
+            KeySize(key_size) => PathKeySize((path.len(), key_size)),
+        }
+    }
+
+    pub fn add_path<const N: usize>(self, path: Vec<&'a [u8]>) -> PathKeyInfo<'a, N>
     {
         match self {
             Key(key) => PathKey((path, key)),
@@ -131,31 +139,36 @@ impl<'a> KeyInfo<'a> {
     }
 }
 
-pub enum PathKeyInfo<'a, P>
-where
-    P: IntoIterator<Item = &'a [u8]>,
-    <P as IntoIterator>::IntoIter: ExactSizeIterator + DoubleEndedIterator + Clone,
+pub enum PathKeyInfo<'a, const N: usize>
 {
     /// An into iter Path with a Key
-    PathKey((P, Vec<u8>)),
+    PathFixedSizeKey(([&'a [u8]; N], Vec<u8>)),
     /// An into iter Path with a Key
-    PathKeyRef((P, &'a [u8])),
+    PathFixedSizeKeyRef(([&'a [u8]; N], &'a [u8])),
+
+    /// An into iter Path with a Key
+    PathKey((Vec<&'a [u8]>, Vec<u8>)),
+    /// An into iter Path with a Key
+    PathKeyRef((Vec<&'a [u8]>, &'a [u8])),
     /// A path size
     PathKeySize((usize, usize)),
 }
 
-impl<'a, P> PathKeyInfo<'a, P>
-where
-    P: IntoIterator<Item = &'a [u8]>,
-    <P as IntoIterator>::IntoIter: ExactSizeIterator + DoubleEndedIterator + Clone,
+impl<'a, const N: usize> PathKeyInfo<'a, N>
 {
     pub fn len(&'a self) -> usize {
         match self {
             PathKey((path_iterator, key)) => {
-                path_iterator.clone().into_iter().map(|a| a.len()).sum() + key.len()
+                path_iterator.clone().into_iter().map(|a| a.len()).sum::<usize>() + key.len()
             }
             PathKeyRef((path_iterator, key)) => {
-                path_iterator.clone().into_iter().map(|a| a.len()).sum() + key.len()
+                path_iterator.clone().into_iter().map(|a| a.len()).sum::<usize>() + key.len()
+            }
+            PathFixedSizeKey((path_iterator, key)) => {
+                path_iterator.clone().into_iter().map(|a| a.len()).sum::<usize>() + key.len()
+            }
+            PathFixedSizeKeyRef((path_iterator, key)) => {
+                path_iterator.clone().into_iter().map(|a| a.len()).sum::<usize>() + key.len()
             }
             PathKeySize((path_size, key_size)) => *path_size + *key_size,
         }
@@ -176,25 +189,21 @@ pub enum KeyElementInfo<'a> {
     KeyElementSize((usize, usize)),
 }
 
-pub enum PathKeyElementInfo<'a, P>
-where
-    P: IntoIterator<Item = &'a [u8]>,
-    <P as IntoIterator>::IntoIter: ExactSizeIterator + DoubleEndedIterator + Clone,
+pub enum PathKeyElementInfo<'a, const N: usize>
 {
     /// A triple Path Key and Element
-    PathKeyElement((P, &'a [u8], Element)),
+    PathFixedSizeKeyElement(([&'a [u8]; N], &'a [u8], Element)),
+    /// A triple Path Key and Element
+    PathKeyElement((Vec<&'a [u8]>, &'a [u8], Element)),
     /// A triple of sum of Path lengths, Key length and Element size
     PathKeyElementSize((usize, usize, usize)),
 }
 
-impl<'a, P> PathKeyElementInfo<'a, P>
-where
-    P: IntoIterator<Item = &'a [u8]>,
-    <P as IntoIterator>::IntoIter: ExactSizeIterator + DoubleEndedIterator + Clone,
+impl<'a, const N: usize> PathKeyElementInfo<'a, N>
 {
     pub fn from_path_info_and_key_element(
-        path_info: PathInfo<'a, P>,
-        key_element: KeyElementInfo,
+        path_info: PathInfo<'a, N>,
+        key_element: KeyElementInfo<'a>,
     ) -> Result<Self, Error> {
         match path_info {
             PathIterator(path_interator) => match key_element {
@@ -217,7 +226,7 @@ where
             },
             PathFixedSizeIterator(path_interator) => match key_element {
                 KeyElementInfo::KeyElement((key, element)) => {
-                    Ok(PathKeyElement((path_interator, key, element)))
+                    Ok(PathFixedSizeKeyElement((path_interator, key, element)))
                 }
                 KeyElementInfo::KeyElementSize(_) => Err(Error::CorruptedData(String::from(
                     "path matched with key element size",
@@ -226,7 +235,16 @@ where
         }
     }
 
-    pub fn from_path_and_key_element(path: P, key_element: KeyElementInfo) -> Result<Self, Error> {
+    pub fn from_fixed_size_path_and_key_element(path: [&'a [u8]; N], key_element: KeyElementInfo<'a>) -> Result<Self, Error> {
+        match key_element {
+            KeyElementInfo::KeyElement((key, element)) => Ok(PathFixedSizeKeyElement((path, key, element))),
+            KeyElementInfo::KeyElementSize(_) => Err(Error::CorruptedData(String::from(
+                "path matched with key element size",
+            ))),
+        }
+    }
+
+    pub fn from_path_and_key_element(path: Vec<&'a [u8]>, key_element: KeyElementInfo<'a>) -> Result<Self, Error> {
         match key_element {
             KeyElementInfo::KeyElement((key, element)) => Ok(PathKeyElement((path, key, element))),
             KeyElementInfo::KeyElementSize(_) => Err(Error::CorruptedData(String::from(
@@ -242,6 +260,7 @@ where
             PathKeyElementInfo::PathKeyElementSize((_, key_size, element_size)) => {
                 *key_size + *element_size
             }
+            PathFixedSizeKeyElement((_, key, element)) => element.node_byte_size(key),
         }
     }
 }
@@ -273,7 +292,7 @@ impl<'a> DocumentInfo<'a> {
             DocumentInfo::DocumentAndSerialization((document, _)) => {
                 KeyInfo::KeyRef(document.id.as_slice())
             }
-            DocumentInfo::DocumentSize(_) => 32,
+            DocumentInfo::DocumentSize(_) => KeyInfo::KeySize(32),
         }
     }
 
