@@ -95,11 +95,7 @@ impl QueryOperation {
         }
     }
 
-    pub fn for_key_check_with_path_length(
-        key_len: usize,
-        path_len: usize,
-    ) -> Self
-    {
+    pub fn for_key_check_with_path_length(key_len: usize, path_len: usize) -> Self {
         QueryOperation {
             key_size: key_len as u32,
             path_size: path_len as u32,

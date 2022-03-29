@@ -858,7 +858,6 @@ pub fn cbor_inner_size_value(document_type: &[(Value, Value)], key: &str) -> Opt
     } else {
         None
     }
-
 }
 
 fn cbor_inner_bool_value_with_default(
