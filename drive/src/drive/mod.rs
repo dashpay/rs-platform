@@ -1,5 +1,5 @@
 pub mod defaults;
-mod object_size_info;
+pub mod object_size_info;
 
 use crate::contract::{Contract, Document, DocumentType};
 use crate::drive::defaults::{CONTRACT_DOCUMENTS_PATH_HEIGHT, DEFAULT_HASH_SIZE};
@@ -238,9 +238,7 @@ impl Drive {
                 Ok(())
             }
             KeyInfo::Key(key) => {
-                insert_operations.push(InsertOperation::for_empty_tree(key.len()));
-                self.grove
-                    .insert(path, key.as_slice(), Element::empty_tree(), transaction)
+                Err(Error::InternalError("only a key ref can be inserted into groveDB"))
             }
         }
     }
@@ -732,7 +730,7 @@ impl Drive {
     // insert operations
     fn add_document_to_primary_storage(
         &self,
-        document_and_contract_info: DocumentAndContractInfo,
+        document_and_contract_info: &DocumentAndContractInfo,
         block_time: f64,
         insert_without_check: bool,
         transaction: TransactionArg,
@@ -994,7 +992,7 @@ impl Drive {
         } else {
             // if we have override_document set that means we already checked if it exists
             self.add_document_to_primary_storage(
-                document_and_contract_info,
+                &document_and_contract_info,
                 block_time,
                 override_document,
                 transaction,
@@ -1003,7 +1001,7 @@ impl Drive {
             )?;
         }
         // fourth we need to store a reference to the document for each index
-        for index in document_and_contract_info.document_type.indices {
+        for index in &document_and_contract_info.document_type.indices {
             // at this point the contract path is to the contract documents
             // for each index the top index component will already have been added
             // when the contract itself was created
@@ -1026,7 +1024,7 @@ impl Drive {
             let index_path_slices: Vec<&[u8]> = index_path.iter().map(|x| x.as_slice()).collect();
 
             // The zero will not matter here, because the PathKeyInfo is variable
-            let path_key_info = document_top_field.add_path::<0>(index_path_slices);
+            let path_key_info = document_top_field.clone().add_path::<0>(index_path_slices);
 
             // here we are inserting an empty tree that will have a subtree of all other index properties
             self.grove_insert_empty_tree_if_not_exists(
@@ -1061,7 +1059,7 @@ impl Drive {
                     .get_raw_for_document_type(&index_property.name, &document_and_contract_info.document_type, document_and_contract_info.owner_id.clone())?
                     .unwrap_or_default();
 
-                let path_key_info = index_property_key.add_path_info(index_path_info.clone())?;
+                let path_key_info = index_property_key.clone().add_path_info(index_path_info.clone())?;
 
                 // here we are inserting an empty tree that will have a subtree of all other index properties
                 self.grove_insert_empty_tree_if_not_exists(
@@ -1076,7 +1074,7 @@ impl Drive {
                 // Iteration 1. the index path is now something like Contracts/ContractID/Documents(1)/$ownerId/<ownerId>/toUserId
                 // Iteration 2. the index path is now something like Contracts/ContractID/Documents(1)/$ownerId/<ownerId>/toUserId/<ToUserId>/accountReference
 
-                let path_key_info = document_index_field.add_path_info(index_path_info.clone())?;
+                let path_key_info = document_index_field.clone().add_path_info(index_path_info.clone())?;
 
                 // here we are inserting an empty tree that will have a subtree of all other index properties
                 self.grove_insert_empty_tree_if_not_exists(
@@ -1338,7 +1336,7 @@ impl Drive {
             // we need to store the document for it's primary key
             // we should be overriding if the document_type does not have history enabled
             self.add_document_to_primary_storage(
-                document_and_contract_info,
+                &document_and_contract_info,
                 block_time,
                 true,
                 transaction,

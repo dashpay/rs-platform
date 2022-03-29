@@ -9,6 +9,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::{BTreeMap, HashMap};
 use tempfile::TempDir;
+use rs_drive::drive::object_size_info::DocumentAndContractInfo;
+use rs_drive::drive::object_size_info::DocumentInfo::DocumentAndSerialization;
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -115,13 +117,16 @@ pub fn setup(count: u32, seed: u64) -> (Drive, Contract, TempDir) {
                 common::value_to_cbor(value, Some(rs_drive::drive::defaults::PROTOCOL_VERSION));
             let document = Document::from_cbor(document_cbor.as_slice(), None, None)
                 .expect("document should be properly deserialized");
+            let document_type = contract.document_type_for_name("person").expect("expected to get document type");
+
             drive
                 .add_document_for_contract(
-                    &document,
-                    &document_cbor,
-                    &contract,
-                    "person",
-                    None,
+                    DocumentAndContractInfo {
+                        document_info: DocumentAndSerialization((&document, &document_cbor)),
+                        contract: &contract,
+                        document_type,
+                        owner_id: None
+                    },
                     true,
                     block_time as f64,
                     Some(&db_transaction),
@@ -876,13 +881,16 @@ fn test_query_historical() {
     let document = Document::from_cbor(person_cbor.as_slice(), None, None)
         .expect("document should be properly deserialized");
 
+    let document_type = contract.document_type_for_name("person").expect("expected to get document type");
+
     drive
         .add_document_for_contract(
-            &document,
-            &person_cbor,
-            &contract,
-            "person",
-            None,
+            DocumentAndContractInfo {
+                document_info: DocumentAndSerialization((&document, &person_cbor)),
+                contract: &contract,
+                document_type,
+                owner_id: None
+            },
             true,
             0f64,
             Some(&db_transaction),
@@ -912,13 +920,16 @@ fn test_query_historical() {
     let document = Document::from_cbor(person_cbor.as_slice(), None, None)
         .expect("document should be properly deserialized");
 
+    let document_type = contract.document_type_for_name("person").expect("expected to get document type");
+
     drive
         .add_document_for_contract(
-            &document,
-            &person_cbor,
-            &contract,
-            "person",
-            None,
+            DocumentAndContractInfo {
+                document_info: DocumentAndSerialization((&document, &person_cbor)),
+                contract: &contract,
+                document_type,
+                owner_id: None
+            },
             true,
             0f64,
             Some(&db_transaction),

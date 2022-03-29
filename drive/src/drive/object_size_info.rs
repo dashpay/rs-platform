@@ -41,7 +41,11 @@ impl<'a, const N: usize> PathInfo<'a, N>
                 )))
             }
             PathIterator(path_iterator) => match key_info {
-                Key(key) => path_iterator.push(key.as_slice()),
+                Key(key) => {
+                return Err(Error::CorruptedData(String::from(
+                "only a key reference can be pushed",
+                )))
+                }
                 KeyRef(key_ref) => path_iterator.push(key_ref),
                 KeySize(key_size) => {
                     return Err(Error::CorruptedData(String::from(
@@ -59,6 +63,7 @@ impl<'a, const N: usize> PathInfo<'a, N>
     }
 }
 
+#[derive(Clone)]
 pub enum KeyInfo<'a> {
     /// A key
     Key(Vec<u8>),
@@ -272,6 +277,7 @@ pub struct DocumentAndContractInfo<'a> {
     pub owner_id: Option<&'a [u8]>,
 }
 
+#[derive(Clone)]
 pub enum DocumentInfo<'a> {
     /// The document and it's serialized form
     DocumentAndSerialization((&'a Document, &'a [u8])),
