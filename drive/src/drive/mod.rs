@@ -15,13 +15,13 @@ use crate::drive::object_size_info::{
     DocumentAndContractInfo, DocumentInfo, KeyElementInfo, KeyInfo, PathInfo, PathKeyElementInfo,
     PathKeyInfo,
 };
+use crate::fee::calculate_fee;
 use crate::fee::op::{BaseOp, DeleteOperation, InsertOperation, QueryOperation};
 use crate::query::DriveQuery;
 use enum_map::EnumMap;
 use grovedb::{Element, Error, GroveDb, TransactionArg};
 use std::collections::HashMap;
 use std::path::Path;
-use crate::fee::calculate_fee;
 
 pub struct Drive {
     pub grove: GroveDb,
@@ -1591,7 +1591,7 @@ impl Drive {
         document_type_name: &str,
         owner_id: Option<&[u8]>,
         transaction: TransactionArg,
-    ) -> Result<(i64,u64), Error> {
+    ) -> Result<(i64, u64), Error> {
         let mut query_operations: Vec<QueryOperation> = vec![];
         let mut delete_operations: Vec<DeleteOperation> = vec![];
         self.delete_document_for_contract_operations(
@@ -1614,14 +1614,14 @@ impl Drive {
         document_type_name: &str,
         owner_id: Option<&[u8]>,
         transaction: TransactionArg,
-    ) -> Result<(i64,u64), Error> {
+    ) -> Result<(i64, u64), Error> {
         let contract = Contract::from_cbor(contract_cbor)?;
         self.delete_document_for_contract(
             document_id,
             &contract,
             document_type_name,
             owner_id,
-            transaction
+            transaction,
         )
     }
 
@@ -1792,6 +1792,25 @@ impl Drive {
         let query = DriveQuery::from_cbor(query_cbor, contract, document_type)?;
 
         query.execute_no_proof(&self.grove, transaction)
+    }
+
+    pub fn worst_case_fee_for_document_type_with_name(
+        &self,
+        contract: &Contract,
+        document_type_name: &str,
+    ) -> Result<(i64, u64), Error> {
+        let document_type = contract.document_type_for_name(document_type_name)?;
+        self.add_document_for_contract(
+            DocumentAndContractInfo {
+                document_info: DocumentSize(document_type.max_size()),
+                contract,
+                document_type,
+                owner_id: None,
+            },
+            false,
+            0.0,
+            None,
+        )
     }
 }
 

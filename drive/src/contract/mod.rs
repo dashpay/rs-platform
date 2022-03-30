@@ -485,6 +485,13 @@ impl DocumentType {
         })
     }
 
+    pub fn max_size(&self) -> usize {
+        self.properties
+            .iter()
+            .filter_map(|(_, document_field_type)| document_field_type.max_size())
+            .sum()
+    }
+
     pub fn top_level_indices(&self) -> Result<Vec<&IndexProperty>, Error> {
         let mut index_properties: Vec<&IndexProperty> = Vec::with_capacity(self.indices.len());
         for index in &self.indices {

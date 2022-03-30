@@ -40,11 +40,11 @@ impl DocumentFieldType {
             DocumentFieldType::Integer => Some(8),
             DocumentFieldType::Number => Some(8),
             DocumentFieldType::String(_, max_length) => match max_length {
-                None => None,
+                None => Some(16384),
                 Some(size) => Some(*size * 4),
             },
             DocumentFieldType::ByteArray(_, max_size) => match max_size {
-                None => None,
+                None => Some(65536),
                 Some(size) => Some(*size),
             },
             DocumentFieldType::Boolean => Some(1),
