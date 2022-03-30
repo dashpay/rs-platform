@@ -21,6 +21,7 @@ use enum_map::EnumMap;
 use grovedb::{Element, Error, GroveDb, TransactionArg};
 use std::collections::HashMap;
 use std::path::Path;
+use crate::fee::calculate_fee;
 
 pub struct Drive {
     pub grove: GroveDb,
@@ -673,7 +674,7 @@ impl Drive {
         contract_cbor: Vec<u8>,
         block_time: f64,
         transaction: TransactionArg,
-    ) -> Result<u64, Error> {
+    ) -> Result<(i64, u64), Error> {
         let mut query_operations: Vec<QueryOperation> = vec![];
         let mut insert_operations: Vec<InsertOperation> = vec![];
         // first we need to deserialize the contract
@@ -727,7 +728,8 @@ impl Drive {
                 &mut insert_operations,
             )?;
         }
-        Ok(0)
+        let fees = calculate_fee(None, Some(query_operations), Some(insert_operations), None)?;
+        Ok(fees)
     }
 
     // If a document isn't sent to this function then we are just calling to know the query and
@@ -881,7 +883,7 @@ impl Drive {
         override_document: bool,
         block_time: f64,
         transaction: TransactionArg,
-    ) -> Result<u64, Error> {
+    ) -> Result<(i64, u64), Error> {
         let contract = Contract::from_cbor(contract_cbor)?;
 
         let document = Document::from_cbor(document_cbor, None, owner_id)?;
@@ -912,7 +914,7 @@ impl Drive {
         override_document: bool,
         block_time: f64,
         transaction: TransactionArg,
-    ) -> Result<u64, Error> {
+    ) -> Result<(i64, u64), Error> {
         let document = Document::from_cbor(document_cbor, None, owner_id)?;
 
         let document_info = DocumentAndSerialization((&document, document_cbor));
@@ -938,7 +940,7 @@ impl Drive {
         override_document: bool,
         block_time: f64,
         transaction: TransactionArg,
-    ) -> Result<u64, Error> {
+    ) -> Result<(i64, u64), Error> {
         let mut query_operations: Vec<QueryOperation> = vec![];
         let mut insert_operations: Vec<InsertOperation> = vec![];
         self.add_document_for_contract_operations(
@@ -949,7 +951,8 @@ impl Drive {
             &mut query_operations,
             &mut insert_operations,
         )?;
-        Ok(0)
+        let fees = calculate_fee(None, Some(query_operations), Some(insert_operations), None)?;
+        Ok(fees)
     }
 
     fn add_document_for_contract_operations(
@@ -1205,7 +1208,7 @@ impl Drive {
         owner_id: Option<&[u8]>,
         block_time: f64,
         transaction: TransactionArg,
-    ) -> Result<u64, Error> {
+    ) -> Result<(i64, u64), Error> {
         let contract = Contract::from_cbor(contract_cbor)?;
 
         let document = Document::from_cbor(document_cbor, None, owner_id)?;
@@ -1229,7 +1232,7 @@ impl Drive {
         owner_id: Option<&[u8]>,
         block_time: f64,
         transaction: TransactionArg,
-    ) -> Result<u64, Error> {
+    ) -> Result<(i64, u64), Error> {
         let document = Document::from_cbor(document_cbor, None, owner_id)?;
 
         self.update_document_for_contract(
@@ -1252,7 +1255,7 @@ impl Drive {
         owner_id: Option<&[u8]>,
         block_time: f64,
         transaction: TransactionArg,
-    ) -> Result<u64, Error> {
+    ) -> Result<(i64, u64), Error> {
         let mut query_operations: Vec<QueryOperation> = vec![];
         let mut insert_operations: Vec<InsertOperation> = vec![];
 
@@ -1270,7 +1273,8 @@ impl Drive {
             &mut query_operations,
             &mut insert_operations,
         )?;
-        Ok(0)
+        let fees = calculate_fee(None, Some(query_operations), Some(insert_operations), None)?;
+        Ok(fees)
     }
 
     fn update_document_for_contract_operations(
@@ -1587,7 +1591,7 @@ impl Drive {
         document_type_name: &str,
         owner_id: Option<&[u8]>,
         transaction: TransactionArg,
-    ) -> Result<u64, Error> {
+    ) -> Result<(i64,u64), Error> {
         let mut query_operations: Vec<QueryOperation> = vec![];
         let mut delete_operations: Vec<DeleteOperation> = vec![];
         self.delete_document_for_contract_operations(
@@ -1598,7 +1602,9 @@ impl Drive {
             transaction,
             &mut query_operations,
             &mut delete_operations,
-        )
+        );
+        let fees = calculate_fee(None, Some(query_operations), None, Some(delete_operations))?;
+        Ok(fees)
     }
 
     pub fn delete_document_for_contract_cbor(
@@ -1608,18 +1614,14 @@ impl Drive {
         document_type_name: &str,
         owner_id: Option<&[u8]>,
         transaction: TransactionArg,
-    ) -> Result<u64, Error> {
-        let mut query_operations: Vec<QueryOperation> = vec![];
-        let mut delete_operations: Vec<DeleteOperation> = vec![];
+    ) -> Result<(i64,u64), Error> {
         let contract = Contract::from_cbor(contract_cbor)?;
-        self.delete_document_for_contract_operations(
+        self.delete_document_for_contract(
             document_id,
             &contract,
             document_type_name,
             owner_id,
-            transaction,
-            &mut query_operations,
-            &mut delete_operations,
+            transaction
         )
     }
 
@@ -1632,7 +1634,7 @@ impl Drive {
         transaction: TransactionArg,
         query_operations: &mut Vec<QueryOperation>,
         delete_operations: &mut Vec<DeleteOperation>,
-    ) -> Result<u64, Error> {
+    ) -> Result<(), Error> {
         let document_type = contract.document_type_for_name(document_type_name)?;
 
         if !document_type.documents_mutable {
@@ -1763,7 +1765,7 @@ impl Drive {
                 )?;
             }
         }
-        Ok(0)
+        Ok(())
     }
 
     pub fn query_documents_from_contract_cbor(

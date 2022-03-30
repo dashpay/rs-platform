@@ -278,11 +278,12 @@ impl DriveWrapper {
                     let this = task_context.undefined();
 
                     let callback_arguments: Vec<Handle<JsValue>> = match result {
-                        Ok(score) => {
+                        Ok((storage_fee, processing_fee)) => {
                             // First parameter of JS callbacks is error, which is null in this case
                             vec![
                                 task_context.null().upcast(),
-                                task_context.number(score as f64).upcast(),
+                                task_context.number(storage_fee as f64).upcast(),
+                                task_context.number(processing_fee as f64).upcast(),
                             ]
                         }
 
@@ -339,11 +340,12 @@ impl DriveWrapper {
                     let this = task_context.undefined();
 
                     let callback_arguments: Vec<Handle<JsValue>> = match result {
-                        Ok(score) => {
+                        Ok((storage_fee, processing_fee)) => {
                             // First parameter of JS callbacks is error, which is null in this case
                             vec![
                                 task_context.null().upcast(),
-                                task_context.number(score as f64).upcast(),
+                                task_context.number(storage_fee as f64).upcast(),
+                                task_context.number(processing_fee as f64).upcast(),
                             ]
                         }
 
@@ -397,11 +399,12 @@ impl DriveWrapper {
                     let this = task_context.undefined();
 
                     let callback_arguments: Vec<Handle<JsValue>> = match result {
-                        Ok(score) => {
+                        Ok((storage_fee, processing_fee)) => {
                             // First parameter of JS callbacks is error, which is null in this case
                             vec![
                                 task_context.null().upcast(),
-                                task_context.number(score as f64).upcast(),
+                                task_context.number(storage_fee as f64).upcast(),
+                                task_context.number(processing_fee as f64).upcast(),
                             ]
                         }
 
@@ -461,11 +464,12 @@ impl DriveWrapper {
                         let this = task_context.undefined();
 
                         let callback_arguments: Vec<Handle<JsValue>> = match result {
-                            Ok(score) => {
+                            Ok((storage_fee, processing_fee)) => {
                                 // First parameter of JS callbacks is error, which is null in this case
                                 vec![
                                     task_context.null().upcast(),
-                                    task_context.number(score as f64).upcast(),
+                                    task_context.number(storage_fee as f64).upcast(),
+                                    task_context.number(processing_fee as f64).upcast(),
                                 ]
                             }
 
