@@ -1303,7 +1303,7 @@ impl Drive {
                 transaction,
                 query_operations,
                 insert_operations,
-            );
+            )?;
             return Ok(());
         }
 
@@ -1602,7 +1602,7 @@ impl Drive {
             transaction,
             &mut query_operations,
             &mut delete_operations,
-        );
+        )?;
         let fees = calculate_fee(None, Some(query_operations), None, Some(delete_operations))?;
         Ok(fees)
     }
