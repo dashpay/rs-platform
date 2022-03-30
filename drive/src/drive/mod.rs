@@ -254,7 +254,8 @@ impl Drive {
     ) -> Result<bool, Error> {
         match path_key_info {
             PathKeyInfo::PathKeyRef((path, key)) => {
-                let path = path.into_iter();
+                let index_path_slices: Vec<&[u8]> = path.iter().map(|x| x.as_slice()).collect();
+                let path = index_path_slices.into_iter();
                 let inserted = self.grove.insert_if_not_exists(
                     path.clone(),
                     key,
@@ -276,7 +277,8 @@ impl Drive {
                 Ok(true)
             }
             PathKeyInfo::PathKey((path, key)) => {
-                let path = path.into_iter();
+                let index_path_slices: Vec<&[u8]> = path.iter().map(|x| x.as_slice()).collect();
+                let path = index_path_slices.into_iter();
                 let inserted = self.grove.insert_if_not_exists(
                     path.clone(),
                     key.as_slice(),
@@ -328,6 +330,8 @@ impl Drive {
     ) -> Result<(), Error> {
         match path_key_element_info {
             PathKeyElement((path, key, element)) => {
+                let index_path_slices: Vec<&[u8]> = path.iter().map(|x| x.as_slice()).collect();
+                let path = index_path_slices.into_iter();
                 insert_operations.push(InsertOperation::for_key_value(key.len(), &element));
                 self.grove.insert(path, key, element, transaction)
             }
@@ -354,7 +358,8 @@ impl Drive {
     ) -> Result<bool, Error> {
         match path_key_element_info {
             PathKeyElement((path, key, element)) => {
-                let path_iter = path.into_iter();
+                let index_path_slices: Vec<&[u8]> = path.iter().map(|x| x.as_slice()).collect();
+                let path_iter = index_path_slices.into_iter();
                 let insert_operation = InsertOperation::for_key_value(key.len(), &element);
                 let query_operation =
                     QueryOperation::for_key_check_in_path(key.len(), path_iter.clone());
@@ -1028,10 +1033,8 @@ impl Drive {
                 )?
                 .unwrap_or_default();
 
-            let index_path_slices: Vec<&[u8]> = index_path.iter().map(|x| x.as_slice()).collect();
-
             // The zero will not matter here, because the PathKeyInfo is variable
-            let path_key_info = document_top_field.clone().add_path::<0>(index_path_slices);
+            let path_key_info = document_top_field.clone().add_path::<0>(index_path.clone());
 
             // here we are inserting an empty tree that will have a subtree of all other index properties
             self.grove_insert_empty_tree_if_not_exists(
@@ -1047,15 +1050,13 @@ impl Drive {
                 .document_info
                 .is_document_and_serialization()
             {
-                let index_path_slices: Vec<&[u8]> =
-                    index_path.iter().map(|x| x.as_slice()).collect();
-                PathInfo::PathIterator::<0>(index_path_slices)
+                PathInfo::PathIterator::<0>(index_path)
             } else {
                 PathInfo::PathSize(index_path.iter().map(|x| x.len()).sum())
             };
 
             // we push the actual value of the index path
-            index_path_info.push(document_top_field);
+            index_path_info.push(document_top_field)?;
             // the index path is now something like Contracts/ContractID/Documents(1)/$ownerId/<ownerId>
 
             for i in 1..index.properties.len() {
@@ -1086,7 +1087,7 @@ impl Drive {
                     insert_operations,
                 )?;
 
-                index_path_info.push(index_property_key);
+                index_path_info.push(index_property_key)?;
 
                 // Iteration 1. the index path is now something like Contracts/ContractID/Documents(1)/$ownerId/<ownerId>/toUserId
                 // Iteration 2. the index path is now something like Contracts/ContractID/Documents(1)/$ownerId/<ownerId>/toUserId/<ToUserId>/accountReference
@@ -1106,7 +1107,7 @@ impl Drive {
                 all_fields_null &= document_index_field.is_empty();
 
                 // we push the actual value of the index path
-                index_path_info.push(document_index_field);
+                index_path_info.push(document_index_field)?;
                 // Iteration 1. the index path is now something like Contracts/ContractID/Documents(1)/$ownerId/<ownerId>/toUserId/<ToUserId>/
                 // Iteration 2. the index path is now something like Contracts/ContractID/Documents(1)/$ownerId/<ownerId>/toUserId/<ToUserId>/accountReference/<accountReference>
             }
@@ -1128,8 +1129,6 @@ impl Drive {
                 Element::Reference(reference_path)
             }
 
-            let index_path_slices: Vec<&[u8]> = index_path.iter().map(|x| x.as_slice()).collect();
-
             // unique indexes will be stored under key "0"
             // non unique indices should have a tree at key "0" that has all elements based off of primary key
             if !index.unique || all_fields_null {
@@ -1144,7 +1143,7 @@ impl Drive {
                     insert_operations,
                 )?;
 
-                index_path_info.push(Key(vec![0]));
+                index_path_info.push(Key(vec![0]))?;
 
                 let key_element_info = match &document_and_contract_info.document_info {
                     DocumentAndSerialization((document, _)) => {
@@ -1418,13 +1417,10 @@ impl Drive {
                 let mut change_occured_on_index = document_top_field != old_document_top_field;
 
                 if change_occured_on_index {
-                    let index_path_slices: Vec<&[u8]> =
-                        index_path.iter().map(|x| x.as_slice()).collect();
-
                     // here we are inserting an empty tree that will have a subtree of all other index properties
                     self.grove_insert_empty_tree_if_not_exists(
                         PathKeyInfo::PathKeyRef::<0>((
-                            index_path_slices,
+                            index_path.clone(),
                             document_top_field.as_slice(),
                         )),
                         transaction,
@@ -1468,13 +1464,10 @@ impl Drive {
                     change_occured_on_index |= document_index_field != old_document_index_field;
 
                     if change_occured_on_index {
-                        let index_path_slices: Vec<&[u8]> =
-                            index_path.iter().map(|x| x.as_slice()).collect();
-
                         // here we are inserting an empty tree that will have a subtree of all other index properties
                         self.grove_insert_empty_tree_if_not_exists(
                             PathKeyInfo::PathKeyRef::<0>((
-                                index_path_slices,
+                                index_path.clone(),
                                 index_property.name.as_bytes(),
                             )),
                             transaction,
@@ -1490,13 +1483,10 @@ impl Drive {
                     // Iteration 2. the index path is now something like Contracts/ContractID/Documents(1)/$ownerId/<ownerId>/toUserId/<ToUserId>/accountReference
 
                     if change_occured_on_index {
-                        let index_path_slices: Vec<&[u8]> =
-                            index_path.iter().map(|x| x.as_slice()).collect();
-
                         // here we are inserting an empty tree that will have a subtree of all other index properties
                         self.grove_insert_empty_tree_if_not_exists(
                             PathKeyInfo::PathKeyRef::<0>((
-                                index_path_slices,
+                                index_path.clone(),
                                 document_index_field.as_slice(),
                             )),
                             transaction,
@@ -1544,16 +1534,12 @@ impl Drive {
                         )?;
                     }
 
-                    // now we need to insert the new element
-                    let index_path_slices: Vec<&[u8]> =
-                        index_path.iter().map(|x| x.as_slice()).collect();
-
                     // unique indexes will be stored under key "0"
                     // non unique indices should have a tree at key "0" that has all elements based off of primary key
                     if !index.unique || all_fields_null {
                         // here we are inserting an empty tree that will have a subtree of all other index properties
                         self.grove_insert_empty_tree_if_not_exists(
-                            PathKeyInfo::PathKeyRef::<0>((index_path_slices, &[0])),
+                            PathKeyInfo::PathKeyRef::<0>((index_path.clone(), &[0])),
                             transaction,
                             query_operations,
                             insert_operations,
@@ -1566,7 +1552,7 @@ impl Drive {
                         // here we should return an error if the element already exists
                         self.grove_insert(
                             PathKeyElement::<0>((
-                                index_path_slices,
+                                index_path,
                                 document.id.as_slice(),
                                 document_reference.clone(),
                             )),
@@ -1579,11 +1565,7 @@ impl Drive {
 
                         // here we should return an error if the element already exists
                         let inserted = self.grove_insert_if_not_exists(
-                            PathKeyElement::<0>((
-                                index_path_slices,
-                                &[0],
-                                document_reference.clone(),
-                            )),
+                            PathKeyElement::<0>((index_path, &[0], document_reference.clone())),
                             transaction,
                             query_operations,
                             insert_operations,
