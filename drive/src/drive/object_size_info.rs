@@ -96,31 +96,35 @@ impl<'a> KeyInfo<'a> {
     pub fn add_path_info<const N: usize>(
         self,
         path_info: PathInfo<'a, N>,
-    ) -> Result<PathKeyInfo<'a, N>, Error> {
+    ) -> PathKeyInfo<'a, N> {
         match self {
             Key(key) => {
-                if let PathIterator(iter) = path_info {
-                    Ok(PathKey((iter, key)))
-                } else if let PathFixedSizeIterator(iter) = path_info {
-                    Ok(PathFixedSizeKey((iter, key)))
-                } else {
-                    Err(Error::CorruptedData(String::from(
-                        "request for path iterator on path size",
-                    )))
+                match path_info {
+                    PathFixedSizeIterator(iter) => {
+                        PathFixedSizeKey((iter, key))
+                    }
+                    PathIterator(iter) => {
+                        PathKey((iter, key))
+                    }
+                    PathSize(size) => {
+                        PathKeySize((size, key.len()))
+                    }
                 }
             }
             KeyRef(key_ref) => {
-                if let PathIterator(iter) = path_info {
-                    Ok(PathKeyRef((iter, key_ref)))
-                } else if let PathFixedSizeIterator(iter) = path_info {
-                    Ok(PathFixedSizeKeyRef((iter, key_ref)))
-                } else {
-                    Err(Error::CorruptedData(String::from(
-                        "request for path iterator on path size",
-                    )))
+                match path_info {
+                    PathFixedSizeIterator(iter) => {
+                        PathFixedSizeKeyRef((iter, key_ref))
+                    }
+                    PathIterator(iter) => {
+                        PathKeyRef((iter, key_ref))
+                    }
+                    PathSize(size) => {
+                        PathKeySize((size, key_ref.len()))
+                    }
                 }
             }
-            KeySize(key_size) => Ok(PathKeySize((path_info.len(), key_size))),
+            KeySize(key_size) => PathKeySize((path_info.len(), key_size)),
         }
     }
 

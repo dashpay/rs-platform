@@ -1080,7 +1080,7 @@ impl Drive {
 
                 let path_key_info = index_property_key
                     .clone()
-                    .add_path_info(index_path_info.clone())?;
+                    .add_path_info(index_path_info.clone());
 
                 // here we are inserting an empty tree that will have a subtree of all other index properties
                 self.grove_insert_empty_tree_if_not_exists(
@@ -1097,7 +1097,7 @@ impl Drive {
 
                 let path_key_info = document_index_field
                     .clone()
-                    .add_path_info(index_path_info.clone())?;
+                    .add_path_info(index_path_info.clone());
 
                 // here we are inserting an empty tree that will have a subtree of all other index properties
                 self.grove_insert_empty_tree_if_not_exists(
@@ -1137,7 +1137,7 @@ impl Drive {
             if !index.unique || all_fields_null {
                 let key_path_info = KeyRef(&[0]);
 
-                let path_key_info = key_path_info.add_path_info(index_path_info.clone())?;
+                let path_key_info = key_path_info.add_path_info(index_path_info.clone());
                 // here we are inserting an empty tree that will have a subtree of all other index properties
                 self.grove_insert_empty_tree_if_not_exists(
                     path_key_info,
