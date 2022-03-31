@@ -3,6 +3,7 @@ use grovedb::{Element, Error};
 use std::iter::Sum;
 
 pub(crate) const STORAGE_CREDIT_PER_BYTE: u64 = 5000;
+pub(crate) const STORAGE_PROCESSING_CREDIT_PER_BYTE: u64 = 10;
 pub(crate) const QUERY_CREDIT_PER_BYTE: u64 = 10;
 
 #[derive(Debug, Enum)]
@@ -148,7 +149,7 @@ impl InsertOperation {
     }
 
     pub fn ephemeral_cost(&self) -> u64 {
-        self.data_size() as u64 * STORAGE_CREDIT_PER_BYTE
+        self.data_size() as u64 * STORAGE_PROCESSING_CREDIT_PER_BYTE
     }
 
     pub fn storage_cost(&self) -> i64 {
@@ -188,7 +189,7 @@ impl DeleteOperation {
     }
 
     pub fn ephemeral_cost(&self) -> u64 {
-        self.data_size() as u64 * STORAGE_CREDIT_PER_BYTE
+        self.data_size() as u64 * STORAGE_PROCESSING_CREDIT_PER_BYTE
     }
 
     pub fn storage_cost(&self) -> i64 {
