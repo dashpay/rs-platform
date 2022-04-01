@@ -71,17 +71,24 @@ impl DocumentFieldType {
                     Ok(vec)
                 }
             }
-            DocumentFieldType::Date => {
-                let value_as_integer = value
-                    .as_integer()
-                    .ok_or_else(get_field_type_matching_error)?;
+            DocumentFieldType::Date => match *value {
+                Value::Integer(value_as_integer) => {
+                    let value_as_i128: i128 = value_as_integer.try_into().map_err(|_| {
+                        Error::CorruptedData(String::from("expected integer value"))
+                    })?;
+                    let value_as_f64: f64 = value_as_i128 as f64;
 
-                let value_as_u64: u64 = value_as_integer
-                    .try_into()
-                    .map_err(|_| Error::CorruptedData(String::from("expected integer value")))?;
+                    encode_float(value_as_f64)
+                }
+                Value::Float(value_as_float) => {
+                    let value_as_f64: f64 = value_as_float.try_into().map_err(|_| {
+                        Error::CorruptedData(String::from("expected integer value"))
+                    })?;
 
-                encode_unsigned_integer(value_as_u64)
-            }
+                    encode_float(value_as_f64)
+                }
+                _ => Err(get_field_type_matching_error()),
+            },
             DocumentFieldType::Integer => {
                 let value_as_integer = value
                     .as_integer()
