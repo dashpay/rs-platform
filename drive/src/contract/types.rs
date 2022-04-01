@@ -1,8 +1,8 @@
-use std::fmt;
 use byteorder::{BigEndian, WriteBytesExt};
 use ciborium::value::Value;
 use grovedb::Error;
 use serde::{Deserialize, Serialize};
+use std::fmt;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub enum DocumentFieldType {
@@ -59,8 +59,8 @@ impl DocumentFieldType {
 impl fmt::Display for DocumentFieldType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let text = match self {
-            DocumentFieldType::Integer => {"integer".to_string() }
-            DocumentFieldType::Number => { "number".to_string() }
+            DocumentFieldType::Integer => "integer".to_string(),
+            DocumentFieldType::Number => "number".to_string(),
             DocumentFieldType::String(min, max) => {
                 let min_string = if let Some(min) = min {
                     format!("min: {}", *min)
@@ -87,10 +87,10 @@ impl fmt::Display for DocumentFieldType {
                 };
                 format!("bytes {} / {}", min_bytes.as_str(), max_bytes.as_str())
             }
-            DocumentFieldType::Boolean => { "bool".to_string() }
-            DocumentFieldType::Date => { "date".to_string() }
-            DocumentFieldType::Object => { "object".to_string() }
-            DocumentFieldType::Array => { "array".to_string() }
+            DocumentFieldType::Boolean => "bool".to_string(),
+            DocumentFieldType::Date => "date".to_string(),
+            DocumentFieldType::Object => "object".to_string(),
+            DocumentFieldType::Array => "array".to_string(),
         };
         write!(f, "{}", text.as_str())
     }

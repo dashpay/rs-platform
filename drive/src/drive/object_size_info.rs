@@ -93,37 +93,18 @@ impl<'a> KeyInfo<'a> {
         }
     }
 
-    pub fn add_path_info<const N: usize>(
-        self,
-        path_info: PathInfo<'a, N>,
-    ) -> PathKeyInfo<'a, N> {
+    pub fn add_path_info<const N: usize>(self, path_info: PathInfo<'a, N>) -> PathKeyInfo<'a, N> {
         match self {
-            Key(key) => {
-                match path_info {
-                    PathFixedSizeIterator(iter) => {
-                        PathFixedSizeKey((iter, key))
-                    }
-                    PathIterator(iter) => {
-                        PathKey((iter, key))
-                    }
-                    PathSize(size) => {
-                        PathKeySize((size, key.len()))
-                    }
-                }
-            }
-            KeyRef(key_ref) => {
-                match path_info {
-                    PathFixedSizeIterator(iter) => {
-                        PathFixedSizeKeyRef((iter, key_ref))
-                    }
-                    PathIterator(iter) => {
-                        PathKeyRef((iter, key_ref))
-                    }
-                    PathSize(size) => {
-                        PathKeySize((size, key_ref.len()))
-                    }
-                }
-            }
+            Key(key) => match path_info {
+                PathFixedSizeIterator(iter) => PathFixedSizeKey((iter, key)),
+                PathIterator(iter) => PathKey((iter, key)),
+                PathSize(size) => PathKeySize((size, key.len())),
+            },
+            KeyRef(key_ref) => match path_info {
+                PathFixedSizeIterator(iter) => PathFixedSizeKeyRef((iter, key_ref)),
+                PathIterator(iter) => PathKeyRef((iter, key_ref)),
+                PathSize(size) => PathKeySize((size, key_ref.len())),
+            },
             KeySize(key_size) => PathKeySize((path_info.len(), key_size)),
         }
     }
