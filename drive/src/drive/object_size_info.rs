@@ -1,4 +1,5 @@
 use crate::contract::{Contract, Document, DocumentType};
+use crate::drive::defaults::DEFAULT_HASH_SIZE;
 use crate::drive::object_size_info::KeyInfo::{Key, KeyRef, KeySize};
 use crate::drive::object_size_info::PathInfo::{PathFixedSizeIterator, PathIterator, PathSize};
 use crate::drive::object_size_info::PathKeyElementInfo::{
@@ -323,16 +324,21 @@ impl<'a> DocumentInfo<'a> {
                     Some(value) => Ok(Some(Key(value))),
                 }
             }
-            DocumentInfo::DocumentSize(_) => {
-                let document_field_type =
-                    document_type.properties.get(key_path).ok_or_else(|| {
-                        Error::CorruptedData(String::from("incorrect key path for document type"))
+            DocumentInfo::DocumentSize(_) => match key_path {
+                "$ownerId" | "$id" => Ok(Some(KeySize(DEFAULT_HASH_SIZE))),
+                _ => {
+                    let document_field_type =
+                        document_type.properties.get(key_path).ok_or_else(|| {
+                            Error::CorruptedData(String::from(
+                                "incorrect key path for document type",
+                            ))
+                        })?;
+                    let max_size = document_field_type.max_size().ok_or_else(|| {
+                        Error::CorruptedData(String::from("document type must have a max size"))
                     })?;
-                let max_size = document_field_type.max_size().ok_or_else(|| {
-                    Error::CorruptedData(String::from("document type must have a max size"))
-                })?;
-                Ok(Some(KeySize(max_size)))
-            }
+                    Ok(Some(KeySize(max_size)))
+                }
+            },
         }
     }
 }
