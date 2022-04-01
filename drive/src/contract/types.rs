@@ -1,5 +1,5 @@
 use byteorder::{BigEndian, WriteBytesExt};
-use ciborium::value::Value;
+use ciborium::value::{Integer, Value};
 use grovedb::Error;
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -148,6 +148,61 @@ impl DocumentFieldType {
             DocumentFieldType::Array => Err(Error::CorruptedData(String::from(
                 "we should never try encoding an array",
             ))),
+        };
+    }
+
+    // Given a field type and a value this function chooses and executes the right encoding method
+    pub fn value_from_string(&self, str: &str) -> Result<Value, Error> {
+        return match self {
+            DocumentFieldType::String(min, max) => {
+                if let Some(min) = min {
+                    if str.len() < *min {
+                        return Err(Error::InternalError("string is too small"));
+                    }
+                }
+                if let Some(max) = max {
+                    if str.len() > *max {
+                        return Err(Error::InternalError("string is too big"));
+                    }
+                }
+                Ok(Value::Text(str.to_string()))
+            }
+            DocumentFieldType::Integer => str
+                .parse::<i128>()
+                .map(|f| Value::Integer(Integer::try_from(f).unwrap()))
+                .map_err(|_| Error::CorruptedData(String::from("value is not an integer"))),
+            DocumentFieldType::Number | DocumentFieldType::Date => str
+                .parse::<f64>()
+                .map(|f| Value::Float(f))
+                .map_err(|_| Error::CorruptedData(String::from("value is not a float"))),
+            DocumentFieldType::ByteArray(min, max) => {
+                if let Some(min) = min {
+                    if str.len() / 2 < *min {
+                        return Err(Error::InternalError("byte array is too small"));
+                    }
+                }
+                if let Some(max) = max {
+                    if str.len() / 2 > *max {
+                        return Err(Error::InternalError("byte array  is too big"));
+                    }
+                }
+                Ok(Value::Bytes(hex::decode(str).map_err(|_| {
+                    Error::CorruptedData(String::from("could not parse hex bytes"))
+                })?))
+            }
+            DocumentFieldType::Boolean => {
+                if str.to_lowercase().as_str() == "true" {
+                    Ok(Value::Bool(true))
+                } else if str.to_lowercase().as_str() == "false" {
+                    Ok(Value::Bool(false))
+                } else {
+                    Err(Error::CorruptedData(String::from(
+                        "could not parse a boolean to a value",
+                    )))
+                }
+            }
+            DocumentFieldType::Object => Err(Error::InternalError("objects not supported")),
+            DocumentFieldType::Array => Err(Error::InternalError("arrays not supported")),
         };
     }
 }
