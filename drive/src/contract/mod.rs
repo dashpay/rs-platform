@@ -326,7 +326,7 @@ impl DocumentType {
                 let field_type = self.properties.get(key).ok_or_else(|| {
                     Error::CorruptedData(String::from("expected document to have field"))
                 })?;
-                types::encode_document_field_type(field_type, value)
+                field_type.encode_value(value)
             }
         }
     }

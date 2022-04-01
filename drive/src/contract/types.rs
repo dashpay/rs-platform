@@ -54,6 +54,102 @@ impl DocumentFieldType {
             DocumentFieldType::Array => None,
         }
     }
+
+    // Given a field type and a value this function chooses and executes the right encoding method
+    pub fn encode_value(&self, value: &Value) -> Result<Vec<u8>, Error> {
+        if value.is_null() {
+            return Ok(vec![]);
+        }
+        return match self {
+            DocumentFieldType::String(_, _) => {
+                let value_as_text = value.as_text().ok_or_else(get_field_type_matching_error)?;
+                let vec = value_as_text.as_bytes().to_vec();
+                if vec.is_empty() {
+                    // we don't want to collide with the definition of an empty string
+                    Ok(vec![0])
+                } else {
+                    Ok(vec)
+                }
+            }
+            DocumentFieldType::Date => {
+                let value_as_integer = value
+                    .as_integer()
+                    .ok_or_else(get_field_type_matching_error)?;
+
+                let value_as_u64: u64 = value_as_integer
+                    .try_into()
+                    .map_err(|_| Error::CorruptedData(String::from("expected integer value")))?;
+
+                encode_unsigned_integer(value_as_u64)
+            }
+            DocumentFieldType::Integer => {
+                let value_as_integer = value
+                    .as_integer()
+                    .ok_or_else(get_field_type_matching_error)?;
+
+                let value_as_i64: i64 = value_as_integer
+                    .try_into()
+                    .map_err(|_| Error::CorruptedData(String::from("expected integer value")))?;
+
+                encode_signed_integer(value_as_i64)
+            }
+            DocumentFieldType::Number => {
+                let value_as_f64 = if value.is_integer() {
+                    let value_as_integer = value
+                        .as_integer()
+                        .ok_or_else(get_field_type_matching_error)?;
+
+                    let value_as_i64: i64 = value_as_integer
+                        .try_into()
+                        .map_err(|_| Error::CorruptedData(String::from("expected number value")))?;
+
+                    value_as_i64 as f64
+                } else {
+                    value.as_float().ok_or_else(get_field_type_matching_error)?
+                };
+
+                encode_float(value_as_f64)
+            }
+            DocumentFieldType::ByteArray(_, _) => match value {
+                Value::Bytes(bytes) => Ok(bytes.clone()),
+                Value::Text(text) => {
+                    let value_as_bytes = base64::decode(text).map_err(|_| {
+                        Error::CorruptedData(String::from("bytearray: invalid base64 value"))
+                    })?;
+                    Ok(value_as_bytes)
+                }
+                Value::Array(array) => array
+                    .iter()
+                    .map(|byte| match byte {
+                        Value::Integer(int) => {
+                            let value_as_u8: u8 = (*int).try_into().map_err(|_| {
+                                Error::CorruptedData(String::from("expected u8 value"))
+                            })?;
+                            Ok(value_as_u8)
+                        }
+                        _ => Err(Error::CorruptedData(String::from(
+                            "not an array of integers",
+                        ))),
+                    })
+                    .collect::<Result<Vec<u8>, Error>>(),
+                _ => Err(get_field_type_matching_error()),
+            },
+            DocumentFieldType::Boolean => {
+                let value_as_boolean = value.as_bool().ok_or_else(get_field_type_matching_error)?;
+                if value_as_boolean {
+                    Ok(vec![1])
+                } else {
+                    Ok(vec![0])
+                }
+            }
+            DocumentFieldType::Object => Err(Error::CorruptedData(String::from(
+                "we should never try encoding an object",
+            ))),
+            DocumentFieldType::Array => Err(Error::CorruptedData(String::from(
+                "we should never try encoding an array",
+            ))),
+        };
+    }
 }
 
 impl fmt::Display for DocumentFieldType {
@@ -110,105 +206,6 @@ fn get_field_type_matching_error() -> Error {
     Error::CorruptedData(String::from(
         "document field type doesn't match document value",
     ))
-}
-
-// Given a field type and a value this function chooses and executes the right encoding method
-pub fn encode_document_field_type(
-    field_type: &DocumentFieldType,
-    value: &Value,
-) -> Result<Vec<u8>, Error> {
-    if value.is_null() {
-        return Ok(vec![]);
-    }
-    return match field_type {
-        DocumentFieldType::String(_, _) => {
-            let value_as_text = value.as_text().ok_or_else(get_field_type_matching_error)?;
-            let vec = value_as_text.as_bytes().to_vec();
-            if vec.is_empty() {
-                // we don't want to collide with the definition of an empty string
-                Ok(vec![0])
-            } else {
-                Ok(vec)
-            }
-        }
-        DocumentFieldType::Date => {
-            let value_as_integer = value
-                .as_integer()
-                .ok_or_else(get_field_type_matching_error)?;
-
-            let value_as_u64: u64 = value_as_integer
-                .try_into()
-                .map_err(|_| Error::CorruptedData(String::from("expected integer value")))?;
-
-            encode_unsigned_integer(value_as_u64)
-        }
-        DocumentFieldType::Integer => {
-            let value_as_integer = value
-                .as_integer()
-                .ok_or_else(get_field_type_matching_error)?;
-
-            let value_as_i64: i64 = value_as_integer
-                .try_into()
-                .map_err(|_| Error::CorruptedData(String::from("expected integer value")))?;
-
-            encode_signed_integer(value_as_i64)
-        }
-        DocumentFieldType::Number => {
-            let value_as_f64 = if value.is_integer() {
-                let value_as_integer = value
-                    .as_integer()
-                    .ok_or_else(get_field_type_matching_error)?;
-
-                let value_as_i64: i64 = value_as_integer
-                    .try_into()
-                    .map_err(|_| Error::CorruptedData(String::from("expected number value")))?;
-
-                value_as_i64 as f64
-            } else {
-                value.as_float().ok_or_else(get_field_type_matching_error)?
-            };
-
-            encode_float(value_as_f64)
-        }
-        DocumentFieldType::ByteArray(_, _) => match value {
-            Value::Bytes(bytes) => Ok(bytes.clone()),
-            Value::Text(text) => {
-                let value_as_bytes = base64::decode(text).map_err(|_| {
-                    Error::CorruptedData(String::from("bytearray: invalid base64 value"))
-                })?;
-                Ok(value_as_bytes)
-            }
-            Value::Array(array) => array
-                .iter()
-                .map(|byte| match byte {
-                    Value::Integer(int) => {
-                        let value_as_u8: u8 = (*int)
-                            .try_into()
-                            .map_err(|_| Error::CorruptedData(String::from("expected u8 value")))?;
-                        Ok(value_as_u8)
-                    }
-                    _ => Err(Error::CorruptedData(String::from(
-                        "not an array of integers",
-                    ))),
-                })
-                .collect::<Result<Vec<u8>, Error>>(),
-            _ => Err(get_field_type_matching_error()),
-        },
-        DocumentFieldType::Boolean => {
-            let value_as_boolean = value.as_bool().ok_or_else(get_field_type_matching_error)?;
-            if value_as_boolean {
-                Ok(vec![1])
-            } else {
-                Ok(vec![0])
-            }
-        }
-        DocumentFieldType::Object => Err(Error::CorruptedData(String::from(
-            "we should never try encoding an object",
-        ))),
-        DocumentFieldType::Array => Err(Error::CorruptedData(String::from(
-            "we should never try encoding an array",
-        ))),
-    };
 }
 
 pub fn encode_unsigned_integer(val: u64) -> Result<Vec<u8>, Error> {
@@ -301,7 +298,7 @@ pub fn encode_float(val: f64) -> Result<Vec<u8>, Error> {
 }
 
 mod tests {
-    use crate::contract::types::{encode_document_field_type, DocumentFieldType};
+    use crate::contract::types::DocumentFieldType;
     use ciborium::value::{Integer, Value};
 
     #[test]
@@ -321,11 +318,14 @@ mod tests {
         let integer2 = Value::Integer(Integer::from(600));
         let integer3 = Value::Integer(Integer::from(i64::MAX));
 
-        let encoded_integer1 = encode_document_field_type(&DocumentFieldType::Integer, &integer1)
+        let encoded_integer1 = &DocumentFieldType::Integer
+            .encode_value(&integer1)
             .expect(encode_err_msg);
-        let encoded_integer2 = encode_document_field_type(&DocumentFieldType::Integer, &integer2)
+        let encoded_integer2 = &DocumentFieldType::Integer
+            .encode_value(&integer2)
             .expect(encode_err_msg);
-        let encoded_integer3 = encode_document_field_type(&DocumentFieldType::Integer, &integer3)
+        let encoded_integer3 = &DocumentFieldType::Integer
+            .encode_value(&integer3)
             .expect(encode_err_msg);
 
         assert!(encoded_integer1 < encoded_integer2);
@@ -336,11 +336,14 @@ mod tests {
         let integer2 = Value::Integer(Integer::from(-600));
         let integer3 = Value::Integer(Integer::from(i64::MIN));
 
-        let encoded_integer1 = encode_document_field_type(&DocumentFieldType::Integer, &integer1)
+        let encoded_integer1 = &DocumentFieldType::Integer
+            .encode_value(&integer1)
             .expect(encode_err_msg);
-        let encoded_integer2 = encode_document_field_type(&DocumentFieldType::Integer, &integer2)
+        let encoded_integer2 = &DocumentFieldType::Integer
+            .encode_value(&integer2)
             .expect(encode_err_msg);
-        let encoded_integer3 = encode_document_field_type(&DocumentFieldType::Integer, &integer3)
+        let encoded_integer3 = &DocumentFieldType::Integer
+            .encode_value(&integer3)
             .expect(encode_err_msg);
 
         assert!(encoded_integer1 > encoded_integer2);
@@ -351,11 +354,14 @@ mod tests {
         let integer2 = Value::Integer(Integer::from(0));
         let integer3 = Value::Integer(Integer::from(1));
 
-        let encoded_integer1 = encode_document_field_type(&DocumentFieldType::Integer, &integer1)
+        let encoded_integer1 = &DocumentFieldType::Integer
+            .encode_value(&integer1)
             .expect(encode_err_msg);
-        let encoded_integer2 = encode_document_field_type(&DocumentFieldType::Integer, &integer2)
+        let encoded_integer2 = &DocumentFieldType::Integer
+            .encode_value(&integer2)
             .expect(encode_err_msg);
-        let encoded_integer3 = encode_document_field_type(&DocumentFieldType::Integer, &integer3)
+        let encoded_integer3 = &DocumentFieldType::Integer
+            .encode_value(&integer3)
             .expect(encode_err_msg);
 
         assert!(encoded_integer2 > encoded_integer1);
@@ -382,21 +388,29 @@ mod tests {
         let float4 = Value::Float(f64::MAX);
         let float5 = Value::Float(f64::INFINITY);
 
-        let encoded_number1 =
-            encode_document_field_type(&DocumentFieldType::Number, &float1).expect(encode_err_msg);
-        let encoded_number2 =
-            encode_document_field_type(&DocumentFieldType::Number, &float2).expect(encode_err_msg);
-        let encoded_number3 =
-            encode_document_field_type(&DocumentFieldType::Number, &float3).expect(encode_err_msg);
-        let encoded_number4 =
-            encode_document_field_type(&DocumentFieldType::Number, &float4).expect(encode_err_msg);
-        let encoded_number5 =
-            encode_document_field_type(&DocumentFieldType::Number, &float5).expect(encode_err_msg);
-        let encoded_number6 = encode_document_field_type(&DocumentFieldType::Number, &integer1)
+        let encoded_number1 = &DocumentFieldType::Number
+            .encode_value(&float1)
             .expect(encode_err_msg);
-        let encoded_number7 = encode_document_field_type(&DocumentFieldType::Number, &integer2)
+        let encoded_number2 = &DocumentFieldType::Number
+            .encode_value(&float2)
             .expect(encode_err_msg);
-        let encoded_number8 = encode_document_field_type(&DocumentFieldType::Number, &integer3)
+        let encoded_number3 = &DocumentFieldType::Number
+            .encode_value(&float3)
+            .expect(encode_err_msg);
+        let encoded_number4 = &DocumentFieldType::Number
+            .encode_value(&float4)
+            .expect(encode_err_msg);
+        let encoded_number5 = &DocumentFieldType::Number
+            .encode_value(&float5)
+            .expect(encode_err_msg);
+        let encoded_number6 = &DocumentFieldType::Number
+            .encode_value(&integer1)
+            .expect(encode_err_msg);
+        let encoded_number7 = &DocumentFieldType::Number
+            .encode_value(&integer2)
+            .expect(encode_err_msg);
+        let encoded_number8 = &DocumentFieldType::Number
+            .encode_value(&integer3)
             .expect(encode_err_msg);
 
         assert!(encoded_number1 < encoded_number2);
@@ -415,16 +429,21 @@ mod tests {
         let float4 = Value::Float(f64::MIN);
         let float5 = Value::Float(f64::NEG_INFINITY);
 
-        let encoded_float1 =
-            encode_document_field_type(&DocumentFieldType::Number, &float1).expect(encode_err_msg);
-        let encoded_float2 =
-            encode_document_field_type(&DocumentFieldType::Number, &float2).expect(encode_err_msg);
-        let encoded_float3 =
-            encode_document_field_type(&DocumentFieldType::Number, &float3).expect(encode_err_msg);
-        let encoded_float4 =
-            encode_document_field_type(&DocumentFieldType::Number, &float4).expect(encode_err_msg);
-        let encoded_float5 =
-            encode_document_field_type(&DocumentFieldType::Number, &float5).expect(encode_err_msg);
+        let encoded_float1 = &DocumentFieldType::Number
+            .encode_value(&float1)
+            .expect(encode_err_msg);
+        let encoded_float2 = &DocumentFieldType::Number
+            .encode_value(&float2)
+            .expect(encode_err_msg);
+        let encoded_float3 = &DocumentFieldType::Number
+            .encode_value(&float3)
+            .expect(encode_err_msg);
+        let encoded_float4 = &DocumentFieldType::Number
+            .encode_value(&float4)
+            .expect(encode_err_msg);
+        let encoded_float5 = &DocumentFieldType::Number
+            .encode_value(&float5)
+            .expect(encode_err_msg);
 
         assert!(encoded_float1 > encoded_float2);
         assert!(encoded_float2 > encoded_float3);
@@ -438,14 +457,15 @@ mod tests {
         let float2 = Value::Float(0.0);
         let smallest_positive_float = Value::Float(0.0 + f64::EPSILON);
 
-        let encoded_float1 =
-            encode_document_field_type(&DocumentFieldType::Number, &largest_negative_float)
-                .expect(encode_err_msg);
-        let encoded_float2 =
-            encode_document_field_type(&DocumentFieldType::Number, &float2).expect(encode_err_msg);
-        let encoded_float3 =
-            encode_document_field_type(&DocumentFieldType::Number, &smallest_positive_float)
-                .expect(encode_err_msg);
+        let encoded_float1 = &DocumentFieldType::Number
+            .encode_value(&largest_negative_float)
+            .expect(encode_err_msg);
+        let encoded_float2 = &DocumentFieldType::Number
+            .encode_value(&float2)
+            .expect(encode_err_msg);
+        let encoded_float3 = &DocumentFieldType::Number
+            .encode_value(&smallest_positive_float)
+            .expect(encode_err_msg);
 
         assert!(encoded_float1 < encoded_float2);
         assert!(encoded_float2 < encoded_float3);
@@ -460,7 +480,7 @@ mod tests {
 
         let object_value = Value::Map(vec![(smallest_positive_float, integer1)]);
 
-        let encoded_object = encode_document_field_type(&DocumentFieldType::Object, &object_value);
+        let encoded_object = &DocumentFieldType::Object.encode_value(&object_value);
 
         assert!(encoded_object.is_err());
     }
