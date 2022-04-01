@@ -5,6 +5,7 @@ use grovedb::TransactionArg;
 use std::fs::File;
 use std::io;
 use std::io::{BufRead, BufReader};
+use std::option::Option::None;
 use std::path::Path;
 
 pub fn setup_contract(
@@ -17,7 +18,7 @@ pub fn setup_contract(
     let contract =
         Contract::from_cbor(&contract_cbor, contract_id).expect("contract should be deserialized");
     drive
-        .apply_contract(contract_cbor, 0f64, transaction)
+        .apply_contract(contract_cbor, contract_id, 0f64, transaction)
         .expect("contract should be applied");
     contract
 }
@@ -31,7 +32,7 @@ pub fn setup_contract_from_hex(
     let contract =
         Contract::from_cbor(&contract_cbor, None).expect("contract should be deserialized");
     drive
-        .apply_contract(contract_cbor, 0f64, transaction)
+        .apply_contract(contract_cbor, None, 0f64, transaction)
         .expect("contract should be applied");
     contract
 }
