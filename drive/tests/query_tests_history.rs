@@ -10,6 +10,7 @@ use rs_drive::query::DriveQuery;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::{BTreeMap, HashMap};
+use std::option::Option::None;
 use tempfile::TempDir;
 
 #[derive(Serialize, Deserialize)]
@@ -104,6 +105,7 @@ pub fn setup(count: u32, seed: u64) -> (Drive, Contract, TempDir) {
     let contract = common::setup_contract(
         &drive,
         "tests/supporting_files/contract/family/family-contract-with-history.json",
+        None,
         Some(&db_transaction),
     );
 

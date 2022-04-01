@@ -13,6 +13,7 @@ use serde_json::json;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{self, BufRead};
+use std::option::Option::None;
 use tempfile::TempDir;
 
 #[derive(Serialize, Deserialize)]
@@ -120,6 +121,7 @@ pub fn setup_family_tests(count: u32, seed: u64) -> (Drive, Contract, TempDir) {
     let contract = common::setup_contract(
         &drive,
         "tests/supporting_files/contract/family/family-contract.json",
+        None,
         Some(&db_transaction),
     );
 
@@ -170,6 +172,7 @@ pub fn setup_family_tests_with_nulls(count: u32, seed: u64) -> (Drive, Contract,
     let contract = common::setup_contract(
         &drive,
         "tests/supporting_files/contract/family/family-contract.json",
+        None,
         Some(&db_transaction),
     );
 
@@ -271,6 +274,7 @@ pub fn setup_dpns_tests(count: u32, seed: u64) -> (Drive, Contract, TempDir) {
     let contract = common::setup_contract(
         &drive,
         "tests/supporting_files/contract/dpns/dpns-contract.json",
+        None,
         Some(&db_transaction),
     );
 
@@ -319,6 +323,7 @@ pub fn setup_dpns_test_with_data(path: &str) -> (Drive, Contract, TempDir) {
     let contract = setup_contract(
         &drive,
         "tests/supporting_files/contract/dpns/dpns-contract.json",
+        None,
         Some(&db_transaction),
     );
 

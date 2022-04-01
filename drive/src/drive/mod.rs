@@ -1827,6 +1827,7 @@ mod tests {
     use rand::Rng;
     use serde_json::json;
     use std::collections::HashMap;
+    use std::option::Option::None;
     use tempfile::TempDir;
 
     fn setup_dashpay(_prefix: &str, mutable_contact_requests: bool) -> (Drive, Vec<u8>) {
@@ -1914,6 +1915,7 @@ mod tests {
         let contract = setup_contract(
             &drive,
             "tests/supporting_files/contract/dashpay/dashpay-contract-all-mutable.json",
+            None,
             Some(&db_transaction),
         );
 
@@ -1974,6 +1976,7 @@ mod tests {
         let contract = setup_contract(
             &drive,
             "tests/supporting_files/contract/dashpay/dashpay-contract.json",
+            None,
             Some(&db_transaction),
         );
 
@@ -2033,6 +2036,7 @@ mod tests {
         let contract = setup_contract(
             &drive,
             "tests/supporting_files/contract/dashpay/dashpay-contract-with-profile-history.json",
+            None,
             Some(&db_transaction),
         );
 
@@ -2122,6 +2126,7 @@ mod tests {
         let contract = setup_contract(
             &drive,
             "tests/supporting_files/contract/dashpay/dashpay-contract.json",
+            None,
             Some(&db_transaction),
         );
 
@@ -2172,6 +2177,7 @@ mod tests {
         let contract = setup_contract(
             &drive,
             "tests/supporting_files/contract/dpns/dpns-contract.json",
+            None,
             Some(&db_transaction),
         );
 
@@ -2341,6 +2347,7 @@ mod tests {
         let contract = setup_contract(
             &drive,
             "tests/supporting_files/contract/family/family-contract-reduced.json",
+            None,
             Some(&db_transaction),
         );
 
@@ -2439,6 +2446,7 @@ mod tests {
         let contract = setup_contract(
             &drive,
             "tests/supporting_files/contract/family/family-contract-reduced.json",
+            None,
             Some(&db_transaction),
         );
 
@@ -2596,6 +2604,7 @@ mod tests {
         let contract = setup_contract(
             &drive,
             "tests/supporting_files/contract/family/family-contract-reduced.json",
+            None,
             Some(&db_transaction),
         );
 

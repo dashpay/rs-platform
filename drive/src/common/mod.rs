@@ -7,10 +7,15 @@ use std::io;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 
-pub fn setup_contract(drive: &Drive, path: &str, transaction: TransactionArg) -> Contract {
+pub fn setup_contract(
+    drive: &Drive,
+    path: &str,
+    contract_id: Option<[u8; 32]>,
+    transaction: TransactionArg,
+) -> Contract {
     let contract_cbor = json_document_to_cbor(path, Some(crate::drive::defaults::PROTOCOL_VERSION));
     let contract =
-        Contract::from_cbor(&contract_cbor, None).expect("contract should be deserialized");
+        Contract::from_cbor(&contract_cbor, contract_id).expect("contract should be deserialized");
     drive
         .apply_contract(contract_cbor, 0f64, transaction)
         .expect("contract should be applied");
