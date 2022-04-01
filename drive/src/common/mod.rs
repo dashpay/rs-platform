@@ -9,7 +9,8 @@ use std::path::Path;
 
 pub fn setup_contract(drive: &Drive, path: &str, transaction: TransactionArg) -> Contract {
     let contract_cbor = json_document_to_cbor(path, Some(crate::drive::defaults::PROTOCOL_VERSION));
-    let contract = Contract::from_cbor(&contract_cbor).expect("contract should be deserialized");
+    let contract =
+        Contract::from_cbor(&contract_cbor, None).expect("contract should be deserialized");
     drive
         .apply_contract(contract_cbor, 0f64, transaction)
         .expect("contract should be applied");
@@ -22,7 +23,8 @@ pub fn setup_contract_from_hex(
     transaction: TransactionArg,
 ) -> Contract {
     let contract_cbor = cbor_from_hex(hex_string);
-    let contract = Contract::from_cbor(&contract_cbor).expect("contract should be deserialized");
+    let contract =
+        Contract::from_cbor(&contract_cbor, None).expect("contract should be deserialized");
     drive
         .apply_contract(contract_cbor, 0f64, transaction)
         .expect("contract should be applied");

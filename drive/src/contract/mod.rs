@@ -137,7 +137,7 @@ pub struct IndexProperty {
 
 // Struct Implementations
 impl Contract {
-    pub fn from_cbor(contract_cbor: &[u8]) -> Result<Self, Error> {
+    pub fn from_cbor(contract_cbor: &[u8], contract_id: Option<[u8; 32]>) -> Result<Self, Error> {
         let (version, read_contract_cbor) = contract_cbor.split_at(4);
         if !Drive::check_protocol_version_bytes(version) {
             return Err(Error::CorruptedData(String::from(
@@ -149,10 +149,14 @@ impl Contract {
             .map_err(|_| Error::CorruptedData(String::from("unable to decode contract")))?;
 
         // Get the contract id
-        let contract_id: [u8; 32] = bytes_for_system_value_from_hash_map(&contract, "$id")?
-            .ok_or_else(|| Error::CorruptedData(String::from("unable to get contract id")))?
-            .try_into()
-            .map_err(|_| Error::CorruptedData(String::from("contract_id must be 32 bytes")))?;
+        let contract_id: [u8; 32] = if let Some(contract_id) = contract_id {
+            contract_id
+        } else {
+            bytes_for_system_value_from_hash_map(&contract, "$id")?
+                .ok_or_else(|| Error::CorruptedData(String::from("unable to get contract id")))?
+                .try_into()
+                .map_err(|_| Error::CorruptedData(String::from("contract_id must be 32 bytes")))?
+        };
 
         // Does the contract keep history when the contract itself changes?
         let keeps_history: bool = bool_for_system_value_from_hash_map(
@@ -956,7 +960,7 @@ mod tests {
             "tests/supporting_files/contract/dashpay/dashpay-contract.json",
             Some(1),
         );
-        let contract = Contract::from_cbor(&dashpay_cbor).unwrap();
+        let contract = Contract::from_cbor(&dashpay_cbor, None).unwrap();
 
         assert!(contract.documents_mutable_contract_default);
         assert!(!contract.keeps_history);
