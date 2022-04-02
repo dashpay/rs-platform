@@ -1047,12 +1047,15 @@ mod tests {
         );
         let contract = Contract::from_cbor(&dashpay_cbor, None).unwrap();
 
-        let document_type = contract.document_type_for_name("profile").expect("expected to get profile document type");
+        let document_type = contract
+            .document_type_for_name("profile")
+            .expect("expected to get profile document type");
         let document = document_type.random_document(Some(3333));
 
         let document_cbor = document.to_cbor();
 
-        let recovered_document = Document::from_cbor(document_cbor.as_slice(), None, None).expect("expected to get document");
+        let recovered_document = Document::from_cbor(document_cbor.as_slice(), None, None)
+            .expect("expected to get document");
 
         assert_eq!(recovered_document, document);
     }
