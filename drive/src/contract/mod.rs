@@ -44,8 +44,11 @@ pub struct DocumentType {
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct Document {
+    #[serde(rename = "$id")]
     pub id: [u8; 32],
+    #[serde(flatten)]
     pub properties: BTreeMap<String, CborValue>,
+    #[serde(rename = "$ownerId")]
     pub owner_id: [u8; 32],
 }
 
@@ -660,6 +663,7 @@ impl Document {
         let mut buffer: Vec<u8> = Vec::new();
         buffer.write_u32::<BigEndian>(PROTOCOL_VERSION);
         ciborium::ser::into_writer(&self, &mut buffer).expect("unable to serialize into cbor");
+        ciborium::ser::into_writer(&self, &mut buffer).expect("unable to serialize into cbor");
         buffer
     }
 
@@ -1021,7 +1025,7 @@ fn bool_for_system_value_from_tree_map(
 #[cfg(test)]
 mod tests {
     use crate::common::json_document_to_cbor;
-    use crate::contract::Contract;
+    use crate::contract::{Contract, Document};
     use crate::drive::Drive;
     use std::collections::HashMap;
 
@@ -1033,6 +1037,24 @@ mod tests {
         let document: HashMap<String, ciborium::value::Value> =
             ciborium::de::from_reader(read_document_cbor).expect("cannot deserialize cbor");
         assert!(document.get("a").is_some());
+    }
+
+    #[test]
+    fn test_document_cbor_serialization() {
+        let dashpay_cbor = json_document_to_cbor(
+            "tests/supporting_files/contract/dashpay/dashpay-contract.json",
+            Some(1),
+        );
+        let contract = Contract::from_cbor(&dashpay_cbor, None).unwrap();
+
+        let document_type = contract.document_type_for_name("profile").expect("expected to get profile document type");
+        let document = document_type.random_document(Some(3333));
+
+        let document_cbor = document.to_cbor();
+
+        let recovered_document = Document::from_cbor(document_cbor.as_slice(), None, None).expect("expected to get document");
+
+        assert_eq!(recovered_document, document);
     }
 
     #[test]
