@@ -263,7 +263,7 @@ impl fmt::Display for DocumentFieldType {
                 } else {
                     "no max".to_string()
                 };
-                format!("string {} / {}", min_string.as_str(), max_string.as_str())
+                format!("string ({} / {})", min_string.as_str(), max_string.as_str())
             }
             DocumentFieldType::ByteArray(min, max) => {
                 let min_bytes = if let Some(min) = min {
@@ -276,7 +276,7 @@ impl fmt::Display for DocumentFieldType {
                 } else {
                     "no max".to_string()
                 };
-                format!("bytes {} / {}", min_bytes.as_str(), max_bytes.as_str())
+                format!("bytes ({} / {})", min_bytes.as_str(), max_bytes.as_str())
             }
             DocumentFieldType::Boolean => "bool".to_string(),
             DocumentFieldType::Date => "date".to_string(),

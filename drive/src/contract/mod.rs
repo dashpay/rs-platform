@@ -10,6 +10,7 @@ use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
+use std::fmt;
 
 // contract
 // - id
@@ -731,6 +732,39 @@ impl Document {
                 Error::CorruptedData(String::from("document type should exist for name"))
             })?;
         self.get_raw_for_document_type(key, document_type, owner_id)
+    }
+}
+
+fn value_string_representation(value: &Value) -> String {
+    match value {
+        Value::Integer(integer) => {
+            let i: i128 = integer.clone().try_into().unwrap();
+            format!("{}", i)
+        }
+        Value::Bytes(bytes) => hex::encode(bytes),
+        Value::Float(float) => {
+            format!("{}", float)
+        }
+        Value::Text(text) => text.clone(),
+        Value::Bool(b) => {
+            format!("{}", b)
+        }
+        Value::Null => "None".to_string(),
+        Value::Tag(_, _) => "Tag".to_string(),
+        Value::Array(_) => "Array".to_string(),
+        Value::Map(_) => "Map".to_string(),
+        _ => "".to_string(),
+    }
+}
+
+impl fmt::Display for Document {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "id:{} ", hex::encode(self.id))?;
+        write!(f, "owner_id:{} ", hex::encode(self.owner_id))?;
+        self.properties
+            .iter()
+            .map(|(key, value)| write!(f, "{}:{} ", key, value_string_representation(value)));
+        Ok(())
     }
 }
 
