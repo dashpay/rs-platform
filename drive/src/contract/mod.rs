@@ -545,13 +545,6 @@ impl DocumentType {
             owner_id,
         }
     }
-
-    pub fn to_cbor(&self) -> Vec<u8> {
-        let mut buffer: Vec<u8> = Vec::new();
-        buffer.write_u32::<BigEndian>(PROTOCOL_VERSION);
-        ciborium::ser::into_writer(&self, &mut buffer).expect("unable to serialize into cbor");
-        buffer
-    }
 }
 
 impl Document {
@@ -660,6 +653,13 @@ impl Document {
                 .try_into()
                 .expect("try_into shouldn't fail, document_id must be 32 bytes"),
         })
+    }
+
+    pub fn to_cbor(&self) -> Vec<u8> {
+        let mut buffer: Vec<u8> = Vec::new();
+        buffer.write_u32::<BigEndian>(PROTOCOL_VERSION);
+        ciborium::ser::into_writer(&self, &mut buffer).expect("unable to serialize into cbor");
+        buffer
     }
 
     pub fn get_raw_for_document_type<'a>(
