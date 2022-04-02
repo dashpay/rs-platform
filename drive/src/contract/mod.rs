@@ -508,6 +508,18 @@ impl DocumentType {
         Ok(index_properties)
     }
 
+    pub fn random_documents(&self, count: u32, seed: Option<u64>) -> Vec<Document> {
+        let mut rng = match seed {
+            None => rand::rngs::StdRng::from_entropy(),
+            Some(seed_value) => rand::rngs::StdRng::seed_from_u64(seed_value),
+        };
+        let mut vec : Vec<Document> = vec![];
+        for _i in 0..count {
+            vec.push(self.random_document_with_rng(rng));
+        }
+        vec
+    }
+
     pub fn random_document(&self, seed: Option<u64>) -> Document {
         let mut rng = match seed {
             None => rand::rngs::StdRng::from_entropy(),
