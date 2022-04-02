@@ -25,11 +25,11 @@ impl DocumentFieldType {
             DocumentFieldType::Integer => Some(8),
             DocumentFieldType::Number => Some(8),
             DocumentFieldType::String(min_length, _) => match min_length {
-                None => None,
+                None => Some(0),
                 Some(size) => Some(*size * 4),
             },
             DocumentFieldType::ByteArray(min_size, _) => match min_size {
-                None => None,
+                None => Some(0),
                 Some(size) => Some(*size),
             },
             DocumentFieldType::Boolean => Some(1),
