@@ -8,7 +8,7 @@ use grovedb::Error;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
 use rand::rngs::StdRng;
-use rand::SeedableRng;
+use rand::{Rng, SeedableRng};
 
 // contract
 // - id
@@ -508,24 +508,27 @@ impl DocumentType {
         Ok(index_properties)
     }
 
-    // pub fn random_document(&self, seed: Option<u64>) -> Document {
-    //     let mut rng = match seed {
-    //         None => rand::rngs::StdRng::from_entropy(),
-    //         Some(seed_value) => rand::rngs::StdRng::seed_from_u64(seed_value),
-    //     };
-    //     self.random_document_with_rng(rng)
-    // }
-    //
-    // pub fn random_document_with_rng(&self, rng: StdRng) -> Document {
-    //
-    //     let document_properties = self.properties.iter().map(|a| a).collect();
-    //
-    //     Document {
-    //         id: [],
-    //         properties: document_properties,
-    //         owner_id: []
-    //     }
-    // }
+    pub fn random_document(&self, seed: Option<u64>) -> Document {
+        let mut rng = match seed {
+            None => rand::rngs::StdRng::from_entropy(),
+            Some(seed_value) => rand::rngs::StdRng::seed_from_u64(seed_value),
+        };
+        self.random_document_with_rng(rng)
+    }
+
+    pub fn random_document_with_rng(&self, mut rng: StdRng) -> Document {
+        let id = rng.gen::<[u8; 32]>();
+        let owner_id = rng.gen::<[u8; 32]>();
+        let properties = self.properties.iter().map(|(key, document_field_type)|{
+            (key.clone(), document_field_type.random_value(&mut rng))
+        }).collect();
+
+        Document {
+            id,
+            properties,
+            owner_id,
+        }
+    }
 }
 
 impl Document {

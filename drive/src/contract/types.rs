@@ -3,6 +3,9 @@ use ciborium::value::{Integer, Value};
 use grovedb::Error;
 use serde::{Deserialize, Serialize};
 use std::fmt;
+use rand::distributions::{Alphanumeric, Standard, Uniform};
+use rand::Rng;
+use rand::rngs::StdRng;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub enum DocumentFieldType {
@@ -52,6 +55,37 @@ impl DocumentFieldType {
             DocumentFieldType::Date => Some(8),
             DocumentFieldType::Object => None,
             DocumentFieldType::Array => None,
+        }
+    }
+
+    pub fn random_size(&self, rng: &mut StdRng) -> usize {
+        rng.gen_range(self.min_size().unwrap()..self.max_size().unwrap())
+    }
+
+    pub fn random_value(&self, rng: &mut StdRng) -> Value {
+        match self {
+            DocumentFieldType::Integer => { Value::Integer(Integer::try_from(rng.gen::<i64>()).unwrap())  },
+            DocumentFieldType::Number =>{ Value::Float(rng.gen::<f64>()) },
+            DocumentFieldType::String(_, _) => {
+                let size = self.random_size(rng);
+                Value::Text(rng
+                    .sample_iter(Alphanumeric)
+                    .take(size)
+                    .map(char::from)
+                    .collect())
+            },
+            DocumentFieldType::ByteArray(_, _) => {
+                let size = self.random_size(rng);
+                Value::Bytes(rng.sample_iter(Standard).take(size).collect())
+            },
+            DocumentFieldType::Boolean => {
+                Value::Bool(rng.gen::<bool>())
+            },
+            DocumentFieldType::Date => {
+                Value::Float(rng.gen::<f64>())
+            },
+            DocumentFieldType::Object => Value::Null,
+            DocumentFieldType::Array => Value::Null,
         }
     }
 
