@@ -663,7 +663,6 @@ impl Document {
         let mut buffer: Vec<u8> = Vec::new();
         buffer.write_u32::<BigEndian>(PROTOCOL_VERSION);
         ciborium::ser::into_writer(&self, &mut buffer).expect("unable to serialize into cbor");
-        ciborium::ser::into_writer(&self, &mut buffer).expect("unable to serialize into cbor");
         buffer
     }
 
