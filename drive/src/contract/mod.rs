@@ -1,7 +1,7 @@
 mod defaults;
 pub mod types;
 
-use crate::drive::defaults::DEFAULT_HASH_SIZE;
+use crate::drive::defaults::{DEFAULT_HASH_SIZE, PROTOCOL_VERSION};
 use crate::drive::{Drive, RootTree};
 use ciborium::value::{Value as CborValue, Value};
 use grovedb::Error;
@@ -9,6 +9,7 @@ use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
+use byteorder::{BigEndian, WriteBytesExt};
 
 // contract
 // - id
@@ -543,6 +544,13 @@ impl DocumentType {
             properties,
             owner_id,
         }
+    }
+
+    pub fn to_cbor(&self) -> Vec<u8> {
+        let mut buffer: Vec<u8> = Vec::new();
+        buffer.write_u32::<BigEndian>(PROTOCOL_VERSION);
+        ciborium::ser::into_writer(&self, &mut buffer).expect("unable to serialize into cbor");
+        buffer
     }
 }
 
