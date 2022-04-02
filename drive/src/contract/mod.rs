@@ -5,10 +5,10 @@ use crate::drive::defaults::DEFAULT_HASH_SIZE;
 use crate::drive::{Drive, RootTree};
 use ciborium::value::{Value as CborValue, Value};
 use grovedb::Error;
-use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, HashMap};
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
+use serde::{Deserialize, Serialize};
+use std::collections::{BTreeMap, HashMap};
 
 // contract
 // - id
@@ -147,8 +147,9 @@ impl Contract {
             )));
         }
         // Deserialize the contract
-        let contract: BTreeMap<String, CborValue> = ciborium::de::from_reader(read_contract_cbor)
-            .map_err(|_| Error::CorruptedData(String::from("unable to decode contract")))?;
+        let contract: BTreeMap<String, CborValue> =
+            ciborium::de::from_reader(read_contract_cbor)
+                .map_err(|_| Error::CorruptedData(String::from("unable to decode contract")))?;
 
         // Get the contract id
         let contract_id: [u8; 32] = if let Some(contract_id) = contract_id {
@@ -513,9 +514,9 @@ impl DocumentType {
             None => rand::rngs::StdRng::from_entropy(),
             Some(seed_value) => rand::rngs::StdRng::seed_from_u64(seed_value),
         };
-        let mut vec : Vec<Document> = vec![];
+        let mut vec: Vec<Document> = vec![];
         for _i in 0..count {
-            vec.push(self.random_document_with_rng(rng));
+            vec.push(self.random_document_with_rng(&mut rng));
         }
         vec
     }
@@ -525,15 +526,17 @@ impl DocumentType {
             None => rand::rngs::StdRng::from_entropy(),
             Some(seed_value) => rand::rngs::StdRng::seed_from_u64(seed_value),
         };
-        self.random_document_with_rng(rng)
+        self.random_document_with_rng(&mut rng)
     }
 
-    pub fn random_document_with_rng(&self, mut rng: StdRng) -> Document {
+    pub fn random_document_with_rng(&self, rng: &mut StdRng) -> Document {
         let id = rng.gen::<[u8; 32]>();
         let owner_id = rng.gen::<[u8; 32]>();
-        let properties = self.properties.iter().map(|(key, document_field_type)|{
-            (key.clone(), document_field_type.random_value(&mut rng))
-        }).collect();
+        let properties = self
+            .properties
+            .iter()
+            .map(|(key, document_field_type)| (key.clone(), document_field_type.random_value(rng)))
+            .collect();
 
         Document {
             id,
