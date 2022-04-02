@@ -26,6 +26,25 @@ impl DocumentFieldType {
             DocumentFieldType::Number => Some(8),
             DocumentFieldType::String(min_length, _) => match min_length {
                 None => Some(0),
+                Some(size) => Some(*size),
+            },
+            DocumentFieldType::ByteArray(min_size, _) => match min_size {
+                None => Some(0),
+                Some(size) => Some(*size),
+            },
+            DocumentFieldType::Boolean => Some(1),
+            DocumentFieldType::Date => Some(8),
+            DocumentFieldType::Object => None,
+            DocumentFieldType::Array => None,
+        }
+    }
+
+    pub fn min_byte_size(&self) -> Option<usize> {
+        match self {
+            DocumentFieldType::Integer => Some(8),
+            DocumentFieldType::Number => Some(8),
+            DocumentFieldType::String(min_length, _) => match min_length {
+                None => Some(0),
                 Some(size) => Some(*size * 4),
             },
             DocumentFieldType::ByteArray(min_size, _) => match min_size {
@@ -39,7 +58,7 @@ impl DocumentFieldType {
         }
     }
 
-    pub fn max_size(&self) -> Option<usize> {
+    pub fn max_byte_size(&self) -> Option<usize> {
         match self {
             DocumentFieldType::Integer => Some(8),
             DocumentFieldType::Number => Some(8),
@@ -58,8 +77,29 @@ impl DocumentFieldType {
         }
     }
 
+    pub fn max_size(&self) -> Option<usize> {
+        match self {
+            DocumentFieldType::Integer => Some(8),
+            DocumentFieldType::Number => Some(8),
+            DocumentFieldType::String(_, max_length) => match max_length {
+                None => Some(16384),
+                Some(size) => Some(*size),
+            },
+            DocumentFieldType::ByteArray(_, max_size) => match max_size {
+                None => Some(65536),
+                Some(size) => Some(*size),
+            },
+            DocumentFieldType::Boolean => Some(1),
+            DocumentFieldType::Date => Some(8),
+            DocumentFieldType::Object => None,
+            DocumentFieldType::Array => None,
+        }
+    }
+
     pub fn random_size(&self, rng: &mut StdRng) -> usize {
-        rng.gen_range(self.min_size().unwrap()..self.max_size().unwrap())
+        let min_size = self.min_size().unwrap();
+        let max_size = self.max_size().unwrap();
+        rng.gen_range(min_size..=max_size)
     }
 
     pub fn random_value(&self, rng: &mut StdRng) -> Value {
@@ -82,7 +122,10 @@ impl DocumentFieldType {
                 Value::Bytes(rng.sample_iter(Standard).take(size).collect())
             }
             DocumentFieldType::Boolean => Value::Bool(rng.gen::<bool>()),
-            DocumentFieldType::Date => Value::Float(rng.gen::<f64>()),
+            DocumentFieldType::Date => {
+                let f: f64 = rng.gen_range(1548910575000.0..1648910575000.0);
+                Value::Float(f.round() / 1000.0)
+            }
             DocumentFieldType::Object => Value::Null,
             DocumentFieldType::Array => Value::Null,
         }

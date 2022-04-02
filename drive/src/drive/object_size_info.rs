@@ -333,7 +333,7 @@ impl<'a> DocumentInfo<'a> {
                                 "incorrect key path for document type",
                             ))
                         })?;
-                    let max_size = document_field_type.max_size().ok_or_else(|| {
+                    let max_size = document_field_type.max_byte_size().ok_or_else(|| {
                         Error::CorruptedData(String::from("document type must have a max size"))
                     })?;
                     Ok(Some(KeySize(max_size)))

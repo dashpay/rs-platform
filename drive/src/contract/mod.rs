@@ -500,7 +500,7 @@ impl DocumentType {
     pub fn max_size(&self) -> usize {
         self.properties
             .iter()
-            .filter_map(|(_, document_field_type)| document_field_type.max_size())
+            .filter_map(|(_, document_field_type)| document_field_type.max_byte_size())
             .sum()
     }
 
@@ -738,7 +738,7 @@ impl Document {
     }
 }
 
-fn value_string_representation(value: &Value) -> String {
+fn reduced_value_string_representation(value: &Value) -> String {
     match value {
         Value::Integer(integer) => {
             let i: i128 = integer.clone().try_into().unwrap();
@@ -748,7 +748,15 @@ fn value_string_representation(value: &Value) -> String {
         Value::Float(float) => {
             format!("{}", float)
         }
-        Value::Text(text) => text.clone(),
+        Value::Text(text) => {
+            let len = text.len();
+            if len > 20 {
+                let first_text = text.split_at(20).0.to_string();
+                format!("{}[...({})]", first_text, len)
+            } else {
+                text.clone()
+            }
+        }
         Value::Bool(b) => {
             format!("{}", b)
         }
@@ -762,11 +770,15 @@ fn value_string_representation(value: &Value) -> String {
 
 impl fmt::Display for Document {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "id:{} ", hex::encode(self.id))?;
-        write!(f, "owner_id:{} ", hex::encode(self.owner_id))?;
-        self.properties
-            .iter()
-            .map(|(key, value)| write!(f, "{}:{} ", key, value_string_representation(value)));
+        write!(f, "id:{} ", bs58::encode(self.id).into_string())?;
+        write!(f, "owner_id:{} ", bs58::encode(self.owner_id).into_string())?;
+        if self.properties.is_empty() {
+            write!(f, "no properties")?;
+        } else {
+            for (key, value) in self.properties.iter() {
+                write!(f, "{}:{} ", key, reduced_value_string_representation(value))?
+            }
+        }
         Ok(())
     }
 }
@@ -1057,6 +1069,23 @@ mod tests {
             .expect("expected to get document");
 
         assert_eq!(recovered_document, document);
+    }
+
+    #[test]
+    fn test_document_display() {
+        let dashpay_cbor = json_document_to_cbor(
+            "tests/supporting_files/contract/dashpay/dashpay-contract.json",
+            Some(1),
+        );
+        let contract = Contract::from_cbor(&dashpay_cbor, None).unwrap();
+
+        let document_type = contract
+            .document_type_for_name("profile")
+            .expect("expected to get profile document type");
+        let document = document_type.random_document(Some(3333));
+
+        let document_string = format!("{}", document);
+        assert_eq!(document_string.as_str(), "id:2vq574DjKi7ZD8kJ6dMHxT5wu6ZKD2bW5xKAyKAGW7qZ owner_id:ChTEGXJcpyknkADUC5s6tAzvPqVG7x6Lo1Nr5mFtj2mk $createdAt:1627081806.116 $updatedAt:1575820087.909 avatarUrl:W18RuyblDX7hxB38OJYt[...(894)] displayName:wvAD8Grs2h publicMessage:LdWpGtOzOkYXStdxU3G0[...(105)] ")
     }
 
     #[test]
