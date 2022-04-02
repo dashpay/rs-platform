@@ -7,6 +7,8 @@ use ciborium::value::{Value as CborValue, Value};
 use grovedb::Error;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
+use rand::rngs::StdRng;
+use rand::SeedableRng;
 
 // contract
 // - id
@@ -33,7 +35,7 @@ pub struct Contract {
 pub struct DocumentType {
     pub name: String,
     pub indices: Vec<Index>,
-    pub properties: HashMap<String, types::DocumentFieldType>,
+    pub properties: BTreeMap<String, types::DocumentFieldType>,
     pub documents_keep_history: bool,
     pub documents_mutable: bool,
 }
@@ -41,7 +43,7 @@ pub struct DocumentType {
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct Document {
     pub id: [u8; 32],
-    pub properties: HashMap<String, CborValue>,
+    pub properties: BTreeMap<String, CborValue>,
     pub owner_id: [u8; 32],
 }
 
@@ -145,42 +147,42 @@ impl Contract {
             )));
         }
         // Deserialize the contract
-        let contract: HashMap<String, CborValue> = ciborium::de::from_reader(read_contract_cbor)
+        let contract: BTreeMap<String, CborValue> = ciborium::de::from_reader(read_contract_cbor)
             .map_err(|_| Error::CorruptedData(String::from("unable to decode contract")))?;
 
         // Get the contract id
         let contract_id: [u8; 32] = if let Some(contract_id) = contract_id {
             contract_id
         } else {
-            bytes_for_system_value_from_hash_map(&contract, "$id")?
+            bytes_for_system_value_from_tree_map(&contract, "$id")?
                 .ok_or_else(|| Error::CorruptedData(String::from("unable to get contract id")))?
                 .try_into()
                 .map_err(|_| Error::CorruptedData(String::from("contract_id must be 32 bytes")))?
         };
 
         // Does the contract keep history when the contract itself changes?
-        let keeps_history: bool = bool_for_system_value_from_hash_map(
+        let keeps_history: bool = bool_for_system_value_from_tree_map(
             &contract,
             "keepsHistory",
             crate::contract::defaults::DEFAULT_CONTRACT_KEEPS_HISTORY,
         )?;
 
         // Is the contract mutable?
-        let readonly: bool = bool_for_system_value_from_hash_map(
+        let readonly: bool = bool_for_system_value_from_tree_map(
             &contract,
             "readOnly",
             !crate::contract::defaults::DEFAULT_CONTRACT_MUTABILITY,
         )?;
 
         // Do documents in the contract keep history?
-        let documents_keep_history_contract_default: bool = bool_for_system_value_from_hash_map(
+        let documents_keep_history_contract_default: bool = bool_for_system_value_from_tree_map(
             &contract,
             "documentsKeepHistoryContractDefault",
             crate::contract::defaults::DEFAULT_CONTRACT_DOCUMENTS_KEEPS_HISTORY,
         )?;
 
         // Are documents in the contract mutable?
-        let documents_mutable_contract_default: bool = bool_for_system_value_from_hash_map(
+        let documents_mutable_contract_default: bool = bool_for_system_value_from_tree_map(
             &contract,
             "documentsMutableContractDefault",
             crate::contract::defaults::DEFAULT_CONTRACT_DOCUMENT_MUTABILITY,
@@ -337,7 +339,7 @@ impl DocumentType {
         default_keeps_history: bool,
         default_mutability: bool,
     ) -> Result<Self, Error> {
-        let mut document_properties: HashMap<String, types::DocumentFieldType> = HashMap::new();
+        let mut document_properties: BTreeMap<String, types::DocumentFieldType> = BTreeMap::new();
 
         // Do documents of this type keep history? (Overrides contract value)
         let documents_keep_history: bool = cbor_inner_bool_value_with_default(
@@ -386,7 +388,7 @@ impl DocumentType {
             })?;
 
         fn insert_values(
-            document_properties: &mut HashMap<String, types::DocumentFieldType>,
+            document_properties: &mut BTreeMap<String, types::DocumentFieldType>,
             prefix: Option<&str>,
             property_key: &Value,
             property_value: &Value,
@@ -505,6 +507,25 @@ impl DocumentType {
         }
         Ok(index_properties)
     }
+
+    // pub fn random_document(&self, seed: Option<u64>) -> Document {
+    //     let mut rng = match seed {
+    //         None => rand::rngs::StdRng::from_entropy(),
+    //         Some(seed_value) => rand::rngs::StdRng::seed_from_u64(seed_value),
+    //     };
+    //     self.random_document_with_rng(rng)
+    // }
+    //
+    // pub fn random_document_with_rng(&self, rng: StdRng) -> Document {
+    //
+    //     let document_properties = self.properties.iter().map(|a| a).collect();
+    //
+    //     Document {
+    //         id: [],
+    //         properties: document_properties,
+    //         owner_id: []
+    //     }
+    // }
 }
 
 impl Document {
@@ -521,14 +542,14 @@ impl Document {
         }
         // first we need to deserialize the document and contract indices
         // we would need dedicated deserialization functions based on the document type
-        let mut document: HashMap<String, CborValue> =
+        let mut document: BTreeMap<String, CborValue> =
             ciborium::de::from_reader(read_document_cbor)
                 .map_err(|_| Error::CorruptedData(String::from("unable to decode contract")))?;
 
         let owner_id: [u8; 32] = match owner_id {
             None => {
                 let owner_id: Vec<u8> =
-                    bytes_for_system_value_from_hash_map(&document, "$ownerId")?.ok_or_else(
+                    bytes_for_system_value_from_tree_map(&document, "$ownerId")?.ok_or_else(
                         || Error::CorruptedData(String::from("unable to get document $ownerId")),
                     )?;
                 document.remove("$ownerId");
@@ -549,7 +570,7 @@ impl Document {
 
         let id: [u8; 32] = match document_id {
             None => {
-                let document_id: Vec<u8> = bytes_for_system_value_from_hash_map(&document, "$id")?
+                let document_id: Vec<u8> = bytes_for_system_value_from_tree_map(&document, "$id")?
                     .ok_or_else(|| {
                         Error::CorruptedData(String::from("unable to get document $id"))
                     })?;
@@ -600,7 +621,7 @@ impl Document {
 
         // first we need to deserialize the document and contract indices
         // we would need dedicated deserialization functions based on the document type
-        let properties: HashMap<String, CborValue> = ciborium::de::from_reader(read_document_cbor)
+        let properties: BTreeMap<String, CborValue> = ciborium::de::from_reader(read_document_cbor)
             .map_err(|_| Error::CorruptedData(String::from("unable to decode contract")))?;
 
         // dev-note: properties is everything other than the id and owner id
@@ -906,8 +927,8 @@ pub fn bytes_for_system_value(value: &Value) -> Result<Option<Vec<u8>>, Error> {
     }
 }
 
-fn bytes_for_system_value_from_hash_map(
-    document: &HashMap<String, CborValue>,
+fn bytes_for_system_value_from_tree_map(
+    document: &BTreeMap<String, CborValue>,
     key: &str,
 ) -> Result<Option<Vec<u8>>, Error> {
     let value = document.get(key);
@@ -918,8 +939,8 @@ fn bytes_for_system_value_from_hash_map(
     }
 }
 
-fn bool_for_system_value_from_hash_map(
-    document: &HashMap<String, CborValue>,
+fn bool_for_system_value_from_tree_map(
+    document: &BTreeMap<String, CborValue>,
     key: &str,
     default: bool,
 ) -> Result<bool, Error> {
