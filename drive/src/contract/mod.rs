@@ -363,7 +363,9 @@ impl DocumentType {
 
         let index_values = cbor_inner_array_value(document_type_value_map, "indices");
         let indices: Vec<Index> = match index_values {
-            None => { vec![] }
+            None => {
+                vec![]
+            }
             Some(index_values) => {
                 let mut m_indexes = Vec::with_capacity(index_values.len());
                 for index_value in index_values {
@@ -372,13 +374,13 @@ impl DocumentType {
                             "table document is not a map as expected",
                         )));
                     }
-                    let index = Index::from_cbor_value(index_value.as_map().expect("confirmed as map"))?;
+                    let index =
+                        Index::from_cbor_value(index_value.as_map().expect("confirmed as map"))?;
                     m_indexes.push(index);
                 }
                 m_indexes
             }
         };
-
 
         // Extract the properties
         let property_values = cbor_inner_map_value(document_type_value_map, "properties")

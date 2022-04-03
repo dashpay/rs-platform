@@ -1836,10 +1836,10 @@ mod tests {
     use crate::drive::{defaults, Drive};
     use crate::query::DriveQuery;
     use rand::Rng;
+    use serde::de::Unexpected::Option;
     use serde_json::json;
     use std::collections::HashMap;
     use std::option::Option::None;
-    use serde::de::Unexpected::Option;
     use tempfile::TempDir;
 
     fn setup_dashpay(_prefix: &str, mutable_contact_requests: bool) -> (Drive, Vec<u8>) {
@@ -1879,7 +1879,8 @@ mod tests {
 
         // let's construct the grovedb structure for the dashpay data contract
         let contract_cbor = json_document_to_cbor(contract_path, Some(1));
-        let contract = Contract::from_cbor(&contract_cbor, None).expect("expected to deserialize the contract");
+        let contract = Contract::from_cbor(&contract_cbor, None)
+            .expect("expected to deserialize the contract");
         drive
             .apply_contract(&contract, contract_cbor.clone(), 0f64, None)
             .expect("expected to apply contract successfully");
@@ -3324,7 +3325,9 @@ mod tests {
     fn test_create_deep_nested_contract() {
         let (drive, contract, contract_cbor) = setup_deep_nested_contract();
 
-        let document_type = contract.document_type_for_name("nest").expect("expected to get document type");
+        let document_type = contract
+            .document_type_for_name("nest")
+            .expect("expected to get document type");
 
         let document = document_type.random_document(Some(5));
 
@@ -3336,7 +3339,10 @@ mod tests {
         drive
             .add_document_for_contract(
                 DocumentAndContractInfo {
-                    document_info: DocumentInfo::DocumentAndSerialization((&document, document.to_cbor().as_slice())),
+                    document_info: DocumentInfo::DocumentAndSerialization((
+                        &document,
+                        document.to_cbor().as_slice(),
+                    )),
                     contract: &contract,
                     document_type,
                     owner_id: Some(&random_owner_id),
