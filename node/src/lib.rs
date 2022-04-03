@@ -267,7 +267,7 @@ impl DriveWrapper {
 
         drive
             .send_to_drive_thread(move |drive: &Drive, transaction, channel| {
-                let result = drive.apply_contract(
+                let result = drive.apply_contract_cbor(
                     contract_cbor,
                     None,
                     block_time,
