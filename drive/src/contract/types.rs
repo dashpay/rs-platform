@@ -131,6 +131,35 @@ impl DocumentFieldType {
         }
     }
 
+    pub fn random_filled_value(&self, rng: &mut StdRng) -> Value {
+        match self {
+            DocumentFieldType::Integer => {
+                Value::Integer(Integer::try_from(rng.gen::<i64>()).unwrap())
+            }
+            DocumentFieldType::Number => Value::Float(rng.gen::<f64>()),
+            DocumentFieldType::String(_, _) => {
+                let size = self.max_size().unwrap();
+                Value::Text(
+                    rng.sample_iter(Alphanumeric)
+                        .take(size)
+                        .map(char::from)
+                        .collect(),
+                )
+            }
+            DocumentFieldType::ByteArray(_, _) => {
+                let size = self.max_size().unwrap();
+                Value::Bytes(rng.sample_iter(Standard).take(size).collect())
+            }
+            DocumentFieldType::Boolean => Value::Bool(rng.gen::<bool>()),
+            DocumentFieldType::Date => {
+                let f: f64 = rng.gen_range(1548910575000.0..1648910575000.0);
+                Value::Float(f.round() / 1000.0)
+            }
+            DocumentFieldType::Object => Value::Null,
+            DocumentFieldType::Array => Value::Null,
+        }
+    }
+
     // Given a field type and a value this function chooses and executes the right encoding method
     pub fn encode_value(&self, value: &Value) -> Result<Vec<u8>, Error> {
         if value.is_null() {

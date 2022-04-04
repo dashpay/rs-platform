@@ -584,6 +584,42 @@ impl DocumentType {
             owner_id,
         }
     }
+
+    pub fn random_filled_documents(&self, count: u32, seed: Option<u64>) -> Vec<Document> {
+        let mut rng = match seed {
+            None => rand::rngs::StdRng::from_entropy(),
+            Some(seed_value) => rand::rngs::StdRng::seed_from_u64(seed_value),
+        };
+        let mut vec: Vec<Document> = vec![];
+        for _i in 0..count {
+            vec.push(self.random_filled_document_with_rng(&mut rng));
+        }
+        vec
+    }
+
+    pub fn random_filled_document(&self, seed: Option<u64>) -> Document {
+        let mut rng = match seed {
+            None => rand::rngs::StdRng::from_entropy(),
+            Some(seed_value) => rand::rngs::StdRng::seed_from_u64(seed_value),
+        };
+        self.random_filled_document_with_rng(&mut rng)
+    }
+
+    pub fn random_filled_document_with_rng(&self, rng: &mut StdRng) -> Document {
+        let id = rng.gen::<[u8; 32]>();
+        let owner_id = rng.gen::<[u8; 32]>();
+        let properties = self
+            .properties
+            .iter()
+            .map(|(key, document_field_type)| (key.clone(), document_field_type.random_filled_value(rng)))
+            .collect();
+
+        Document {
+            id,
+            properties,
+            owner_id,
+        }
+    }
 }
 
 impl Document {
