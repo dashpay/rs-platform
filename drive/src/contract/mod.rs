@@ -194,6 +194,17 @@ impl Contract {
             crate::contract::defaults::DEFAULT_CONTRACT_DOCUMENT_MUTABILITY,
         )?;
 
+        let definition_references = match contract.get("$defs") {
+            None => BTreeMap::new(),
+            Some(definition_value) => {
+                let definition_map = definition_value.as_map();
+                match definition_map {
+                    None => BTreeMap::new(),
+                    Some(key_value) => cbor_map_to_btree_map(key_value),
+                }
+            }
+        };
+
         let documents_cbor_value = contract
             .get("documents")
             .ok_or_else(|| Error::CorruptedData(String::from("unable to get documents")))?;
@@ -221,6 +232,7 @@ impl Contract {
             let document_type = DocumentType::from_cbor_value(
                 type_key_value.as_text().expect("confirmed as text"),
                 document_type_value.as_map().expect("confirmed as map"),
+                &definition_references,
                 documents_keep_history_contract_default,
                 documents_mutable_contract_default,
             )?;
@@ -342,6 +354,7 @@ impl DocumentType {
     pub fn from_cbor_value(
         name: &str,
         document_type_value_map: &[(Value, Value)],
+        definition_references: &BTreeMap<String, &Value>,
         default_keeps_history: bool,
         default_mutability: bool,
     ) -> Result<Self, Error> {
@@ -383,7 +396,7 @@ impl DocumentType {
         };
 
         // Extract the properties
-        let property_values = cbor_inner_map_value(document_type_value_map, "properties")
+        let property_values = cbor_inner_btree_map(document_type_value_map, "properties")
             .ok_or_else(|| {
                 Error::CorruptedData(String::from(
                     "unable to get document properties from the contract",
@@ -393,23 +406,13 @@ impl DocumentType {
         fn insert_values(
             document_properties: &mut BTreeMap<String, types::DocumentFieldType>,
             prefix: Option<&str>,
-            property_key: &Value,
+            property_key: String,
             property_value: &Value,
+            definition_references: &BTreeMap<String, &Value>,
         ) -> Result<(), Error> {
-            if !property_key.is_text() {
-                return Err(Error::CorruptedData(String::from(
-                    "property key should be text",
-                )));
-            }
-
-            let property_key_string = property_key
-                .as_text()
-                .expect("confirmed as text")
-                .to_string();
-
             let prefixed_property_key = match prefix {
-                None => property_key_string,
-                Some(prefix) => [prefix, property_key_string.as_str()].join("."),
+                None => property_key,
+                Some(prefix) => [prefix, property_key.as_str()].join("."),
             };
 
             if !property_value.is_map() {
@@ -419,8 +422,36 @@ impl DocumentType {
             }
 
             let inner_property_values = property_value.as_map().expect("confirmed as map");
-            let type_value = cbor_inner_text_value(inner_property_values, "type")
-                .ok_or_else(|| Error::CorruptedData(String::from("cannot find type property")))?;
+            let base_inner_properties = cbor_map_to_btree_map(inner_property_values);
+
+            let type_value = cbor_inner_text_value(&inner_property_values, "type");
+            let result: Result<(&str, BTreeMap<String, &Value>), Error> = match type_value {
+                None => {
+                    let ref_value = btree_map_inner_text_value(&base_inner_properties, "$ref")
+                        .ok_or_else(|| {
+                            Error::CorruptedData(String::from("cannot find type property"))
+                        })?;
+                    if !ref_value.starts_with("#/$defs/") {
+                        return Err(Error::CorruptedData(String::from("malformed reference")));
+                    }
+                    let ref_value = ref_value.split_at(8).1;
+                    let inner_properties_map =
+                        btree_map_inner_map_value(definition_references, ref_value).ok_or_else(
+                            || Error::CorruptedData(String::from("document reference not found")),
+                        )?;
+                    let type_value = cbor_inner_text_value(&inner_properties_map, "type")
+                        .ok_or_else(|| {
+                            Error::CorruptedData(String::from(
+                                "cannot find type property on reference",
+                            ))
+                        })?;
+                    let inner_properties = cbor_map_to_btree_map(inner_properties_map);
+                    Ok((type_value, inner_properties))
+                }
+                Some(type_value) => Ok((type_value, base_inner_properties)),
+            };
+
+            let (type_value, inner_properties) = result?;
 
             let field_type: types::DocumentFieldType;
 
@@ -428,12 +459,12 @@ impl DocumentType {
                 "array" => {
                     // Only handling bytearrays for v1
                     // Return an error if it is not a byte array
-                    field_type = match cbor_inner_bool_value(inner_property_values, "byteArray") {
+                    field_type = match btree_map_inner_bool_value(&inner_properties, "byteArray") {
                         Some(inner_bool) => {
                             if inner_bool {
                                 types::DocumentFieldType::ByteArray(
-                                    cbor_inner_size_value(inner_property_values, "minItems"),
-                                    cbor_inner_size_value(inner_property_values, "maxItems"),
+                                    btree_map_inner_size_value(&inner_properties, "minItems"),
+                                    btree_map_inner_size_value(&inner_properties, "maxItems"),
                                 )
                             } else {
                                 return Err(Error::CorruptedData(String::from("invalid type")));
@@ -445,25 +476,26 @@ impl DocumentType {
                     document_properties.insert(prefixed_property_key, field_type);
                 }
                 "object" => {
-                    let properties = cbor_inner_map_value(inner_property_values, "properties")
+                    let properties = btree_map_inner_btree_map(&inner_properties, "properties")
                         .ok_or_else(|| {
                             Error::CorruptedData(String::from(
                                 "cannot find byteArray property for array type",
                             ))
                         })?;
-                    for (object_property_key, object_property_value) in properties.iter() {
+                    for (object_property_key, object_property_value) in properties.into_iter() {
                         insert_values(
                             document_properties,
                             Some(&prefixed_property_key),
                             object_property_key,
                             object_property_value,
+                            definition_references,
                         )?
                     }
                 }
                 "string" => {
                     field_type = types::DocumentFieldType::String(
-                        cbor_inner_size_value(inner_property_values, "minLength"),
-                        cbor_inner_size_value(inner_property_values, "maxLength"),
+                        btree_map_inner_size_value(&inner_properties, "minLength"),
+                        btree_map_inner_size_value(&inner_properties, "maxLength"),
                     );
                     document_properties.insert(prefixed_property_key, field_type);
                 }
@@ -478,7 +510,13 @@ impl DocumentType {
 
         // Based on the property name, determine the type
         for (property_key, property_value) in property_values {
-            insert_values(&mut document_properties, None, property_key, property_value)?;
+            insert_values(
+                &mut document_properties,
+                None,
+                property_key,
+                property_value,
+                definition_references,
+            )?;
         }
 
         // Add system properties
@@ -877,6 +915,16 @@ pub fn get_key_from_cbor_map<'a>(
     None
 }
 
+pub fn cbor_map_to_btree_map(cbor_map: &[(Value, Value)]) -> BTreeMap<String, &Value> {
+    cbor_map
+        .iter()
+        .filter_map(|(key, value)| match key.as_text() {
+            None => None,
+            Some(key) => Some((key.to_string(), value)),
+        })
+        .collect::<BTreeMap<String, &Value>>()
+}
+
 pub fn cbor_inner_array_value<'a>(
     document_type: &'a [(Value, Value)],
     key: &'a str,
@@ -899,11 +947,55 @@ pub fn cbor_inner_map_value<'a>(
     None
 }
 
+pub fn cbor_inner_btree_map<'a>(
+    document_type: &'a [(Value, Value)],
+    key: &'a str,
+) -> Option<BTreeMap<String, &'a Value>> {
+    let key_value = get_key_from_cbor_map(document_type, key)?;
+    if let Value::Map(map_value) = key_value {
+        return Some(cbor_map_to_btree_map(map_value));
+    }
+    None
+}
+
+pub fn btree_map_inner_btree_map<'a>(
+    document_type: &'a BTreeMap<String, &'a Value>,
+    key: &'a str,
+) -> Option<BTreeMap<String, &'a Value>> {
+    let key_value = document_type.get(key)?;
+    if let Value::Map(map_value) = key_value {
+        return Some(cbor_map_to_btree_map(map_value));
+    }
+    None
+}
+
+pub fn btree_map_inner_map_value<'a>(
+    document_type: &'a BTreeMap<String, &'a Value>,
+    key: &'a str,
+) -> Option<&'a Vec<(Value, Value)>> {
+    let key_value = document_type.get(key)?;
+    if let Value::Map(map_value) = key_value {
+        return Some(map_value);
+    }
+    None
+}
+
 pub fn cbor_inner_text_value<'a>(
     document_type: &'a [(Value, Value)],
     key: &'a str,
 ) -> Option<&'a str> {
     let key_value = get_key_from_cbor_map(document_type, key)?;
+    if let Value::Text(string_value) = key_value {
+        return Some(string_value);
+    }
+    None
+}
+
+pub fn btree_map_inner_text_value<'a>(
+    document_type: &'a BTreeMap<String, &'a Value>,
+    key: &'a str,
+) -> Option<&'a str> {
+    let key_value = document_type.get(key)?;
     if let Value::Text(string_value) = key_value {
         return Some(string_value);
     }
@@ -949,8 +1041,37 @@ pub fn cbor_inner_bool_value(document_type: &[(Value, Value)], key: &str) -> Opt
     None
 }
 
+pub fn btree_map_inner_bool_value(
+    document_type: &BTreeMap<String, &Value>,
+    key: &str,
+) -> Option<bool> {
+    let key_value = document_type.get(key)?;
+    if let Value::Bool(bool_value) = key_value {
+        return Some(*bool_value);
+    }
+    None
+}
+
 pub fn cbor_inner_size_value(document_type: &[(Value, Value)], key: &str) -> Option<usize> {
     let key_value = get_key_from_cbor_map(document_type, key)?;
+    if let Value::Integer(integer) = key_value {
+        let value_as_usize: Result<usize, Error> = (*integer)
+            .try_into()
+            .map_err(|_| Error::CorruptedData(String::from("expected u8 value")));
+        match value_as_usize {
+            Ok(size) => Some(size),
+            Err(_) => None,
+        }
+    } else {
+        None
+    }
+}
+
+pub fn btree_map_inner_size_value(
+    document_type: &BTreeMap<String, &Value>,
+    key: &str,
+) -> Option<usize> {
+    let key_value = document_type.get(key)?;
     if let Value::Integer(integer) = key_value {
         let value_as_usize: Result<usize, Error> = (*integer)
             .try_into()
