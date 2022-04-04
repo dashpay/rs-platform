@@ -611,7 +611,9 @@ impl DocumentType {
         let properties = self
             .properties
             .iter()
-            .map(|(key, document_field_type)| (key.clone(), document_field_type.random_filled_value(rng)))
+            .map(|(key, document_field_type)| {
+                (key.clone(), document_field_type.random_filled_value(rng))
+            })
             .collect();
 
         Document {
