@@ -1875,7 +1875,27 @@ mod tests {
             .create_root_tree(None)
             .expect("expected to create root tree successfully");
 
-        let contract_path = "tests/supporting_files/contract/deepNested/deep-nested.json";
+        let contract_path = "tests/supporting_files/contract/deepNested/deep-nested50.json";
+        // let's construct the grovedb structure for the dashpay data contract
+        let contract_cbor = json_document_to_cbor(contract_path, Some(1));
+        let contract = Contract::from_cbor(&contract_cbor, None)
+            .expect("expected to deserialize the contract");
+        drive
+            .apply_contract(&contract, contract_cbor.clone(), 0f64, None)
+            .expect("expected to apply contract successfully");
+
+        (drive, contract, contract_cbor)
+    }
+
+    fn setup_reference_contract() -> (Drive, Contract, Vec<u8>) {
+        let tmp_dir = TempDir::new().unwrap();
+        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+
+        drive
+            .create_root_tree(None)
+            .expect("expected to create root tree successfully");
+
+        let contract_path = "tests/supporting_files/contract/references/references.json";
 
         // let's construct the grovedb structure for the dashpay data contract
         let contract_cbor = json_document_to_cbor(contract_path, Some(1));
@@ -3322,7 +3342,7 @@ mod tests {
     }
 
     #[test]
-    fn test_create_deep_nested_contract() {
+    fn test_create_deep_nested_contract_50() {
         let (drive, contract, contract_cbor) = setup_deep_nested_contract();
 
         let document_type = contract
@@ -3334,6 +3354,39 @@ mod tests {
         let nested_value = document.properties.get("abc0.abc0.abc0.abc0.abc0.abc0.abc0.abc0.abc0.abc0.abc0.abc0.abc0.abc0.abc0.abc0.abc0.abc0.abc0.abc0.abc0.abc0.abc0.abc0.abc0.abc0.abc0.abc0.abc0.abc0.abc0.abc0.abc0.abc0.abc0.abc0.abc0.abc0.abc0.abc0.abc0.abc0.abc0.abc0.abc0.abc0.abc0.abc0.abc0.abc0");
 
         assert!(nested_value.is_some());
+
+        let random_owner_id = rand::thread_rng().gen::<[u8; 32]>();
+        drive
+            .add_document_for_contract(
+                DocumentAndContractInfo {
+                    document_info: DocumentInfo::DocumentAndSerialization((
+                        &document,
+                        document.to_cbor().as_slice(),
+                    )),
+                    contract: &contract,
+                    document_type,
+                    owner_id: Some(&random_owner_id),
+                },
+                false,
+                0f64,
+                None,
+            )
+            .expect("expected to insert a document successfully");
+    }
+
+    #[test]
+    fn test_create_reference_contract() {
+        let (drive, contract, contract_cbor) = setup_reference_contract();
+
+        let document_type = contract
+            .document_type_for_name("note")
+            .expect("expected to get document type");
+
+        let document = document_type.random_document(Some(5));
+
+        let ref_value = document.properties.get("abc17");
+
+        assert!(ref_value.is_some());
 
         let random_owner_id = rand::thread_rng().gen::<[u8; 32]>();
         drive
