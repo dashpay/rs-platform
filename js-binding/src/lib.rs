@@ -16,5 +16,5 @@ pub use document::*;
 mod data_contract;
 pub use data_contract::*;
 
-mod validation;
-pub use validation::*;
+mod identity_facade;
+pub use identity_facade::*;
