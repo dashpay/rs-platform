@@ -219,7 +219,7 @@ impl Drive {
         Ok(())
     }
 
-    fn grove_insert_empty_tree<'a: 'b, 'b, 'c, P>(
+    fn grove_insert_empty_tree<'a, 'c, P>(
         &'a self,
         path: P,
         key_info: KeyInfo<'c>,
@@ -246,7 +246,7 @@ impl Drive {
         }
     }
 
-    fn grove_insert_empty_tree_if_not_exists<'a: 'b, 'b, 'c, const N: usize>(
+    fn grove_insert_empty_tree_if_not_exists<'a, 'c, const N: usize>(
         &'a self,
         path_key_info: PathKeyInfo<'c, N>,
         transaction: TransactionArg,
@@ -255,8 +255,7 @@ impl Drive {
     ) -> Result<bool, Error> {
         match path_key_info {
             PathKeyInfo::PathKeyRef((path, key)) => {
-                let index_path_slices: Vec<&[u8]> = path.iter().map(|x| x.as_slice()).collect();
-                let path = index_path_slices.into_iter();
+                let path = path.iter().map(|x| x.as_slice());
                 let inserted = self.grove.insert_if_not_exists(
                     path.clone(),
                     key,
@@ -278,8 +277,7 @@ impl Drive {
                 Ok(true)
             }
             PathKeyInfo::PathKey((path, key)) => {
-                let index_path_slices: Vec<&[u8]> = path.iter().map(|x| x.as_slice()).collect();
-                let path = index_path_slices.into_iter();
+                let path = path.iter().map(|x| x.as_slice());
                 let inserted = self.grove.insert_if_not_exists(
                     path.clone(),
                     key.as_slice(),
@@ -323,7 +321,7 @@ impl Drive {
         }
     }
 
-    fn grove_insert<'a: 'b, 'b, 'c, const N: usize>(
+    fn grove_insert<'a, 'c, const N: usize>(
         &'a self,
         path_key_element_info: PathKeyElementInfo<'c, N>,
         transaction: TransactionArg,
@@ -331,8 +329,7 @@ impl Drive {
     ) -> Result<(), Error> {
         match path_key_element_info {
             PathKeyElement((path, key, element)) => {
-                let index_path_slices: Vec<&[u8]> = path.iter().map(|x| x.as_slice()).collect();
-                let path = index_path_slices.into_iter();
+                let path = path.iter().map(|x| x.as_slice());
                 insert_operations.push(InsertOperation::for_key_value(key.len(), &element));
                 self.grove.insert(path, key, element, transaction)
             }
@@ -350,7 +347,7 @@ impl Drive {
         }
     }
 
-    fn grove_insert_if_not_exists<'a: 'b, 'b, 'c, const N: usize>(
+    fn grove_insert_if_not_exists<'a, 'c, const N: usize>(
         &'a self,
         path_key_element_info: PathKeyElementInfo<'c, N>,
         transaction: TransactionArg,
@@ -359,8 +356,7 @@ impl Drive {
     ) -> Result<bool, Error> {
         match path_key_element_info {
             PathKeyElement((path, key, element)) => {
-                let index_path_slices: Vec<&[u8]> = path.iter().map(|x| x.as_slice()).collect();
-                let path_iter = index_path_slices.into_iter();
+                let path_iter = path.iter().map(|x| x.as_slice());
                 let insert_operation = InsertOperation::for_key_value(key.len(), &element);
                 let query_operation =
                     QueryOperation::for_key_check_in_path(key.len(), path_iter.clone());
@@ -399,7 +395,7 @@ impl Drive {
         }
     }
 
-    fn grove_get<'a: 'b, 'b, 'c, P>(
+    fn grove_get<'a, 'c, P>(
         &'a self,
         path: P,
         key_info: KeyInfo<'c>,
@@ -722,7 +718,7 @@ impl Drive {
                 // if the contract is not mutable update_contract will return an error
                 self.update_contract(
                     contract_element,
-                    &contract,
+                    contract,
                     &original_contract,
                     block_time,
                     transaction,
@@ -733,7 +729,7 @@ impl Drive {
         } else {
             self.insert_contract(
                 contract_element,
-                &contract,
+                contract,
                 block_time,
                 transaction,
                 &mut insert_operations,
@@ -798,7 +794,7 @@ impl Drive {
                         contract_documents_keeping_history_primary_key_path_for_document_id_size(
                             document_type.name.len(),
                         );
-                    PathKeyElementSize((path_max_length, 8 as usize, max_size))
+                    PathKeyElementSize((path_max_length, 8_usize, max_size))
                 }
             };
             self.grove_insert(path_key_element_info, transaction, insert_operations)?;
@@ -858,14 +854,14 @@ impl Drive {
             let path_key_element_info = match document_and_contract_info.document_info {
                 DocumentAndSerialization((document, document_cbor)) => PathFixedSizeKeyElement((
                     primary_key_path,
-                    document.id.as_slice().clone(),
+                    document.id.as_slice(),
                     Element::Item(Vec::from(document_cbor)),
                 )),
                 DocumentSize(max_size) => PathKeyElementSize((
                     crate::drive::defaults::BASE_CONTRACT_DOCUMENTS_PRIMARY_KEY_PATH
                         + document_type.name.len(),
                     DEFAULT_HASH_SIZE,
-                    max_size.clone(),
+                    max_size,
                 )),
             };
             let inserted = self.grove_insert_if_not_exists(
@@ -1042,8 +1038,8 @@ impl Drive {
                 .document_info
                 .get_raw_for_document_type(
                     &top_index_property.name,
-                    &document_and_contract_info.document_type,
-                    document_and_contract_info.owner_id.clone(),
+                    document_and_contract_info.document_type,
+                    document_and_contract_info.owner_id,
                 )?
                 .unwrap_or_default();
 
@@ -1084,8 +1080,8 @@ impl Drive {
                     .document_info
                     .get_raw_for_document_type(
                         &index_property.name,
-                        &document_and_contract_info.document_type,
-                        document_and_contract_info.owner_id.clone(),
+                        document_and_contract_info.document_type,
+                        document_and_contract_info.owner_id,
                     )?
                     .unwrap_or_default();
 
@@ -1164,11 +1160,11 @@ impl Drive {
                         let document_reference = make_document_reference(
                             primary_key_path,
                             document,
-                            &document_and_contract_info.document_type,
+                            document_and_contract_info.document_type,
                         );
                         KeyElement((document.id.as_slice(), document_reference))
                     }
-                    DocumentSize(max_size) => KeyElementSize((8 as usize, *max_size)),
+                    DocumentSize(max_size) => KeyElementSize((8_usize, *max_size)),
                 };
 
                 let path_key_element_info = PathKeyElementInfo::from_path_info_and_key_element(
@@ -1184,7 +1180,7 @@ impl Drive {
                         let document_reference = make_document_reference(
                             primary_key_path,
                             document,
-                            &document_and_contract_info.document_type,
+                            document_and_contract_info.document_type,
                         );
                         KeyElement((&[0], document_reference))
                     }
@@ -1607,7 +1603,7 @@ impl Drive {
         let mut delete_operations: Vec<DeleteOperation> = vec![];
         self.delete_document_for_contract_operations(
             document_id,
-            &contract,
+            contract,
             document_type_name,
             owner_id,
             transaction,

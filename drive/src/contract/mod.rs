@@ -289,7 +289,7 @@ impl Contract {
     pub fn documents_with_history_primary_key_path<'a>(
         &'a self,
         document_type_name: &'a str,
-        id: &'a Vec<u8>,
+        id: &'a [u8],
     ) -> [&'a [u8]; 6] {
         [
             Into::<&[u8; 1]>::into(RootTree::ContractDocuments),
@@ -424,7 +424,7 @@ impl DocumentType {
             let inner_property_values = property_value.as_map().expect("confirmed as map");
             let base_inner_properties = cbor_map_to_btree_map(inner_property_values);
 
-            let type_value = cbor_inner_text_value(&inner_property_values, "type");
+            let type_value = cbor_inner_text_value(inner_property_values, "type");
             let result: Result<(&str, BTreeMap<String, &Value>), Error> = match type_value {
                 None => {
                     let ref_value = btree_map_inner_text_value(&base_inner_properties, "$ref")
@@ -439,7 +439,7 @@ impl DocumentType {
                         btree_map_inner_map_value(definition_references, ref_value).ok_or_else(
                             || Error::CorruptedData(String::from("document reference not found")),
                         )?;
-                    let type_value = cbor_inner_text_value(&inner_properties_map, "type")
+                    let type_value = cbor_inner_text_value(inner_properties_map, "type")
                         .ok_or_else(|| {
                             Error::CorruptedData(String::from(
                                 "cannot find type property on reference",
@@ -734,7 +734,9 @@ impl Document {
 
     pub fn to_cbor(&self) -> Vec<u8> {
         let mut buffer: Vec<u8> = Vec::new();
-        buffer.write_u32::<BigEndian>(PROTOCOL_VERSION);
+        buffer
+            .write_u32::<BigEndian>(PROTOCOL_VERSION)
+            .expect("writign protocol version caused error");
         ciborium::ser::into_writer(&self, &mut buffer).expect("unable to serialize into cbor");
         buffer
     }
@@ -814,7 +816,7 @@ impl Document {
 fn reduced_value_string_representation(value: &Value) -> String {
     match value {
         Value::Integer(integer) => {
-            let i: i128 = integer.clone().try_into().unwrap();
+            let i: i128 = (*integer).try_into().unwrap();
             format!("{}", i)
         }
         Value::Bytes(bytes) => hex::encode(bytes),
@@ -956,10 +958,7 @@ pub fn get_key_from_cbor_map<'a>(
 pub fn cbor_map_to_btree_map(cbor_map: &[(Value, Value)]) -> BTreeMap<String, &Value> {
     cbor_map
         .iter()
-        .filter_map(|(key, value)| match key.as_text() {
-            None => None,
-            Some(key) => Some((key.to_string(), value)),
-        })
+        .filter_map(|(key, value)| key.as_text().map(|key| (key.to_string(), value)))
         .collect::<BTreeMap<String, &Value>>()
 }
 

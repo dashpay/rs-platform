@@ -47,16 +47,16 @@ pub fn json_document_to_cbor(path: impl AsRef<Path>, protocol_version: Option<u3
 pub fn value_to_cbor(value: serde_json::Value, protocol_version: Option<u32>) -> Vec<u8> {
     let mut buffer: Vec<u8> = Vec::new();
     if let Some(protocol_version) = protocol_version {
-        buffer.write_u32::<BigEndian>(protocol_version);
+        buffer
+            .write_u32::<BigEndian>(protocol_version)
+            .expect("writing protocol version caused error");
     }
     ciborium::ser::into_writer(&value, &mut buffer).expect("unable to serialize into cbor");
     buffer
 }
 
 pub fn cbor_from_hex(hex_string: String) -> Vec<u8> {
-    let decoded = hex::decode(hex_string).expect("Decoding failed");
-
-    decoded
+    hex::decode(hex_string).expect("Decoding failed")
 }
 
 pub fn text_file_strings(path: impl AsRef<Path>) -> Vec<String> {

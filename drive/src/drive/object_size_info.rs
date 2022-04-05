@@ -28,10 +28,20 @@ impl<'a, const N: usize> PathInfo<'a, N> {
     pub fn len(&self) -> usize {
         match self {
             PathFixedSizeIterator(path_iterator) => {
-                path_iterator.clone().into_iter().map(|a| a.len()).sum()
+                (*path_iterator).into_iter().map(|a| a.len()).sum()
             }
             PathIterator(path_iterator) => path_iterator.clone().into_iter().map(|a| a.len()).sum(),
             PathSize(path_size) => *path_size,
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        match self {
+            PathFixedSizeIterator(path_iterator) => {
+                (*path_iterator).into_iter().all(|a| a.is_empty())
+            }
+            PathIterator(path_iterator) => path_iterator.clone().into_iter().all(|a| a.is_empty()),
+            PathSize(path_size) => *path_size == 0,
         }
     }
 
@@ -161,22 +171,30 @@ impl<'a, const N: usize> PathKeyInfo<'a, N> {
                     + key.len()
             }
             PathFixedSizeKey((path_iterator, key)) => {
-                path_iterator
-                    .clone()
-                    .into_iter()
-                    .map(|a| a.len())
-                    .sum::<usize>()
-                    + key.len()
+                (*path_iterator).into_iter().map(|a| a.len()).sum::<usize>() + key.len()
             }
             PathFixedSizeKeyRef((path_iterator, key)) => {
-                path_iterator
-                    .clone()
-                    .into_iter()
-                    .map(|a| a.len())
-                    .sum::<usize>()
-                    + key.len()
+                (*path_iterator).into_iter().map(|a| a.len()).sum::<usize>() + key.len()
             }
             PathKeySize((path_size, key_size)) => *path_size + *key_size,
+        }
+    }
+
+    pub fn is_empty(&'a self) -> bool {
+        match self {
+            PathKey((path_iterator, key)) => {
+                key.is_empty() && path_iterator.clone().into_iter().all(|a| a.is_empty())
+            }
+            PathKeyRef((path_iterator, key)) => {
+                key.is_empty() && path_iterator.clone().into_iter().all(|a| a.is_empty())
+            }
+            PathFixedSizeKey((path_iterator, key)) => {
+                key.is_empty() && (*path_iterator).into_iter().all(|a| a.is_empty())
+            }
+            PathFixedSizeKeyRef((path_iterator, key)) => {
+                key.is_empty() && (*path_iterator).into_iter().all(|a| a.is_empty())
+            }
+            PathKeySize((path_size, key_size)) => (*path_size + *key_size) == 0,
         }
     }
 }
