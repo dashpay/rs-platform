@@ -138,8 +138,8 @@ impl Index {
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub struct IndexProperty {
-    pub(crate) name: String,
-    pub(crate) ascending: bool,
+    pub name: String,
+    pub ascending: bool,
 }
 
 // Struct Implementations
