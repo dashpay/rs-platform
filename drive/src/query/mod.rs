@@ -58,6 +58,72 @@ impl InternalClauses {
             && self.primary_key_in_clause.is_none()
             && self.primary_key_equal_clause.is_none()
     }
+
+    fn extract_from_clauses(all_where_clauses: Vec<WhereClause>) -> Result<Self, Error> {
+        let primary_key_equal_clauses_array = all_where_clauses
+            .iter()
+            .filter_map(|where_clause| match where_clause.operator {
+                Equal => match where_clause.is_identifier() {
+                    true => Some(where_clause.clone()),
+                    false => None,
+                },
+                _ => None,
+            })
+            .collect::<Vec<WhereClause>>();
+
+        let primary_key_in_clauses_array = all_where_clauses
+            .iter()
+            .filter_map(|where_clause| match where_clause.operator {
+                In => match where_clause.is_identifier() {
+                    true => Some(where_clause.clone()),
+                    false => None,
+                },
+                _ => None,
+            })
+            .collect::<Vec<WhereClause>>();
+
+        let (equal_clauses, range_clause, in_clause) =
+            WhereClause::group_clauses(&all_where_clauses)?;
+
+        let primary_key_equal_clause = match primary_key_equal_clauses_array.len() {
+            0 => Ok(None),
+            1 => Ok(Some(
+                primary_key_equal_clauses_array
+                    .get(0)
+                    .expect("there must be a value")
+                    .clone(),
+            )),
+            _ => Err(Error::InvalidQuery(
+                "There should only be one equal clause for the primary key",
+            )),
+        }?;
+
+        let primary_key_in_clause = match primary_key_in_clauses_array.len() {
+            0 => Ok(None),
+            1 => Ok(Some(
+                primary_key_in_clauses_array
+                    .get(0)
+                    .expect("there must be a value")
+                    .clone(),
+            )),
+            _ => Err(Error::InvalidQuery(
+                "There should only be one in clause for the primary key",
+            )),
+        }?;
+
+        let internal_clauses = InternalClauses {
+            primary_key_equal_clause,
+            primary_key_in_clause,
+            in_clause,
+            range_clause,
+            equal_clauses,
+        };
+
+        match internal_clauses.verify() {
+            true => Ok(internal_clauses),
+            false => Err(Error::InvalidQuery("Query has invalid where clauses")),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -138,7 +204,7 @@ impl<'a> DriveQuery<'a> {
                 }
             })?;
 
-        let internal_clauses = Self::extract_clauses(all_where_clauses)?;
+        let internal_clauses = InternalClauses::extract_from_clauses(all_where_clauses)?;
 
         let start_at_option = query_document.get("startAt");
         let start_after_option = query_document.get("startAfter");
@@ -291,7 +357,7 @@ impl<'a> DriveQuery<'a> {
             )?;
         }
 
-        let internal_clauses = Self::extract_clauses(all_where_clauses)?;
+        let internal_clauses = InternalClauses::extract_from_clauses(all_where_clauses)?;
 
         let start_at_option = None;
         let start_at_included = true;
@@ -312,72 +378,6 @@ impl<'a> DriveQuery<'a> {
             start_at_included,
             block_time: None,
         })
-    }
-
-    fn extract_clauses(all_where_clauses: Vec<WhereClause>) -> Result<InternalClauses, Error> {
-        let primary_key_equal_clauses_array = all_where_clauses
-            .iter()
-            .filter_map(|where_clause| match where_clause.operator {
-                Equal => match where_clause.is_identifier() {
-                    true => Some(where_clause.clone()),
-                    false => None,
-                },
-                _ => None,
-            })
-            .collect::<Vec<WhereClause>>();
-
-        let primary_key_in_clauses_array = all_where_clauses
-            .iter()
-            .filter_map(|where_clause| match where_clause.operator {
-                In => match where_clause.is_identifier() {
-                    true => Some(where_clause.clone()),
-                    false => None,
-                },
-                _ => None,
-            })
-            .collect::<Vec<WhereClause>>();
-
-        let (equal_clauses, range_clause, in_clause) =
-            WhereClause::group_clauses(&all_where_clauses)?;
-
-        let primary_key_equal_clause = match primary_key_equal_clauses_array.len() {
-            0 => Ok(None),
-            1 => Ok(Some(
-                primary_key_equal_clauses_array
-                    .get(0)
-                    .expect("there must be a value")
-                    .clone(),
-            )),
-            _ => Err(Error::InvalidQuery(
-                "There should only be one equal clause for the primary key",
-            )),
-        }?;
-
-        let primary_key_in_clause = match primary_key_in_clauses_array.len() {
-            0 => Ok(None),
-            1 => Ok(Some(
-                primary_key_in_clauses_array
-                    .get(0)
-                    .expect("there must be a value")
-                    .clone(),
-            )),
-            _ => Err(Error::InvalidQuery(
-                "There should only be one in clause for the primary key",
-            )),
-        }?;
-
-        let internal_clauses = InternalClauses {
-            primary_key_equal_clause,
-            primary_key_in_clause,
-            in_clause,
-            range_clause,
-            equal_clauses,
-        };
-
-        match internal_clauses.verify() {
-            true => Ok(internal_clauses),
-            false => Err(Error::InvalidQuery("Query has invalid where clauses")),
-        }
     }
 
     pub fn construct_path_query(
