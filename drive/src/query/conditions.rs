@@ -6,6 +6,7 @@ use crate::query::conditions::WhereOperator::{
 use ciborium::value::{Integer, Value};
 use grovedb::{Error, Query};
 use sqlparser::ast;
+use std::collections::{BTreeSet, HashMap};
 
 fn sql_value_to_cbor(sql_value: ast::Value) -> Option<Value> {
     match sql_value {
@@ -211,29 +212,62 @@ impl<'a> WhereClause {
         }
     }
 
-    pub(crate) fn group_range_clauses(
+    pub(crate) fn group_clauses(
         where_clauses: &'a [WhereClause],
-    ) -> Result<Option<Self>, Error> {
-        if where_clauses
-            .iter()
-            .any(|where_clause| match where_clause.operator {
-                Equal => true,
-                In => true,
-                GreaterThan => false,
-                GreaterThanOrEquals => false,
-                LessThan => false,
-                LessThanOrEquals => false,
-                StartsWith => false,
-                Between => false,
-                BetweenExcludeBounds => false,
-                BetweenExcludeRight => false,
-                BetweenExcludeLeft => false,
-            })
-        {
-            return Err(Error::InvalidQuery(
-                "equal and in queries are not groupable",
-            ));
+    ) -> Result<(HashMap<String, Self>, Option<Self>, Option<Self>), Error> {
+        if where_clauses.is_empty() {
+            return Ok((HashMap::new(), None, None));
         }
+        let equal_clauses_array =
+            where_clauses
+                .iter()
+                .filter_map(|where_clause| match where_clause.operator {
+                    Equal => match where_clause.is_identifier() {
+                        true => None,
+                        false => Some(where_clause.clone()),
+                    },
+                    _ => None,
+                });
+        let mut known_fields: BTreeSet<String> = BTreeSet::new();
+        let equal_clauses: HashMap<String, WhereClause> = equal_clauses_array
+            .into_iter()
+            .map(|where_clause| {
+                if known_fields.contains(&where_clause.field) {
+                    Err(Error::InvalidQuery("duplicate equality fields"))
+                } else {
+                    known_fields.insert(where_clause.field.clone());
+                    Ok((where_clause.field.clone(), where_clause))
+                }
+            })
+            .collect::<Result<HashMap<String, WhereClause>, Error>>()?;
+
+        let in_clauses_array = where_clauses
+            .iter()
+            .filter_map(|where_clause| match where_clause.operator {
+                WhereOperator::In => match where_clause.is_identifier() {
+                    true => None,
+                    false => Some(where_clause.clone()),
+                },
+                _ => None,
+            })
+            .collect::<Vec<WhereClause>>();
+
+        let in_clause = match in_clauses_array.len() {
+            0 => Ok(None),
+            1 => {
+                let clause = in_clauses_array.get(0).expect("there must be a value");
+                if known_fields.contains(&clause.field) {
+                    Err(Error::InvalidQuery(
+                        "in clause has same field as an equality clause",
+                    ))
+                } else {
+                    known_fields.insert(clause.field.clone());
+                    Ok(Some(clause.clone()))
+                }
+            }
+            _ => Err(Error::InvalidQuery("There should only be one in clause")),
+        }?;
+
         // In order to group range clauses
         let groupable_range_clauses: Vec<&WhereClause> = where_clauses
             .iter()
@@ -269,64 +303,86 @@ impl<'a> WhereClause {
             })
             .collect();
 
-        return if non_groupable_range_clauses.is_empty() {
+        let range_clause = if non_groupable_range_clauses.is_empty() {
             if groupable_range_clauses.is_empty() {
-                return Ok(None);
+                Ok(None)
             } else if groupable_range_clauses.len() == 1 {
-                let clause = *groupable_range_clauses.get(0).unwrap();
-                return Ok(Some(clause.clone()));
-            } else if groupable_range_clauses.len() > 2 {
-                return Err(Error::InvalidQuery(
-                    "there can only be at most 2 range clauses",
-                ));
-            } else if groupable_range_clauses
-                .iter()
-                .any(|&z| z.field != groupable_range_clauses.first().unwrap().field)
-            {
-                return Err(Error::InvalidQuery("all ranges must be on same field"));
-            } else {
-                let lower_upper_error = || {
-                    Error::InvalidQuery(
-                        "lower and upper bounds must be passed if providing 2 ranges",
-                    )
-                };
-
-                // we need to find the bounds of the clauses
-                let lower_bounds_clause =
-                    WhereClause::lower_bound_clause(groupable_range_clauses.as_slice())?
-                        .ok_or_else(lower_upper_error)?;
-                let upper_bounds_clause =
-                    WhereClause::upper_bound_clause(groupable_range_clauses.as_slice())?
-                        .ok_or_else(lower_upper_error)?;
-
-                let operator = match (lower_bounds_clause.operator, upper_bounds_clause.operator) {
-                    (GreaterThanOrEquals, LessThanOrEquals) => Some(Between),
-                    (GreaterThanOrEquals, LessThan) => Some(BetweenExcludeRight),
-                    (GreaterThan, LessThanOrEquals) => Some(BetweenExcludeLeft),
-                    (GreaterThan, LessThan) => Some(BetweenExcludeBounds),
-                    _ => None,
+                let clause = *groupable_range_clauses.first().unwrap();
+                if known_fields.contains(clause.field.as_str()) {
+                    Err(Error::InvalidQuery(
+                        "in clause has same field as an equality clause",
+                    ))
+                } else {
+                    Ok(Some(clause.clone()))
                 }
-                .ok_or_else(lower_upper_error)?;
+            } else if groupable_range_clauses.len() > 2 {
+                Err(Error::InvalidQuery(
+                    "there can only be at most 2 range clauses",
+                ))
+            } else {
+                let first_field = groupable_range_clauses.first().unwrap().field.as_str();
+                if known_fields.contains(first_field) {
+                    Err(Error::InvalidQuery(
+                        "a range clause has same field as an equality or in clause",
+                    ))
+                } else if groupable_range_clauses
+                    .iter()
+                    .any(|&z| z.field.as_str() != first_field)
+                {
+                    Err(Error::InvalidQuery("all ranges must be on same field"))
+                } else {
+                    let lower_upper_error = || {
+                        Error::InvalidQuery(
+                            "lower and upper bounds must be passed if providing 2 ranges",
+                        )
+                    };
 
-                Ok(Some(WhereClause {
-                    field: groupable_range_clauses.first().unwrap().field.clone(),
-                    operator,
-                    value: Value::Array(vec![
-                        lower_bounds_clause.value.clone(),
-                        upper_bounds_clause.value.clone(),
-                    ]),
-                }))
+                    // we need to find the bounds of the clauses
+                    let lower_bounds_clause =
+                        WhereClause::lower_bound_clause(groupable_range_clauses.as_slice())?
+                            .ok_or_else(lower_upper_error)?;
+                    let upper_bounds_clause =
+                        WhereClause::upper_bound_clause(groupable_range_clauses.as_slice())?
+                            .ok_or_else(lower_upper_error)?;
+
+                    let operator =
+                        match (lower_bounds_clause.operator, upper_bounds_clause.operator) {
+                            (GreaterThanOrEquals, LessThanOrEquals) => Some(Between),
+                            (GreaterThanOrEquals, LessThan) => Some(BetweenExcludeRight),
+                            (GreaterThan, LessThanOrEquals) => Some(BetweenExcludeLeft),
+                            (GreaterThan, LessThan) => Some(BetweenExcludeBounds),
+                            _ => None,
+                        }
+                        .ok_or_else(lower_upper_error)?;
+
+                    Ok(Some(WhereClause {
+                        field: groupable_range_clauses.first().unwrap().field.clone(),
+                        operator,
+                        value: Value::Array(vec![
+                            lower_bounds_clause.value.clone(),
+                            upper_bounds_clause.value.clone(),
+                        ]),
+                    }))
+                }
             }
         } else if non_groupable_range_clauses.len() == 1 && groupable_range_clauses.is_empty() {
             let where_clause = *non_groupable_range_clauses.get(0).unwrap();
-            Ok(Some(where_clause.clone()))
+            if known_fields.contains(where_clause.field.as_str()) {
+                Err(Error::InvalidQuery(
+                    "a non groupable range clause has same field as an equality or in clause",
+                ))
+            } else {
+                Ok(Some(where_clause.clone()))
+            }
         } else if groupable_range_clauses.is_empty() {
             Err(Error::InvalidQuery(
                 "there can not be more than 1 non groupable range clause",
             ))
         } else {
             Err(Error::InvalidQuery("clauses are not groupable"))
-        };
+        }?;
+
+        Ok((equal_clauses, range_clause, in_clause))
     }
 
     fn split_value_for_between(
@@ -847,14 +903,32 @@ mod tests {
                     value: Value::Float(1.0),
                 },
             ];
-            WhereClause::group_range_clauses(&where_clauses)
-                .expect("expected to have groupable pair")
-                .expect("expected to have where clause returned");
+            let (_, range_clause, _) = WhereClause::group_clauses(&where_clauses)
+                .expect("expected to have groupable pair");
+            range_clause.expect("expected to have range clause returned");
         }
     }
 
     #[test]
-    fn test_restricted_query_pairs() {
+    fn test_different_fields_grouping_causes_error() {
+        let where_clauses = vec![
+            WhereClause {
+                field: "a".to_string(),
+                operator: LessThan,
+                value: Value::Float(0.0),
+            },
+            WhereClause {
+                field: "b".to_string(),
+                operator: GreaterThan,
+                value: Value::Float(1.0),
+            },
+        ];
+        WhereClause::group_clauses(&where_clauses)
+            .expect_err("different fields should not be groupable");
+    }
+
+    #[test]
+    fn test_restricted_query_pairs_causes_error() {
         let restricted_pairs_test_cases = [
             [Equal, LessThan],
             [Equal, GreaterThan],
@@ -881,7 +955,7 @@ mod tests {
                     value: Value::Float(1.0),
                 },
             ];
-            WhereClause::group_range_clauses(&where_clauses)
+            WhereClause::group_clauses(&where_clauses)
                 .expect_err("expected to not have a groupable pair");
         }
     }

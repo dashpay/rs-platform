@@ -337,29 +337,8 @@ impl<'a> DriveQuery<'a> {
             })
             .collect::<Vec<WhereClause>>();
 
-        let range_clause = WhereClause::group_range_clauses(&all_where_clauses)?;
-
-        let equal_clauses_array =
-            all_where_clauses
-                .iter()
-                .filter_map(|where_clause| match where_clause.operator {
-                    Equal => match where_clause.is_identifier() {
-                        true => None,
-                        false => Some(where_clause.clone()),
-                    },
-                    _ => None,
-                });
-
-        let in_clauses_array = all_where_clauses
-            .iter()
-            .filter_map(|where_clause| match where_clause.operator {
-                WhereOperator::In => match where_clause.is_identifier() {
-                    true => None,
-                    false => Some(where_clause.clone()),
-                },
-                _ => None,
-            })
-            .collect::<Vec<WhereClause>>();
+        let (equal_clauses, range_clause, in_clause) =
+            WhereClause::group_clauses(&all_where_clauses)?;
 
         let primary_key_equal_clause = match primary_key_equal_clauses_array.len() {
             0 => Ok(None),
@@ -386,22 +365,6 @@ impl<'a> DriveQuery<'a> {
                 "There should only be one in clause for the primary key",
             )),
         }?;
-
-        let in_clause = match in_clauses_array.len() {
-            0 => Ok(None),
-            1 => Ok(Some(
-                in_clauses_array
-                    .get(0)
-                    .expect("there must be a value")
-                    .clone(),
-            )),
-            _ => Err(Error::InvalidQuery("There should only be one in clause")),
-        }?;
-
-        let equal_clauses: HashMap<String, WhereClause> = equal_clauses_array
-            .into_iter()
-            .map(|where_clause| (where_clause.field.clone(), where_clause))
-            .collect();
 
         let internal_clauses = InternalClauses {
             primary_key_equal_clause,
@@ -894,5 +857,34 @@ impl<'a> DriveQuery<'a> {
             Err(Error::PathKeyNotFound(_)) | Err(Error::PathNotFound(_)) => Ok((Vec::new(), 0)),
             _ => query_result,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::common;
+    use crate::contract::{Contract, DocumentType};
+    use crate::query::DriveQuery;
+    use serde_json::json;
+
+    #[test]
+    fn test_invalid_query() {
+        let query_value = json!({
+            "where": [
+                ["firstName", "<", "Gilligan"],
+                ["lastName", "<", "Michelle"],
+            ],
+            "limit": 100,
+            "orderBy": [
+                ["firstName", "asc"],
+                ["lastName", "asc"],
+            ]
+        });
+        let contract = Contract::default();
+        let document_type = DocumentType::default();
+
+        let where_cbor = common::value_to_cbor(query_value, None);
+        let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &document_type)
+            .expect_err("all ranges must be on same field");
     }
 }
