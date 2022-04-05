@@ -163,13 +163,13 @@ impl DataContractWasm {
             ))
             .to_js_value()
         })?;
-        self.0.entropy = Some(entropy);
+        self.0.entropy = entropy;
         Ok(())
     }
 
     #[wasm_bindgen(js_name=getEntropy)]
-    pub fn get_entropy(&mut self) -> Option<Vec<u8>> {
-        self.0.entropy.map(|e| e.to_vec())
+    pub fn get_entropy(&mut self) -> Vec<u8> {
+        self.0.entropy.to_vec()
     }
 
     #[wasm_bindgen(js_name=getBinaryProperties)]
