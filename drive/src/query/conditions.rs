@@ -214,6 +214,26 @@ impl<'a> WhereClause {
     pub(crate) fn group_range_clauses(
         where_clauses: &'a [WhereClause],
     ) -> Result<Option<Self>, Error> {
+        if where_clauses
+            .iter()
+            .any(|where_clause| match where_clause.operator {
+                Equal => true,
+                In => true,
+                GreaterThan => false,
+                GreaterThanOrEquals => false,
+                LessThan => false,
+                LessThanOrEquals => false,
+                StartsWith => false,
+                Between => false,
+                BetweenExcludeBounds => false,
+                BetweenExcludeRight => false,
+                BetweenExcludeLeft => false,
+            })
+        {
+            return Err(Error::InvalidQuery(
+                "equal and in queries are not groupable",
+            ));
+        }
         // In order to group range clauses
         let groupable_range_clauses: Vec<&WhereClause> = where_clauses
             .iter()
@@ -297,14 +317,15 @@ impl<'a> WhereClause {
                     ]),
                 }))
             }
-        } else if non_groupable_range_clauses.len() == 1 {
+        } else if non_groupable_range_clauses.len() == 1 && groupable_range_clauses.is_empty() {
             let where_clause = *non_groupable_range_clauses.get(0).unwrap();
             Ok(Some(where_clause.clone()))
-        } else {
-            // if non_groupable_range_clauses.len() > 1
+        } else if groupable_range_clauses.is_empty() {
             Err(Error::InvalidQuery(
                 "there can not be more than 1 non groupable range clause",
             ))
+        } else {
+            Err(Error::InvalidQuery("clauses are not groupable"))
         };
     }
 
@@ -792,6 +813,76 @@ impl<'a> WhereClause {
             _ => Err(Error::InvalidQuery(
                 "Issue parsing sql: invalid selection format",
             )),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::query::conditions::WhereClause;
+    use crate::query::conditions::WhereOperator::{
+        Equal, GreaterThan, GreaterThanOrEquals, In, LessThan, LessThanOrEquals,
+    };
+    use ciborium::value::Value;
+
+    #[test]
+    fn test_allowed_query_pairs() {
+        let allowed_pairs_test_cases = [
+            [LessThan, GreaterThan],
+            [LessThan, GreaterThanOrEquals],
+            [GreaterThan, LessThan],
+            [GreaterThan, LessThanOrEquals],
+            [GreaterThanOrEquals, LessThanOrEquals],
+        ];
+        for query_pair in allowed_pairs_test_cases {
+            let where_clauses = vec![
+                WhereClause {
+                    field: "a".to_string(),
+                    operator: *query_pair.get(0).unwrap(),
+                    value: Value::Float(0.0),
+                },
+                WhereClause {
+                    field: "a".to_string(),
+                    operator: *query_pair.get(1).unwrap(),
+                    value: Value::Float(1.0),
+                },
+            ];
+            WhereClause::group_range_clauses(&where_clauses)
+                .expect("expected to have groupable pair")
+                .expect("expected to have where clause returned");
+        }
+    }
+
+    #[test]
+    fn test_restricted_query_pairs() {
+        let restricted_pairs_test_cases = [
+            [Equal, LessThan],
+            [Equal, GreaterThan],
+            [In, LessThan],
+            [Equal, GreaterThan],
+            [LessThanOrEquals, LessThanOrEquals],
+            [LessThan, LessThan],
+            [LessThan, LessThanOrEquals],
+            [GreaterThan, GreaterThan],
+            [GreaterThan, GreaterThanOrEquals],
+            [GreaterThanOrEquals, GreaterThanOrEquals],
+            [Equal, Equal],
+        ];
+        for query_pair in restricted_pairs_test_cases {
+            let where_clauses = vec![
+                WhereClause {
+                    field: "a".to_string(),
+                    operator: *query_pair.get(0).unwrap(),
+                    value: Value::Float(0.0),
+                },
+                WhereClause {
+                    field: "a".to_string(),
+                    operator: *query_pair.get(1).unwrap(),
+                    value: Value::Float(1.0),
+                },
+            ];
+            WhereClause::group_range_clauses(&where_clauses)
+                .expect_err("expected to not have a groupable pair");
         }
     }
 }
