@@ -282,16 +282,14 @@ impl DriveWrapper {
                         Ok((storage_fee, processing_fee)) => {
                             let js_array: Handle<JsArray> = task_context.empty_array();
 
-                            js_array.set(
-                                &mut task_context,
-                                0,
-                                task_context.number(storage_fee as f64).upcast(),
-                            )?;
-                            js_array.set(
-                                &mut task_context,
-                                1,
-                                task_context.number(processing_fee as f64).upcast(),
-                            )?;
+                            let storage_fee_value =
+                                task_context.number(storage_fee as f64).upcast::<JsValue>();
+                            let processing_fee_value = task_context
+                                .number(processing_fee as f64)
+                                .upcast::<JsValue>();
+
+                            js_array.set(&mut task_context, 0, storage_fee_value)?;
+                            js_array.set(&mut task_context, 1, processing_fee_value)?;
 
                             // First parameter of JS callbacks is error, which is null in this case
                             vec![task_context.null().upcast(), js_array.upcast()]
@@ -353,16 +351,14 @@ impl DriveWrapper {
                         Ok((storage_fee, processing_fee)) => {
                             let js_array: Handle<JsArray> = task_context.empty_array();
 
-                            js_array.set(
-                                &mut task_context,
-                                0,
-                                task_context.number(storage_fee as f64).upcast(),
-                            )?;
-                            js_array.set(
-                                &mut task_context,
-                                1,
-                                task_context.number(processing_fee as f64).upcast(),
-                            )?;
+                            let storage_fee_value =
+                                task_context.number(storage_fee as f64).upcast::<JsValue>();
+                            let processing_fee_value = task_context
+                                .number(processing_fee as f64)
+                                .upcast::<JsValue>();
+
+                            js_array.set(&mut task_context, 0, storage_fee_value)?;
+                            js_array.set(&mut task_context, 1, processing_fee_value)?;
 
                             // First parameter of JS callbacks is error, which is null in this case
                             vec![task_context.null().upcast(), js_array.upcast()]
@@ -421,16 +417,14 @@ impl DriveWrapper {
                         Ok((storage_fee, processing_fee)) => {
                             let js_array: Handle<JsArray> = task_context.empty_array();
 
-                            js_array.set(
-                                &mut task_context,
-                                0,
-                                task_context.number(storage_fee as f64).upcast(),
-                            )?;
-                            js_array.set(
-                                &mut task_context,
-                                1,
-                                task_context.number(processing_fee as f64).upcast(),
-                            )?;
+                            let storage_fee_value =
+                                task_context.number(storage_fee as f64).upcast::<JsValue>();
+                            let processing_fee_value = task_context
+                                .number(processing_fee as f64)
+                                .upcast::<JsValue>();
+
+                            js_array.set(&mut task_context, 0, storage_fee_value)?;
+                            js_array.set(&mut task_context, 1, processing_fee_value)?;
 
                             // First parameter of JS callbacks is error, which is null in this case
                             vec![task_context.null().upcast(), js_array.upcast()]
@@ -495,16 +489,14 @@ impl DriveWrapper {
                             Ok((storage_fee, processing_fee)) => {
                                 let js_array: Handle<JsArray> = task_context.empty_array();
 
-                                js_array.set(
-                                    &mut task_context,
-                                    0,
-                                    task_context.number(storage_fee as f64).upcast(),
-                                )?;
-                                js_array.set(
-                                    &mut task_context,
-                                    1,
-                                    task_context.number(processing_fee as f64).upcast(),
-                                )?;
+                                let storage_fee_value =
+                                    task_context.number(storage_fee as f64).upcast::<JsValue>();
+                                let processing_fee_value = task_context
+                                    .number(processing_fee as f64)
+                                    .upcast::<JsValue>();
+
+                                js_array.set(&mut task_context, 0, storage_fee_value)?;
+                                js_array.set(&mut task_context, 1, processing_fee_value)?;
 
                                 // First parameter of JS callbacks is error, which is null in this case
                                 vec![task_context.null().upcast(), js_array.upcast()]
