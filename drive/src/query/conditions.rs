@@ -1,11 +1,11 @@
 use crate::contract::{Document, DocumentType};
-use crate::query::conditions::WhereOperator::{
-    Between, BetweenExcludeBounds, BetweenExcludeLeft, BetweenExcludeRight, Equal, GreaterThan,
-    GreaterThanOrEquals, In, LessThan, LessThanOrEquals, StartsWith,
-};
 use ciborium::value::{Integer, Value};
 use grovedb::{Error, Query};
 use sqlparser::ast;
+use WhereOperator::{
+    Between, BetweenExcludeBounds, BetweenExcludeLeft, BetweenExcludeRight, Equal, GreaterThan,
+    GreaterThanOrEquals, In, LessThan, LessThanOrEquals, StartsWith,
+};
 
 fn sql_value_to_cbor(sql_value: ast::Value) -> Option<Value> {
     match sql_value {
