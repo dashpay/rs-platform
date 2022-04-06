@@ -1,3 +1,5 @@
+//! This module contains data structures that are left to be implemented
+
 use dpp::mocks;
 use wasm_bindgen::prelude::*;
 
