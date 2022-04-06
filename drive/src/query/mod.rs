@@ -3,10 +3,8 @@ mod defaults;
 pub mod ordering;
 
 use crate::contract::{bytes_for_system_value, Contract, Document, DocumentType, IndexProperty};
-use conditions::WhereOperator::{
-    Equal, In
-};
 use ciborium::value::{Value as CborValue, Value};
+use conditions::WhereOperator::{Equal, In};
 use conditions::{WhereClause, WhereOperator};
 use grovedb::{Element, Error, GroveDb, PathQuery, Query, QueryItem, SizedQuery, TransactionArg};
 use indexmap::IndexMap;

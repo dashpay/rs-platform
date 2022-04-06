@@ -2,7 +2,11 @@ pub mod defaults;
 pub mod object_size_info;
 
 use crate::contract::{Contract, Document, DocumentType};
+use crate::fee::calculate_fee;
+use crate::fee::op::{BaseOp, DeleteOperation, InsertOperation, QueryOperation};
+use crate::query::DriveQuery;
 use defaults::{CONTRACT_DOCUMENTS_PATH_HEIGHT, DEFAULT_HASH_SIZE};
+use grovedb::{Element, Error, GroveDb, TransactionArg};
 use object_size_info::DocumentInfo::{DocumentAndSerialization, DocumentSize};
 use object_size_info::KeyElementInfo::{KeyElement, KeyElementSize};
 use object_size_info::KeyInfo::{Key, KeyRef, KeySize};
@@ -14,10 +18,6 @@ use object_size_info::{
     DocumentAndContractInfo, DocumentInfo, KeyElementInfo, KeyInfo, PathInfo, PathKeyElementInfo,
     PathKeyInfo,
 };
-use crate::fee::calculate_fee;
-use crate::fee::op::{BaseOp, DeleteOperation, InsertOperation, QueryOperation};
-use crate::query::DriveQuery;
-use grovedb::{Element, Error, GroveDb, TransactionArg};
 use std::path::Path;
 
 pub struct Drive {
