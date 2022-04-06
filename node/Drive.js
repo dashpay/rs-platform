@@ -12,6 +12,7 @@ const {
   driveCreateRootTree,
   driveApplyContract,
   driveCreateDocument,
+  driveCreateDocumentWorstCase,
   driveUpdateDocument,
   driveDeleteDocument,
   driveQueryDocuments,
@@ -30,6 +31,7 @@ const driveCloseAsync = appendStack(promisify(driveClose));
 const driveCreateRootTreeAsync = appendStack(promisify(driveCreateRootTree));
 const driveApplyContractAsync = appendStack(promisify(driveApplyContract));
 const driveCreateDocumentAsync = appendStack(promisify(driveCreateDocument));
+const driveCreateDocumentWorstCaseAsync = appendStack(promisify(driveCreateDocumentWorstCase));
 const driveUpdateDocumentAsync = appendStack(promisify(driveUpdateDocument));
 const driveDeleteDocumentAsync = appendStack(promisify(driveDeleteDocument));
 const driveQueryDocumentsAsync = appendStack(promisify(driveQueryDocuments));
@@ -97,6 +99,19 @@ class Drive {
       true,
       blockTime,
       useTransaction,
+    );
+  }
+
+  /**
+   * @param {DataContract} dataContract
+   * @param {string} documentType
+   * @returns {Promise<void>}
+   */
+  async worstCaseCreateDocument(dataContract, documentType) {
+    return driveCreateDocumentWorstCaseAsync.call(
+        this.drive,
+        dataContract,
+        documentType,
     );
   }
 

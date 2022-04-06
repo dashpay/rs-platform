@@ -938,6 +938,30 @@ impl Drive {
         )
     }
 
+    pub fn add_document_worst_case_for_contract_cbor(
+        &self,
+        contract_cbor: &[u8],
+        document_type_name: &str,
+    ) -> Result<(i64, u64), Error> {
+        let contract = Contract::from_cbor(contract_cbor, None)?;
+
+        let document_type = &contract.document_type_for_name(document_type_name)?;
+
+        let document_info = DocumentSize(document_type.max_size());
+
+        self.add_document_for_contract(
+            DocumentAndContractInfo {
+                document_info,
+                contract: &contract,
+                document_type,
+                owner_id: None,
+            },
+            true,
+            0f64,
+            None,
+        )
+    }
+
     pub fn add_document_for_contract(
         &self,
         document_and_contract_info: DocumentAndContractInfo,

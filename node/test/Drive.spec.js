@@ -98,6 +98,19 @@ describe('Drive', () => {
     });
   });
 
+  describe('#worstCaseAddDocument', () => {
+    beforeEach(async () => {
+      await drive.createRootTree();
+
+      await drive.applyContract(dataContract, blockTime);
+    });
+    it('should get worst case fee', async () => {
+      const result = await drive.worstCaseCreateDocument(dataContract, 'niceDocument');
+
+      expect(result).to.have.deep.members([5015000, 25880]);
+    });
+  });
+
   describe('#updateDocument', () => {
     beforeEach(async () => {
       await drive.createRootTree();
