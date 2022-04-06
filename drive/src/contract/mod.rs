@@ -144,33 +144,6 @@ pub struct IndexProperty {
 
 // Struct Implementations
 impl Contract {
-    pub fn fetch_with_id(drive: &Drive, contract_id: [u8; 32]) -> Option<Self> {
-        if let Ok(Some(stored_element)) = drive.grove_get(
-            contract_root_path(&contract.id),
-            KeyRef(&[0]),
-            transaction,
-            &mut query_operations,
-        ) {
-            already_exists = true;
-            match stored_element {
-                Element::Item(stored_contract_bytes) => {
-                    if contract_serialization != stored_contract_bytes {
-                        original_contract_stored_data = stored_contract_bytes;
-                    }
-                }
-                _ => {
-                    already_exists = false;
-                }
-            }
-        };
-
-        let contract_element = Element::Item(contract_serialization);
-
-        if already_exists {
-            if !original_contract_stored_data.is_empty() {
-                let original_contract = Contract::from_cbor(&original_contract_stored_data, None)?;
-    }
-
     pub fn from_cbor(contract_cbor: &[u8], contract_id: Option<[u8; 32]>) -> Result<Self, Error> {
         let (version, read_contract_cbor) = contract_cbor.split_at(4);
         if !Drive::check_protocol_version_bytes(version) {

@@ -2,6 +2,7 @@ pub mod conditions;
 mod defaults;
 pub mod ordering;
 
+use crate::contract;
 use crate::contract::{bytes_for_system_value, Contract, Document, DocumentType, IndexProperty};
 use ciborium::value::{Value as CborValue, Value};
 use conditions::WhereOperator::{Equal, In};
@@ -153,14 +154,6 @@ impl<'a> DriveQuery<'a> {
     }
 
     pub fn from_cbor(
-        query_cbor: &[u8],
-        contract_id: [u8; 32],
-        document_type_name: &'a str,
-    ) -> Result<Self, Error> {
-        Contract::fetch_with_id(contract_id);
-    }
-
-    pub fn from_cbor_with_known_contract(
         query_cbor: &[u8],
         contract: &'a Contract,
         document_type: &'a DocumentType,
@@ -889,7 +882,7 @@ mod tests {
         let document_type = DocumentType::default();
 
         let where_cbor = common::value_to_cbor(query_value, None);
-        let query = DriveQuery::from_cbor_with_known_contract(where_cbor.as_slice(), &contract, &document_type)
+        let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &document_type)
             .expect_err("all ranges must be on same field");
     }
 }

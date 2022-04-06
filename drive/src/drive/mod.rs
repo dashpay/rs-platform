@@ -18,10 +18,14 @@ use object_size_info::{
     DocumentAndContractInfo, DocumentInfo, KeyElementInfo, KeyInfo, PathInfo, PathKeyElementInfo,
     PathKeyInfo,
 };
+use std::cell::Cell;
+use std::collections::HashMap;
 use std::path::Path;
+use std::rc::Rc;
 
 pub struct Drive {
     pub grove: GroveDb,
+    pub cached_contracts: Cell<HashMap<[u8; 32], Rc<Contract>>>,
 }
 
 #[repr(u8)]
@@ -166,7 +170,10 @@ fn contract_documents_keeping_history_storage_time_reference_path_size(
 impl Drive {
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
         match GroveDb::open(path) {
-            Ok(grove) => Ok(Drive { grove }),
+            Ok(grove) => Ok(Drive {
+                grove,
+                cached_contracts: Cell::new(HashMap::new()),
+            }),
             Err(e) => Err(e),
         }
     }
@@ -674,16 +681,61 @@ impl Drive {
         self.apply_contract(&contract, contract_cbor, block_time, transaction)
     }
 
+    pub fn get_contract(
+        &self,
+        contract_id: [u8; 32],
+        transaction: TransactionArg,
+    ) -> Result<Option<Rc<Contract>>, Error> {
+        let cached_contracts = self.cached_contracts.take();
+        match cached_contracts.get(contract_id.as_slice()) {
+            None => {
+                self.cached_contracts.replace(cached_contracts);
+                self.fetch_contract(contract_id, transaction)
+            }
+            Some(contract) => {
+                let contract_ref = Rc::clone(contract);
+                self.cached_contracts.replace(cached_contracts);
+                Ok(Some(contract_ref))
+            }
+        }
+    }
+
+    pub fn get_cached_contract(
+        &self,
+        contract_id: [u8; 32],
+    ) -> Result<Option<Rc<Contract>>, Error> {
+        let cached_contracts = self.cached_contracts.take();
+        match cached_contracts.get(contract_id.as_slice()) {
+            None => {
+                self.cached_contracts.replace(cached_contracts);
+                Ok(None)
+            }
+            Some(contract) => {
+                let contract_ref = Rc::clone(contract);
+                self.cached_contracts.replace(cached_contracts);
+                Ok(Some(contract_ref))
+            }
+        }
+    }
+
     pub fn fetch_contract(
         &self,
         contract_id: [u8; 32],
         transaction: TransactionArg,
-    ) -> Result<(i64, u64), Error> {
-        let stored_element = self.grove.get(contract_root_path(&contract_id), &[0], transaction)?;
+    ) -> Result<Option<Rc<Contract>>, Error> {
+        let stored_element = self
+            .grove
+            .get(contract_root_path(&contract_id), &[0], transaction)?;
         if let Element::Item(stored_contract_bytes) = stored_element {
-            let original_contract = Contract::from_cbor(&original_contract_stored_data, None)?;
+            let contract = Rc::new(Contract::from_cbor(&stored_contract_bytes, None)?);
+            let mut cached_contracts = self.cached_contracts.take();
+            cached_contracts.insert(contract_id, Rc::clone(&contract));
+            self.cached_contracts.replace(cached_contracts);
+            Ok(Some(Rc::clone(&contract)))
         } else {
-            Err(Error::InternalError(""))
+            Err(Error::CorruptedData(String::from(
+                "contract path did not refer to a contract element",
+            )))
         }
     }
 
@@ -1788,10 +1840,14 @@ impl Drive {
     pub fn query_documents(
         &self,
         query_cbor: &[u8],
+        contract_id: [u8; 32],
+        document_type_name: &str,
         transaction: TransactionArg,
     ) -> Result<(Vec<Vec<u8>>, u16), Error> {
-        let query = DriveQuery::from_cbor_with_known_contract(query_cbor, contract, document_type)?;
-
+        let contract = self
+            .get_contract(contract_id, transaction)?
+            .ok_or_else(|| Error::InvalidQuery("contract not found"))?;
+        let document_type = contract.document_type_for_name(document_type_name)?;
         self.query_documents_from_contract(&contract, document_type, query_cbor, transaction)
     }
 
@@ -1816,7 +1872,7 @@ impl Drive {
         query_cbor: &[u8],
         transaction: TransactionArg,
     ) -> Result<(Vec<Vec<u8>>, u16), Error> {
-        let query = DriveQuery::from_cbor_with_known_contract(query_cbor, contract, document_type)?;
+        let query = DriveQuery::from_cbor(query_cbor, contract, document_type)?;
 
         query.execute_no_proof(&self.grove, transaction)
     }

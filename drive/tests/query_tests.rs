@@ -14,6 +14,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::{self, BufRead};
 use std::option::Option::None;
+use std::rc::Rc;
 use tempfile::TempDir;
 
 #[derive(Serialize, Deserialize)]
@@ -450,7 +451,7 @@ fn test_family_query() {
         .document_types
         .get("person")
         .expect("contract should have a person document type");
-    let query = DriveQuery::from_cbor_with_known_contract(where_cbor.as_slice(), &contract, &person_document_type)
+    let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &person_document_type)
         .expect("query should be built");
     let (results, _) = query
         .execute_no_proof(&drive.grove, Some(&db_transaction))
@@ -646,7 +647,7 @@ fn test_family_query() {
         .document_types
         .get("person")
         .expect("contract should have a person document type");
-    let query = DriveQuery::from_cbor_with_known_contract(where_cbor.as_slice(), &contract, person_document_type)
+    let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
         .expect("query should be built");
     let (results, _) = query
         .execute_no_proof(&drive.grove, None)
@@ -691,7 +692,7 @@ fn test_family_query() {
         .document_types
         .get("person")
         .expect("contract should have a person document type");
-    let query = DriveQuery::from_cbor_with_known_contract(where_cbor.as_slice(), &contract, person_document_type)
+    let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
         .expect("query should be built");
     let (results, _) = query
         .execute_no_proof(&drive.grove, None)
@@ -731,7 +732,7 @@ fn test_family_query() {
         .document_types
         .get("person")
         .expect("contract should have a person document type");
-    let query = DriveQuery::from_cbor_with_known_contract(where_cbor.as_slice(), &contract, person_document_type)
+    let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
         .expect("query should be built");
     let (results, _) = query
         .execute_no_proof(&drive.grove, None)
@@ -772,7 +773,7 @@ fn test_family_query() {
         .document_types
         .get("person")
         .expect("contract should have a person document type");
-    let query = DriveQuery::from_cbor_with_known_contract(where_cbor.as_slice(), &contract, person_document_type)
+    let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
         .expect("query should be built");
     let (results, _) = query
         .execute_no_proof(&drive.grove, None)
@@ -847,7 +848,7 @@ fn test_family_query() {
         .document_types
         .get("person")
         .expect("contract should have a person document type");
-    let query = DriveQuery::from_cbor_with_known_contract(where_cbor.as_slice(), &contract, person_document_type)
+    let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
         .expect("query should be built");
     let (results, _) = query
         .execute_no_proof(&drive.grove, None)
@@ -896,7 +897,7 @@ fn test_family_query() {
         .document_types
         .get("person")
         .expect("contract should have a person document type");
-    let query = DriveQuery::from_cbor_with_known_contract(where_cbor.as_slice(), &contract, person_document_type)
+    let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
         .expect("query should be built");
     let (results, _) = query
         .execute_no_proof(&drive.grove, None)
@@ -939,7 +940,7 @@ fn test_family_query() {
         .document_types
         .get("person")
         .expect("contract should have a person document type");
-    let query = DriveQuery::from_cbor_with_known_contract(where_cbor.as_slice(), &contract, person_document_type)
+    let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
         .expect("query should be built");
     let (results, _) = query
         .execute_no_proof(&drive.grove, None)
@@ -976,7 +977,7 @@ fn test_family_query() {
         .document_types
         .get("person")
         .expect("contract should have a person document type");
-    let query = DriveQuery::from_cbor_with_known_contract(where_cbor.as_slice(), &contract, person_document_type)
+    let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
         .expect("query should be built");
     let (results, _) = query
         .execute_no_proof(&drive.grove, None)
@@ -1025,7 +1026,7 @@ fn test_family_query() {
         .document_types
         .get("person")
         .expect("contract should have a person document type");
-    let query = DriveQuery::from_cbor_with_known_contract(where_cbor.as_slice(), &contract, person_document_type)
+    let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
         .expect("query should be built");
     let (results, _) = query
         .execute_no_proof(&drive.grove, None)
@@ -1073,7 +1074,7 @@ fn test_family_query() {
         .document_types
         .get("person")
         .expect("contract should have a person document type");
-    let query = DriveQuery::from_cbor_with_known_contract(where_cbor.as_slice(), &contract, person_document_type)
+    let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
         .expect("query should be built");
     let (results, _) = query
         .execute_no_proof(&drive.grove, None)
@@ -1583,7 +1584,7 @@ fn test_family_sql_query() {
         }),
         None,
     );
-    let query1 = DriveQuery::from_cbor_with_known_contract(query_cbor.as_slice(), &contract, person_document_type)
+    let query1 = DriveQuery::from_cbor(query_cbor.as_slice(), &contract, person_document_type)
         .expect("should build query");
 
     let sql_string = "select * from person order by firstName asc limit 100";
@@ -1600,7 +1601,7 @@ fn test_family_sql_query() {
         }),
         None,
     );
-    let query1 = DriveQuery::from_cbor_with_known_contract(query_cbor.as_slice(), &contract, person_document_type)
+    let query1 = DriveQuery::from_cbor(query_cbor.as_slice(), &contract, person_document_type)
         .expect("should build query");
 
     let sql_string = "select * from person where firstName = 'Chris'";
@@ -1621,7 +1622,7 @@ fn test_family_sql_query() {
         }),
         None,
     );
-    let query1 = DriveQuery::from_cbor_with_known_contract(query_cbor.as_slice(), &contract, person_document_type)
+    let query1 = DriveQuery::from_cbor(query_cbor.as_slice(), &contract, person_document_type)
         .expect("should build query");
 
     let sql_string =
@@ -1643,7 +1644,7 @@ fn test_family_sql_query() {
         }),
         None,
     );
-    let query1 = DriveQuery::from_cbor_with_known_contract(query_cbor.as_slice(), &contract, person_document_type)
+    let query1 = DriveQuery::from_cbor(query_cbor.as_slice(), &contract, person_document_type)
         .expect("should build query");
 
     let sql_string =
@@ -1666,7 +1667,7 @@ fn test_family_sql_query() {
         }),
         None,
     );
-    let query1 = DriveQuery::from_cbor_with_known_contract(query_cbor.as_slice(), &contract, person_document_type)
+    let query1 = DriveQuery::from_cbor(query_cbor.as_slice(), &contract, person_document_type)
         .expect("should build query");
 
     let sql_string = "select * from person where firstName > 'Chris' and firstName <= 'Noellyn' order by firstName asc limit 100";
@@ -1688,7 +1689,7 @@ fn test_family_sql_query() {
         }),
         None,
     );
-    let query1 = DriveQuery::from_cbor_with_known_contract(query_cbor.as_slice(), &contract, person_document_type)
+    let query1 = DriveQuery::from_cbor(query_cbor.as_slice(), &contract, person_document_type)
         .expect("should build query");
 
     let sql_string =
@@ -1744,7 +1745,7 @@ fn test_family_with_nulls_query() {
         .document_types
         .get("person")
         .expect("contract should have a person document type");
-    let query = DriveQuery::from_cbor_with_known_contract(where_cbor.as_slice(), &contract, &person_document_type)
+    let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &person_document_type)
         .expect("query should be built");
     let (results, _) = query
         .execute_no_proof(&drive.grove, Some(&db_transaction))
@@ -1802,6 +1803,72 @@ fn test_family_with_nulls_query() {
 }
 
 #[test]
+fn test_query_with_cached_contract() {
+    let (drive, contract, _tmp_dir) = setup_family_tests(10, 73509);
+
+    let db_transaction = drive.grove.start_transaction();
+
+    let root_hash = drive
+        .grove
+        .root_hash(Some(&db_transaction))
+        .expect("there is always a root hash");
+    assert_eq!(
+        root_hash.expect("cannot get root hash").as_slice(),
+        vec![
+            183, 13, 106, 124, 50, 188, 192, 92, 107, 14, 43, 145, 51, 136, 215, 20, 246, 175, 188,
+            89, 10, 125, 69, 27, 133, 240, 196, 221, 202, 143, 53, 249,
+        ]
+    );
+
+    let all_names = [
+        "Adey".to_string(),
+        "Briney".to_string(),
+        "Cammi".to_string(),
+        "Celinda".to_string(),
+        "Dalia".to_string(),
+        "Gilligan".to_string(),
+        "Kevina".to_string(),
+        "Meta".to_string(),
+        "Noellyn".to_string(),
+        "Prissie".to_string(),
+    ];
+
+    // A query getting all elements by firstName
+
+    let query_value = json!({
+        "where": [
+        ],
+        "limit": 100,
+        "orderBy": [
+            ["firstName", "asc"]
+        ]
+    });
+    let where_cbor = common::value_to_cbor(query_value, None);
+
+    let contract_ref = drive
+        .get_cached_contract(contract.id)
+        .expect("expected to be able to get no contract");
+    assert!(contract_ref.is_none());
+
+    let (results, _) = drive
+        .query_documents(
+            where_cbor.as_slice(),
+            contract.id,
+            "person",
+            Some(&db_transaction),
+        )
+        .expect("query should be executed");
+
+    assert_eq!(results.len(), 10);
+
+    let contract_ref = drive
+        .get_cached_contract(contract.id)
+        .expect("expected to be able to get contract")
+        .expect("expected a reference counter to the contract");
+    assert_eq!(Rc::strong_count(&contract_ref), 2);
+}
+
+#[test]
 fn test_dpns_query() {
     let (drive, contract, _tmp_dir) = setup_dpns_tests(10, 11456);
 
@@ -1848,7 +1915,7 @@ fn test_dpns_query() {
         .document_types
         .get("domain")
         .expect("contract should have a domain document type");
-    let query = DriveQuery::from_cbor_with_known_contract(where_cbor.as_slice(), &contract, &domain_document_type)
+    let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &domain_document_type)
         .expect("query should be built");
     let (results, _) = query
         .execute_no_proof(&drive.grove, Some(&db_transaction))
@@ -1888,7 +1955,7 @@ fn test_dpns_query() {
         .document_types
         .get("domain")
         .expect("contract should have a domain document type");
-    let query = DriveQuery::from_cbor_with_known_contract(where_cbor.as_slice(), &contract, &domain_document_type)
+    let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &domain_document_type)
         .expect("query should be built");
     let (results, _) = query
         .execute_no_proof(&drive.grove, Some(&db_transaction))
@@ -1957,7 +2024,7 @@ fn test_dpns_query() {
         .document_types
         .get("domain")
         .expect("contract should have a domain document type");
-    let query = DriveQuery::from_cbor_with_known_contract(where_cbor.as_slice(), &contract, &domain_document_type)
+    let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &domain_document_type)
         .expect("query should be built");
     let (results, _) = query
         .execute_no_proof(&drive.grove, Some(&db_transaction))
@@ -2004,7 +2071,7 @@ fn test_dpns_query() {
         .document_types
         .get("domain")
         .expect("contract should have a domain document type");
-    let query = DriveQuery::from_cbor_with_known_contract(where_cbor.as_slice(), &contract, &domain_document_type)
+    let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &domain_document_type)
         .expect("query should be built");
     let (results, _) = query
         .execute_no_proof(&drive.grove, Some(&db_transaction))
@@ -2070,7 +2137,7 @@ fn test_dpns_query() {
         .document_types
         .get("domain")
         .expect("contract should have a domain document type");
-    let query = DriveQuery::from_cbor_with_known_contract(where_cbor.as_slice(), &contract, &domain_document_type)
+    let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &domain_document_type)
         .expect("query should be built");
     let (results, _) = query
         .execute_no_proof(&drive.grove, Some(&db_transaction))
@@ -2115,7 +2182,7 @@ fn test_dpns_query() {
         .document_types
         .get("domain")
         .expect("contract should have a domain document type");
-    let query = DriveQuery::from_cbor_with_known_contract(where_cbor.as_slice(), &contract, &domain_document_type)
+    let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &domain_document_type)
         .expect("query should be built");
     let (results, _) = query
         .execute_no_proof(&drive.grove, Some(&db_transaction))
@@ -2152,7 +2219,7 @@ fn test_dpns_query() {
         .document_types
         .get("domain")
         .expect("contract should have a domain document type");
-    let query = DriveQuery::from_cbor_with_known_contract(where_cbor.as_slice(), &contract, &domain_document_type)
+    let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &domain_document_type)
         .expect("query should be built");
     let (results, _) = query
         .execute_no_proof(&drive.grove, Some(&db_transaction))
