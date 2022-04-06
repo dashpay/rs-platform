@@ -1,6 +1,5 @@
 use enum_map::{enum_map, Enum, EnumMap};
 use grovedb::{Element, Error};
-use std::iter::Sum;
 
 pub(crate) const STORAGE_CREDIT_PER_BYTE: u64 = 5000;
 pub(crate) const STORAGE_PROCESSING_CREDIT_PER_BYTE: u64 = 10;

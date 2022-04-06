@@ -3,15 +3,12 @@ mod defaults;
 pub mod ordering;
 
 use crate::contract::{bytes_for_system_value, Contract, Document, DocumentType, IndexProperty};
-use crate::query::conditions::WhereOperator::{
-    Between, BetweenExcludeBounds, BetweenExcludeLeft, BetweenExcludeRight, Equal, GreaterThan,
-    GreaterThanOrEquals, In, LessThan, LessThanOrEquals, StartsWith,
-};
-use crate::query::conditions::{WhereClause, WhereOperator};
-use crate::query::ordering::OrderClause;
-use ciborium::value::{Integer, Value as CborValue, Value};
+use ciborium::value::{Value as CborValue, Value};
+use conditions::WhereOperator::{Equal, In};
+use conditions::{WhereClause, WhereOperator};
 use grovedb::{Element, Error, GroveDb, PathQuery, Query, QueryItem, SizedQuery, TransactionArg};
 use indexmap::IndexMap;
+use ordering::OrderClause;
 use sqlparser::ast;
 use sqlparser::ast::TableFactor::Table;
 use sqlparser::ast::Value::Number;
