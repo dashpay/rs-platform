@@ -392,7 +392,7 @@ impl Drive {
         }
     }
 
-    fn grove_get<'a, 'c, P>(
+    pub(crate) fn grove_get<'a, 'c, P>(
         &'a self,
         path: P,
         key_info: KeyInfo<'c>,
@@ -672,6 +672,19 @@ impl Drive {
         // first we need to deserialize the contract
         let contract = Contract::from_cbor(&contract_cbor, contract_id)?;
         self.apply_contract(&contract, contract_cbor, block_time, transaction)
+    }
+
+    pub fn fetch_contract(
+        &self,
+        contract_id: [u8; 32],
+        transaction: TransactionArg,
+    ) -> Result<(i64, u64), Error> {
+        let stored_element = self.grove.get(contract_root_path(&contract_id), &[0], transaction)?;
+        if let Element::Item(stored_contract_bytes) = stored_element {
+            let original_contract = Contract::from_cbor(&original_contract_stored_data, None)?;
+        } else {
+            Err(Error::InternalError(""))
+        }
     }
 
     pub fn apply_contract(
@@ -1772,6 +1785,16 @@ impl Drive {
         Ok(())
     }
 
+    pub fn query_documents(
+        &self,
+        query_cbor: &[u8],
+        transaction: TransactionArg,
+    ) -> Result<(Vec<Vec<u8>>, u16), Error> {
+        let query = DriveQuery::from_cbor_with_known_contract(query_cbor, contract, document_type)?;
+
+        self.query_documents_from_contract(&contract, document_type, query_cbor, transaction)
+    }
+
     pub fn query_documents_from_contract_cbor(
         &self,
         contract_cbor: &[u8],
@@ -1793,7 +1816,7 @@ impl Drive {
         query_cbor: &[u8],
         transaction: TransactionArg,
     ) -> Result<(Vec<Vec<u8>>, u16), Error> {
-        let query = DriveQuery::from_cbor(query_cbor, contract, document_type)?;
+        let query = DriveQuery::from_cbor_with_known_contract(query_cbor, contract, document_type)?;
 
         query.execute_no_proof(&self.grove, transaction)
     }
