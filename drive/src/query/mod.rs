@@ -18,6 +18,10 @@ use sqlparser::dialect::GenericDialect;
 use sqlparser::parser::Parser;
 use std::collections::HashMap;
 use std::ops::BitXor;
+use crate::drive::Drive;
+use crate::drive::object_size_info::{KeyInfo, KeyValueInfo};
+use crate::fee::calculate_fee;
+use crate::fee::op::QueryOperation;
 
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct InternalClauses {
@@ -378,10 +382,11 @@ impl<'a> DriveQuery<'a> {
         })
     }
 
-    pub fn construct_path_query(
+    pub fn construct_path_query_operations(
         &self,
-        grove: &GroveDb,
+        drive: &Drive,
         transaction: TransactionArg,
+        query_operations: &mut Vec<QueryOperation>,
     ) -> Result<PathQuery, Error> {
         // First we should get the overall document_type_path
         let document_type_path = self
@@ -415,8 +420,7 @@ impl<'a> DriveQuery<'a> {
                         )
                     };
 
-                let start_at_document = grove
-                    .get(start_at_document_path, &start_at_document_key, transaction)
+                let start_at_document = drive.grove_get(start_at_document_path, KeyValueInfo::KeyRefRequest(&start_at_document_key), transaction, query_operations)
                     .map_err(|e| match e {
                         Error::PathKeyNotFound(_) | Error::PathNotFound(_) => {
                             let error_message = if self.start_at_included {
@@ -428,7 +432,7 @@ impl<'a> DriveQuery<'a> {
                             Error::InvalidQuery(error_message)
                         }
                         _ => e,
-                    })?;
+                    })?.ok_or_else(|| Error::CorruptedData(String::from("expected a value")))?;
 
                 if let Element::Item(item) = start_at_document {
                     let document = Document::from_cbor(item.as_slice(), None, None)?;
@@ -845,15 +849,27 @@ impl<'a> DriveQuery<'a> {
 
     pub fn execute_no_proof(
         &self,
-        grove: &GroveDb,
+        drive: &Drive,
         transaction: TransactionArg,
-    ) -> Result<(Vec<Vec<u8>>, u16), Error> {
-        let path_query = self.construct_path_query(grove, transaction)?;
-
-        let query_result = grove.get_path_query(&path_query, transaction);
+    ) -> Result<(Vec<Vec<u8>>, u16, u64), Error> {
+        let mut query_operations: Vec<QueryOperation> = vec![];
+        let path_query = self.construct_path_query_operations(drive, transaction, &mut query_operations)?;
+        let query_result = drive.grove.get_path_query(&path_query, transaction);
         match query_result {
-            Err(Error::PathKeyNotFound(_)) | Err(Error::PathNotFound(_)) => Ok((Vec::new(), 0)),
-            _ => query_result,
+            Err(Error::PathKeyNotFound(_)) | Err(Error::PathNotFound(_)) => {
+                let path_query_operations = QueryOperation::for_empty_path_query(&path_query);
+                query_operations.push(path_query_operations);
+                let (_, processing_fee) = calculate_fee(None, Some(query_operations), None, None)?;
+                Ok((Vec::new(), 0, processing_fee))
+            },
+            _ => {
+                match query_result? { (data, skipped) => {
+                    let path_query_operations = QueryOperation::for_path_query(&path_query, &data);
+                    query_operations.push(path_query_operations);
+                    let (_, processing_fee) = calculate_fee(None, Some(query_operations), None, None)?;
+                    Ok((data, skipped, processing_fee))
+                } }
+            },
         }
     }
 }

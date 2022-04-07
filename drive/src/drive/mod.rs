@@ -13,15 +13,17 @@ use object_size_info::KeyInfo::{Key, KeyRef, KeySize};
 use object_size_info::PathKeyElementInfo::{
     PathFixedSizeKeyElement, PathKeyElement, PathKeyElementSize,
 };
+use object_size_info::KeyValueInfo::KeyRefRequest;
 use object_size_info::PathKeyInfo::{PathFixedSizeKeyRef, PathKeyRef, PathKeySize};
 use object_size_info::{
     DocumentAndContractInfo, DocumentInfo, KeyElementInfo, KeyInfo, PathInfo, PathKeyElementInfo,
-    PathKeyInfo,
+    PathKeyInfo, KeyValueInfo
 };
 use std::cell::Cell;
 use std::collections::HashMap;
 use std::path::Path;
 use std::rc::Rc;
+
 
 pub struct Drive {
     pub grove: GroveDb,
@@ -402,7 +404,7 @@ impl Drive {
     pub(crate) fn grove_get<'a, 'c, P>(
         &'a self,
         path: P,
-        key_info: KeyInfo<'c>,
+        key_value_info: KeyValueInfo<'c>,
         transaction: TransactionArg,
         query_operations: &mut Vec<QueryOperation>,
     ) -> Result<Option<Element>, Error>
@@ -411,14 +413,24 @@ impl Drive {
         <P as IntoIterator>::IntoIter: ExactSizeIterator + DoubleEndedIterator + Clone,
     {
         let path_iter = path.into_iter();
-        query_operations.push(QueryOperation::for_key_check_in_path(
-            key_info.len(),
-            path_iter.clone(),
-        ));
-        if let KeyRef(key) = key_info {
-            Ok(Some(self.grove.get(path_iter, key, transaction)?))
-        } else {
-            Ok(None)
+        match key_value_info {
+            KeyValueInfo::KeyRefRequest(key) => {
+                let item = self.grove.get(path_iter.clone(), key, transaction)?;
+                query_operations.push(QueryOperation::for_value_retrieval_in_path(
+                    key.len(),
+                    path_iter,
+                    item.serialized_byte_size(),
+                ));
+                Ok(Some(item))
+            }
+            KeyValueInfo::KeyValueMaxSize((key_size, value_size)) => {
+                query_operations.push(QueryOperation::for_value_retrieval_in_path(
+                    key_size,
+                    path_iter,
+                    value_size,
+                ));
+                Ok(None)
+            }
         }
     }
 
@@ -755,7 +767,7 @@ impl Drive {
 
         if let Ok(Some(stored_element)) = self.grove_get(
             contract_root_path(&contract.id),
-            KeyRef(&[0]),
+            KeyRefRequest(&[0]),
             transaction,
             &mut query_operations,
         ) {
@@ -1051,7 +1063,7 @@ impl Drive {
             && self
                 .grove_get(
                     primary_key_path,
-                    document_and_contract_info.document_info.id_key_info(),
+                    document_and_contract_info.document_info.id_key_value_info(),
                     transaction,
                     query_operations,
                 )
@@ -1416,14 +1428,14 @@ impl Drive {
                     );
                 self.grove_get(
                     contract_documents_keeping_history_primary_key_path_for_document_id,
-                    KeyRef(&[0]),
+                    KeyRefRequest(&[0]),
                     transaction,
                     query_operations,
                 )?
             } else {
                 self.grove_get(
                     contract_documents_primary_key_path,
-                    KeyRef(document.id.as_slice()),
+                    KeyRefRequest(document.id.as_slice()),
                     transaction,
                     query_operations,
                 )?
@@ -1723,7 +1735,7 @@ impl Drive {
         // next we need to get the document from storage
         let document_element: Option<Element> = self.grove_get(
             contract_documents_primary_key_path,
-            KeyRef(document_id),
+            KeyRefRequest(document_id),
             transaction,
             query_operations,
         )?;
@@ -1843,7 +1855,7 @@ impl Drive {
         contract_id: [u8; 32],
         document_type_name: &str,
         transaction: TransactionArg,
-    ) -> Result<(Vec<Vec<u8>>, u16), Error> {
+    ) -> Result<(Vec<Vec<u8>>, u16, u64), Error> {
         let contract = self
             .get_contract(contract_id, transaction)?
             .ok_or_else(|| Error::InvalidQuery("contract not found"))?;
@@ -1857,7 +1869,7 @@ impl Drive {
         document_type_name: String,
         query_cbor: &[u8],
         transaction: TransactionArg,
-    ) -> Result<(Vec<Vec<u8>>, u16), Error> {
+    ) -> Result<(Vec<Vec<u8>>, u16, u64), Error> {
         let contract = Contract::from_cbor(contract_cbor, None)?;
 
         let document_type = contract.document_type_for_name(document_type_name.as_str())?;
@@ -1871,10 +1883,10 @@ impl Drive {
         document_type: &DocumentType,
         query_cbor: &[u8],
         transaction: TransactionArg,
-    ) -> Result<(Vec<Vec<u8>>, u16), Error> {
+    ) -> Result<(Vec<Vec<u8>>, u16, u64), Error> {
         let query = DriveQuery::from_cbor(query_cbor, contract, document_type)?;
 
-        query.execute_no_proof(&self.grove, transaction)
+        query.execute_no_proof(&self, transaction)
     }
 
     pub fn worst_case_fee_for_document_type_with_name(
@@ -2517,7 +2529,7 @@ mod tests {
         let query = DriveQuery::from_sql_expr(sql_string, &contract).expect("should build query");
 
         let (results_no_transaction, _) = query
-            .execute_no_proof(&drive.grove, None)
+            .execute_no_proof(&drive, None)
             .expect("expected to execute query");
 
         assert_eq!(results_no_transaction.len(), 1);
@@ -2525,7 +2537,7 @@ mod tests {
         let db_transaction = drive.grove.start_transaction();
 
         let (results_on_transaction, _) = query
-            .execute_no_proof(&drive.grove, Some(&db_transaction))
+            .execute_no_proof(&drive, Some(&db_transaction))
             .expect("expected to execute query");
 
         assert_eq!(results_on_transaction.len(), 1);
@@ -2551,7 +2563,7 @@ mod tests {
         let db_transaction = drive.grove.start_transaction();
 
         let (results_on_transaction, _) = query
-            .execute_no_proof(&drive.grove, Some(&db_transaction))
+            .execute_no_proof(&drive, Some(&db_transaction))
             .expect("expected to execute query");
 
         assert_eq!(results_on_transaction.len(), 0);
@@ -2647,7 +2659,7 @@ mod tests {
         let query = DriveQuery::from_sql_expr(sql_string, &contract).expect("should build query");
 
         let (results_no_transaction, _) = query
-            .execute_no_proof(&drive.grove, None)
+            .execute_no_proof(&drive, None)
             .expect("expected to execute query");
 
         assert_eq!(results_no_transaction.len(), 2);
@@ -2678,7 +2690,7 @@ mod tests {
         let query = DriveQuery::from_sql_expr(sql_string, &contract).expect("should build query");
 
         let (results_no_transaction, _) = query
-            .execute_no_proof(&drive.grove, None)
+            .execute_no_proof(&drive, None)
             .expect("expected to execute query");
 
         assert_eq!(results_no_transaction.len(), 1);
@@ -2709,7 +2721,7 @@ mod tests {
         let query = DriveQuery::from_sql_expr(sql_string, &contract).expect("should build query");
 
         let (results_no_transaction, _) = query
-            .execute_no_proof(&drive.grove, None)
+            .execute_no_proof(&drive, None)
             .expect("expected to execute query");
 
         assert_eq!(results_no_transaction.len(), 0);
@@ -2805,7 +2817,7 @@ mod tests {
         let query = DriveQuery::from_sql_expr(sql_string, &contract).expect("should build query");
 
         let (results_no_transaction, _) = query
-            .execute_no_proof(&drive.grove, None)
+            .execute_no_proof(&drive, None)
             .expect("expected to execute query");
 
         assert_eq!(results_no_transaction.len(), 2);
@@ -2898,7 +2910,7 @@ mod tests {
         let query = DriveQuery::from_sql_expr(sql_string, &contract).expect("should build query");
 
         let (results_no_transaction, _) = query
-            .execute_no_proof(&drive.grove, None)
+            .execute_no_proof(&drive, None)
             .expect("expected to execute query");
 
         assert_eq!(results_no_transaction.len(), 0);
@@ -3098,7 +3110,7 @@ mod tests {
         let query = DriveQuery::from_sql_expr(sql_string, &contract).expect("should build query");
 
         let (results_no_transaction, _) = query
-            .execute_no_proof(&drive.grove, None)
+            .execute_no_proof(&drive, None)
             .expect("expected to execute query");
 
         assert_eq!(results_no_transaction.len(), 1);
@@ -3119,7 +3131,7 @@ mod tests {
             .expect("should update alice profile");
 
         let (results_no_transaction, _) = query
-            .execute_no_proof(&drive.grove, None)
+            .execute_no_proof(&drive, None)
             .expect("expected to execute query");
 
         assert_eq!(results_no_transaction.len(), 1);
@@ -3181,7 +3193,7 @@ mod tests {
         let query = DriveQuery::from_sql_expr(sql_string, &contract).expect("should build query");
 
         let (results_no_transaction, _) = query
-            .execute_no_proof(&drive.grove, None)
+            .execute_no_proof(&drive, None)
             .expect("expected to execute query");
 
         assert_eq!(results_no_transaction.len(), 1);
@@ -3189,7 +3201,7 @@ mod tests {
         let db_transaction = drive.grove.start_transaction();
 
         let (results_on_transaction, _) = query
-            .execute_no_proof(&drive.grove, Some(&db_transaction))
+            .execute_no_proof(&drive, Some(&db_transaction))
             .expect("expected to execute query");
 
         assert_eq!(results_on_transaction.len(), 1);
@@ -3210,7 +3222,7 @@ mod tests {
             .expect("should update alice profile");
 
         let (results_on_transaction, _) = query
-            .execute_no_proof(&drive.grove, Some(&db_transaction))
+            .execute_no_proof(&drive, Some(&db_transaction))
             .expect("expected to execute query");
 
         assert_eq!(results_on_transaction.len(), 1);
@@ -3277,7 +3289,7 @@ mod tests {
         let query = DriveQuery::from_sql_expr(sql_string, &contract).expect("should build query");
 
         let (results_no_transaction, _) = query
-            .execute_no_proof(&drive.grove, None)
+            .execute_no_proof(&drive, None)
             .expect("expected to execute query");
 
         assert_eq!(results_no_transaction.len(), 1);
@@ -3285,7 +3297,7 @@ mod tests {
         let db_transaction = drive.grove.start_transaction();
 
         let (results_on_transaction, _) = query
-            .execute_no_proof(&drive.grove, Some(&db_transaction))
+            .execute_no_proof(&drive, Some(&db_transaction))
             .expect("expected to execute query");
 
         assert_eq!(results_on_transaction.len(), 1);
@@ -3301,7 +3313,7 @@ mod tests {
             .expect("expected to delete document");
 
         let (results_on_transaction, _) = query
-            .execute_no_proof(&drive.grove, Some(&db_transaction))
+            .execute_no_proof(&drive, Some(&db_transaction))
             .expect("expected to execute query");
 
         assert_eq!(results_on_transaction.len(), 0);
@@ -3312,7 +3324,7 @@ mod tests {
             .expect("expected to rollback transaction");
 
         let (results_on_transaction, _) = query
-            .execute_no_proof(&drive.grove, Some(&db_transaction))
+            .execute_no_proof(&drive, Some(&db_transaction))
             .expect("expected to execute query");
 
         assert_eq!(results_on_transaction.len(), 1);

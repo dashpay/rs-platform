@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use byteorder::{BigEndian, WriteBytesExt};
 use ciborium::value::{Integer, Value};
 use grovedb::Error;
@@ -15,7 +16,7 @@ pub enum DocumentFieldType {
     ByteArray(Option<usize>, Option<usize>),
     Boolean,
     Date,
-    Object,
+    Object(BTreeMap<String, DocumentFieldType>),
     Array,
 }
 
@@ -34,7 +35,9 @@ impl DocumentFieldType {
             },
             DocumentFieldType::Boolean => Some(1),
             DocumentFieldType::Date => Some(8),
-            DocumentFieldType::Object => None,
+            DocumentFieldType::Object(sub_fields) => {
+                sub_fields.iter().map(| (_, sub_field)|  sub_field.min_size()).sum()
+            },
             DocumentFieldType::Array => None,
         }
     }
@@ -53,7 +56,9 @@ impl DocumentFieldType {
             },
             DocumentFieldType::Boolean => Some(1),
             DocumentFieldType::Date => Some(8),
-            DocumentFieldType::Object => None,
+            DocumentFieldType::Object(sub_fields) => {
+                sub_fields.iter().map(| (_, sub_field)|  sub_field.min_byte_size()).sum()
+            },
             DocumentFieldType::Array => None,
         }
     }
@@ -72,7 +77,9 @@ impl DocumentFieldType {
             },
             DocumentFieldType::Boolean => Some(1),
             DocumentFieldType::Date => Some(8),
-            DocumentFieldType::Object => None,
+            DocumentFieldType::Object(sub_fields) => {
+                sub_fields.iter().map(| (_, sub_field)|  sub_field.max_byte_size()).sum()
+            },
             DocumentFieldType::Array => None,
         }
     }
@@ -91,7 +98,9 @@ impl DocumentFieldType {
             },
             DocumentFieldType::Boolean => Some(1),
             DocumentFieldType::Date => Some(8),
-            DocumentFieldType::Object => None,
+            DocumentFieldType::Object(sub_fields) => {
+                sub_fields.iter().map(| (_, sub_field)|  sub_field.max_size()).sum()
+            },
             DocumentFieldType::Array => None,
         }
     }
@@ -126,7 +135,10 @@ impl DocumentFieldType {
                 let f: f64 = rng.gen_range(1548910575000.0..1648910575000.0);
                 Value::Float(f.round() / 1000.0)
             }
-            DocumentFieldType::Object => Value::Null,
+            DocumentFieldType::Object(sub_fields) => {
+                let value_vec = sub_fields.iter().map(| (string, field_type)| (Value::Text(string.clone()), field_type.random_value(rng))).collect();
+                Value::Map(value_vec)
+            },
             DocumentFieldType::Array => Value::Null,
         }
     }
@@ -155,7 +167,10 @@ impl DocumentFieldType {
                 let f: f64 = rng.gen_range(1548910575000.0..1648910575000.0);
                 Value::Float(f.round() / 1000.0)
             }
-            DocumentFieldType::Object => Value::Null,
+            DocumentFieldType::Object(sub_fields) => {
+                let value_vec = sub_fields.iter().map(| (string, field_type)| (Value::Text(string.clone()), field_type.random_filled_value(rng))).collect();
+                Value::Map(value_vec)
+            },
             DocumentFieldType::Array => Value::Null,
         }
     }
@@ -248,7 +263,7 @@ impl DocumentFieldType {
                     Ok(vec![0])
                 }
             }
-            DocumentFieldType::Object => Err(Error::CorruptedData(String::from(
+            DocumentFieldType::Object(_) => Err(Error::CorruptedData(String::from(
                 "we should never try encoding an object",
             ))),
             DocumentFieldType::Array => Err(Error::CorruptedData(String::from(
@@ -307,7 +322,7 @@ impl DocumentFieldType {
                     )))
                 }
             }
-            DocumentFieldType::Object => Err(Error::InternalError("objects not supported")),
+            DocumentFieldType::Object(_) => Err(Error::InternalError("objects not supported")),
             DocumentFieldType::Array => Err(Error::InternalError("arrays not supported")),
         };
     }
@@ -346,7 +361,11 @@ impl fmt::Display for DocumentFieldType {
             }
             DocumentFieldType::Boolean => "bool".to_string(),
             DocumentFieldType::Date => "date".to_string(),
-            DocumentFieldType::Object => "object".to_string(),
+            DocumentFieldType::Object(sub_fields) => {
+                let object_rep = sub_fields.iter()
+                    .map(|(string, document_field_type)| format!("{} : {}",string, document_field_type)).collect::<Vec<String>>().join(" | ");
+                format!("object: {{ {} }}", object_rep)
+            },
             DocumentFieldType::Array => "array".to_string(),
         };
         write!(f, "{}", text.as_str())

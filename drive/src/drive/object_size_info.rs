@@ -1,16 +1,15 @@
 use crate::contract::{Contract, Document, DocumentType};
 use crate::drive::defaults::DEFAULT_HASH_SIZE;
-use crate::drive::object_size_info::KeyInfo::{Key, KeyRef, KeySize};
-use crate::drive::object_size_info::PathInfo::{PathFixedSizeIterator, PathIterator, PathSize};
-use crate::drive::object_size_info::PathKeyElementInfo::{
+use KeyInfo::{Key, KeyRef, KeySize};
+use PathInfo::{PathFixedSizeIterator, PathIterator, PathSize};
+use PathKeyElementInfo::{
     PathFixedSizeKeyElement, PathKeyElement, PathKeyElementSize,
 };
-use crate::drive::object_size_info::PathKeyInfo::{
+use PathKeyInfo::{
     PathFixedSizeKey, PathFixedSizeKeyRef, PathKey, PathKeyRef, PathKeySize,
 };
 use grovedb::{Element, Error};
-use std::array::TryFromSliceError;
-use std::borrow::{Borrow, BorrowMut};
+use KeyValueInfo::{KeyRefRequest, KeyValueMaxSize};
 
 #[derive(Clone)]
 pub enum PathInfo<'a, const N: usize> {
@@ -318,12 +317,12 @@ impl<'a> DocumentInfo<'a> {
         }
     }
 
-    pub fn id_key_info(&self) -> KeyInfo {
+    pub fn id_key_value_info(&self) -> KeyValueInfo {
         match self {
             DocumentInfo::DocumentAndSerialization((document, _)) => {
-                KeyInfo::KeyRef(document.id.as_slice())
+                KeyValueInfo::KeyRefRequest(document.id.as_slice())
             }
-            DocumentInfo::DocumentSize(_) => KeyInfo::KeySize(32),
+            DocumentInfo::DocumentSize(document_max_size) => KeyValueInfo::KeyValueMaxSize((32, *document_max_size)),
         }
     }
 
@@ -360,3 +359,22 @@ impl<'a> DocumentInfo<'a> {
         }
     }
 }
+
+#[derive(Clone)]
+pub enum KeyValueInfo<'a> {
+    /// A key by reference
+    KeyRefRequest(&'a [u8]),
+    /// Max size possible for value
+    KeyValueMaxSize((usize, usize)),
+}
+
+impl<'a> KeyValueInfo<'a> {
+    pub fn key_len(&'a self) -> usize {
+        match self {
+            KeyRefRequest(key) => key.len(),
+            KeyValueMaxSize((key_size,_)) => *key_size,
+        }
+    }
+}
+
+
