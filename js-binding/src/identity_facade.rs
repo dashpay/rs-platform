@@ -1,9 +1,9 @@
-use js_sys::JsString;
+use dpp::errors::consensus::ConsensusError;
 use dpp::identity::IdentityPublicKey;
 use dpp::identity::{AssetLockProof, Identity, KeyID};
 use dpp::metadata::Metadata;
+use js_sys::JsString;
 use wasm_bindgen::prelude::*;
-use dpp::errors::consensus::ConsensusError;
 
 use crate::identifier::IdentifierWrapper;
 use crate::IdentityPublicKeyWasm;
@@ -20,11 +20,18 @@ impl ValidationResultWasm {
     /// remove before shipping
     #[wasm_bindgen(js_name=errorsText)]
     pub fn errors_text(&self) -> Vec<JsString> {
-        self.0.errors().iter().map(|e| match e {
-            ConsensusError::JsonSchemaError(err) => {
-                err.to_string().into()
-            }
-        }).collect()
+        self.0
+            .errors()
+            .iter()
+            .map(|e| match e {
+                ConsensusError::JsonSchemaError(err) => err.to_string().into(),
+            })
+            .collect()
+    }
+
+    #[wasm_bindgen(js_name=isValid)]
+    pub fn is_valid(&self) -> bool {
+        self.0.is_valid()
     }
 }
 
@@ -47,8 +54,12 @@ impl IdentityFacadeWasm {
     }
 
     #[wasm_bindgen()]
-    pub fn validate(&self, identity_json: JsValue) -> ValidationResultWasm {
+    pub fn validate(&self, raw_identity_object: JsValue) -> ValidationResultWasm {
         // TODO: handle the case when
-        self.0.validate(JsValue::into_serde(&identity_json).expect("unable to serialize identity")).into()
+        self.0
+            .validate(
+                JsValue::into_serde(&raw_identity_object).expect("unable to serialize identity"),
+            )
+            .into()
     }
 }
