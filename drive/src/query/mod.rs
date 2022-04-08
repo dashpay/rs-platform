@@ -2,14 +2,13 @@ pub mod conditions;
 mod defaults;
 pub mod ordering;
 
-use crate::contract;
 use crate::contract::{bytes_for_system_value, Contract, Document, DocumentType, IndexProperty};
 use ciborium::value::{Value as CborValue, Value};
 use conditions::WhereOperator::{Equal, In};
-use conditions::{WhereClause, WhereOperator};
-use grovedb::{Element, Error, GroveDb, PathQuery, Query, QueryItem, SizedQuery, TransactionArg};
+pub use conditions::{WhereClause, WhereOperator};
+pub use grovedb::{Element, Error, GroveDb, PathQuery, Query, QueryItem, SizedQuery, TransactionArg};
 use indexmap::IndexMap;
-use ordering::OrderClause;
+pub use ordering::OrderClause;
 use sqlparser::ast;
 use sqlparser::ast::TableFactor::Table;
 use sqlparser::ast::Value::Number;
