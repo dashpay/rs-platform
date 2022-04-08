@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use dpp::errors::consensus::ConsensusError;
 use dpp::identity::IdentityPublicKey;
 use dpp::identity::{AssetLockProof, Identity, KeyID};
@@ -10,6 +11,7 @@ use crate::IdentityPublicKeyWasm;
 use crate::MetadataWasm;
 use dpp::identity::IdentityFacade;
 use dpp::validation::ValidationResult;
+use dpp::version::ProtocolVersionValidator;
 
 #[wasm_bindgen(js_name=ValidationResult)]
 pub struct ValidationResultWasm(ValidationResult);
@@ -46,7 +48,9 @@ pub struct IdentityFacadeWasm(IdentityFacade);
 impl IdentityFacadeWasm {
     #[wasm_bindgen(constructor)]
     pub fn new() -> IdentityFacadeWasm {
-        let identity_facade = IdentityFacade::new().unwrap();
+        // TODO: REMOVE THAT LINE, TAKE IT AS AN ARGUMENT
+        let protocol_version_validator = ProtocolVersionValidator::default();
+        let identity_facade = IdentityFacade::new(Arc::new(protocol_version_validator)).unwrap();
 
         IdentityFacadeWasm(identity_facade)
     }
