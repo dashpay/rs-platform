@@ -23,9 +23,7 @@ impl ValidationResultWasm {
         self.0
             .errors()
             .iter()
-            .map(|e| match e {
-                ConsensusError::JsonSchemaError(err) => err.to_string().into(),
-            })
+            .map(|e| e.to_string().into())
             .collect()
     }
 
