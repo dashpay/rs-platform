@@ -21,3 +21,5 @@ pub use identity_facade::*;
 
 mod dash_platform_protocol;
 pub use dash_platform_protocol::*;
+
+pub mod errors;
