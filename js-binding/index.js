@@ -7,7 +7,7 @@ const rust = import('./pkg');
 
 rust
     .then(dpp => {
-        const { Identifier, Identity } = dpp;
+        const { Identifier, Identity, DataContract, Document } = dpp;
         const identifier = Identifier.fromString("EDCuAy8AXqAh56eFRkKRKb79SC35csP3W9VPe1UMaz87")
         console.log(identifier.toString());
         const buf = identifier.toBuffer();
@@ -27,5 +27,8 @@ rust
         console.log("the identity", i.toObject());
         console.log("the public keys", i.getPublicKeys());
 
+
+        let dataContract = new DataContract;
+        console.log("Data Contract as an object: ", dataContract.toObject());
     })
     .catch(console.error);
