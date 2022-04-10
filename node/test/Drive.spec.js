@@ -201,6 +201,20 @@ describe('Drive', () => {
       expect(fetchedDocuments[0].toObject()).to.deep.equal(documents[4].toObject());
     });
 
+    it('should query existing documents again', async () => {
+      // Create documents
+      await Promise.all(
+          documents.map((document) => drive.createDocument(document, blockTime)),
+      );
+      const fetchedDocuments = await drive.queryDocuments(dataContract, 'indexedDocument', {
+        where: [['lastName', '==', 'Kennedy']],
+      });
+
+      expect(fetchedDocuments).to.have.lengthOf(1);
+      expect(fetchedDocuments[0]).to.be.an.instanceOf(Document);
+      expect(fetchedDocuments[0].toObject()).to.deep.equal(documents[4].toObject());
+    });
+
     it('should return empty array if documents are not exist', async () => {
       const fetchedDocuments = await drive.queryDocuments(dataContract, 'indexedDocument', {
         where: [['lastName', '==', 'Kennedy']],
