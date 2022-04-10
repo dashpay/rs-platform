@@ -519,7 +519,7 @@ impl DriveWrapper {
 
     fn js_create_and_execute_query(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         let js_query_cbor = cx.argument::<JsBuffer>(0)?;
-        let js_contract_cbor = cx.argument::<JsBuffer>(1)?;
+        let js_contract_id = cx.argument::<JsBuffer>(1)?;
         let js_document_type_name = cx.argument::<JsString>(2)?;
         let js_using_transaction = cx.argument::<JsBoolean>(3)?;
         let js_callback = cx.argument::<JsFunction>(4)?.root(&mut cx);
@@ -529,16 +529,16 @@ impl DriveWrapper {
             .downcast_or_throw::<JsBox<DriveWrapper>, _>(&mut cx)?;
 
         let query_cbor = converter::js_buffer_to_vec_u8(js_query_cbor, &mut cx);
-        let contract_cbor = converter::js_buffer_to_vec_u8(js_contract_cbor, &mut cx);
+        let contract_id = converter::js_buffer_to_vec_u8(js_contract_id, &mut cx);
         let document_type_name = js_document_type_name.value(&mut cx);
         let using_transaction = js_using_transaction.value(&mut cx);
 
         drive
             .send_to_drive_thread(move |drive: &Drive, transaction, channel| {
-                let result = drive.query_documents_from_contract_cbor(
-                    &contract_cbor,
-                    document_type_name,
+                let result = drive.query_documents(
                     &query_cbor,
+                    <[u8; 32]>::try_from(contract_id).unwrap(),
+                    document_type_name.as_str(),
                     using_transaction.then(|| transaction).flatten(),
                 );
 
