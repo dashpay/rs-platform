@@ -1,8 +1,9 @@
 pub mod conditions;
 mod defaults;
 pub mod ordering;
+mod test_index;
 
-use crate::contract::{bytes_for_system_value, Contract, Document, DocumentType, IndexProperty};
+use crate::contract::{bytes_for_system_value, Contract, Document, DocumentType, Index, IndexProperty};
 use crate::drive::object_size_info::{KeyInfo, KeyValueInfo};
 use crate::drive::Drive;
 use crate::error::drive::DriveError;
@@ -631,11 +632,7 @@ impl<'a> DriveQuery<'a> {
         }
     }
 
-    pub fn get_non_primary_key_path_query(
-        &self,
-        document_type_path: Vec<Vec<u8>>,
-        starts_at_document: Option<(Document, bool)>,
-    ) -> Result<PathQuery, Error> {
+    pub fn find_best_index(&self) -> Result<&Index, Error> {
         let equal_fields = self
             .internal_clauses
             .equal_clauses
@@ -684,7 +681,15 @@ impl<'a> DriveQuery<'a> {
                 "query must better match an existing index",
             )));
         }
+        Ok(index)
+    }
 
+    pub fn get_non_primary_key_path_query(
+        &self,
+        document_type_path: Vec<Vec<u8>>,
+        starts_at_document: Option<(Document, bool)>,
+    ) -> Result<PathQuery, Error> {
+        let index = self.find_best_index()?;
         let ordered_clauses: Vec<&WhereClause> = index
             .properties
             .iter()
@@ -913,9 +918,10 @@ impl<'a> DriveQuery<'a> {
 
 #[cfg(test)]
 mod tests {
+    use ciborium::value::{Integer, Value};
     use crate::common;
-    use crate::contract::{Contract, DocumentType};
-    use crate::query::DriveQuery;
+    use crate::contract::{Contract, DocumentType, Index, IndexProperty};
+    use crate::query::{DriveQuery, WhereClause, WhereOperator};
     use serde_json::json;
 
     #[test]
@@ -935,7 +941,7 @@ mod tests {
         let document_type = DocumentType::default();
 
         let where_cbor = common::value_to_cbor(query_value, None);
-        let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &document_type)
+        DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &document_type)
             .expect_err("all ranges must be on same field");
     }
 }
