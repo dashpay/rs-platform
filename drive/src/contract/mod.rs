@@ -3,9 +3,10 @@ pub mod types;
 
 use crate::drive::defaults::{DEFAULT_HASH_SIZE, PROTOCOL_VERSION};
 use crate::drive::{Drive, RootTree};
+use crate::error::contract::ContractError;
+use crate::error::Error;
 use byteorder::{BigEndian, WriteBytesExt};
 use ciborium::value::{Value as CborValue, Value};
-use grovedb::Error;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
@@ -147,23 +148,32 @@ impl Contract {
     pub fn from_cbor(contract_cbor: &[u8], contract_id: Option<[u8; 32]>) -> Result<Self, Error> {
         let (version, read_contract_cbor) = contract_cbor.split_at(4);
         if !Drive::check_protocol_version_bytes(version) {
-            return Err(Error::CorruptedData(String::from(
+            return Err(Error::Contract(ContractError::InvalidProtocolVersion(
                 "invalid protocol version",
             )));
         }
         // Deserialize the contract
-        let contract: BTreeMap<String, CborValue> =
-            ciborium::de::from_reader(read_contract_cbor)
-                .map_err(|_| Error::CorruptedData(String::from("unable to decode contract")))?;
+        let contract: BTreeMap<String, CborValue> = ciborium::de::from_reader(read_contract_cbor)
+            .map_err(|_| {
+            Error::Contract(ContractError::InvalidCBOR("unable to decode contract"))
+        })?;
 
         // Get the contract id
         let contract_id: [u8; 32] = if let Some(contract_id) = contract_id {
             contract_id
         } else {
             bytes_for_system_value_from_tree_map(&contract, "$id")?
-                .ok_or_else(|| Error::CorruptedData(String::from("unable to get contract id")))?
+                .ok_or_else(|| {
+                    Error::Contract(ContractError::MissingRequiredKey(
+                        "unable to get contract id",
+                    ))
+                })?
                 .try_into()
-                .map_err(|_| Error::CorruptedData(String::from("contract_id must be 32 bytes")))?
+                .map_err(|_| {
+                    Error::Contract(ContractError::FieldRequirementUnmet(
+                        "contract_id must be 32 bytes",
+                    ))
+                })?
         };
 
         // Does the contract keep history when the contract itself changes?
@@ -205,27 +215,29 @@ impl Contract {
             }
         };
 
-        let documents_cbor_value = contract
-            .get("documents")
-            .ok_or_else(|| Error::CorruptedData(String::from("unable to get documents")))?;
-        let contract_document_types_raw = documents_cbor_value
-            .as_map()
-            .ok_or_else(|| Error::CorruptedData(String::from("unable to get documents")))?;
+        let documents_cbor_value = contract.get("documents").ok_or_else(|| {
+            Error::Contract(ContractError::MissingRequiredKey("unable to get documents"))
+        })?;
+        let contract_document_types_raw = documents_cbor_value.as_map().ok_or_else(|| {
+            Error::Contract(ContractError::InvalidContractStructure(
+                "documents must be a map",
+            ))
+        })?;
 
         let mut contract_document_types: BTreeMap<String, DocumentType> = BTreeMap::new();
 
         // Build the document type hashmap
         for (type_key_value, document_type_value) in contract_document_types_raw {
             if !type_key_value.is_text() {
-                return Err(Error::CorruptedData(String::from(
-                    "table type is not a string as expected",
+                return Err(Error::Contract(ContractError::InvalidContractStructure(
+                    "document type name is not a string as expected",
                 )));
             }
 
             // Make sure the document_type_value is a map
             if !document_type_value.is_map() {
-                return Err(Error::CorruptedData(String::from(
-                    "table type is not a map as expected",
+                return Err(Error::Contract(ContractError::InvalidContractStructure(
+                    "document type data is not a map as expected",
                 )));
             }
 
@@ -303,7 +315,9 @@ impl Contract {
 
     pub fn document_type_for_name(&self, document_type_name: &str) -> Result<&DocumentType, Error> {
         self.document_types.get(document_type_name).ok_or_else(|| {
-            Error::CorruptedData(String::from("can not get document type from contract"))
+            Error::Contract(ContractError::DocumentTypeNotFound(
+                "can not get document type from contract",
+            ))
         })
     }
 }
@@ -340,11 +354,15 @@ impl DocumentType {
     ) -> Result<Vec<u8>, Error> {
         match key {
             "$ownerId" | "$id" => bytes_for_system_value(value)?.ok_or_else(|| {
-                Error::CorruptedData(String::from("expected system value to be deserialized"))
+                Error::Contract(ContractError::FieldRequirementUnmet(
+                    "expected system value to be deserialized",
+                ))
             }),
             _ => {
                 let field_type = self.properties.get(key).ok_or_else(|| {
-                    Error::CorruptedData(String::from("expected document to have field"))
+                    Error::Contract(ContractError::DocumentTypeFieldNotFound(
+                        "expected contract to have field",
+                    ))
                 })?;
                 field_type.encode_value(value)
             }
@@ -383,7 +401,7 @@ impl DocumentType {
                 let mut m_indexes = Vec::with_capacity(index_values.len());
                 for index_value in index_values {
                     if !index_value.is_map() {
-                        return Err(Error::CorruptedData(String::from(
+                        return Err(Error::Contract(ContractError::InvalidContractStructure(
                             "table document is not a map as expected",
                         )));
                     }
@@ -398,7 +416,7 @@ impl DocumentType {
         // Extract the properties
         let property_values = cbor_inner_btree_map(document_type_value_map, "properties")
             .ok_or_else(|| {
-                Error::CorruptedData(String::from(
+                Error::Contract(ContractError::InvalidContractStructure(
                     "unable to get document properties from the contract",
                 ))
             })?;
@@ -416,7 +434,7 @@ impl DocumentType {
             };
 
             if !property_value.is_map() {
-                return Err(Error::CorruptedData(String::from(
+                return Err(Error::Contract(ContractError::InvalidContractStructure(
                     "document property is not a map as expected",
                 )));
             }
@@ -429,19 +447,27 @@ impl DocumentType {
                 None => {
                     let ref_value = btree_map_inner_text_value(&base_inner_properties, "$ref")
                         .ok_or_else(|| {
-                            Error::CorruptedData(String::from("cannot find type property"))
+                            Error::Contract(ContractError::InvalidContractStructure(
+                                "cannot find type property",
+                            ))
                         })?;
                     if !ref_value.starts_with("#/$defs/") {
-                        return Err(Error::CorruptedData(String::from("malformed reference")));
+                        return Err(Error::Contract(ContractError::InvalidContractStructure(
+                            "malformed reference",
+                        )));
                     }
                     let ref_value = ref_value.split_at(8).1;
                     let inner_properties_map =
                         btree_map_inner_map_value(definition_references, ref_value).ok_or_else(
-                            || Error::CorruptedData(String::from("document reference not found")),
+                            || {
+                                Error::Contract(ContractError::ReferenceDefinitionNotFound(
+                                    "document reference not found",
+                                ))
+                            },
                         )?;
                     let type_value = cbor_inner_text_value(inner_properties_map, "type")
                         .ok_or_else(|| {
-                            Error::CorruptedData(String::from(
+                            Error::Contract(ContractError::InvalidContractStructure(
                                 "cannot find type property on reference",
                             ))
                         })?;
@@ -467,7 +493,11 @@ impl DocumentType {
                                     btree_map_inner_size_value(&inner_properties, "maxItems"),
                                 )
                             } else {
-                                return Err(Error::CorruptedData(String::from("invalid type")));
+                                return Err(Error::Contract(
+                                    ContractError::InvalidContractStructure(
+                                        "byteArray should always be true if defined",
+                                    ),
+                                ));
                             }
                         }
                         None => types::DocumentFieldType::Array,
@@ -478,8 +508,8 @@ impl DocumentType {
                 "object" => {
                     let properties = btree_map_inner_btree_map(&inner_properties, "properties")
                         .ok_or_else(|| {
-                            Error::CorruptedData(String::from(
-                                "cannot find byteArray property for array type",
+                            Error::Contract(ContractError::InvalidContractStructure(
+                                "object must have properties",
                             ))
                         })?;
                     for (object_property_key, object_property_value) in properties.into_iter() {
@@ -500,8 +530,9 @@ impl DocumentType {
                     document_properties.insert(prefixed_property_key, field_type);
                 }
                 _ => {
-                    field_type = types::string_to_field_type(type_value)
-                        .ok_or_else(|| Error::CorruptedData(String::from("invalid type")))?;
+                    field_type = types::string_to_field_type(type_value).ok_or_else(|| {
+                        Error::Contract(ContractError::ValueWrongType("invalid type"))
+                    })?;
                     document_properties.insert(prefixed_property_key, field_type);
                 }
             }
@@ -632,32 +663,41 @@ impl Document {
     ) -> Result<Self, Error> {
         let (version, read_document_cbor) = document_cbor.split_at(4);
         if !Drive::check_protocol_version_bytes(version) {
-            return Err(Error::CorruptedData(String::from(
+            return Err(Error::Contract(ContractError::InvalidProtocolVersion(
                 "invalid protocol version",
             )));
         }
         // first we need to deserialize the document and contract indices
         // we would need dedicated deserialization functions based on the document type
         let mut document: BTreeMap<String, CborValue> =
-            ciborium::de::from_reader(read_document_cbor)
-                .map_err(|_| Error::CorruptedData(String::from("unable to decode contract")))?;
+            ciborium::de::from_reader(read_document_cbor).map_err(|_| {
+                Error::Contract(ContractError::InvalidCBOR("unable to decode contract"))
+            })?;
 
         let owner_id: [u8; 32] = match owner_id {
             None => {
-                let owner_id: Vec<u8> =
-                    bytes_for_system_value_from_tree_map(&document, "$ownerId")?.ok_or_else(
-                        || Error::CorruptedData(String::from("unable to get document $ownerId")),
-                    )?;
+                let owner_id: Vec<u8> = bytes_for_system_value_from_tree_map(
+                    &document, "$ownerId",
+                )?
+                .ok_or_else(|| {
+                    Error::Contract(ContractError::DocumentOwnerIdMissing(
+                        "unable to get document $ownerId",
+                    ))
+                })?;
                 document.remove("$ownerId");
                 if owner_id.len() != 32 {
-                    return Err(Error::CorruptedData(String::from("invalid owner id")));
+                    return Err(Error::Contract(ContractError::FieldRequirementUnmet(
+                        "invalid owner id",
+                    )));
                 }
                 owner_id.as_slice().try_into()
             }
             Some(owner_id) => {
                 // we need to start by verifying that the owner_id is a 256 bit number (32 bytes)
                 if owner_id.len() != 32 {
-                    return Err(Error::CorruptedData(String::from("invalid owner id")));
+                    return Err(Error::Contract(ContractError::FieldRequirementUnmet(
+                        "invalid owner id",
+                    )));
                 }
                 owner_id.try_into()
             }
@@ -668,18 +708,24 @@ impl Document {
             None => {
                 let document_id: Vec<u8> = bytes_for_system_value_from_tree_map(&document, "$id")?
                     .ok_or_else(|| {
-                        Error::CorruptedData(String::from("unable to get document $id"))
+                        Error::Contract(ContractError::DocumentIdMissing(
+                            "unable to get document $id",
+                        ))
                     })?;
                 document.remove("$id");
                 if document_id.len() != 32 {
-                    return Err(Error::CorruptedData(String::from("invalid document id")));
+                    return Err(Error::Contract(ContractError::FieldRequirementUnmet(
+                        "invalid document id",
+                    )));
                 }
                 document_id.as_slice().try_into()
             }
             Some(document_id) => {
                 // we need to start by verifying that the document_id is a 256 bit number (32 bytes)
                 if document_id.len() != 32 {
-                    return Err(Error::CorruptedData(String::from("invalid document id")));
+                    return Err(Error::Contract(ContractError::FieldRequirementUnmet(
+                        "invalid document id",
+                    )));
                 }
                 document_id.try_into()
             }
@@ -701,16 +747,20 @@ impl Document {
     ) -> Result<Self, Error> {
         // we need to start by verifying that the owner_id is a 256 bit number (32 bytes)
         if owner_id.len() != 32 {
-            return Err(Error::CorruptedData(String::from("invalid owner id")));
+            return Err(Error::Contract(ContractError::FieldRequirementUnmet(
+                "invalid owner id",
+            )));
         }
 
         if document_id.len() != 32 {
-            return Err(Error::CorruptedData(String::from("invalid document id")));
+            return Err(Error::Contract(ContractError::FieldRequirementUnmet(
+                "invalid document id",
+            )));
         }
 
         let (version, read_document_cbor) = document_cbor.split_at(4);
         if !Drive::check_protocol_version_bytes(version) {
-            return Err(Error::CorruptedData(String::from(
+            return Err(Error::Contract(ContractError::InvalidProtocolVersion(
                 "invalid protocol version",
             )));
         }
@@ -718,7 +768,9 @@ impl Document {
         // first we need to deserialize the document and contract indices
         // we would need dedicated deserialization functions based on the document type
         let properties: BTreeMap<String, CborValue> = ciborium::de::from_reader(read_document_cbor)
-            .map_err(|_| Error::CorruptedData(String::from("unable to decode contract")))?;
+            .map_err(|_| {
+                Error::Contract(ContractError::InvalidCBOR("unable to decode contract"))
+            })?;
 
         // dev-note: properties is everything other than the id and owner id
         Ok(Document {
@@ -736,7 +788,7 @@ impl Document {
         let mut buffer: Vec<u8> = Vec::new();
         buffer
             .write_u32::<BigEndian>(PROTOCOL_VERSION)
-            .expect("writign protocol version caused error");
+            .expect("writing protocol version caused error");
         ciborium::ser::into_writer(&self, &mut buffer).expect("unable to serialize into cbor");
         buffer
     }
@@ -757,7 +809,7 @@ impl Document {
             }
             let key_paths: Vec<&str> = key_path.split('.').collect::<Vec<&str>>();
             let (key, rest_key_paths) = key_paths.split_first().ok_or_else(|| {
-                Error::CorruptedData(String::from(
+                Error::Contract(ContractError::MissingRequiredKey(
                     "key must not be null when getting from document",
                 ))
             })?;
@@ -770,12 +822,14 @@ impl Document {
                     Ok(Some(value))
                 } else {
                     let (key, rest_key_paths) = key_paths.split_first().ok_or_else(|| {
-                        Error::CorruptedData(String::from(
+                        Error::Contract(ContractError::MissingRequiredKey(
                             "key must not be null when getting from document",
                         ))
                     })?;
                     let map_values = value.as_map().ok_or_else(|| {
-                        Error::CorruptedData(String::from("inner key must refer to a value map"))
+                        Error::Contract(ContractError::ValueWrongType(
+                            "inner key must refer to a value map",
+                        ))
                     })?;
                     match get_key_from_cbor_map(map_values, key) {
                         None => Ok(None),
@@ -807,7 +861,9 @@ impl Document {
             .document_types
             .get(document_type_name)
             .ok_or_else(|| {
-                Error::CorruptedData(String::from("document type should exist for name"))
+                Error::Contract(ContractError::DocumentTypeNotFound(
+                    "document type should exist for name",
+                ))
             })?;
         self.get_raw_for_document_type(key, document_type, owner_id)
     }
@@ -870,9 +926,9 @@ impl Index {
         let mut index_properties: Vec<IndexProperty> = Vec::new();
 
         for (key_value, value_value) in index_type_value_map {
-            let key = key_value
-                .as_text()
-                .ok_or_else(|| Error::CorruptedData(String::from("key should be of type text")))?;
+            let key = key_value.as_text().ok_or_else(|| {
+                Error::Contract(ContractError::KeyWrongType("key should be of type text"))
+            })?;
 
             if key == "unique" {
                 if value_value.is_bool() {
@@ -880,13 +936,15 @@ impl Index {
                 }
             } else if key == "properties" {
                 let properties = value_value.as_array().ok_or_else(|| {
-                    Error::CorruptedData(String::from("property value should be an array"))
+                    Error::Contract(ContractError::InvalidContractStructure(
+                        "property value should be an array",
+                    ))
                 })?;
 
                 // Iterate over this and get the index properties
                 for property in properties {
                     if !property.is_map() {
-                        return Err(Error::CorruptedData(String::from(
+                        return Err(Error::Contract(ContractError::InvalidContractStructure(
                             "table document is not a map as expected",
                         )));
                     }
@@ -913,11 +971,17 @@ impl IndexProperty {
         let key = property
             .0 // key
             .as_text()
-            .ok_or_else(|| Error::CorruptedData(String::from("key should be of type string")))?;
+            .ok_or_else(|| {
+                Error::Contract(ContractError::KeyWrongType("key should be of type string"))
+            })?;
         let value = property
             .1 // value
             .as_text()
-            .ok_or_else(|| Error::CorruptedData(String::from("value should be of type string")))?;
+            .ok_or_else(|| {
+                Error::Contract(ContractError::ValueWrongType(
+                    "value should be of type string",
+                ))
+            })?;
 
         let ascending = value == "asc";
 
@@ -1051,12 +1115,12 @@ pub fn cbor_inner_bytes_value<'a>(
                 .iter()
                 .map(|byte| match byte {
                     Value::Integer(int) => {
-                        let value_as_u8: u8 = (*int)
-                            .try_into()
-                            .map_err(|_| Error::CorruptedData(String::from("expected u8 value")))?;
+                        let value_as_u8: u8 = (*int).try_into().map_err(|_| {
+                            Error::Contract(ContractError::ValueWrongType("expected u8 value"))
+                        })?;
                         Ok(value_as_u8)
                     }
-                    _ => Err(Error::CorruptedData(String::from(
+                    _ => Err(Error::Contract(ContractError::ValueWrongType(
                         "not an array of integers",
                     ))),
                 })
@@ -1094,7 +1158,7 @@ pub fn cbor_inner_size_value(document_type: &[(Value, Value)], key: &str) -> Opt
     if let Value::Integer(integer) = key_value {
         let value_as_usize: Result<usize, Error> = (*integer)
             .try_into()
-            .map_err(|_| Error::CorruptedData(String::from("expected u8 value")));
+            .map_err(|_| Error::Contract(ContractError::ValueWrongType("expected u8 value")));
         match value_as_usize {
             Ok(size) => Some(size),
             Err(_) => None,
@@ -1112,7 +1176,7 @@ pub fn btree_map_inner_size_value(
     if let Value::Integer(integer) = key_value {
         let value_as_usize: Result<usize, Error> = (*integer)
             .try_into()
-            .map_err(|_| Error::CorruptedData(String::from("expected u8 value")));
+            .map_err(|_| Error::Contract(ContractError::ValueWrongType("expected u8 value")));
         match value_as_usize {
             Ok(size) => Some(size),
             Err(_) => None,
@@ -1141,17 +1205,17 @@ pub fn bytes_for_system_value(value: &Value) -> Result<Option<Vec<u8>>, Error> {
             .iter()
             .map(|byte| match byte {
                 Value::Integer(int) => {
-                    let value_as_u8: u8 = (*int)
-                        .try_into()
-                        .map_err(|_| Error::CorruptedData(String::from("expected u8 value")))?;
+                    let value_as_u8: u8 = (*int).try_into().map_err(|_| {
+                        Error::Contract(ContractError::ValueWrongType("expected u8 value"))
+                    })?;
                     Ok(Some(value_as_u8))
                 }
-                _ => Err(Error::CorruptedData(String::from(
+                _ => Err(Error::Contract(ContractError::ValueWrongType(
                     "not an array of integers",
                 ))),
             })
             .collect::<Result<Option<Vec<u8>>, Error>>(),
-        _ => Err(Error::CorruptedData(String::from(
+        _ => Err(Error::Contract(ContractError::ValueWrongType(
             "system value is incorrect type",
         ))),
     }
@@ -1179,7 +1243,7 @@ fn bool_for_system_value_from_tree_map(
         if let Value::Bool(bool_value) = value {
             Ok(*bool_value)
         } else {
-            Err(Error::CorruptedData(String::from(
+            Err(Error::Contract(ContractError::ValueWrongType(
                 "value is expected to be a boolean",
             )))
         }

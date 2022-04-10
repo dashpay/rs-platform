@@ -546,13 +546,15 @@ impl DriveWrapper {
                     let callback = js_callback.into_inner(&mut task_context);
                     let this = task_context.undefined();
                     let callback_arguments: Vec<Handle<JsValue>> = match result {
-                        Ok((value, skipped)) => {
+                        Ok((value, skipped, cost)) => {
                             let js_array: Handle<JsArray> = task_context.empty_array();
                             let js_vecs = converter::nested_vecs_to_js(value, &mut task_context)?;
                             let js_num = task_context.number(skipped).upcast::<JsValue>();
+                            let js_cost = task_context.number(cost as f64).upcast::<JsValue>();
 
                             js_array.set(&mut task_context, 0, js_vecs)?;
                             js_array.set(&mut task_context, 1, js_num)?;
+                            js_array.set(&mut task_context, 2, js_cost)?;
 
                             vec![task_context.null().upcast(), js_array.upcast()]
                         }
@@ -1039,6 +1041,7 @@ impl DriveWrapper {
                         let js_num = task_context.number(skipped).upcast::<JsValue>();
                         js_array.set(&mut task_context, 0, js_vecs)?;
                         js_array.set(&mut task_context, 1, js_num)?;
+
                         vec![task_context.null().upcast(), js_array.upcast()]
                     }
 

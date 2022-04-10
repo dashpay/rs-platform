@@ -3,10 +3,19 @@ mod defaults;
 pub mod ordering;
 
 use crate::contract::{bytes_for_system_value, Contract, Document, DocumentType, IndexProperty};
+use crate::drive::object_size_info::{KeyInfo, KeyValueInfo};
+use crate::drive::Drive;
+use crate::error::drive::DriveError;
+use crate::error::query::QueryError;
+use crate::error::Error;
+use crate::fee::calculate_fee;
+use crate::fee::op::QueryOperation;
 use ciborium::value::{Value as CborValue, Value};
 use conditions::WhereOperator::{Equal, In};
 pub use conditions::{WhereClause, WhereOperator};
-pub use grovedb::{Element, Error, GroveDb, PathQuery, Query, QueryItem, SizedQuery, TransactionArg};
+pub use grovedb::{
+    Element, Error as GroveError, GroveDb, PathQuery, Query, QueryItem, SizedQuery, TransactionArg,
+};
 use indexmap::IndexMap;
 pub use ordering::OrderClause;
 use sqlparser::ast;
@@ -17,10 +26,6 @@ use sqlparser::dialect::GenericDialect;
 use sqlparser::parser::Parser;
 use std::collections::HashMap;
 use std::ops::BitXor;
-use crate::drive::Drive;
-use crate::drive::object_size_info::{KeyInfo, KeyValueInfo};
-use crate::fee::calculate_fee;
-use crate::fee::op::QueryOperation;
 
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct InternalClauses {
@@ -94,8 +99,10 @@ impl InternalClauses {
                     .expect("there must be a value")
                     .clone(),
             )),
-            _ => Err(Error::InvalidQuery(
-                "There should only be one equal clause for the primary key",
+            _ => Err(Error::Query(
+                QueryError::DuplicateNonGroupableClauseSameField(
+                    "There should only be one equal clause for the primary key",
+                ),
             )),
         }?;
 
@@ -107,8 +114,10 @@ impl InternalClauses {
                     .expect("there must be a value")
                     .clone(),
             )),
-            _ => Err(Error::InvalidQuery(
-                "There should only be one in clause for the primary key",
+            _ => Err(Error::Query(
+                QueryError::DuplicateNonGroupableClauseSameField(
+                    "There should only be one in clause for the primary key",
+                ),
             )),
         }?;
 
@@ -122,7 +131,9 @@ impl InternalClauses {
 
         match internal_clauses.verify() {
             true => Ok(internal_clauses),
-            false => Err(Error::InvalidQuery("Query has invalid where clauses")),
+            false => Err(Error::Query(QueryError::InvalidWhereClauseComponents(
+                "Query has invalid where clauses",
+            ))),
         }
     }
 }
@@ -162,7 +173,7 @@ impl<'a> DriveQuery<'a> {
         document_type: &'a DocumentType,
     ) -> Result<Self, Error> {
         let query_document: HashMap<String, CborValue> = ciborium::de::from_reader(query_cbor)
-            .map_err(|_| Error::InvalidQuery("unable to decode query"))?;
+            .map_err(|_| Error::Query(QueryError::InvalidCBOR("unable to decode query")))?;
 
         let limit: u16 = query_document
             .get("limit")
@@ -173,9 +184,9 @@ impl<'a> DriveQuery<'a> {
                     None
                 }
             })
-            .ok_or(Error::InvalidQuery(
+            .ok_or(Error::Query(QueryError::InvalidLimit(
                 "limit should be a integer from 1 to 100",
-            ))?;
+            )))?;
 
         let block_time: Option<f64> = query_document.get("blockTime").and_then(|id_cbor| {
             if let CborValue::Float(b) = id_cbor {
@@ -196,12 +207,16 @@ impl<'a> DriveQuery<'a> {
                             if let CborValue::Array(clauses_components) = where_clause {
                                 WhereClause::from_components(clauses_components)
                             } else {
-                                Err(Error::InvalidQuery("where clause must be an array"))
+                                Err(Error::Query(QueryError::InvalidFormatWhereClause(
+                                    "where clause must be an array",
+                                )))
                             }
                         })
                         .collect::<Result<Vec<WhereClause>, Error>>()
                 } else {
-                    Err(Error::InvalidQuery("where clause must be an array"))
+                    Err(Error::Query(QueryError::InvalidFormatWhereClause(
+                        "where clause must be an array",
+                    )))
                 }
             })?;
 
@@ -210,9 +225,9 @@ impl<'a> DriveQuery<'a> {
         let start_at_option = query_document.get("startAt");
         let start_after_option = query_document.get("startAfter");
         if start_after_option.is_some() && start_at_option.is_some() {
-            return Err(Error::InvalidQuery(
+            return Err(Error::Query(QueryError::DuplicateStartConditions(
                 "only one of startAt or startAfter should be provided",
-            ));
+            )));
         }
 
         let mut start_at_included = true;
@@ -271,18 +286,18 @@ impl<'a> DriveQuery<'a> {
     pub fn from_sql_expr(sql_string: &str, contract: &'a Contract) -> Result<Self, Error> {
         let dialect: GenericDialect = sqlparser::dialect::GenericDialect {};
         let statements: Vec<Statement> = Parser::parse_sql(&dialect, sql_string)
-            .map_err(|_| Error::InvalidQuery("Issue parsing sql"))?;
+            .map_err(|_| Error::Query(QueryError::InvalidSQL("Issue parsing sql")))?;
 
         // Should ideally iterate over each statement
         let first_statement = statements
             .get(0)
-            .ok_or(Error::InvalidQuery("Issue parsing SQL"))?;
+            .ok_or(Error::Query(QueryError::InvalidSQL("Issue parsing sql")))?;
 
         let query: &ast::Query = match first_statement {
             ast::Statement::Query(query_struct) => Some(query_struct),
             _ => None,
         }
-        .ok_or(Error::InvalidQuery("Issue parsing sql"))?;
+        .ok_or(Error::Query(QueryError::InvalidSQL("Issue parsing sql")))?;
 
         let limit: u16 = if let Some(limit_expr) = &query.limit {
             match limit_expr {
@@ -292,9 +307,9 @@ impl<'a> DriveQuery<'a> {
                 }
                 _ => None,
             }
-            .ok_or(Error::InvalidQuery(
+            .ok_or(Error::Query(QueryError::InvalidLimit(
                 "Issue parsing sql: invalid limit value",
-            ))?
+            )))?
         } else {
             defaults::DEFAULT_QUERY_LIMIT
         };
@@ -314,13 +329,15 @@ impl<'a> DriveQuery<'a> {
             ast::SetExpr::Select(select) => Some(select),
             _ => None,
         }
-        .ok_or(Error::InvalidQuery("Issue parsing sql"))?;
+        .ok_or(Error::Query(QueryError::InvalidSQL("Issue parsing sql")))?;
 
         // Get the document type from the 'from' section
         let document_type_name = match &select
             .from
             .get(0)
-            .ok_or(Error::InvalidQuery("Invalid query: missing from section"))?
+            .ok_or(Error::Query(QueryError::InvalidSQL(
+                "Invalid query: missing from section",
+            )))?
             .relation
         {
             Table {
@@ -331,12 +348,16 @@ impl<'a> DriveQuery<'a> {
             } => name.0.get(0).as_ref().map(|identifier| &identifier.value),
             _ => None,
         }
-        .ok_or(Error::InvalidQuery("Issue parsing sql: invalid from value"))?;
+        .ok_or(Error::Query(QueryError::InvalidSQL(
+            "Issue parsing sql: invalid from value",
+        )))?;
 
         let document_type = contract
             .document_types
             .get(document_type_name)
-            .ok_or(Error::InvalidQuery("document type not found in contract"))?;
+            .ok_or(Error::Query(QueryError::DocumentTypeNotFound(
+                "document type not found in contract",
+            )))?;
 
         // Restrictions
         // only binary where clauses are supported
@@ -419,25 +440,35 @@ impl<'a> DriveQuery<'a> {
                         )
                     };
 
-                let start_at_document = drive.grove_get(start_at_document_path, KeyValueInfo::KeyRefRequest(&start_at_document_key), transaction, query_operations)
+                let start_at_document = drive
+                    .grove_get(
+                        start_at_document_path,
+                        KeyValueInfo::KeyRefRequest(&start_at_document_key),
+                        transaction,
+                        query_operations,
+                    )
                     .map_err(|e| match e {
-                        Error::PathKeyNotFound(_) | Error::PathNotFound(_) => {
+                        Error::GroveDB(GroveError::PathKeyNotFound(_))
+                        | Error::GroveDB(GroveError::PathNotFound(_)) => {
                             let error_message = if self.start_at_included {
                                 "startAt document not found"
                             } else {
                                 "startAfter document not found"
                             };
 
-                            Error::InvalidQuery(error_message)
+                            Error::Query(QueryError::StartDocumentNotFound(error_message))
                         }
                         _ => e,
-                    })?.ok_or_else(|| Error::CorruptedData(String::from("expected a value")))?;
+                    })?
+                    .ok_or_else(|| {
+                        Error::Drive(DriveError::CorruptedCodeExecution("expected a value"))
+                    })?;
 
                 if let Element::Item(item) = start_at_document {
                     let document = Document::from_cbor(item.as_slice(), None, None)?;
                     Ok(Some((document, self.start_at_included)))
                 } else {
-                    Err(Error::CorruptedData(String::from(
+                    Err(Error::Drive(DriveError::CorruptedDocumentPath(
                         "Holding paths should only have items",
                     )))
                 }
@@ -484,7 +515,9 @@ impl<'a> DriveQuery<'a> {
             // This is for a range
             let left_to_right = if self.order_by.keys().len() == 1 {
                 if self.order_by.keys().next().unwrap() != "$id" {
-                    return Err(Error::InvalidQuery("order by should include $id only"));
+                    return Err(Error::Query(QueryError::InvalidOrderByProperties(
+                        "order by should include $id only",
+                    )));
                 }
 
                 let order_clause = self.order_by.get("$id").unwrap();
@@ -510,9 +543,9 @@ impl<'a> DriveQuery<'a> {
             if let Some(primary_key_in_clause) = &self.internal_clauses.primary_key_in_clause {
                 let in_values = match &primary_key_in_clause.value {
                     Value::Array(array) => Ok(array),
-                    _ => Err(Error::InvalidQuery(
+                    _ => Err(Error::Query(QueryError::InvalidInClause(
                         "when using in operator you must provide an array of values",
-                    )),
+                    ))),
                 }?;
                 match starts_at_key_option {
                     None => {
@@ -538,7 +571,8 @@ impl<'a> DriveQuery<'a> {
                 if self.document_type.documents_keep_history {
                     // if the documents keep history then we should insert a subquery
                     if let Some(_block_time) = self.block_time {
-                        return Err(Error::InternalError("Not yet implemented"));
+                        //todo
+                        return Err(Error::Query(QueryError::Unsupported("Not yet implemented")));
                         // in order to be able to do this we would need limited subqueries
                         // as we only want the first element before the block_time
 
@@ -576,7 +610,7 @@ impl<'a> DriveQuery<'a> {
                 if self.document_type.documents_keep_history {
                     // if the documents keep history then we should insert a subquery
                     if let Some(_block_time) = self.block_time {
-                        return Err(Error::InternalError("Not yet implemented"));
+                        return Err(Error::Query(QueryError::Unsupported("Not yet implemented")));
                         // in order to be able to do this we would need limited subqueries
                         // as we only want the first element before the block_time
 
@@ -642,11 +676,13 @@ impl<'a> DriveQuery<'a> {
         let (index, difference) = self
             .document_type
             .index_for_types(fields.as_slice(), in_field, order_by_keys.as_slice())
-            .ok_or(Error::InvalidQuery("query must be for valid indexes"))?;
+            .ok_or(Error::Query(QueryError::WhereClauseOnNonIndexedProperty(
+                "query must be for valid indexes",
+            )))?;
         if difference > defaults::MAX_INDEX_DIFFERENCE {
-            return Err(Error::InvalidQuery(
+            return Err(Error::Query(QueryError::QueryTooFarFromIndex(
                 "query must better match an existing index",
-            ));
+            )));
         }
 
         let ordered_clauses: Vec<&WhereClause> = index
@@ -763,9 +799,9 @@ impl<'a> DriveQuery<'a> {
                     let order_clause: &OrderClause = self
                         .order_by
                         .get(where_clause.field.as_str())
-                        .ok_or(Error::InvalidQuery(
+                        .ok_or(Error::Query(QueryError::MissingOrderByForRange(
                             "query must have an orderBy field for each range element",
-                        ))?;
+                        )))?;
 
                     order_clause.ascending
                 } else {
@@ -790,9 +826,9 @@ impl<'a> DriveQuery<'a> {
                         let order_clause: &OrderClause = self
                             .order_by
                             .get(where_clause.field.as_str())
-                            .ok_or(Error::InvalidQuery(
+                            .ok_or(Error::Query(QueryError::MissingOrderByForRange(
                                 "query must have an orderBy field for each range element",
-                            ))?;
+                            )))?;
                         let mut subquery = where_clause.to_path_query(
                             self.document_type,
                             &starts_at_document,
@@ -817,8 +853,8 @@ impl<'a> DriveQuery<'a> {
             index.properties.split_at(intermediate_values.len());
 
         // Now we should construct the path
-        let last_index = last_indexes.first().ok_or(Error::InvalidQuery(
-            "document query has no index with fields",
+        let last_index = last_indexes.first().ok_or(Error::Query(
+            QueryError::QueryOnDocumentTypeWithNoIndexes("document query has no index with fields"),
         ))?;
 
         let mut path = document_type_path;
@@ -852,22 +888,24 @@ impl<'a> DriveQuery<'a> {
         transaction: TransactionArg,
     ) -> Result<(Vec<Vec<u8>>, u16, u64), Error> {
         let mut query_operations: Vec<QueryOperation> = vec![];
-        let path_query = self.construct_path_query_operations(drive, transaction, &mut query_operations)?;
+        let path_query =
+            self.construct_path_query_operations(drive, transaction, &mut query_operations)?;
         let query_result = drive.grove.get_path_query(&path_query, transaction);
         match query_result {
-            Err(Error::PathKeyNotFound(_)) | Err(Error::PathNotFound(_)) => {
+            Err(GroveError::PathKeyNotFound(_)) | Err(GroveError::PathNotFound(_)) => {
                 let path_query_operations = QueryOperation::for_empty_path_query(&path_query);
                 query_operations.push(path_query_operations);
                 let (_, processing_fee) = calculate_fee(None, Some(query_operations), None, None)?;
                 Ok((Vec::new(), 0, processing_fee))
-            },
-            _ => {
-                match query_result? { (data, skipped) => {
+            }
+            _ => match query_result? {
+                (data, skipped) => {
                     let path_query_operations = QueryOperation::for_path_query(&path_query, &data);
                     query_operations.push(path_query_operations);
-                    let (_, processing_fee) = calculate_fee(None, Some(query_operations), None, None)?;
+                    let (_, processing_fee) =
+                        calculate_fee(None, Some(query_operations), None, None)?;
                     Ok((data, skipped, processing_fee))
-                } }
+                }
             },
         }
     }

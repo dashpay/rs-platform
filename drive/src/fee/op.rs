@@ -103,10 +103,14 @@ impl QueryOperation {
         }
     }
 
-    pub fn for_value_retrieval_in_path<'a: 'b, 'b, 'c, P>(key_len: usize, path: P, value_len: usize) -> Self
-        where
-            P: IntoIterator<Item = &'c [u8]>,
-            <P as IntoIterator>::IntoIter: ExactSizeIterator + DoubleEndedIterator + Clone,
+    pub fn for_value_retrieval_in_path<'a: 'b, 'b, 'c, P>(
+        key_len: usize,
+        path: P,
+        value_len: usize,
+    ) -> Self
+    where
+        P: IntoIterator<Item = &'c [u8]>,
+        <P as IntoIterator>::IntoIter: ExactSizeIterator + DoubleEndedIterator + Clone,
     {
         let path_size: u32 = path
             .into_iter()
@@ -119,7 +123,11 @@ impl QueryOperation {
         }
     }
 
-    pub fn for_value_retrieval_with_path_length(key_len: usize, path_len: usize, value_len: usize) -> Self {
+    pub fn for_value_retrieval_with_path_length(
+        key_len: usize,
+        path_len: usize,
+        value_len: usize,
+    ) -> Self {
         QueryOperation {
             key_size: key_len as u32,
             path_size: path_len as u32,
@@ -129,7 +137,13 @@ impl QueryOperation {
 
     pub fn for_path_query(path_query: &PathQuery, returned_values: &Vec<Vec<u8>>) -> Self {
         QueryOperation {
-            key_size: path_query.query.query.items.iter().map(|query_item| query_item.processing_footprint()).sum(),
+            key_size: path_query
+                .query
+                .query
+                .items
+                .iter()
+                .map(|query_item| query_item.processing_footprint())
+                .sum(),
             path_size: path_query.path.len() as u32,
             value_size: returned_values.iter().map(|v| v.len() as u32).sum(),
         }
@@ -137,7 +151,13 @@ impl QueryOperation {
 
     pub fn for_empty_path_query(path_query: &PathQuery) -> Self {
         QueryOperation {
-            key_size: path_query.query.query.items.iter().map(|query_item| query_item.processing_footprint()).sum(),
+            key_size: path_query
+                .query
+                .query
+                .items
+                .iter()
+                .map(|query_item| query_item.processing_footprint())
+                .sum(),
             path_size: path_query.path.len() as u32,
             value_size: 0,
         }

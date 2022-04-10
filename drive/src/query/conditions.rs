@@ -1,6 +1,8 @@
 use crate::contract::{Document, DocumentType};
+use crate::error::query::QueryError;
+use crate::error::{drive::DriveError, Error};
 use ciborium::value::{Integer, Value};
-use grovedb::{Error, Query};
+use grovedb::Query;
 use sqlparser::ast;
 use std::collections::{BTreeSet, HashMap};
 use WhereOperator::{
@@ -70,12 +72,24 @@ impl WhereOperator {
             GreaterThanOrEquals => Ok(LessThanOrEquals),
             LessThan => Ok(GreaterThan),
             LessThanOrEquals => Ok(GreaterThanOrEquals),
-            Between => Err(Error::InvalidQuery("Between clause order invalid")),
-            BetweenExcludeBounds => Err(Error::InvalidQuery("Between clause order invalid")),
-            BetweenExcludeLeft => Err(Error::InvalidQuery("Between clause order invalid")),
-            BetweenExcludeRight => Err(Error::InvalidQuery("Between clause order invalid")),
-            In => Err(Error::InvalidQuery("In clause order invalid")),
-            StartsWith => Err(Error::InvalidQuery("Startswith clause order invalid")),
+            Between => Err(Error::Query(QueryError::InvalidWhereClauseOrder(
+                "Between clause order invalid",
+            ))),
+            BetweenExcludeBounds => Err(Error::Query(QueryError::InvalidWhereClauseOrder(
+                "Between clause order invalid",
+            ))),
+            BetweenExcludeLeft => Err(Error::Query(QueryError::InvalidWhereClauseOrder(
+                "Between clause order invalid",
+            ))),
+            BetweenExcludeRight => Err(Error::Query(QueryError::InvalidWhereClauseOrder(
+                "Between clause order invalid",
+            ))),
+            In => Err(Error::Query(QueryError::InvalidWhereClauseOrder(
+                "In clause order invalid",
+            ))),
+            StartsWith => Err(Error::Query(QueryError::InvalidWhereClauseOrder(
+                "Startswith clause order invalid",
+            ))),
         }
     }
 }
@@ -144,35 +158,42 @@ impl<'a> WhereClause {
 
     pub fn from_components(clause_components: &'a [Value]) -> Result<Self, Error> {
         if clause_components.len() != 3 {
-            return Err(Error::InvalidQuery(
+            return Err(Error::Query(QueryError::InvalidWhereClauseComponents(
                 "where clauses should have at most 3 components",
-            ));
+            )));
         }
 
         let field_value = clause_components
             .get(0)
             .expect("check above enforces it exists");
-        let field_ref = field_value.as_text().ok_or(Error::InvalidQuery(
-            "first field of where component should be a string",
-        ))?;
+        let field_ref =
+            field_value
+                .as_text()
+                .ok_or(Error::Query(QueryError::InvalidWhereClauseComponents(
+                    "first field of where component should be a string",
+                )))?;
         let field = String::from(field_ref);
 
         let operator_value = clause_components
             .get(1)
             .expect("check above enforces it exists");
-        let operator_string = operator_value.as_text().ok_or(Error::InvalidQuery(
-            "second field of where component should be a string",
+        let operator_string = operator_value.as_text().ok_or(Error::Query(
+            QueryError::InvalidWhereClauseComponents(
+                "second field of where component should be a string",
+            ),
         ))?;
 
         let operator = WhereOperator::from_string(operator_string).ok_or({
-            Error::InvalidQuery("second field of where component should be a known operator")
+            Error::Query(QueryError::InvalidWhereClauseComponents(
+                "second field of where component should be a known operator",
+            ))
         })?;
 
         let value = clause_components
             .get(2)
-            .ok_or(Error::InvalidQuery(
+            .ok_or(Error::Query(QueryError::InvalidWhereClauseComponents(
                 "third field of where component should exist",
-            ))?
+            )))?
             .clone();
 
         Ok(WhereClause {
@@ -192,9 +213,9 @@ impl<'a> WhereClause {
         match lower_range_clauses.len() {
             0 => Ok(None),
             1 => Ok(Some(lower_range_clauses.get(0).unwrap())),
-            _ => Err(Error::InvalidQuery(
+            _ => Err(Error::Query(QueryError::MultipleRangeClauses(
                 "there can only at most one range clause with a lower bound",
-            )),
+            ))),
         }
     }
 
@@ -206,9 +227,9 @@ impl<'a> WhereClause {
         match upper_range_clauses.len() {
             0 => Ok(None),
             1 => Ok(Some(upper_range_clauses.get(0).unwrap())),
-            _ => Err(Error::InvalidQuery(
+            _ => Err(Error::Query(QueryError::MultipleRangeClauses(
                 "there can only at most one range clause with a lower bound",
-            )),
+            ))),
         }
     }
 
@@ -233,7 +254,11 @@ impl<'a> WhereClause {
             .into_iter()
             .map(|where_clause| {
                 if known_fields.contains(&where_clause.field) {
-                    Err(Error::InvalidQuery("duplicate equality fields"))
+                    Err(Error::Query(
+                        QueryError::DuplicateNonGroupableClauseSameField(
+                            "duplicate equality fields",
+                        ),
+                    ))
                 } else {
                     known_fields.insert(where_clause.field.clone());
                     Ok((where_clause.field.clone(), where_clause))
@@ -257,15 +282,19 @@ impl<'a> WhereClause {
             1 => {
                 let clause = in_clauses_array.get(0).expect("there must be a value");
                 if known_fields.contains(&clause.field) {
-                    Err(Error::InvalidQuery(
-                        "in clause has same field as an equality clause",
+                    Err(Error::Query(
+                        QueryError::DuplicateNonGroupableClauseSameField(
+                            "in clause has same field as an equality clause",
+                        ),
                     ))
                 } else {
                     known_fields.insert(clause.field.clone());
                     Ok(Some(clause.clone()))
                 }
             }
-            _ => Err(Error::InvalidQuery("There should only be one in clause")),
+            _ => Err(Error::Query(QueryError::MultipleInClauses(
+                "There should only be one in clause",
+            ))),
         }?;
 
         // In order to group range clauses
@@ -303,84 +332,89 @@ impl<'a> WhereClause {
             })
             .collect();
 
-        let range_clause = if non_groupable_range_clauses.is_empty() {
-            if groupable_range_clauses.is_empty() {
-                Ok(None)
-            } else if groupable_range_clauses.len() == 1 {
-                let clause = *groupable_range_clauses.first().unwrap();
-                if known_fields.contains(clause.field.as_str()) {
-                    Err(Error::InvalidQuery(
-                        "in clause has same field as an equality clause",
-                    ))
+        let range_clause =
+            if non_groupable_range_clauses.is_empty() {
+                if groupable_range_clauses.is_empty() {
+                    Ok(None)
+                } else if groupable_range_clauses.len() == 1 {
+                    let clause = *groupable_range_clauses.first().unwrap();
+                    if known_fields.contains(clause.field.as_str()) {
+                        Err(Error::Query(QueryError::InvalidWhereClauseComponents(
+                            "in clause has same field as an equality clause",
+                        )))
+                    } else {
+                        Ok(Some(clause.clone()))
+                    }
+                } else if groupable_range_clauses.len() > 2 {
+                    Err(Error::Query(QueryError::MultipleRangeClauses(
+                        "there can only be at most 2 range clauses that must be on the same field",
+                    )))
                 } else {
-                    Ok(Some(clause.clone()))
-                }
-            } else if groupable_range_clauses.len() > 2 {
-                Err(Error::InvalidQuery(
-                    "there can only be at most 2 range clauses",
-                ))
-            } else {
-                let first_field = groupable_range_clauses.first().unwrap().field.as_str();
-                if known_fields.contains(first_field) {
-                    Err(Error::InvalidQuery(
-                        "a range clause has same field as an equality or in clause",
-                    ))
-                } else if groupable_range_clauses
-                    .iter()
-                    .any(|&z| z.field.as_str() != first_field)
-                {
-                    Err(Error::InvalidQuery("all ranges must be on same field"))
-                } else {
-                    let lower_upper_error = || {
-                        Error::InvalidQuery(
-                            "lower and upper bounds must be passed if providing 2 ranges",
-                        )
-                    };
+                    let first_field = groupable_range_clauses.first().unwrap().field.as_str();
+                    if known_fields.contains(first_field) {
+                        Err(Error::Query(QueryError::InvalidWhereClauseComponents(
+                            "a range clause has same field as an equality or in clause",
+                        )))
+                    } else if groupable_range_clauses
+                        .iter()
+                        .any(|&z| z.field.as_str() != first_field)
+                    {
+                        Err(Error::Query(QueryError::MultipleRangeClauses(
+                            "all ranges must be on same field",
+                        )))
+                    } else {
+                        let lower_upper_error = || {
+                            Error::Query(QueryError::RangeClausesNotGroupable(
+                                "lower and upper bounds must be passed if providing 2 ranges",
+                            ))
+                        };
 
-                    // we need to find the bounds of the clauses
-                    let lower_bounds_clause =
-                        WhereClause::lower_bound_clause(groupable_range_clauses.as_slice())?
+                        // we need to find the bounds of the clauses
+                        let lower_bounds_clause =
+                            WhereClause::lower_bound_clause(groupable_range_clauses.as_slice())?
+                                .ok_or_else(lower_upper_error)?;
+                        let upper_bounds_clause =
+                            WhereClause::upper_bound_clause(groupable_range_clauses.as_slice())?
+                                .ok_or_else(lower_upper_error)?;
+
+                        let operator =
+                            match (lower_bounds_clause.operator, upper_bounds_clause.operator) {
+                                (GreaterThanOrEquals, LessThanOrEquals) => Some(Between),
+                                (GreaterThanOrEquals, LessThan) => Some(BetweenExcludeRight),
+                                (GreaterThan, LessThanOrEquals) => Some(BetweenExcludeLeft),
+                                (GreaterThan, LessThan) => Some(BetweenExcludeBounds),
+                                _ => None,
+                            }
                             .ok_or_else(lower_upper_error)?;
-                    let upper_bounds_clause =
-                        WhereClause::upper_bound_clause(groupable_range_clauses.as_slice())?
-                            .ok_or_else(lower_upper_error)?;
 
-                    let operator =
-                        match (lower_bounds_clause.operator, upper_bounds_clause.operator) {
-                            (GreaterThanOrEquals, LessThanOrEquals) => Some(Between),
-                            (GreaterThanOrEquals, LessThan) => Some(BetweenExcludeRight),
-                            (GreaterThan, LessThanOrEquals) => Some(BetweenExcludeLeft),
-                            (GreaterThan, LessThan) => Some(BetweenExcludeBounds),
-                            _ => None,
-                        }
-                        .ok_or_else(lower_upper_error)?;
-
-                    Ok(Some(WhereClause {
-                        field: groupable_range_clauses.first().unwrap().field.clone(),
-                        operator,
-                        value: Value::Array(vec![
-                            lower_bounds_clause.value.clone(),
-                            upper_bounds_clause.value.clone(),
-                        ]),
-                    }))
+                        Ok(Some(WhereClause {
+                            field: groupable_range_clauses.first().unwrap().field.clone(),
+                            operator,
+                            value: Value::Array(vec![
+                                lower_bounds_clause.value.clone(),
+                                upper_bounds_clause.value.clone(),
+                            ]),
+                        }))
+                    }
                 }
-            }
-        } else if non_groupable_range_clauses.len() == 1 && groupable_range_clauses.is_empty() {
-            let where_clause = *non_groupable_range_clauses.get(0).unwrap();
-            if known_fields.contains(where_clause.field.as_str()) {
-                Err(Error::InvalidQuery(
+            } else if non_groupable_range_clauses.len() == 1 && groupable_range_clauses.is_empty() {
+                let where_clause = *non_groupable_range_clauses.get(0).unwrap();
+                if known_fields.contains(where_clause.field.as_str()) {
+                    Err(Error::Query(QueryError::DuplicateNonGroupableClauseSameField(
                     "a non groupable range clause has same field as an equality or in clause",
-                ))
+                )))
+                } else {
+                    Ok(Some(where_clause.clone()))
+                }
+            } else if groupable_range_clauses.is_empty() {
+                Err(Error::Query(QueryError::MultipleRangeClauses(
+                    "there can not be more than 1 non groupable range clause",
+                )))
             } else {
-                Ok(Some(where_clause.clone()))
-            }
-        } else if groupable_range_clauses.is_empty() {
-            Err(Error::InvalidQuery(
-                "there can not be more than 1 non groupable range clause",
-            ))
-        } else {
-            Err(Error::InvalidQuery("clauses are not groupable"))
-        }?;
+                Err(Error::Query(QueryError::RangeClausesNotGroupable(
+                    "clauses are not groupable",
+                )))
+            }?;
 
         Ok((equal_clauses, range_clause, in_clause))
     }
@@ -394,14 +428,14 @@ impl<'a> WhereClause {
             _ => None,
         }
         .ok_or({
-            Error::InvalidQuery(
+            Error::Query(QueryError::InvalidBetweenClause(
                 "when using between operator you must provide a tuple array of values",
-            )
+            ))
         })?;
         if in_values.len() != 2 {
-            return Err(Error::InvalidQuery(
+            return Err(Error::Query(QueryError::InvalidBetweenClause(
                 "when using between operator you must provide an array of exactly two values",
-            ));
+            )));
         }
         let left_key = document_type
             .serialize_value_for_key(self.field.as_str(), in_values.get(0).unwrap())?;
@@ -454,9 +488,9 @@ impl<'a> WhereClause {
             In => {
                 let in_values = match &self.value {
                     Value::Array(array) => Ok(array),
-                    _ => Err(Error::InvalidQuery(
+                    _ => Err(Error::Query(QueryError::InvalidInClause(
                         "when using in operator you must provide an array of values",
-                    )),
+                    ))),
                 }?;
                 match starts_at_key_option {
                     None => {
@@ -716,7 +750,9 @@ impl<'a> WhereClause {
                     document_type.serialize_value_for_key(self.field.as_str(), &self.value)?;
                 let mut right_key = left_key.clone();
                 let last_char = right_key.last_mut().ok_or({
-                    Error::InvalidQuery("starts with must have at least one character")
+                    Error::Query(QueryError::InvalidStartsWithClause(
+                        "starts with must have at least one character",
+                    ))
                 })?;
                 *last_char += 1;
                 match starts_at_key_option {
@@ -763,30 +799,32 @@ impl<'a> WhereClause {
                 negated,
             } => {
                 if *negated {
-                    return Err(Error::InvalidQuery(
+                    return Err(Error::Query(QueryError::Unsupported(
                         "Invalid query: negated in clause not supported",
-                    ));
+                    )));
                 }
 
                 let field_name = if let ast::Expr::Identifier(ident) = &**expr {
                     ident.value.clone()
                 } else {
-                    return Err(Error::InvalidQuery(
+                    return Err(Error::Query(QueryError::InvalidInClause(
                         "Invalid query: in clause should start with an identifier",
-                    ));
+                    )));
                 };
 
                 let mut in_values: Vec<Value> = Vec::new();
                 for value in list {
                     if let ast::Expr::Value(sql_value) = value {
                         let cbor_val = sql_value_to_cbor(sql_value.clone()).ok_or({
-                            Error::InvalidQuery("Invalid query: unexpected value type")
+                            Error::Query(QueryError::InvalidSQL(
+                                "Invalid query: unexpected value type",
+                            ))
                         })?;
                         in_values.push(cbor_val);
                     } else {
-                        return Err(Error::InvalidQuery(
+                        return Err(Error::Query(QueryError::InvalidSQL(
                             "Invalid query: expected a list of sql values",
-                        ));
+                        )));
                     }
                 }
 
@@ -804,7 +842,7 @@ impl<'a> WhereClause {
                     Self::build_where_clauses_from_operations(&*right, where_clauses)?;
                 } else {
                     let mut where_operator = WhereOperator::from_sql_operator(op.clone())
-                        .ok_or(Error::InvalidQuery("Unknown operator"))?;
+                        .ok_or(Error::Query(QueryError::Unsupported("Unknown operator")))?;
 
                     let identifier;
                     let value_expr;
@@ -821,9 +859,9 @@ impl<'a> WhereClause {
                         value_expr = &**left;
                         where_operator = where_operator.flip()?;
                     } else {
-                        return Err(Error::InvalidQuery(
+                        return Err(Error::Query(QueryError::InvalidSQL(
                             "Invalid query: where clause should have field name and value",
-                        ));
+                        )));
                     }
 
                     let field_name = if let ast::Expr::Identifier(ident) = identifier {
@@ -834,12 +872,16 @@ impl<'a> WhereClause {
 
                     let value = if let ast::Expr::Value(value) = value_expr {
                         let cbor_val = sql_value_to_cbor(value.clone()).ok_or({
-                            Error::InvalidQuery("Invalid query: unexpected value type")
+                            Error::Query(QueryError::InvalidSQL(
+                                "Invalid query: unexpected value type",
+                            ))
                         })?;
                         if where_operator == StartsWith {
                             // make sure the value is of the right format i.e prefix%
                             let inner_text = cbor_val.as_text().ok_or({
-                                Error::InvalidQuery("Invalid query: startsWith takes text")
+                                Error::Query(QueryError::InvalidStartsWithClause(
+                                    "Invalid query: startsWith takes text",
+                                ))
                             })?;
                             let match_locations: Vec<_> = inner_text.match_indices('%').collect();
                             if match_locations.len() == 1
@@ -847,9 +889,9 @@ impl<'a> WhereClause {
                             {
                                 Value::Text(String::from(&inner_text[..(inner_text.len() - 1)]))
                             } else {
-                                return Err(Error::InvalidQuery(
+                                return Err(Error::Query(QueryError::Unsupported(
                                     "Invalid query: like can only be used to represent startswith",
-                                ));
+                                )));
                             }
                         } else {
                             cbor_val
@@ -866,9 +908,9 @@ impl<'a> WhereClause {
                 }
                 Ok(())
             }
-            _ => Err(Error::InvalidQuery(
+            _ => Err(Error::Query(QueryError::InvalidSQL(
                 "Issue parsing sql: invalid selection format",
-            )),
+            ))),
         }
     }
 }
