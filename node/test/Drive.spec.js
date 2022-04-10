@@ -14,12 +14,14 @@ const TEST_DATA_PATH = './test_data';
 describe('Drive', () => {
   let drive;
   let dataContract;
+  let blockTime;
   let documents;
 
   beforeEach(() => {
     drive = new Drive(TEST_DATA_PATH);
 
     dataContract = getDataContractFixture();
+    blockTime = new Date();
     documents = getDocumentsFixture(dataContract);
   });
 
@@ -44,13 +46,13 @@ describe('Drive', () => {
     });
 
     it('should create contract if not exists', async () => {
-      const result = await drive.applyContract(dataContract);
-
-      expect(result).to.equals(0);
+      const result = await drive.applyContract(dataContract, blockTime);
+      blockTime.setSeconds(blockTime.getSeconds() + 10);
+      expect(result).to.have.deep.members([12345000, 24690]);
     });
 
     it('should update existing contract', async () => {
-      await drive.applyContract(dataContract);
+      await drive.applyContract(dataContract, blockTime);
 
       dataContract.setDocumentSchema('newDocumentType', {
         type: 'object',
@@ -61,10 +63,10 @@ describe('Drive', () => {
         },
         additionalProperties: false,
       });
+      blockTime.setSeconds(blockTime.getSeconds() + 10);
+      const result = await drive.applyContract(dataContract, blockTime);
 
-      const result = await drive.applyContract(dataContract);
-
-      expect(result).to.equals(0);
+      expect(result).to.have.deep.members([11455000, 53010]);
     });
   });
 
@@ -72,16 +74,16 @@ describe('Drive', () => {
     beforeEach(async () => {
       await drive.createRootTree();
 
-      await drive.applyContract(dataContract);
+      await drive.applyContract(dataContract, blockTime);
     });
 
     context('without indices', () => {
       it('should create a document', async () => {
         const documentWithoutIndices = documents[0];
 
-        const result = await drive.createDocument(documentWithoutIndices);
+        const result = await drive.createDocument(documentWithoutIndices, blockTime);
 
-        expect(result).to.equals(0);
+        expect(result).to.have.deep.members([1145000, 2290]);
       });
     });
 
@@ -89,9 +91,9 @@ describe('Drive', () => {
       it('should create a document', async () => {
         const documentWithIndices = documents[3];
 
-        const result = await drive.createDocument(documentWithIndices);
+        const result = await drive.createDocument(documentWithIndices, blockTime);
 
-        expect(result).to.equals(0);
+        expect(result).to.have.deep.members([5015000, 25060]);
       });
     });
   });
@@ -100,7 +102,7 @@ describe('Drive', () => {
     beforeEach(async () => {
       await drive.createRootTree();
 
-      await drive.applyContract(dataContract);
+      await drive.applyContract(dataContract, blockTime);
     });
 
     context('without indices', () => {
@@ -108,14 +110,14 @@ describe('Drive', () => {
         // Create a document
         const documentWithoutIndices = documents[0];
 
-        await drive.createDocument(documentWithoutIndices);
+        await drive.createDocument(documentWithoutIndices, blockTime);
 
         // Update the document
         documentWithoutIndices.set('name', 'Bob');
 
-        const result = await drive.updateDocument(documentWithoutIndices);
+        const result = await drive.updateDocument(documentWithoutIndices, blockTime);
 
-        expect(result).to.equals(0);
+        expect(result).to.have.deep.members([1135000, 5060]);
       });
     });
 
@@ -124,14 +126,14 @@ describe('Drive', () => {
         // Create a document
         const documentWithIndices = documents[3];
 
-        await drive.createDocument(documentWithIndices);
+        await drive.createDocument(documentWithIndices, blockTime);
 
         // Update the document
         documentWithIndices.set('firstName', 'Bob');
 
-        const result = await drive.updateDocument(documentWithIndices);
+        const result = await drive.updateDocument(documentWithIndices, blockTime);
 
-        expect(result).to.equals(0);
+        expect(result).to.have.deep.members([1785000, 9860]);
       });
     });
   });
@@ -140,7 +142,7 @@ describe('Drive', () => {
     beforeEach(async () => {
       await drive.createRootTree();
 
-      await drive.applyContract(dataContract);
+      await drive.applyContract(dataContract, blockTime);
     });
 
     context('without indices', () => {
@@ -148,7 +150,7 @@ describe('Drive', () => {
         // Create a document
         const documentWithoutIndices = documents[3];
 
-        await drive.createDocument(documentWithoutIndices);
+        await drive.createDocument(documentWithoutIndices, blockTime);
 
         const result = await drive.deleteDocument(
           dataContract,
@@ -156,7 +158,7 @@ describe('Drive', () => {
           documentWithoutIndices.getId(),
         );
 
-        expect(result).to.equals(0);
+        expect(result).to.have.deep.members([0, 3280]);
       });
     });
 
@@ -165,7 +167,7 @@ describe('Drive', () => {
         // Create a document
         const documentWithIndices = documents[3];
 
-        await drive.createDocument(documentWithIndices);
+        await drive.createDocument(documentWithIndices, blockTime);
 
         const result = await drive.deleteDocument(
           dataContract,
@@ -173,7 +175,7 @@ describe('Drive', () => {
           documentWithIndices.getId(),
         );
 
-        expect(result).to.equals(0);
+        expect(result).to.have.deep.members([0, 3280]);
       });
     });
   });
@@ -182,15 +184,28 @@ describe('Drive', () => {
     beforeEach(async () => {
       await drive.createRootTree();
 
-      await drive.applyContract(dataContract);
+      await drive.applyContract(dataContract, blockTime);
     });
 
     it('should query existing documents', async () => {
       // Create documents
       await Promise.all(
-        documents.map((document) => drive.createDocument(document)),
+        documents.map((document) => drive.createDocument(document, blockTime)),
       );
+      const fetchedDocuments = await drive.queryDocuments(dataContract, 'indexedDocument', {
+        where: [['lastName', '==', 'Kennedy']],
+      });
 
+      expect(fetchedDocuments).to.have.lengthOf(1);
+      expect(fetchedDocuments[0]).to.be.an.instanceOf(Document);
+      expect(fetchedDocuments[0].toObject()).to.deep.equal(documents[4].toObject());
+    });
+
+    it('should query existing documents again', async () => {
+      // Create documents
+      await Promise.all(
+        documents.map((document) => drive.createDocument(document, blockTime)),
+      );
       const fetchedDocuments = await drive.queryDocuments(dataContract, 'indexedDocument', {
         where: [['lastName', '==', 'Kennedy']],
       });
@@ -281,7 +296,7 @@ describe('Drive', () => {
 
         expect.fail('Expected to throw en error');
       } catch (e) {
-        expect(e.message).to.be.equal('invalid path key: key not found in Merk: 746573745f6b6579');
+        expect(e.message).to.be.equal('path key not found: key not found in Merk: 746573745f6b6579');
       }
     });
 
@@ -344,7 +359,7 @@ describe('Drive', () => {
 
           expect.fail('Expected to throw an error');
         } catch (e) {
-          expect(e.message).to.be.equal('invalid path key: key not found in Merk: 746573745f6b6579');
+          expect(e.message).to.be.equal('path key not found: key not found in Merk: 746573745f6b6579');
         }
       });
     });
@@ -374,7 +389,7 @@ describe('Drive', () => {
 
           expect.fail('Expected to throw an error');
         } catch (e) {
-          expect(e.message).to.be.equal('invalid path key: key not found in Merk: 746573745f6b6579');
+          expect(e.message).to.be.equal('path key not found: key not found in Merk: 746573745f6b6579');
         }
 
         await groveDb.commitTransaction();
@@ -413,7 +428,7 @@ describe('Drive', () => {
 
           expect.fail('Expected to throw an error');
         } catch (e) {
-          expect(e.message).to.be.equal('invalid path key: key not found in Merk: 746573745f6b6579');
+          expect(e.message).to.be.equal('path key not found: key not found in Merk: 746573745f6b6579');
         }
       });
     });
@@ -475,7 +490,7 @@ describe('Drive', () => {
 
           expect.fail('Expected to throw an error');
         } catch (e) {
-          expect(e.message).to.be.equal('invalid path key: key not found in Merk: 746573745f6b6579');
+          expect(e.message).to.be.equal('path key not found: key not found in Merk: 746573745f6b6579');
         }
       });
     });

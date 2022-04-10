@@ -2,6 +2,7 @@
   "$id":"94zNLp7A1ZcYG3Egqf2YmQk4DQr9P8D543GwXyCJRz4",
   "documents":{
     "person":{
+      "documentsKeepHistory": true,
       "indices":[
         {
           "properties":[
@@ -31,6 +32,46 @@
             },
             {
               "age":"asc"
+            }
+          ]
+        },
+        {
+          "properties":[
+            {
+              "firstName":"asc"
+            },
+            {
+              "age":"asc"
+            },
+            {
+              "message":"asc"
+            }
+          ]
+        },
+        {
+          "properties":[
+            {
+              "message":"asc"
+            }
+          ]
+        },
+        {
+          "properties":[
+            {
+              "message":"asc"
+            },
+            {
+              "age":"asc"
+            }
+          ]
+        },
+        {
+          "properties":[
+            {
+              "age":"asc"
+            },
+            {
+              "message":"asc"
             }
           ]
         },
@@ -96,6 +137,10 @@
         "lastName":{
           "type":"string",
           "maxLength":50
+        },
+        "message":{
+          "type":"string",
+          "maxLength":128
         }
       },
       "required":[
