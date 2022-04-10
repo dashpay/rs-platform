@@ -9,7 +9,8 @@ use crate::fee::calculate_fee;
 use crate::fee::op::{BaseOp, DeleteOperation, InsertOperation, QueryOperation};
 use crate::query::DriveQuery;
 use defaults::{CONTRACT_DOCUMENTS_PATH_HEIGHT, DEFAULT_HASH_SIZE};
-use grovedb::{Element, Error as GroveError, GroveDb, TransactionArg};
+use grovedb::{Element, GroveDb, TransactionArg};
+use moka::sync::Cache;
 use object_size_info::DocumentInfo::{DocumentAndSerialization, DocumentSize};
 use object_size_info::KeyElementInfo::{KeyElement, KeyElementSize};
 use object_size_info::KeyInfo::{Key, KeyRef, KeySize};
@@ -22,14 +23,14 @@ use object_size_info::{
     DocumentAndContractInfo, DocumentInfo, KeyElementInfo, KeyInfo, KeyValueInfo, PathInfo,
     PathKeyElementInfo, PathKeyInfo,
 };
-use std::cell::Cell;
-use std::collections::HashMap;
+use std::borrow::BorrowMut;
+use std::cell::RefCell;
 use std::path::Path;
-use std::rc::Rc;
+use std::sync::Arc;
 
 pub struct Drive {
     pub grove: GroveDb,
-    pub cached_contracts: Cell<HashMap<[u8; 32], Rc<Contract>>>,
+    pub cached_contracts: RefCell<Cache<[u8; 32], Arc<Contract>>>, //HashMap<[u8; 32], Rc<Contract>>>,
 }
 
 #[repr(u8)]
@@ -176,7 +177,7 @@ impl Drive {
         match GroveDb::open(path) {
             Ok(grove) => Ok(Drive {
                 grove,
-                cached_contracts: Cell::new(HashMap::new()),
+                cached_contracts: RefCell::new(Cache::new(200)),
             }),
             Err(e) => Err(Error::GroveDB(e)),
         }
@@ -708,16 +709,12 @@ impl Drive {
         &self,
         contract_id: [u8; 32],
         transaction: TransactionArg,
-    ) -> Result<Option<Rc<Contract>>, Error> {
-        let cached_contracts = self.cached_contracts.take();
-        match cached_contracts.get(contract_id.as_slice()) {
-            None => {
-                self.cached_contracts.replace(cached_contracts);
-                self.fetch_contract(contract_id, transaction)
-            }
+    ) -> Result<Option<Arc<Contract>>, Error> {
+        let cached_contracts = self.cached_contracts.borrow();
+        match cached_contracts.get(&contract_id) {
+            None => self.fetch_contract(contract_id, transaction),
             Some(contract) => {
-                let contract_ref = Rc::clone(contract);
-                self.cached_contracts.replace(cached_contracts);
+                let contract_ref = Arc::clone(&contract);
                 Ok(Some(contract_ref))
             }
         }
@@ -726,16 +723,12 @@ impl Drive {
     pub fn get_cached_contract(
         &self,
         contract_id: [u8; 32],
-    ) -> Result<Option<Rc<Contract>>, Error> {
-        let cached_contracts = self.cached_contracts.take();
-        match cached_contracts.get(contract_id.as_slice()) {
-            None => {
-                self.cached_contracts.replace(cached_contracts);
-                Ok(None)
-            }
+    ) -> Result<Option<Arc<Contract>>, Error> {
+        let cached_contracts = self.cached_contracts.borrow();
+        match cached_contracts.get(&contract_id) {
+            None => Ok(None),
             Some(contract) => {
-                let contract_ref = Rc::clone(contract);
-                self.cached_contracts.replace(cached_contracts);
+                let contract_ref = Arc::clone(&contract);
                 Ok(Some(contract_ref))
             }
         }
@@ -745,16 +738,15 @@ impl Drive {
         &self,
         contract_id: [u8; 32],
         transaction: TransactionArg,
-    ) -> Result<Option<Rc<Contract>>, Error> {
+    ) -> Result<Option<Arc<Contract>>, Error> {
         let stored_element = self
             .grove
             .get(contract_root_path(&contract_id), &[0], transaction)?;
         if let Element::Item(stored_contract_bytes) = stored_element {
-            let contract = Rc::new(Contract::from_cbor(&stored_contract_bytes, None)?);
-            let mut cached_contracts = self.cached_contracts.take();
-            cached_contracts.insert(contract_id, Rc::clone(&contract));
-            self.cached_contracts.replace(cached_contracts);
-            Ok(Some(Rc::clone(&contract)))
+            let contract = Arc::new(Contract::from_cbor(&stored_contract_bytes, None)?);
+            let mut cached_contracts = self.cached_contracts.borrow();
+            cached_contracts.insert(contract_id, Arc::clone(&contract));
+            Ok(Some(Arc::clone(&contract)))
         } else {
             Err(Error::Drive(DriveError::CorruptedContractPath(
                 "contract path did not refer to a contract element",

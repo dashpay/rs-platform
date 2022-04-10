@@ -15,6 +15,7 @@ use std::fs::File;
 use std::io::{self, BufRead};
 use std::option::Option::None;
 use std::rc::Rc;
+use std::sync::Arc;
 use tempfile::TempDir;
 
 #[derive(Serialize, Deserialize)]
@@ -1865,7 +1866,7 @@ fn test_query_with_cached_contract() {
         .get_cached_contract(contract.id)
         .expect("expected to be able to get contract")
         .expect("expected a reference counter to the contract");
-    assert_eq!(Rc::strong_count(&contract_ref), 2);
+    assert_eq!(Arc::strong_count(&contract_ref), 2);
 }
 
 #[test]
