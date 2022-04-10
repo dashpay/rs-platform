@@ -3,7 +3,9 @@ mod defaults;
 pub mod ordering;
 mod test_index;
 
-use crate::contract::{bytes_for_system_value, Contract, Document, DocumentType, Index, IndexProperty};
+use crate::contract::{
+    bytes_for_system_value, Contract, Document, DocumentType, Index, IndexProperty,
+};
 use crate::drive::object_size_info::{KeyInfo, KeyValueInfo};
 use crate::drive::Drive;
 use crate::error::drive::DriveError;
@@ -918,10 +920,10 @@ impl<'a> DriveQuery<'a> {
 
 #[cfg(test)]
 mod tests {
-    use ciborium::value::{Integer, Value};
     use crate::common;
     use crate::contract::{Contract, DocumentType, Index, IndexProperty};
     use crate::query::{DriveQuery, WhereClause, WhereOperator};
+    use ciborium::value::{Integer, Value};
     use serde_json::json;
 
     #[test]

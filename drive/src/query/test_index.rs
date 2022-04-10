@@ -2,30 +2,62 @@
 mod tests {
     use crate::common;
     use crate::contract::{Contract, DocumentType, Index, IndexProperty};
+    use crate::error::{query::QueryError, Error};
     use crate::query::DriveQuery;
-    use crate::error::{Error, query::QueryError};
     use serde_json::json;
 
     fn construct_indexed_document_type() -> DocumentType {
-        DocumentType{
+        DocumentType {
             name: "a".to_string(),
-            indices: vec![Index{
-                properties: vec![IndexProperty{ name: "a".to_string(), ascending: true }],
-                unique: false
-            },Index{
-                properties: vec![IndexProperty{ name: "b".to_string(), ascending: false }],
-                unique: false
-            },Index{
-                properties: vec![IndexProperty{ name: "b".to_string(), ascending: false }, IndexProperty{ name: "a".to_string(), ascending: false }],
-                unique: false
-            },Index{
-                properties: vec![IndexProperty{ name: "b".to_string(), ascending: false }, IndexProperty{ name: "a".to_string(), ascending: false },IndexProperty{ name: "d".to_string(), ascending: false }],
-                unique: false
-            },
+            indices: vec![
+                Index {
+                    properties: vec![IndexProperty {
+                        name: "a".to_string(),
+                        ascending: true,
+                    }],
+                    unique: false,
+                },
+                Index {
+                    properties: vec![IndexProperty {
+                        name: "b".to_string(),
+                        ascending: false,
+                    }],
+                    unique: false,
+                },
+                Index {
+                    properties: vec![
+                        IndexProperty {
+                            name: "b".to_string(),
+                            ascending: false,
+                        },
+                        IndexProperty {
+                            name: "a".to_string(),
+                            ascending: false,
+                        },
+                    ],
+                    unique: false,
+                },
+                Index {
+                    properties: vec![
+                        IndexProperty {
+                            name: "b".to_string(),
+                            ascending: false,
+                        },
+                        IndexProperty {
+                            name: "a".to_string(),
+                            ascending: false,
+                        },
+                        IndexProperty {
+                            name: "d".to_string(),
+                            ascending: false,
+                        },
+                    ],
+                    unique: false,
+                },
             ],
             properties: Default::default(),
             documents_keep_history: false,
-            documents_mutable: false
+            documents_mutable: false,
         }
     }
 
@@ -71,7 +103,9 @@ mod tests {
         let where_cbor = common::value_to_cbor(query_value, None);
         let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &document_type)
             .expect("query should be valid");
-        let error = query.find_best_index().expect_err("expected to not find index");
+        let error = query
+            .find_best_index()
+            .expect_err("expected to not find index");
         assert!(
             matches!(error, Error::Query(QueryError::WhereClauseOnNonIndexedProperty(message)) if message == "query must be for valid indexes")
         )
