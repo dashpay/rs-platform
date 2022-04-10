@@ -204,7 +204,7 @@ describe('Drive', () => {
     it('should query existing documents again', async () => {
       // Create documents
       await Promise.all(
-          documents.map((document) => drive.createDocument(document, blockTime)),
+        documents.map((document) => drive.createDocument(document, blockTime)),
       );
       const fetchedDocuments = await drive.queryDocuments(dataContract, 'indexedDocument', {
         where: [['lastName', '==', 'Kennedy']],

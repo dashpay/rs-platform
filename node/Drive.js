@@ -159,7 +159,7 @@ class Drive {
     const [encodedDocuments] = await driveQueryDocumentsAsync.call(
       this.drive,
       encodedQuery,
-      dataContract['id'].toBuffer(),
+      dataContract.id.toBuffer(),
       documentType,
       useTransaction,
     );
