@@ -517,6 +517,63 @@ impl DriveWrapper {
         Ok(cx.undefined())
     }
 
+    fn js_insert_identity_cbor(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+        let js_identity_id = cx.argument::<JsBuffer>(0)?;
+        let js_identity_cbor = cx.argument::<JsBuffer>(1)?;
+        let js_using_transaction = cx.argument::<JsBoolean>(2)?;
+        let js_callback = cx.argument::<JsFunction>(3)?.root(&mut cx);
+
+        let drive = cx
+            .this()
+            .downcast_or_throw::<JsBox<DriveWrapper>, _>(&mut cx)?;
+
+        let identity_id = converter::js_buffer_to_vec_u8(js_identity_id, &mut cx);
+        let identity_cbor = converter::js_buffer_to_vec_u8(js_identity_cbor, &mut cx);
+        let using_transaction = js_using_transaction.value(&mut cx);
+
+        drive
+            .send_to_drive_thread(move |drive: &Drive, transaction, channel| {
+                let result = drive.insert_identity_cbor(
+                    Some(&identity_id),
+                    identity_cbor,
+                    using_transaction.then(|| transaction).flatten(),
+                );
+
+                channel.send(move |mut task_context| {
+                    let callback = js_callback.into_inner(&mut task_context);
+                    let this = task_context.undefined();
+
+                    let callback_arguments: Vec<Handle<JsValue>> = match result {
+                        Ok((storage_fee, processing_fee)) => {
+                            let js_array: Handle<JsArray> = task_context.empty_array();
+
+                            let storage_fee_value =
+                                task_context.number(storage_fee as f64).upcast::<JsValue>();
+                            let processing_fee_value = task_context
+                                .number(processing_fee as f64)
+                                .upcast::<JsValue>();
+
+                            js_array.set(&mut task_context, 0, storage_fee_value)?;
+                            js_array.set(&mut task_context, 1, processing_fee_value)?;
+
+                            // First parameter of JS callbacks is error, which is null in this case
+                            vec![task_context.null().upcast(), js_array.upcast()]
+                        }
+
+                        // Convert the error to a JavaScript exception on failure
+                        Err(err) => vec![task_context.error(err.to_string())?.upcast()],
+                    };
+
+                    callback.call(&mut task_context, this, callback_arguments)?;
+
+                    Ok(())
+                });
+            })
+            .or_else(|err| cx.throw_error(err.to_string()))?;
+
+        Ok(cx.undefined())
+    }
+
     fn js_create_and_execute_query(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         let js_query_cbor = cx.argument::<JsBuffer>(0)?;
         let js_contract_id = cx.argument::<JsBuffer>(1)?;
@@ -1212,11 +1269,11 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
         "driveDeleteDocument",
         DriveWrapper::js_delete_document_for_contract_cbor,
     )?;
+    cx.export_function("driveInsertIdentity", DriveWrapper::js_insert_identity_cbor)?;
     cx.export_function(
         "driveQueryDocuments",
         DriveWrapper::js_create_and_execute_query,
     )?;
-
     cx.export_function("groveDbInsert", DriveWrapper::js_grove_db_insert)?;
     cx.export_function(
         "groveDbInsertIfNotExists",

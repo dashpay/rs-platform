@@ -1,6 +1,7 @@
 use crate::drive::object_size_info::PathKeyElementInfo::PathFixedSizeKeyElement;
 use crate::drive::{Drive, RootTree};
 use crate::error::Error;
+use crate::fee::calculate_fee;
 use crate::fee::op::InsertOperation;
 use crate::identity::Identity;
 use grovedb::{Element, TransactionArg};
@@ -11,7 +12,7 @@ impl Drive {
         identity_key: &[u8],
         identity_bytes: Element,
         transaction: TransactionArg,
-    ) -> Result<u64, Error> {
+    ) -> Result<(i64, u64), Error> {
         let mut insert_operations: Vec<InsertOperation> = vec![];
         self.grove_insert(
             PathFixedSizeKeyElement((
@@ -22,7 +23,7 @@ impl Drive {
             transaction,
             &mut insert_operations,
         )?;
-        Ok(1)
+        calculate_fee(None, None, Some(insert_operations), None)
     }
 
     pub fn insert_identity_cbor(
@@ -30,7 +31,7 @@ impl Drive {
         identity_id: Option<&[u8]>,
         identity_bytes: Vec<u8>,
         transaction: TransactionArg,
-    ) -> Result<u64, Error> {
+    ) -> Result<(i64, u64), Error> {
         let identity_id = match identity_id {
             None => {
                 let identity = Identity::from_cbor(identity_bytes.as_slice())?;

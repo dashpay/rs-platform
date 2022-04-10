@@ -6,6 +6,7 @@ const Document = require('@dashevo/dpp/lib/document/Document');
 
 const getDataContractFixture = require('@dashevo/dpp/lib/test/fixtures/getDataContractFixture');
 const getDocumentsFixture = require('@dashevo/dpp/lib/test/fixtures/getDocumentsFixture');
+const getIdentityFixture = require('@dashevo/dpp/lib/test/fixtures/getIdentityFixture');
 
 const Drive = require('../Drive');
 
@@ -14,6 +15,7 @@ const TEST_DATA_PATH = './test_data';
 describe('Drive', () => {
   let drive;
   let dataContract;
+  let identity;
   let blockTime;
   let documents;
 
@@ -21,6 +23,7 @@ describe('Drive', () => {
     drive = new Drive(TEST_DATA_PATH);
 
     dataContract = getDataContractFixture();
+    identity = getIdentityFixture();
     blockTime = new Date();
     documents = getDocumentsFixture(dataContract);
   });
@@ -221,6 +224,17 @@ describe('Drive', () => {
       });
 
       expect(fetchedDocuments).to.have.lengthOf(0);
+    });
+  });
+
+  describe('#insertIdentities', () => {
+    beforeEach(async () => {
+      await drive.createRootTree();
+    });
+    it('should create identity if not exists', async () => {
+      const result = await drive.insertIdentity(identity);
+      blockTime.setSeconds(blockTime.getSeconds() + 10);
+      expect(result).to.have.deep.members([1375000, 2750]);
     });
   });
 

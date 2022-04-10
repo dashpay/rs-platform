@@ -1,10 +1,12 @@
 use contract::ContractError;
 use drive::DriveError;
+use fee::FeeError;
 use identity::IdentityError;
 use query::QueryError;
 use structure::StructureError;
 pub mod contract;
 pub mod drive;
+pub mod fee;
 pub mod identity;
 pub mod query;
 pub mod structure;
@@ -23,4 +25,6 @@ pub enum Error {
     Identity(#[from] IdentityError),
     #[error(transparent)]
     Structure(#[from] StructureError),
+    #[error(transparent)]
+    Fee(#[from] FeeError),
 }
