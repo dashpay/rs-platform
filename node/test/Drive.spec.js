@@ -227,7 +227,7 @@ describe('Drive', () => {
     });
   });
 
-  describe('#insertIdentities', () => {
+  describe('#insertIdentity', () => {
     beforeEach(async () => {
       await drive.createRootTree();
     });
