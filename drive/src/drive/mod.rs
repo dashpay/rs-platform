@@ -244,7 +244,7 @@ impl Drive {
                 insert_operations.push(InsertOperation::for_empty_tree(key.len()));
                 self.grove
                     .insert(path, key, Element::empty_tree(), transaction)
-                    .map_err(|e| Error::GroveDB(e))
+                    .map_err(Error::GroveDB)
             }
             KeyInfo::KeySize(key_max_length) => {
                 insert_operations.push(InsertOperation::for_empty_tree(key_max_length));
@@ -343,7 +343,7 @@ impl Drive {
                 insert_operations.push(InsertOperation::for_key_value(key.len(), &element));
                 self.grove
                     .insert(path, key, element, transaction)
-                    .map_err(|e| Error::GroveDB(e))
+                    .map_err(Error::GroveDB)
             }
             PathKeyElementSize((_path_max_length, key_max_length, element_max_size)) => {
                 insert_operations.push(InsertOperation::for_key_value_size(
@@ -356,7 +356,7 @@ impl Drive {
                 insert_operations.push(InsertOperation::for_key_value(key.len(), &element));
                 self.grove
                     .insert(path, key, element, transaction)
-                    .map_err(|e| Error::GroveDB(e))
+                    .map_err(Error::GroveDB)
             }
         }
     }
@@ -1105,7 +1105,7 @@ impl Drive {
                 .iter()
                 .map(|&x| Vec::from(x))
                 .collect();
-            let top_index_property = index.properties.get(0).ok_or_else(|| {
+            let top_index_property = index.properties.get(0).ok_or({
                 Error::Drive(DriveError::CorruptedContractIndexes(
                     "invalid contract indices",
                 ))
@@ -1150,11 +1150,9 @@ impl Drive {
             // the index path is now something like Contracts/ContractID/Documents(1)/$ownerId/<ownerId>
 
             for i in 1..index.properties.len() {
-                let index_property = index.properties.get(i).ok_or_else(|| {
-                    Error::Drive(DriveError::CorruptedContractIndexes(
-                        "invalid contract indices",
-                    ))
-                })?;
+                let index_property = index.properties.get(i).ok_or(Error::Drive(
+                    DriveError::CorruptedContractIndexes("invalid contract indices"),
+                ))?;
 
                 let index_property_key = KeyRef(index_property.name.as_bytes());
 
@@ -1484,11 +1482,9 @@ impl Drive {
                     .iter()
                     .map(|&x| Vec::from(x))
                     .collect();
-                let top_index_property = index.properties.get(0).ok_or_else(|| {
-                    Error::Drive(DriveError::CorruptedContractIndexes(
-                        "invalid contract indices",
-                    ))
-                })?;
+                let top_index_property = index.properties.get(0).ok_or(Error::Drive(
+                    DriveError::CorruptedContractIndexes("invalid contract indices"),
+                ))?;
                 index_path.push(Vec::from(top_index_property.name.as_bytes()));
 
                 // with the example of the dashpay contract's first index
@@ -1536,11 +1532,9 @@ impl Drive {
                 old_index_path.push(old_document_top_field);
 
                 for i in 1..index.properties.len() {
-                    let index_property = index.properties.get(i).ok_or_else(|| {
-                        Error::Drive(DriveError::CorruptedContractIndexes(
-                            "invalid contract indices",
-                        ))
-                    })?;
+                    let index_property = index.properties.get(i).ok_or(Error::Drive(
+                        DriveError::CorruptedContractIndexes("invalid contract indices"),
+                    ))?;
 
                     let document_index_field = document
                         .get_raw_for_contract(
@@ -1783,11 +1777,9 @@ impl Drive {
                 .iter()
                 .map(|&x| Vec::from(x))
                 .collect();
-            let top_index_property = index.properties.get(0).ok_or_else(|| {
-                Error::Drive(DriveError::CorruptedContractIndexes(
-                    "invalid contract indices",
-                ))
-            })?;
+            let top_index_property = index.properties.get(0).ok_or(Error::Drive(
+                DriveError::CorruptedContractIndexes("invalid contract indices"),
+            ))?;
             index_path.push(Vec::from(top_index_property.name.as_bytes()));
 
             // with the example of the dashpay contract's first index
@@ -1806,11 +1798,9 @@ impl Drive {
             // the index path is now something like Contracts/ContractID/Documents(1)/$ownerId/<ownerId>
 
             for i in 1..index.properties.len() {
-                let index_property = index.properties.get(i).ok_or_else(|| {
-                    Error::Drive(DriveError::CorruptedContractIndexes(
-                        "invalid contract indices",
-                    ))
-                })?;
+                let index_property = index.properties.get(i).ok_or(Error::Drive(
+                    DriveError::CorruptedContractIndexes("invalid contract indices"),
+                ))?;
 
                 index_path.push(Vec::from(index_property.name.as_bytes()));
                 // Iteration 1. the index path is now something like Contracts/ContractID/Documents(1)/$ownerId/<ownerId>/toUserId
@@ -1871,7 +1861,9 @@ impl Drive {
     ) -> Result<(Vec<Vec<u8>>, u16, u64), Error> {
         let contract = self
             .get_contract(contract_id, transaction)?
-            .ok_or_else(|| Error::Query(QueryError::ContractNotFound("contract not found")))?;
+            .ok_or(Error::Query(QueryError::ContractNotFound(
+                "contract not found",
+            )))?;
         let document_type = contract.document_type_for_name(document_type_name)?;
         self.query_documents_from_contract(&contract, document_type, query_cbor, transaction)
     }
@@ -1899,7 +1891,7 @@ impl Drive {
     ) -> Result<(Vec<Vec<u8>>, u16, u64), Error> {
         let query = DriveQuery::from_cbor(query_cbor, contract, document_type)?;
 
-        query.execute_no_proof(&self, transaction)
+        query.execute_no_proof(self, transaction)
     }
 
     pub fn worst_case_fee_for_document_type_with_name(

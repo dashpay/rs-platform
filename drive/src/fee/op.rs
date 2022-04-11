@@ -135,7 +135,7 @@ impl QueryOperation {
         }
     }
 
-    pub fn for_path_query(path_query: &PathQuery, returned_values: &Vec<Vec<u8>>) -> Self {
+    pub fn for_path_query(path_query: &PathQuery, returned_values: &[Vec<u8>]) -> Self {
         QueryOperation {
             key_size: path_query
                 .query

@@ -85,7 +85,7 @@ impl IdentityKey {
         Ok(IdentityKey {
             id,
             key_type,
-            public_key_bytes: Vec::from(public_key_bytes),
+            public_key_bytes,
             purpose,
             security_level,
             readonly,
@@ -109,7 +109,7 @@ impl Identity {
 
         // Get the contract id
         let identity_id: [u8; 32] = bytes_for_system_value_from_tree_map(&identity, "id")?
-            .ok_or_else(|| {
+            .ok_or({
                 Error::Identity(IdentityError::MissingRequiredKey(
                     "unable to get contract id",
                 ))
@@ -137,7 +137,9 @@ impl Identity {
 
         let balance: u64 = identity
             .get("balance")
-            .ok_or({ Error::Identity(IdentityError::MissingRequiredKey("unable to get balance")) })?
+            .ok_or(Error::Identity(IdentityError::MissingRequiredKey(
+                "unable to get balance",
+            )))?
             .as_integer()
             .ok_or({
                 Error::Structure(StructureError::KeyWrongType("balance must be an integer"))
@@ -149,10 +151,10 @@ impl Identity {
                 ))
             })?;
 
-        let keys_cbor_value = identity.get("publicKeys").ok_or_else(|| {
-            Error::Identity(IdentityError::MissingRequiredKey("unable to get keys"))
-        })?;
-        let keys_cbor_value_raw = keys_cbor_value.as_array().ok_or_else(|| {
+        let keys_cbor_value = identity.get("publicKeys").ok_or(Error::Identity(
+            IdentityError::MissingRequiredKey("unable to get keys"),
+        ))?;
+        let keys_cbor_value_raw = keys_cbor_value.as_array().ok_or({
             Error::Identity(IdentityError::InvalidIdentityStructure(
                 "unable to get keys as map",
             ))

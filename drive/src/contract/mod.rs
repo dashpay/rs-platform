@@ -471,8 +471,8 @@ impl DocumentType {
                                 "document reference not found",
                             ))
                         })?;
-                    let type_value = cbor_inner_text_value(inner_properties_map, "type")
-                        .ok_or_else(|| {
+                    let type_value =
+                        cbor_inner_text_value(inner_properties_map, "type").ok_or({
                             Error::Contract(ContractError::InvalidContractStructure(
                                 "cannot find type property on reference",
                             ))
@@ -513,7 +513,7 @@ impl DocumentType {
                 }
                 "object" => {
                     let properties = btree_map_inner_btree_map(&inner_properties, "properties")
-                        .ok_or_else(|| {
+                        .ok_or({
                             Error::Contract(ContractError::InvalidContractStructure(
                                 "object must have properties",
                             ))

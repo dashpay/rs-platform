@@ -463,9 +463,9 @@ impl<'a> DriveQuery<'a> {
                         }
                         _ => e,
                     })?
-                    .ok_or_else(|| {
-                        Error::Drive(DriveError::CorruptedCodeExecution("expected a value"))
-                    })?;
+                    .ok_or(Error::Drive(DriveError::CorruptedCodeExecution(
+                        "expected a value",
+                    )))?;
 
                 if let Element::Item(item) = start_at_document {
                     let document = Document::from_cbor(item.as_slice(), None, None)?;
@@ -905,15 +905,16 @@ impl<'a> DriveQuery<'a> {
                 let (_, processing_fee) = calculate_fee(None, Some(query_operations), None, None)?;
                 Ok((Vec::new(), 0, processing_fee))
             }
-            _ => match query_result? {
-                (data, skipped) => {
+            _ => {
+                let (data, skipped) = query_result?;
+                {
                     let path_query_operations = QueryOperation::for_path_query(&path_query, &data);
                     query_operations.push(path_query_operations);
                     let (_, processing_fee) =
                         calculate_fee(None, Some(query_operations), None, None)?;
                     Ok((data, skipped, processing_fee))
                 }
-            },
+            }
         }
     }
 }
