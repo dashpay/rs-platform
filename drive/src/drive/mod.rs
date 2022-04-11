@@ -7,25 +7,23 @@ use crate::error::drive::DriveError;
 use crate::error::query::QueryError;
 use crate::error::Error;
 use crate::fee::calculate_fee;
-use crate::fee::op::{BaseOp, DeleteOperation, InsertOperation, QueryOperation};
-use crate::identity::Identity;
+use crate::fee::op::{DeleteOperation, InsertOperation, QueryOperation};
 use crate::query::DriveQuery;
 use defaults::{CONTRACT_DOCUMENTS_PATH_HEIGHT, DEFAULT_HASH_SIZE};
 use grovedb::{Element, GroveDb, TransactionArg};
 use moka::sync::Cache;
 use object_size_info::DocumentInfo::{DocumentAndSerialization, DocumentSize};
 use object_size_info::KeyElementInfo::{KeyElement, KeyElementSize};
-use object_size_info::KeyInfo::{Key, KeyRef, KeySize};
+use object_size_info::KeyInfo::{Key, KeyRef};
 use object_size_info::KeyValueInfo::KeyRefRequest;
 use object_size_info::PathKeyElementInfo::{
     PathFixedSizeKeyElement, PathKeyElement, PathKeyElementSize,
 };
-use object_size_info::PathKeyInfo::{PathFixedSizeKeyRef, PathKeyRef, PathKeySize};
+use object_size_info::PathKeyInfo::{PathFixedSizeKeyRef, PathKeySize};
 use object_size_info::{
-    DocumentAndContractInfo, DocumentInfo, KeyElementInfo, KeyInfo, KeyValueInfo, PathInfo,
-    PathKeyElementInfo, PathKeyInfo,
+    DocumentAndContractInfo, DocumentInfo, KeyInfo, KeyValueInfo, PathInfo, PathKeyElementInfo,
+    PathKeyInfo,
 };
-use std::borrow::BorrowMut;
 use std::cell::RefCell;
 use std::path::Path;
 use std::sync::Arc;
@@ -347,7 +345,7 @@ impl Drive {
                     .insert(path, key, element, transaction)
                     .map_err(|e| Error::GroveDB(e))
             }
-            PathKeyElementSize((path_max_length, key_max_length, element_max_size)) => {
+            PathKeyElementSize((_path_max_length, key_max_length, element_max_size)) => {
                 insert_operations.push(InsertOperation::for_key_value_size(
                     key_max_length,
                     element_max_size,
@@ -746,7 +744,7 @@ impl Drive {
             .get(contract_root_path(&contract_id), &[0], transaction)?;
         if let Element::Item(stored_contract_bytes) = stored_element {
             let contract = Arc::new(Contract::from_cbor(&stored_contract_bytes, None)?);
-            let mut cached_contracts = self.cached_contracts.borrow();
+            let cached_contracts = self.cached_contracts.borrow();
             cached_contracts.insert(contract_id, Arc::clone(&contract));
             Ok(Some(Arc::clone(&contract)))
         } else {
@@ -1404,7 +1402,7 @@ impl Drive {
         let document_type = document_and_contract_info.document_type;
         let owner_id = document_and_contract_info.owner_id;
 
-        if let DocumentAndSerialization((document, document_cbor)) =
+        if let DocumentAndSerialization((document, _document_cbor)) =
             document_and_contract_info.document_info
         {
             // we need to construct the path for documents on the contract
@@ -1647,9 +1645,6 @@ impl Drive {
                         )?;
                         index_path.push(vec![0]);
 
-                        let index_path_slices: Vec<&[u8]> =
-                            index_path.iter().map(|x| x.as_slice()).collect();
-
                         // here we should return an error if the element already exists
                         self.grove_insert(
                             PathKeyElement::<0>((
@@ -1661,9 +1656,6 @@ impl Drive {
                             insert_operations,
                         )?;
                     } else {
-                        let index_path_slices: Vec<&[u8]> =
-                            index_path.iter().map(|x| x.as_slice()).collect();
-
                         // here we should return an error if the element already exists
                         let inserted = self.grove_insert_if_not_exists(
                             PathKeyElement::<0>((index_path, &[0], document_reference.clone())),
@@ -3447,7 +3439,7 @@ mod tests {
 
     #[test]
     fn test_create_deep_nested_contract_50() {
-        let (drive, contract, contract_cbor) = setup_deep_nested_contract();
+        let (drive, contract, _contract_cbor) = setup_deep_nested_contract();
 
         let document_type = contract
             .document_type_for_name("nest")
@@ -3480,7 +3472,7 @@ mod tests {
 
     #[test]
     fn test_create_reference_contract() {
-        let (drive, contract, contract_cbor) = setup_reference_contract();
+        let (drive, contract, _contract_cbor) = setup_reference_contract();
 
         let document_type = contract
             .document_type_for_name("note")

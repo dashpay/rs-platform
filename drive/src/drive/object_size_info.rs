@@ -53,7 +53,7 @@ impl<'a, const N: usize> PathInfo<'a, N> {
             PathIterator(path_iterator) => match key_info {
                 Key(key) => path_iterator.push(key),
                 KeyRef(key_ref) => path_iterator.push(key_ref.to_vec()),
-                KeySize(key_size) => {
+                KeySize(_) => {
                     return Err(Error::Drive(DriveError::CorruptedCodeExecution(
                         "can not add a key size to path iterator",
                     )))

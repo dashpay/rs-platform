@@ -14,7 +14,6 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::{self, BufRead};
 use std::option::Option::None;
-use std::rc::Rc;
 use std::sync::Arc;
 use tempfile::TempDir;
 
@@ -1820,19 +1819,6 @@ fn test_query_with_cached_contract() {
             89, 10, 125, 69, 27, 133, 240, 196, 221, 202, 143, 53, 249,
         ]
     );
-
-    let all_names = [
-        "Adey".to_string(),
-        "Briney".to_string(),
-        "Cammi".to_string(),
-        "Celinda".to_string(),
-        "Dalia".to_string(),
-        "Gilligan".to_string(),
-        "Kevina".to_string(),
-        "Meta".to_string(),
-        "Noellyn".to_string(),
-        "Prissie".to_string(),
-    ];
 
     // A query getting all elements by firstName
 

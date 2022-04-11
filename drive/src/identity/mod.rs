@@ -103,7 +103,7 @@ impl Identity {
         }
         // Deserialize the contract
         let identity: BTreeMap<String, Value> = ciborium::de::from_reader(read_identity_cbor)
-            .map_err(|e| {
+            .map_err(|_| {
                 Error::Structure(StructureError::InvalidCBOR("unable to decode identity"))
             })?;
 

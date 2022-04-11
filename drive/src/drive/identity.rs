@@ -58,7 +58,7 @@ mod tests {
     #[test]
     fn test_insert_identity() {
         let tmp_dir = TempDir::new().unwrap();
-        let mut drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
 
         let db_transaction = drive.grove.start_transaction();
 

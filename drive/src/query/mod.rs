@@ -5,7 +5,7 @@ mod test_index;
 
 use crate::common::bytes_for_system_value;
 use crate::contract::{Contract, Document, DocumentType, Index, IndexProperty};
-use crate::drive::object_size_info::{KeyInfo, KeyValueInfo};
+use crate::drive::object_size_info::KeyValueInfo;
 use crate::drive::Drive;
 use crate::error::drive::DriveError;
 use crate::error::query::QueryError;

@@ -1,6 +1,6 @@
 use crate::contract::{Document, DocumentType};
 use crate::error::query::QueryError;
-use crate::error::{drive::DriveError, Error};
+use crate::error::Error;
 use ciborium::value::{Integer, Value};
 use grovedb::Query;
 use sqlparser::ast;

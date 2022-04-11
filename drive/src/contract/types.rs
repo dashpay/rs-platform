@@ -2,7 +2,7 @@ use crate::error::contract::ContractError;
 use crate::error::Error;
 use byteorder::{BigEndian, WriteBytesExt};
 use ciborium::value::{Integer, Value};
-use rand::distributions::{Alphanumeric, Standard, Uniform};
+use rand::distributions::{Alphanumeric, Standard};
 use rand::rngs::StdRng;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
