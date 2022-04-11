@@ -10,6 +10,7 @@ use crate::identifier::IdentifierWrapper;
 use crate::IdentityPublicKeyWasm;
 use crate::MetadataWasm;
 use dpp::identity::IdentityFacade;
+use dpp::NonConsensusError;
 use dpp::validation::ValidationResult;
 use dpp::version::ProtocolVersionValidator;
 
@@ -56,12 +57,22 @@ impl IdentityFacadeWasm {
     }
 
     #[wasm_bindgen()]
-    pub fn validate(&self, raw_identity_object: JsValue) -> ValidationResultWasm {
+    pub fn validate(&self, raw_identity_object: JsValue) -> Result<ValidationResultWasm, NonConsensusErrorWasm> {
         // TODO: handle the case when
         self.0
             .validate(
                 JsValue::into_serde(&raw_identity_object).expect("unable to serialize identity"),
             )
-            .into()
+            .map(|res| res.into())
+            .map_err(|err| err.into())
+    }
+}
+
+#[wasm_bindgen(js_name=Keks)]
+pub struct NonConsensusErrorWasm(NonConsensusError);
+
+impl From<NonConsensusError> for NonConsensusErrorWasm {
+    fn from(err: NonConsensusError) -> Self {
+        Self(err)
     }
 }
