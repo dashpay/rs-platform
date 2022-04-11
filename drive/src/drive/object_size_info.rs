@@ -345,12 +345,11 @@ impl<'a> DocumentInfo<'a> {
             DocumentInfo::DocumentSize(_) => match key_path {
                 "$ownerId" | "$id" => Ok(Some(KeySize(DEFAULT_HASH_SIZE))),
                 _ => {
-                    let document_field_type =
-                        document_type.properties.get(key_path).ok_or({
-                            Error::Contract(ContractError::DocumentTypeFieldNotFound(
-                                "incorrect key path for document type",
-                            ))
-                        })?;
+                    let document_field_type = document_type.properties.get(key_path).ok_or({
+                        Error::Contract(ContractError::DocumentTypeFieldNotFound(
+                            "incorrect key path for document type",
+                        ))
+                    })?;
                     let max_size = document_field_type.max_byte_size().ok_or({
                         Error::Drive(DriveError::CorruptedCodeExecution(
                             "document type must have a max size",
