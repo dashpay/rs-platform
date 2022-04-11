@@ -121,11 +121,11 @@ impl Identity {
 
         let revision: u64 = identity
             .get("revision")
-            .ok_or_else(|| {
+            .ok_or({
                 Error::Identity(IdentityError::MissingRequiredKey("unable to get revision"))
             })?
             .as_integer()
-            .ok_or_else(|| {
+            .ok_or({
                 Error::Structure(StructureError::KeyWrongType("revision must be an integer"))
             })?
             .try_into()
@@ -137,11 +137,11 @@ impl Identity {
 
         let balance: u64 = identity
             .get("balance")
-            .ok_or_else(|| {
+            .ok_or({
                 Error::Identity(IdentityError::MissingRequiredKey("unable to get balance"))
             })?
             .as_integer()
-            .ok_or_else(|| {
+            .ok_or({
                 Error::Structure(StructureError::KeyWrongType("balance must be an integer"))
             })?
             .try_into()
