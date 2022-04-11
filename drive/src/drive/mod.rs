@@ -250,7 +250,7 @@ impl Drive {
                 insert_operations.push(InsertOperation::for_empty_tree(key_max_length));
                 Ok(())
             }
-            KeyInfo::Key(key) => Err(Error::Drive(DriveError::GroveDBInsertion(
+            KeyInfo::Key(_) => Err(Error::Drive(DriveError::GroveDBInsertion(
                 "only a key ref can be inserted into groveDB",
             ))),
         }

@@ -527,6 +527,7 @@ pub fn encode_float(val: f64) -> Result<Vec<u8>, Error> {
     Ok(wtr)
 }
 
+#[cfg(test)]
 mod tests {
     use crate::contract::types::DocumentFieldType;
     use ciborium::value::{Integer, Value};

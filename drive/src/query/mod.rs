@@ -921,9 +921,8 @@ impl<'a> DriveQuery<'a> {
 #[cfg(test)]
 mod tests {
     use crate::common;
-    use crate::contract::{Contract, DocumentType, Index, IndexProperty};
-    use crate::query::{DriveQuery, WhereClause, WhereOperator};
-    use ciborium::value::{Integer, Value};
+    use crate::contract::{Contract, DocumentType};
+    use crate::query::DriveQuery;
     use serde_json::json;
 
     #[test]
