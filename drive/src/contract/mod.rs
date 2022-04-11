@@ -8,7 +8,7 @@ use crate::common::{
     cbor_inner_bool_value_with_default, cbor_inner_btree_map, cbor_inner_text_value,
     cbor_map_to_btree_map, get_key_from_cbor_map,
 };
-use crate::drive::defaults::{DEFAULT_HASH_SIZE, PROTOCOL_VERSION};
+use crate::drive::defaults::PROTOCOL_VERSION;
 use crate::drive::{Drive, RootTree};
 use crate::error::contract::ContractError;
 use crate::error::structure::StructureError;
@@ -171,7 +171,7 @@ impl Contract {
             contract_id
         } else {
             bytes_for_system_value_from_tree_map(&contract, "$id")?
-                .ok_or_else(|| {
+                .ok_or({
                     Error::Contract(ContractError::MissingRequiredKey(
                         "unable to get contract id",
                     ))
@@ -223,10 +223,10 @@ impl Contract {
             }
         };
 
-        let documents_cbor_value = contract.get("documents").ok_or_else(|| {
+        let documents_cbor_value = contract.get("documents").ok_or({
             Error::Contract(ContractError::MissingRequiredKey("unable to get documents"))
         })?;
-        let contract_document_types_raw = documents_cbor_value.as_map().ok_or_else(|| {
+        let contract_document_types_raw = documents_cbor_value.as_map().ok_or({
             Error::Contract(ContractError::InvalidContractStructure(
                 "documents must be a map",
             ))
@@ -322,7 +322,7 @@ impl Contract {
     }
 
     pub fn document_type_for_name(&self, document_type_name: &str) -> Result<&DocumentType, Error> {
-        self.document_types.get(document_type_name).ok_or_else(|| {
+        self.document_types.get(document_type_name).ok_or({
             Error::Contract(ContractError::DocumentTypeNotFound(
                 "can not get document type from contract",
             ))
@@ -361,13 +361,13 @@ impl DocumentType {
         value: &Value,
     ) -> Result<Vec<u8>, Error> {
         match key {
-            "$ownerId" | "$id" => bytes_for_system_value(value)?.ok_or_else(|| {
+            "$ownerId" | "$id" => bytes_for_system_value(value)?.ok_or({
                 Error::Contract(ContractError::FieldRequirementUnmet(
                     "expected system value to be deserialized",
                 ))
             }),
             _ => {
-                let field_type = self.properties.get(key).ok_or_else(|| {
+                let field_type = self.properties.get(key).ok_or({
                     Error::Contract(ContractError::DocumentTypeFieldNotFound(
                         "expected contract to have field",
                     ))
@@ -422,8 +422,8 @@ impl DocumentType {
         };
 
         // Extract the properties
-        let property_values = cbor_inner_btree_map(document_type_value_map, "properties")
-            .ok_or_else(|| {
+        let property_values =
+            cbor_inner_btree_map(document_type_value_map, "properties").ok_or({
                 Error::Contract(ContractError::InvalidContractStructure(
                     "unable to get document properties from the contract",
                 ))
@@ -454,7 +454,7 @@ impl DocumentType {
             let result: Result<(&str, BTreeMap<String, &Value>), Error> = match type_value {
                 None => {
                     let ref_value = btree_map_inner_text_value(&base_inner_properties, "$ref")
-                        .ok_or_else(|| {
+                        .ok_or({
                             Error::Contract(ContractError::InvalidContractStructure(
                                 "cannot find type property",
                             ))
@@ -466,13 +466,11 @@ impl DocumentType {
                     }
                     let ref_value = ref_value.split_at(8).1;
                     let inner_properties_map =
-                        btree_map_inner_map_value(definition_references, ref_value).ok_or_else(
-                            || {
-                                Error::Contract(ContractError::ReferenceDefinitionNotFound(
-                                    "document reference not found",
-                                ))
-                            },
-                        )?;
+                        btree_map_inner_map_value(definition_references, ref_value).ok_or({
+                            Error::Contract(ContractError::ReferenceDefinitionNotFound(
+                                "document reference not found",
+                            ))
+                        })?;
                     let type_value = cbor_inner_text_value(inner_properties_map, "type")
                         .ok_or_else(|| {
                             Error::Contract(ContractError::InvalidContractStructure(
@@ -538,7 +536,7 @@ impl DocumentType {
                     document_properties.insert(prefixed_property_key, field_type);
                 }
                 _ => {
-                    field_type = types::string_to_field_type(type_value).ok_or_else(|| {
+                    field_type = types::string_to_field_type(type_value).ok_or({
                         Error::Contract(ContractError::ValueWrongType("invalid type"))
                     })?;
                     document_properties.insert(prefixed_property_key, field_type);
@@ -684,14 +682,12 @@ impl Document {
 
         let owner_id: [u8; 32] = match owner_id {
             None => {
-                let owner_id: Vec<u8> = bytes_for_system_value_from_tree_map(
-                    &document, "$ownerId",
-                )?
-                .ok_or_else(|| {
-                    Error::Contract(ContractError::DocumentOwnerIdMissing(
-                        "unable to get document $ownerId",
-                    ))
-                })?;
+                let owner_id: Vec<u8> =
+                    bytes_for_system_value_from_tree_map(&document, "$ownerId")?.ok_or({
+                        Error::Contract(ContractError::DocumentOwnerIdMissing(
+                            "unable to get document $ownerId",
+                        ))
+                    })?;
                 document.remove("$ownerId");
                 if owner_id.len() != 32 {
                     return Err(Error::Contract(ContractError::FieldRequirementUnmet(
@@ -715,7 +711,7 @@ impl Document {
         let id: [u8; 32] = match document_id {
             None => {
                 let document_id: Vec<u8> = bytes_for_system_value_from_tree_map(&document, "$id")?
-                    .ok_or_else(|| {
+                    .ok_or({
                         Error::Contract(ContractError::DocumentIdMissing(
                             "unable to get document $id",
                         ))
@@ -816,7 +812,7 @@ impl Document {
                 _ => {}
             }
             let key_paths: Vec<&str> = key_path.split('.').collect::<Vec<&str>>();
-            let (key, rest_key_paths) = key_paths.split_first().ok_or_else(|| {
+            let (key, rest_key_paths) = key_paths.split_first().ok_or({
                 Error::Contract(ContractError::MissingRequiredKey(
                     "key must not be null when getting from document",
                 ))
@@ -829,12 +825,12 @@ impl Document {
                 if key_paths.is_empty() {
                     Ok(Some(value))
                 } else {
-                    let (key, rest_key_paths) = key_paths.split_first().ok_or_else(|| {
+                    let (key, rest_key_paths) = key_paths.split_first().ok_or({
                         Error::Contract(ContractError::MissingRequiredKey(
                             "key must not be null when getting from document",
                         ))
                     })?;
-                    let map_values = value.as_map().ok_or_else(|| {
+                    let map_values = value.as_map().ok_or({
                         Error::Contract(ContractError::ValueWrongType(
                             "inner key must refer to a value map",
                         ))
@@ -865,14 +861,11 @@ impl Document {
         contract: &Contract,
         owner_id: Option<&[u8]>,
     ) -> Result<Option<Vec<u8>>, Error> {
-        let document_type = contract
-            .document_types
-            .get(document_type_name)
-            .ok_or_else(|| {
-                Error::Contract(ContractError::DocumentTypeNotFound(
-                    "document type should exist for name",
-                ))
-            })?;
+        let document_type = contract.document_types.get(document_type_name).ok_or({
+            Error::Contract(ContractError::DocumentTypeNotFound(
+                "document type should exist for name",
+            ))
+        })?;
         self.get_raw_for_document_type(key, document_type, owner_id)
     }
 }
@@ -934,7 +927,7 @@ impl Index {
         let mut index_properties: Vec<IndexProperty> = Vec::new();
 
         for (key_value, value_value) in index_type_value_map {
-            let key = key_value.as_text().ok_or_else(|| {
+            let key = key_value.as_text().ok_or({
                 Error::Contract(ContractError::KeyWrongType("key should be of type text"))
             })?;
 
@@ -943,7 +936,7 @@ impl Index {
                     unique = value_value.as_bool().expect("confirmed as bool");
                 }
             } else if key == "properties" {
-                let properties = value_value.as_array().ok_or_else(|| {
+                let properties = value_value.as_array().ok_or({
                     Error::Contract(ContractError::InvalidContractStructure(
                         "property value should be an array",
                     ))
@@ -979,13 +972,13 @@ impl IndexProperty {
         let key = property
             .0 // key
             .as_text()
-            .ok_or_else(|| {
+            .ok_or({
                 Error::Contract(ContractError::KeyWrongType("key should be of type string"))
             })?;
         let value = property
             .1 // value
             .as_text()
-            .ok_or_else(|| {
+            .ok_or({
                 Error::Contract(ContractError::ValueWrongType(
                     "value should be of type string",
                 ))

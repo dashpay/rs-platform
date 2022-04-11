@@ -1,12 +1,11 @@
 use crate::contract::Contract;
 use crate::drive::Drive;
-use crate::error::drive::DriveError;
 use crate::error::structure::StructureError;
 use crate::error::Error;
 use byteorder::{BigEndian, WriteBytesExt};
 use ciborium::value::Value;
 use grovedb::TransactionArg;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use std::fs::File;
 use std::io;
 use std::io::{BufRead, BufReader};
