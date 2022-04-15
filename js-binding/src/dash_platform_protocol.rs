@@ -1,10 +1,10 @@
-use std::sync::Arc;
-use js_sys::JsString;
+use dpp::errors::consensus::ConsensusError;
 use dpp::identity::IdentityPublicKey;
 use dpp::identity::{AssetLockProof, Identity, KeyID};
 use dpp::metadata::Metadata;
+use js_sys::JsString;
+use std::sync::Arc;
 use wasm_bindgen::prelude::*;
-use dpp::errors::consensus::ConsensusError;
 
 use crate::identifier::IdentifierWrapper;
 use crate::IdentityPublicKeyWasm;

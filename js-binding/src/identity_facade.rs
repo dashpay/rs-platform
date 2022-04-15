@@ -1,18 +1,18 @@
-use std::sync::Arc;
 use dpp::errors::consensus::ConsensusError;
 use dpp::identity::IdentityPublicKey;
 use dpp::identity::{AssetLockProof, Identity, KeyID};
 use dpp::metadata::Metadata;
 use js_sys::JsString;
+use std::sync::Arc;
 use wasm_bindgen::prelude::*;
 
 use crate::identifier::IdentifierWrapper;
 use crate::IdentityPublicKeyWasm;
 use crate::MetadataWasm;
 use dpp::identity::IdentityFacade;
-use dpp::NonConsensusError;
 use dpp::validation::ValidationResult;
 use dpp::version::ProtocolVersionValidator;
+use dpp::NonConsensusError;
 
 #[wasm_bindgen(js_name=ValidationResult)]
 pub struct ValidationResultWasm(ValidationResult);
@@ -57,7 +57,10 @@ impl IdentityFacadeWasm {
     }
 
     #[wasm_bindgen()]
-    pub fn validate(&self, raw_identity_object: JsValue) -> Result<ValidationResultWasm, NonConsensusErrorWasm> {
+    pub fn validate(
+        &self,
+        raw_identity_object: JsValue,
+    ) -> Result<ValidationResultWasm, NonConsensusErrorWasm> {
         // TODO: handle the case when
         self.0
             .validate(
