@@ -9,8 +9,8 @@ use wasm_bindgen::prelude::*;
 use crate::identifier::IdentifierWrapper;
 use crate::IdentityPublicKeyWasm;
 use crate::MetadataWasm;
-use dpp::identity::IdentityFacade;
 use dpp::identity::validation::PublicKeysValidator;
+use dpp::identity::IdentityFacade;
 use dpp::validation::ValidationResult;
 use dpp::version::ProtocolVersionValidator;
 use dpp::NonConsensusError;
@@ -56,7 +56,8 @@ impl IdentityFacadeWasm {
         let identity_facade = IdentityFacade::new(
             Arc::new(protocol_version_validator),
             Arc::new(public_keys_validator),
-        ).unwrap();
+        )
+        .unwrap();
 
         IdentityFacadeWasm(identity_facade)
     }
