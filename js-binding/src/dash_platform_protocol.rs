@@ -10,6 +10,7 @@ use crate::identifier::IdentifierWrapper;
 use crate::IdentityPublicKeyWasm;
 use crate::MetadataWasm;
 use dpp::identity::IdentityFacade;
+use dpp::identity::validation::PublicKeysValidator;
 use dpp::validation::ValidationResult;
 use dpp::version::ProtocolVersionValidator;
 
@@ -20,8 +21,13 @@ pub struct DashPlatformProtocol(IdentityFacade);
 impl DashPlatformProtocol {
     #[wasm_bindgen(constructor)]
     pub fn new() -> DashPlatformProtocol {
+        // TODO: remove default validator and make a real one instead
         let validator = ProtocolVersionValidator::default();
-        let identity_facade = IdentityFacade::new(Arc::new(validator)).unwrap();
+        let public_keys_validator = PublicKeysValidator::new().unwrap();
+        let identity_facade = IdentityFacade::new(
+            Arc::new(validator),
+            Arc::new(public_keys_validator),
+        ).unwrap();
 
         DashPlatformProtocol(identity_facade)
     }

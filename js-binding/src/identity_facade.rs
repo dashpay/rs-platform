@@ -10,6 +10,7 @@ use crate::identifier::IdentifierWrapper;
 use crate::IdentityPublicKeyWasm;
 use crate::MetadataWasm;
 use dpp::identity::IdentityFacade;
+use dpp::identity::validation::PublicKeysValidator;
 use dpp::validation::ValidationResult;
 use dpp::version::ProtocolVersionValidator;
 use dpp::NonConsensusError;
@@ -51,7 +52,11 @@ impl IdentityFacadeWasm {
     pub fn new() -> IdentityFacadeWasm {
         // TODO: REMOVE THAT LINE, TAKE IT AS AN ARGUMENT
         let protocol_version_validator = ProtocolVersionValidator::default();
-        let identity_facade = IdentityFacade::new(Arc::new(protocol_version_validator)).unwrap();
+        let public_keys_validator = PublicKeysValidator::new().unwrap();
+        let identity_facade = IdentityFacade::new(
+            Arc::new(protocol_version_validator),
+            Arc::new(public_keys_validator),
+        ).unwrap();
 
         IdentityFacadeWasm(identity_facade)
     }
