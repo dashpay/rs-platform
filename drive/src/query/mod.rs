@@ -891,6 +891,7 @@ impl<'a> DriveQuery<'a> {
         let path_query =
             self.construct_path_query_operations(drive, transaction, &mut query_operations)?;
         let query_result = drive.grove.get_path_query(&path_query, transaction);
+        dbg!(drive.grove.prove(path_query.clone()).unwrap());
         match query_result {
             Err(GroveError::PathKeyNotFound(_)) | Err(GroveError::PathNotFound(_)) => {
                 let path_query_operations = QueryOperation::for_empty_path_query(&path_query);
