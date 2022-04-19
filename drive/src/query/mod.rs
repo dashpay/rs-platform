@@ -883,10 +883,32 @@ impl<'a> DriveQuery<'a> {
 
     pub fn execute_with_proof(
         self,
-        _grove: &GroveDb,
-        _transaction: TransactionArg,
-    ) -> Result<Vec<u8>, Error> {
-        todo!()
+        drive: &Drive,
+        transaction: TransactionArg,
+    ) -> Result<(Vec<Vec<u8>>, u16, u64), Error> {
+        // TODO: Handle duplication
+        let mut query_operations: Vec<QueryOperation> = vec![];
+        let path_query =
+            self.construct_path_query_operations(drive, transaction, &mut query_operations)?;
+        let query_result = drive.grove.get_path_query(&path_query, transaction);
+        match query_result {
+            Err(GroveError::PathKeyNotFound(_)) | Err(GroveError::PathNotFound(_)) => {
+                let path_query_operations = QueryOperation::for_empty_path_query(&path_query);
+                query_operations.push(path_query_operations);
+                let (_, processing_fee) = calculate_fee(None, Some(query_operations), None, None)?;
+                Ok((Vec::new(), 0, processing_fee))
+            }
+            _ => {
+                let (data, skipped) = query_result?;
+                {
+                    let path_query_operations = QueryOperation::for_path_query(&path_query, &data);
+                    query_operations.push(path_query_operations);
+                    let (_, processing_fee) =
+                        calculate_fee(None, Some(query_operations), None, None)?;
+                    Ok((data, skipped, processing_fee))
+                }
+            }
+        }
     }
 
     pub fn execute_no_proof(

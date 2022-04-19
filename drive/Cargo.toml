@@ -27,7 +27,7 @@ nohash-hasher = "0.2.0"
 
 [dependencies.grovedb]
 git = "https://github.com/dashevo/grovedb"
-branch = "feat/queryFees"
+branch = "feat/proof-demo"
 
 [dependencies.storage]
 git = "https://github.com/dashevo/grovedb"
