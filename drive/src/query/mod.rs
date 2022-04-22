@@ -28,7 +28,7 @@ use sqlparser::ast::{OrderByExpr, Select, Statement};
 use sqlparser::dialect::GenericDialect;
 use sqlparser::parser::Parser;
 use std::collections::HashMap;
-use std::ops::BitXor;
+use std::ops::{BitXor, RangeFrom};
 
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct InternalClauses {
@@ -686,6 +686,198 @@ impl<'a> DriveQuery<'a> {
         Ok(index)
     }
 
+    fn query_item_for_starts_at_key(starts_at_key: Vec<u8>, left_to_right: bool) -> QueryItem {
+        if left_to_right {
+            QueryItem::RangeAfter(starts_at_key..)
+        } else {
+            QueryItem::RangeTo(..starts_at_key)
+        }
+    }
+
+    fn inner_query_from_starts_at_for_id(
+        starts_at_document: &Option<(Document, &DocumentType, &IndexProperty, bool)>,
+        left_to_right: bool,
+    ) -> Query {
+        // We only need items after the start at document
+        let mut inner_query = Query::new_with_direction(left_to_right);
+
+        if let Some((document, _, _, included)) = starts_at_document {
+            let start_at_key = document.id.to_vec();
+            if *included {
+                inner_query.insert_range_from(start_at_key..)
+            } else {
+                inner_query.insert_range_after(start_at_key..)
+            }
+        } else {
+            // No starts at document, take all NULL items
+            inner_query.insert_all();
+        }
+        inner_query
+    }
+
+    // We are passing in starts_at_document 4 parameters
+    // The document
+    // The document type (borrowed)
+    // The index property (borrowed)
+    // if the element itself should be included. ie StartAt vs StartAfter
+    fn inner_query_from_starts_at(
+        starts_at_document: &Option<(Document, &DocumentType, &IndexProperty, bool)>,
+        left_to_right: bool,
+    ) -> Result<Query, Error> {
+        let mut inner_query = Query::new_with_direction(left_to_right);
+        if let Some((document, document_type, indexed_property, included)) = starts_at_document {
+            // We only need items after the start at document
+            let start_at_key = document.get_raw_for_document_type(
+                indexed_property.name.as_str(),
+                &document_type,
+                None,
+            )?;
+            // We want to get items starting at the start key
+            if let Some(start_at_key) = start_at_key {
+                if left_to_right {
+                    if *included {
+                        inner_query.insert_range_from(start_at_key..)
+                    } else {
+                        inner_query.insert_range_after(start_at_key..)
+                    }
+                } else if *included {
+                    inner_query.insert_range_to_inclusive(..=start_at_key)
+                } else {
+                    inner_query.insert_range_to(..start_at_key)
+                }
+            } else if left_to_right {
+                inner_query.insert_all();
+            } else {
+                inner_query.insert_key(vec![]);
+            }
+        } else {
+            // No starts at document, take all NULL items
+            inner_query.insert_all();
+        }
+        Ok(inner_query)
+    }
+
+    fn recursive_insert_on_query(
+        query: Option<&mut Query>,
+        left_over_index_properties: &[&IndexProperty],
+        unique: bool,
+        starts_at_document: &Option<(Document, &DocumentType, &IndexProperty, bool)>, //for key level, included
+        left_to_right: bool,
+    ) -> Result<Option<Query>, Error> {
+        match left_over_index_properties.split_first() {
+            None => {
+                if let Some(query) = query {
+                    match unique {
+                        true => {
+                            query.set_subquery_key(vec![0]);
+
+                            // In the case things are NULL we allow to have multiple values
+                            let inner_query = Self::inner_query_from_starts_at_for_id(
+                                starts_at_document,
+                                left_to_right,
+                            );
+                            query.add_conditional_subquery(
+                                QueryItem::Key(b"".to_vec()),
+                                Some(vec![0]),
+                                Some(inner_query),
+                            );
+                        }
+                        false => {
+                            query.set_subquery_key(vec![0]);
+                            // we just get all by document id order ascending
+                            let full_query =
+                                Self::inner_query_from_starts_at_for_id(&None, left_to_right);
+                            query.set_subquery(full_query);
+
+                            let inner_query = Self::inner_query_from_starts_at_for_id(
+                                starts_at_document,
+                                left_to_right,
+                            );
+
+                            query.add_conditional_subquery(
+                                QueryItem::Key(b"".to_vec()),
+                                Some(vec![0]),
+                                Some(inner_query),
+                            );
+                        }
+                    }
+                }
+                Ok(None)
+            }
+            Some((first, left_over)) => match query {
+                None => {
+                    let mut inner_query =
+                        Self::inner_query_from_starts_at(starts_at_document, left_to_right)?;
+                    DriveQuery::recursive_insert_on_query(
+                        Some(&mut inner_query),
+                        left_over,
+                        unique,
+                        starts_at_document,
+                        left_to_right,
+                    )?;
+                    Ok(Some(inner_query))
+                }
+                Some(query) => {
+                    if let Some((document, document_type, indexed_property, included)) =
+                        starts_at_document
+                    {
+                        let start_at_key = document
+                            .get_raw_for_document_type(first.name.as_str(), document_type, None)
+                            .ok()
+                            .flatten()
+                            .unwrap_or_default();
+
+                        let mut inner_query =
+                            Self::inner_query_from_starts_at(starts_at_document, left_to_right)?;
+                        DriveQuery::recursive_insert_on_query(
+                            Some(&mut inner_query),
+                            left_over,
+                            unique,
+                            starts_at_document,
+                            left_to_right,
+                        )?;
+
+                        query.add_conditional_subquery(
+                            QueryItem::Key(start_at_key.clone()),
+                            Some(first.name.as_bytes().to_vec()),
+                            Some(inner_query),
+                        );
+
+                        let mut inner_query =
+                            Self::inner_query_from_starts_at(starts_at_document, first.ascending)?;
+                        DriveQuery::recursive_insert_on_query(
+                            Some(&mut inner_query),
+                            left_over,
+                            unique,
+                            &None,
+                            first.ascending,
+                        )?;
+
+                        query.add_conditional_subquery(
+                            Self::query_item_for_starts_at_key(start_at_key, first.ascending),
+                            Some(first.name.as_bytes().to_vec()),
+                            Some(inner_query),
+                        );
+                    } else {
+                        let mut inner_query = Query::new_with_direction(first.ascending);
+                        inner_query.insert_all();
+                        DriveQuery::recursive_insert_on_query(
+                            Some(&mut inner_query),
+                            left_over,
+                            unique,
+                            starts_at_document,
+                            left_to_right,
+                        )?;
+
+                        query.set_subquery(inner_query);
+                        query.set_subquery_key(first.name.as_bytes().to_vec());
+                    }
+                    Ok(None)
+                }
+            },
+        }
+    }
+
     pub fn get_non_primary_key_path_query(
         &self,
         document_type_path: Vec<Vec<u8>>,
@@ -703,9 +895,9 @@ impl<'a> DriveQuery<'a> {
                     None => (ordered_clauses.last().copied(), false, None),
                     Some(where_clause) => (Some(where_clause), true, None),
                 },
-                Some(where_clause) => match &self.internal_clauses.range_clause {
-                    None => (Some(where_clause), true, None),
-                    Some(range_clause) => (Some(where_clause), true, Some(range_clause)),
+                Some(in_clause) => match &self.internal_clauses.range_clause {
+                    None => (Some(in_clause), true, None),
+                    Some(range_clause) => (Some(in_clause), true, Some(range_clause)),
                 },
             };
 
@@ -749,58 +941,24 @@ impl<'a> DriveQuery<'a> {
                 })
                 .collect::<Result<Vec<Vec<u8>>, Error>>()?;
 
-        fn recursive_insert(
-            query: Option<&mut Query>,
-            left_over_index_properties: &[&IndexProperty],
-            unique: bool,
-        ) -> Option<Query> {
-            match left_over_index_properties.split_first() {
-                None => {
-                    if let Some(query) = query {
-                        match unique {
-                            true => {
-                                query.set_subquery_key(vec![0]);
-
-                                // In the case things are NULL we allow to have multiple values
-                                let mut full_query = Query::new();
-                                full_query.insert_all();
-
-                                query.add_conditional_subquery(
-                                    QueryItem::Key(b"".to_vec()),
-                                    Some(vec![0]),
-                                    Some(full_query),
-                                );
-                            }
-                            false => {
-                                query.set_subquery_key(vec![0]);
-                                // we just get all by document id order ascending
-                                let mut full_query = Query::new();
-                                full_query.insert_all();
-                                query.set_subquery(full_query);
-                            }
-                        }
-                    }
-                    None
-                }
-                Some((first, left_over)) => {
-                    let mut inner_query = Query::new_with_direction(first.ascending);
-                    inner_query.insert_all();
-                    recursive_insert(Some(&mut inner_query), left_over, unique);
-                    match query {
-                        None => Some(inner_query),
-                        Some(query) => {
-                            query.set_subquery(inner_query);
-                            query.set_subquery_key(first.name.as_bytes().to_vec());
-                            None
-                        }
-                    }
-                }
-            }
-        }
-
         let final_query = match last_clause {
-            None => recursive_insert(None, left_over_index_properties.as_slice(), index.unique)
-                .expect("Index must have left over properties if no last clause"),
+            None => {
+                // There is no last_clause which means we are using an index most likely because of an order_by, however we have no
+                // clauses, in this case we should use the first value of the index.
+                let first_index = index.properties.first().ok_or(Error::Drive(
+                    DriveError::CorruptedContractIndexes("index must have properties"),
+                ))?; // Index must have properties
+                Self::recursive_insert_on_query(
+                    None,
+                    left_over_index_properties.as_slice(),
+                    index.unique,
+                    &starts_at_document.map(|(document, included)| {
+                        (document, self.document_type, first_index, included)
+                    }),
+                    first_index.ascending,
+                )?
+                .expect("Index must have left over properties if no last clause")
+            }
             Some(where_clause) => {
                 let left_to_right = if where_clause.operator.is_range() {
                     let order_clause: &OrderClause = self
@@ -823,30 +981,54 @@ impl<'a> DriveQuery<'a> {
 
                 match subquery_clause {
                     None => {
-                        recursive_insert(
+                        // There is a last_clause, but no subquery_clause, we should use the index property of the last clause
+                        // We need to get the terminal indexes unused by clauses.
+                        let last_index_property = index
+                            .properties
+                            .iter()
+                            .find(|field| where_clause.field == field.name)
+                            .ok_or(Error::Drive(DriveError::CorruptedContractIndexes(
+                                "index must have last_clause field",
+                            )))?;
+                        Self::recursive_insert_on_query(
                             Some(&mut query),
                             left_over_index_properties.as_slice(),
                             index.unique,
-                        );
+                            &starts_at_document.map(|(document, included)| {
+                                (document, self.document_type, last_index_property, included)
+                            }),
+                            left_to_right,
+                        )?;
                     }
-                    Some(where_clause) => {
+                    Some(subquery_where_clause) => {
                         let order_clause: &OrderClause = self
                             .order_by
-                            .get(where_clause.field.as_str())
+                            .get(subquery_where_clause.field.as_str())
                             .ok_or(Error::Query(QueryError::MissingOrderByForRange(
                                 "query must have an orderBy field for each range element",
                             )))?;
-                        let mut subquery = where_clause.to_path_query(
+                        let mut subquery = subquery_where_clause.to_path_query(
                             self.document_type,
                             &starts_at_document,
                             order_clause.ascending,
                         )?;
-                        recursive_insert(
+                        let last_index_property = index
+                            .properties
+                            .iter()
+                            .find(|field| subquery_where_clause.field == field.name)
+                            .ok_or(Error::Drive(DriveError::CorruptedContractIndexes(
+                                "index must have subquery_clause field",
+                            )))?;
+                        Self::recursive_insert_on_query(
                             Some(&mut subquery),
                             left_over_index_properties.as_slice(),
                             index.unique,
-                        );
-                        let subindex = where_clause.field.as_bytes().to_vec();
+                            &starts_at_document.map(|(document, included)| {
+                                (document, self.document_type, last_index_property, included)
+                            }),
+                            left_to_right,
+                        )?;
+                        let subindex = subquery_where_clause.field.as_bytes().to_vec();
                         query.set_subquery_key(subindex);
                         query.set_subquery(subquery);
                     }
