@@ -4,8 +4,14 @@
 // TODO: IMPORTANT NOTICE! THIS IS WORKS ONLY IF BUILT WITH npm run build:node
 const dpp_module = require('./pkg');
 const assert = require('assert');
+const Dpp = require('@dashevo/dpp');
+const getIdenityFixture = require('@dashevo/dpp/lib/test/fixtures/getIdentityFixture');
+const convertBuffersToArrays = require('@dashevo/dpp/lib/util/convertBuffersToArrays');
+const { default: Ajv } = require('ajv/dist/2020');
+const addByteArrayKeyword = require('@dashevo/dpp/lib/ajv/keywords/byteArray/addByteArrayKeyword');
+const schmea = require("@dashevo/dpp/schema/identity/identity.json");
 
-const { IdentityFacade } = dpp_module;
+const { IdentityFacade, DashPlatformProtocol } = dpp_module;
 
 const identityFacade = new IdentityFacade();
 
@@ -66,3 +72,80 @@ console.log(validationResult2.errorsText());
 //         console.log("the public keys", i.getPublicKeys());
 //     })
 //     .catch(console.error);
+
+async function bench() {
+    let rustDpp = new DashPlatformProtocol();
+    let jsDpp = new Dpp();
+
+    let fixtue = getIdenityFixture().toObject();
+
+    await jsDpp.initialize();
+
+    let runs = 1000;
+
+    const start_js = Date.now();
+
+    console.time("js");
+    for (let i = 0; i<runs; i++) {
+        let result = jsDpp.identity.validate(fixtue);
+        if (!result.isValid()) {
+            throw new Error(result.errors[0]);
+        }
+    }
+    console.timeEnd("js");
+
+    const end_js = Date.now();
+
+    const time_js = end_js - start_js;
+
+    console.log(`${time_js * 1000 / runs} s per 1000`);
+
+    let start_rust = Date.now();
+
+    console.time("rust");
+    for (let i = 0; i<runs; i++) {
+        let result = identityFacade.validate(convertBuffersToArrays(fixtue));
+
+        if (!result.isValid()) {
+            throw new Error(result.errorsText()[0]);
+        }
+
+        result.free();
+    }
+    console.timeEnd("rust");
+
+    const end_rust = Date.now();
+
+    const time_rust = end_rust - start_rust;
+
+    console.log(`${time_rust / runs} ms per run`);
+
+    console.log(`Rust is ${time_js / time_rust} times faster`);
+
+    const ajv = new Ajv();
+    addByteArrayKeyword(ajv);
+    const validate = ajv.compile(schmea);
+
+    console.time("ajv");
+    for (let i = 0; i<runs; i++) {
+        validate(fixtue);
+        // let result = jsDpp.identity.validate(fixtue);
+        // if (!result.isValid()) {
+        //     throw new Error(result.errors[0]);
+        // }
+    }
+    console.timeEnd("pks");
+
+    console.time("pks");
+    for (let i = 0; i<runs; i++) {
+        jsDpp.identity.validatePublicKeys(fixtue.publicKeys);
+        // let result = jsDpp.identity.validate(fixtue);
+        // if (!result.isValid()) {
+        //     throw new Error(result.errors[0]);
+        // }
+    }
+    console.timeEnd("pks");
+
+}
+
+bench().catch(console.error)
