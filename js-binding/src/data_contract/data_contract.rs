@@ -174,7 +174,11 @@ impl DataContractWasm {
 
     #[wasm_bindgen(js_name=getBinaryProperties)]
     pub fn get_binary_properties(&self, doc_type: &str) -> Result<JsValue, JsValue> {
-        with_js_error!(JsValue::from_serde(&self.0.get_binary_properties(doc_type)))
+        with_js_error!(JsValue::from_serde(
+            self.0
+                .get_binary_properties(doc_type)
+                .map_err(from_dpp_err)?
+        ))
     }
 
     #[wasm_bindgen(js_name=getMetadata)]
