@@ -22,7 +22,7 @@ impl std::convert::From<AssetLockProof> for AssetLockProofWasm {
 impl IdentityWasm {
     #[wasm_bindgen(js_name=getProtocolVersion)]
     pub fn get_protocol_version(&self) -> u32 {
-        self.0.get_protocol_version().clone()
+        self.0.get_protocol_version()
     }
 
     #[wasm_bindgen(js_name=getId)]
@@ -45,7 +45,7 @@ impl IdentityWasm {
         self.0
             .get_public_keys()
             .clone()
-            .into_iter()
+            .iter()
             .map(|v| JsValue::from_serde(v).expect("unable to convert pub keys"))
             .collect()
     }
