@@ -1,17 +1,7 @@
-use dpp::errors::consensus::ConsensusError;
-use dpp::identity::IdentityPublicKey;
-use dpp::identity::{AssetLockProof, Identity, KeyID};
-use dpp::metadata::Metadata;
-use js_sys::JsString;
 use std::sync::Arc;
 use wasm_bindgen::prelude::*;
-
-use crate::identifier::IdentifierWrapper;
-use crate::IdentityPublicKeyWasm;
-use crate::MetadataWasm;
 use dpp::identity::validation::PublicKeysValidator;
 use dpp::identity::IdentityFacade;
-use dpp::validation::ValidationResult;
 use dpp::version::ProtocolVersionValidator;
 
 #[wasm_bindgen(js_name=DashPlatformProtocol)]

@@ -44,7 +44,6 @@ impl IdentityWasm {
     pub fn get_public_keys(&self) -> Vec<JsValue> {
         self.0
             .get_public_keys()
-            .clone()
             .iter()
             .map(|v| JsValue::from_serde(v).expect("unable to convert pub keys"))
             .collect()
@@ -126,28 +125,28 @@ impl IdentityWasm {
     //? probably it should be a separate trait with blanket implementation
     #[wasm_bindgen(js_name=new)]
     pub fn new() -> Self {
-        return IdentityWasm(Identity::default());
+        IdentityWasm(Identity::default())
     }
 
     #[wasm_bindgen(js_name=from)]
     pub fn from(object: JsValue) -> Self {
         let i: Identity = serde_json::from_str(&object.as_string().unwrap()).unwrap();
-        return IdentityWasm(i);
+        IdentityWasm(i)
     }
 
     #[wasm_bindgen(js_name=toJSON)]
     pub fn to_json(&self) -> JsValue {
-        return JsValue::from_serde(&self.0).unwrap();
+        JsValue::from_serde(&self.0).unwrap()
     }
 
     #[wasm_bindgen(js_name=toObject)]
     pub fn to_object(&self) -> JsValue {
-        return JsValue::from_serde(&self.0).unwrap();
+        JsValue::from_serde(&self.0).unwrap()
     }
 
     #[wasm_bindgen(js_name=toString)]
     pub fn to_string(&self) -> String {
-        return serde_json::to_string(&self.0).unwrap();
+        serde_json::to_string(&self.0).unwrap()
     }
 
     #[wasm_bindgen(js_name=toBuffer)]

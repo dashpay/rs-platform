@@ -1,14 +1,7 @@
-use dpp::errors::consensus::ConsensusError;
-use dpp::identity::IdentityPublicKey;
-use dpp::identity::{AssetLockProof, Identity, KeyID};
-use dpp::metadata::Metadata;
 use js_sys::JsString;
 use std::sync::Arc;
 use wasm_bindgen::prelude::*;
 
-use crate::identifier::IdentifierWrapper;
-use crate::IdentityPublicKeyWasm;
-use crate::MetadataWasm;
 use dpp::identity::validation::PublicKeysValidator;
 use dpp::identity::IdentityFacade;
 use dpp::validation::ValidationResult;
@@ -67,12 +60,11 @@ impl IdentityFacadeWasm {
         &self,
         raw_identity_object: JsValue,
     ) -> Result<ValidationResultWasm, NonConsensusErrorWasm> {
-        let identity_json = JsValue::into_serde(&raw_identity_object).expect("unable to serialize identity");
+        let identity_json =
+            JsValue::into_serde(&raw_identity_object).expect("unable to serialize identity");
         // TODO: handle the case when
         self.0
-            .validate(
-                &identity_json,
-            )
+            .validate(&identity_json)
             .map(|res| res.into())
             .map_err(|err| err.into())
     }

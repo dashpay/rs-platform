@@ -22,7 +22,7 @@ impl std::convert::From<DataContract> for DataContractWasm {
     }
 }
 impl std::convert::Into<DataContract> for DataContractWasm {
-    fn into(self: Self) -> DataContract {
+    fn into(self) -> DataContract {
         self.0
     }
 }
@@ -170,10 +170,7 @@ impl DataContractWasm {
 
     #[wasm_bindgen(js_name=getEntropy)]
     pub fn get_entropy(&mut self) -> Option<Vec<u8>> {
-        match self.0.entropy {
-            Some(e) => Some(e.to_vec()),
-            None => None,
-        }
+        self.0.entropy.map(|e| e.to_vec())
     }
 
     #[wasm_bindgen(js_name=getBinaryProperties)]
@@ -199,7 +196,7 @@ impl DataContractWasm {
 
     #[wasm_bindgen(js_name=toJSON)]
     pub fn to_json(&self) -> Result<JsValue, JsValue> {
-        return self.to_object();
+        self.to_object()
     }
 
     #[wasm_bindgen(js_name=toString)]
