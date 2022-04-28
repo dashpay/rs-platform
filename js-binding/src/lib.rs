@@ -16,4 +16,10 @@ pub use document::*;
 mod data_contract;
 pub use data_contract::*;
 
+mod identity_facade;
+pub use identity_facade::*;
+
+mod dash_platform_protocol;
+pub use dash_platform_protocol::*;
+
 pub mod errors;

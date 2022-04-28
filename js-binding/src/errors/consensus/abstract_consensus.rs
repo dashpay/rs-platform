@@ -3,7 +3,7 @@ use thiserror::Error;
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
-#[derive(Error, Debug, Clone)]
+#[derive(Error, Debug, Clone, Default)]
 #[error("Abstract Consensus Error")]
 pub struct AbstractConsensusError {}
 

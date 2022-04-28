@@ -59,10 +59,7 @@ impl DocumentWasm {
 
     #[wasm_bindgen(js_name=getEntropy)]
     pub fn get_entropy(&mut self) -> Option<Vec<u8>> {
-        match self.0.entropy {
-            Some(e) => Some(e.to_vec()),
-            None => None,
-        }
+        self.0.entropy.map(|e| e.to_vec())
     }
 
     #[wasm_bindgen(js_name=setData)]
@@ -120,17 +117,17 @@ impl DocumentWasm {
 
     #[wasm_bindgen(js_name=toObject)]
     pub fn to_object(&self) -> JsValue {
-        return JsValue::from_serde(&self.0).expect("unable to convert Document to JS object");
+        JsValue::from_serde(&self.0).expect("unable to convert Document to JS object")
     }
 
     #[wasm_bindgen(js_name=toJSON)]
     pub fn to_json(&self) -> JsValue {
-        return self.to_object();
+        self.to_object()
     }
 
     #[wasm_bindgen(js_name=toString)]
     pub fn to_string(&self) -> String {
-        return serde_json::to_string(&self.0).expect("unable to convert Document to string");
+        serde_json::to_string(&self.0).expect("unable to convert Document to string")
     }
 
     #[wasm_bindgen(js_name=toBuffer)]

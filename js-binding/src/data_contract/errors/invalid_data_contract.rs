@@ -35,6 +35,6 @@ impl InvalidDataContractError {
 
     #[wasm_bindgen]
     pub fn get_data_contract(&self) -> DataContractWasm {
-        self.raw_data_contract.clone().into()
+        self.raw_data_contract.clone()
     }
 }
