@@ -158,7 +158,7 @@ class Drive {
   async queryDocuments(dataContract, documentType, query = {}, useTransaction = false) {
     const encodedQuery = await cbor.encodeAsync(query);
 
-    const [encodedDocuments] = await driveQueryDocumentsAsync.call(
+    const [encodedDocuments, , processingFee] = await driveQueryDocumentsAsync.call(
       this.drive,
       encodedQuery,
       dataContract.id.toBuffer(),
@@ -166,13 +166,18 @@ class Drive {
       useTransaction,
     );
 
-    return encodedDocuments.map((encodedDocument) => {
+    const documents = encodedDocuments.map((encodedDocument) => {
       const [protocolVersion, rawDocument] = decodeProtocolEntity(encodedDocument);
 
       rawDocument.$protocolVersion = protocolVersion;
 
       return new Document(rawDocument, dataContract);
     });
+
+    return [
+      documents,
+      processingFee,
+    ];
   }
 
   /**
