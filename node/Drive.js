@@ -62,7 +62,7 @@ class Drive {
 
   /**
    * @param {boolean} [useTransaction=false]
-   * @returns {Promise<void>}
+   * @returns {Promise<[number, number]>}
    */
   async createRootTree(useTransaction = false) {
     return driveCreateRootTreeAsync.call(this.drive, useTransaction);
@@ -72,7 +72,7 @@ class Drive {
    * @param {DataContract} dataContract
    * @param {Date} blockTime
    * @param {boolean} [useTransaction=false]
-   * @returns {Promise<void>}
+   * @returns {Promise<[number, number]>}
    */
   async applyContract(dataContract, blockTime, useTransaction = false) {
     return driveApplyContractAsync.call(
@@ -87,7 +87,7 @@ class Drive {
    * @param {Document} document
    * @param {Date} blockTime
    * @param {boolean} [useTransaction=false]
-   * @returns {Promise<void>}
+   * @returns {Promise<[number, number]>}
    */
   async createDocument(document, blockTime, useTransaction = false) {
     return driveCreateDocumentAsync.call(
@@ -106,7 +106,7 @@ class Drive {
    * @param {Document} document
    * @param {Date} blockTime
    * @param {boolean} [useTransaction=false]
-   * @returns {Promise<void>}
+   * @returns {Promise<[number, number]>}
    */
   async updateDocument(document, blockTime, useTransaction = false) {
     return driveUpdateDocumentAsync.call(
@@ -125,7 +125,7 @@ class Drive {
    * @param {string} documentType
    * @param {Identifier} documentId
    * @param {boolean} [useTransaction=false]
-   * @returns {Promise<void>}
+   * @returns {Promise<[number, number]>}
    */
   async deleteDocument(
     dataContract,
@@ -181,9 +181,9 @@ class Drive {
   }
 
   /**
-   * @param {DataContract} dataContract
+   * @param {DataContract} identity
    * @param {boolean} [useTransaction=false]
-   * @returns {Promise<void>}
+   * @returns {Promise<[number, number]>}
    */
   async insertIdentity(identity, useTransaction = false) {
     return driveInsertIdentityAsync.call(
