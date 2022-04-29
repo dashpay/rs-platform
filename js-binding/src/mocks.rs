@@ -1,11 +1,13 @@
 //! This module contains data structures that are left to be implemented
 
-use dpp::mocks;
+use dpp::document::document_transition::DocumentTransition;
 use wasm_bindgen::prelude::*;
+
+use dpp::errors::consensus::ConsensusError as DPPConsensusError;
 
 #[wasm_bindgen]
 #[derive(Debug, Clone)]
-pub struct DocumentTransitionWasm(mocks::DocumentTransition);
+pub struct DocumentTransitionWasm(DocumentTransition);
 
 impl DocumentTransitionWasm {
     pub fn get_action(&self) -> String {
@@ -13,8 +15,8 @@ impl DocumentTransitionWasm {
     }
 }
 
-impl From<mocks::DocumentTransition> for DocumentTransitionWasm {
-    fn from(v: mocks::DocumentTransition) -> Self {
+impl From<DocumentTransition> for DocumentTransitionWasm {
+    fn from(v: DocumentTransition) -> Self {
         DocumentTransitionWasm(v)
     }
 }
@@ -22,6 +24,6 @@ impl From<mocks::DocumentTransition> for DocumentTransitionWasm {
 #[derive(Debug)]
 pub struct ConsensusError {}
 
-pub fn from_consensus_to_js_error(_: mocks::ConsensusError) -> JsValue {
+pub fn from_consensus_to_js_error(_: DPPConsensusError) -> JsValue {
     unimplemented!()
 }
