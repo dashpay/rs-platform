@@ -153,7 +153,7 @@ class Drive {
    * @param [query.startAfter]
    * @param [query.orderBy]
    * @param {Boolean} [useTransaction=false]
-   * @returns {Promise<Document[]>}
+   * @returns {Promise<[Document[], number]>}
    */
   async queryDocuments(dataContract, documentType, query = {}, useTransaction = false) {
     const encodedQuery = await cbor.encodeAsync(query);
