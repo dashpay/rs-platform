@@ -1,3 +1,5 @@
+#![allow(clippy::from_over_into)]
+
 use crate::errors::{from_dpp_err, RustConversionError};
 use crate::{bail_js, with_js_error};
 use dpp::data_contract::DataContract;
