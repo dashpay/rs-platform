@@ -32,6 +32,7 @@ impl Drive {
         &self,
         identity_id: Option<&[u8]>,
         identity_bytes: Vec<u8>,
+        apply: bool,
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
         let identity_id = match identity_id {
@@ -45,7 +46,7 @@ impl Drive {
         self.insert_identity(
             identity_id.as_slice(),
             Element::Item(identity_bytes),
-            true,
+            apply,
             transaction,
         )
     }
