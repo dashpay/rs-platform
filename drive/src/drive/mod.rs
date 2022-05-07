@@ -9,9 +9,9 @@ use crate::error::query::QueryError;
 use crate::error::Error;
 use crate::fee::calculate_fee;
 use crate::fee::op::{DeleteOperation, InsertOperation, QueryOperation};
-use crate::query::DriveQuery;
+use crate::query::{DriveQuery, GroveError};
 use defaults::{CONTRACT_DOCUMENTS_PATH_HEIGHT, DEFAULT_HASH_SIZE};
-use grovedb::{Element, GroveDb, TransactionArg};
+use grovedb::{Element, GroveDb, Transaction, TransactionArg};
 use moka::sync::Cache;
 use object_size_info::DocumentInfo::{DocumentAndSerialization, DocumentSize};
 use object_size_info::KeyElementInfo::{KeyElement, KeyElementSize};
@@ -27,6 +27,7 @@ use object_size_info::{
 };
 use std::cell::RefCell;
 use std::collections::BTreeSet;
+use std::ops::DerefMut;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -34,6 +35,7 @@ pub struct Drive {
     pub grove: GroveDb,
     pub cached_contracts: RefCell<Cache<[u8; 32], Arc<Contract>>>, //HashMap<[u8; 32], Rc<Contract>>>,
     pub transient_inserts: RefCell<BTreeSet<Vec<Vec<u8>>>>,
+    pub transient_batch_inserts: RefCell<BTreeSet<Vec<Vec<u8>>>>,
 }
 
 #[repr(u8)]
@@ -155,9 +157,32 @@ impl Drive {
                 grove,
                 cached_contracts: RefCell::new(Cache::new(200)),
                 transient_inserts: RefCell::new(BTreeSet::new()),
+                transient_batch_inserts: RefCell::new(BTreeSet::new()),
             }),
             Err(e) => Err(Error::GroveDB(e)),
         }
+    }
+
+    pub fn commit_transaction(&self, transaction: Transaction) -> Result<(), Error> {
+        self.transient_inserts.borrow_mut().clear();
+        self.transient_batch_inserts.borrow_mut().clear();
+        self.grove
+            .commit_transaction(transaction)
+            .map_err(|e| Error::GroveDB(e))
+    }
+
+    pub fn rollback_transaction(&self, transaction: &Transaction) -> Result<(), Error> {
+        self.transient_inserts.borrow_mut().clear();
+        self.transient_batch_inserts.borrow_mut().clear();
+        self.grove
+            .rollback_transaction(transaction)
+            .map_err(|e| Error::GroveDB(e))
+    }
+
+    fn commit_transient_batch_inserts(&self) {
+        self.transient_inserts
+            .borrow_mut()
+            .append(self.transient_batch_inserts.borrow_mut().deref_mut())
     }
 
     pub const fn check_protocol_version(_version: u32) -> bool {
@@ -228,7 +253,7 @@ impl Drive {
                     let mut path_items: Vec<Vec<u8>> =
                         path.into_iter().map(|a| Vec::from(a)).collect();
                     path_items.push(Vec::from(key));
-                    self.transient_inserts.borrow_mut().insert(path_items);
+                    self.transient_batch_inserts.borrow_mut().insert(path_items);
                     Ok(())
                 }
             }
@@ -263,9 +288,13 @@ impl Drive {
                 } else {
                     let mut path_items: Vec<Vec<u8>> = path.clone().map(|a| Vec::from(a)).collect();
                     path_items.push(Vec::from(key));
-                    let exists = self.transient_inserts.borrow_mut().contains(&path_items);
+                    let exists = self
+                        .transient_batch_inserts
+                        .borrow_mut()
+                        .contains(&path_items)
+                        || self.transient_inserts.borrow_mut().contains(&path_items);
                     if !exists {
-                        self.transient_inserts.borrow_mut().insert(path_items);
+                        self.transient_batch_inserts.borrow_mut().insert(path_items);
                     }
                     !exists
                 };
@@ -295,9 +324,13 @@ impl Drive {
                 } else {
                     let mut path_items: Vec<Vec<u8>> = path.clone().map(|a| Vec::from(a)).collect();
                     path_items.push(Vec::from(key.clone()));
-                    let exists = self.transient_inserts.borrow_mut().contains(&path_items);
+                    let exists = self
+                        .transient_batch_inserts
+                        .borrow_mut()
+                        .contains(&path_items)
+                        || self.transient_inserts.borrow_mut().contains(&path_items);
                     if !exists {
-                        self.transient_inserts.borrow_mut().insert(path_items);
+                        self.transient_batch_inserts.borrow_mut().insert(path_items);
                     }
                     !exists
                 };
@@ -319,9 +352,13 @@ impl Drive {
                 } else {
                     let mut path_items: Vec<Vec<u8>> = path.clone().map(|a| Vec::from(a)).collect();
                     path_items.push(Vec::from(key.clone()));
-                    let exists = self.transient_inserts.borrow_mut().contains(&path_items);
+                    let exists = self
+                        .transient_batch_inserts
+                        .borrow_mut()
+                        .contains(&path_items)
+                        || self.transient_inserts.borrow_mut().contains(&path_items);
                     if !exists {
-                        self.transient_inserts.borrow_mut().insert(path_items);
+                        self.transient_batch_inserts.borrow_mut().insert(path_items);
                     }
                     !exists
                 };
@@ -343,9 +380,16 @@ impl Drive {
                 } else {
                     let mut path_items: Vec<Vec<u8>> = path.clone().map(|a| Vec::from(a)).collect();
                     path_items.push(Vec::from(key.clone()));
-                    let exists = self.transient_inserts.borrow_mut().contains(&path_items);
+                    let exists = self
+                        .transient_batch_inserts
+                        .borrow_mut()
+                        .contains(&path_items)
+                        || self
+                            .transient_batch_inserts
+                            .borrow_mut()
+                            .contains(&path_items);
                     if !exists {
-                        self.transient_inserts.borrow_mut().insert(path_items);
+                        self.transient_batch_inserts.borrow_mut().insert(path_items);
                     }
                     !exists
                 };
@@ -418,9 +462,13 @@ impl Drive {
                     let mut path_items: Vec<Vec<u8>> =
                         path.into_iter().map(|a| Vec::from(a)).collect();
                     path_items.push(Vec::from(key));
-                    let exists = self.transient_inserts.borrow_mut().contains(&path_items);
+                    let exists = self
+                        .transient_batch_inserts
+                        .borrow_mut()
+                        .contains(&path_items)
+                        || self.transient_inserts.borrow_mut().contains(&path_items);
                     if !exists {
-                        self.transient_inserts.borrow_mut().insert(path_items);
+                        self.transient_batch_inserts.borrow_mut().insert(path_items);
                     }
                     !exists
                 };
@@ -451,9 +499,13 @@ impl Drive {
                     let mut path_items: Vec<Vec<u8>> =
                         path.into_iter().map(|a| Vec::from(a)).collect();
                     path_items.push(Vec::from(key));
-                    let exists = self.transient_inserts.borrow_mut().contains(&path_items);
+                    let exists = self
+                        .transient_batch_inserts
+                        .borrow_mut()
+                        .contains(&path_items)
+                        || self.transient_inserts.borrow_mut().contains(&path_items);
                     if !exists {
-                        self.transient_inserts.borrow_mut().insert(path_items);
+                        self.transient_batch_inserts.borrow_mut().insert(path_items);
                     }
                     !exists
                 };
@@ -990,11 +1042,17 @@ impl Drive {
                     insert_operations,
                 )?;
                 if !inserted {
+                    if !apply {
+                        self.commit_transient_batch_inserts();
+                    }
                     return Err(Error::Drive(DriveError::CorruptedContractIndexes(
                         "index already exists",
                     )));
                 }
             }
+        }
+        if !apply {
+            self.commit_transient_batch_inserts();
         }
         Ok(())
     }
@@ -1383,6 +1441,9 @@ impl Drive {
                             insert_operations,
                         )?;
                         if !inserted {
+                            if !apply {
+                                self.commit_transient_batch_inserts();
+                            }
                             return Err(Error::Drive(DriveError::CorruptedContractIndexes(
                                 "index already exists",
                             )));
@@ -1390,6 +1451,9 @@ impl Drive {
                     }
                 }
             }
+        }
+        if !apply {
+            self.commit_transient_batch_inserts();
         }
         Ok(())
     }

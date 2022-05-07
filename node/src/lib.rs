@@ -93,14 +93,12 @@ impl DriveWrapper {
                     }
                     DriveMessage::CommitTransaction(callback) => {
                         drive
-                            .grove
                             .commit_transaction(transaction.take().unwrap())
                             .unwrap();
                         callback(&channel);
                     }
                     DriveMessage::RollbackTransaction(callback) => {
                         drive
-                            .grove
                             .rollback_transaction(&transaction.take().unwrap())
                             .unwrap();
                         callback(&channel);
