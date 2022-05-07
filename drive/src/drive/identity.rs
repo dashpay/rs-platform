@@ -11,6 +11,7 @@ impl Drive {
         &self,
         identity_key: &[u8],
         identity_bytes: Element,
+        apply: bool,
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
         let mut insert_operations: Vec<InsertOperation> = vec![];
@@ -21,6 +22,7 @@ impl Drive {
                 identity_bytes,
             )),
             transaction,
+            apply,
             &mut insert_operations,
         )?;
         calculate_fee(None, None, Some(insert_operations), None)
@@ -43,6 +45,7 @@ impl Drive {
         self.insert_identity(
             identity_id.as_slice(),
             Element::Item(identity_bytes),
+            true,
             transaction,
         )
     }
@@ -75,6 +78,7 @@ mod tests {
             .insert_identity(
                 &identity.id,
                 Element::Item(identity_bytes),
+                true,
                 Some(&db_transaction),
             )
             .expect("expected to insert identity");

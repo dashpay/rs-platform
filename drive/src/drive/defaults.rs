@@ -8,3 +8,4 @@ pub const BASE_CONTRACT_DOCUMENTS_PATH: usize = 34;
 pub const BASE_CONTRACT_DOCUMENTS_PRIMARY_KEY_PATH: usize = 35;
 pub const DEFAULT_HASH_SIZE: usize = 32;
 pub const DEFAULT_FLOAT_SIZE: usize = 8;
+pub const EMPTY_TREE_STORAGE_SIZE: usize = 33;
