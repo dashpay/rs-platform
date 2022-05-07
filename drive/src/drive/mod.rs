@@ -168,7 +168,7 @@ impl Drive {
         self.transient_batch_inserts.borrow_mut().clear();
         self.grove
             .commit_transaction(transaction)
-            .map_err(|e| Error::GroveDB(e))
+            .map_err(Error::GroveDB)
     }
 
     pub fn rollback_transaction(&self, transaction: &Transaction) -> Result<(), Error> {
@@ -176,7 +176,7 @@ impl Drive {
         self.transient_batch_inserts.borrow_mut().clear();
         self.grove
             .rollback_transaction(transaction)
-            .map_err(|e| Error::GroveDB(e))
+            .map_err(Error::GroveDB)
     }
 
     fn commit_transient_batch_inserts(&self) {
@@ -250,8 +250,7 @@ impl Drive {
                         .insert(path, key, Element::empty_tree(), transaction)
                         .map_err(Error::GroveDB)
                 } else {
-                    let mut path_items: Vec<Vec<u8>> =
-                        path.into_iter().map(|a| Vec::from(a)).collect();
+                    let mut path_items: Vec<Vec<u8>> = path.into_iter().map(Vec::from).collect();
                     path_items.push(Vec::from(key));
                     self.transient_batch_inserts.borrow_mut().insert(path_items);
                     Ok(())
@@ -286,7 +285,7 @@ impl Drive {
                         transaction,
                     )?
                 } else {
-                    let mut path_items: Vec<Vec<u8>> = path.clone().map(|a| Vec::from(a)).collect();
+                    let mut path_items: Vec<Vec<u8>> = path.clone().map(Vec::from).collect();
                     path_items.push(Vec::from(key));
                     let exists = self
                         .transient_batch_inserts
@@ -322,8 +321,8 @@ impl Drive {
                         transaction,
                     )?
                 } else {
-                    let mut path_items: Vec<Vec<u8>> = path.clone().map(|a| Vec::from(a)).collect();
-                    path_items.push(Vec::from(key.clone()));
+                    let mut path_items: Vec<Vec<u8>> = path.clone().map(Vec::from).collect();
+                    path_items.push(key.clone());
                     let exists = self
                         .transient_batch_inserts
                         .borrow_mut()
@@ -350,8 +349,8 @@ impl Drive {
                         transaction,
                     )?
                 } else {
-                    let mut path_items: Vec<Vec<u8>> = path.clone().map(|a| Vec::from(a)).collect();
-                    path_items.push(Vec::from(key.clone()));
+                    let mut path_items: Vec<Vec<u8>> = path.clone().map(Vec::from).collect();
+                    path_items.push(key.clone());
                     let exists = self
                         .transient_batch_inserts
                         .borrow_mut()
@@ -378,8 +377,8 @@ impl Drive {
                         transaction,
                     )?
                 } else {
-                    let mut path_items: Vec<Vec<u8>> = path.clone().map(|a| Vec::from(a)).collect();
-                    path_items.push(Vec::from(key.clone()));
+                    let mut path_items: Vec<Vec<u8>> = path.clone().map(Vec::from).collect();
+                    path_items.push(Vec::from(key));
                     let exists = self
                         .transient_batch_inserts
                         .borrow_mut()
@@ -459,8 +458,7 @@ impl Drive {
                     self.grove
                         .insert_if_not_exists(path_iter, key, element, transaction)?
                 } else {
-                    let mut path_items: Vec<Vec<u8>> =
-                        path.into_iter().map(|a| Vec::from(a)).collect();
+                    let mut path_items: Vec<Vec<u8>> = path.into_iter().map(Vec::from).collect();
                     path_items.push(Vec::from(key));
                     let exists = self
                         .transient_batch_inserts
@@ -496,8 +494,7 @@ impl Drive {
                     self.grove
                         .insert_if_not_exists(path_iter, key, element, transaction)?
                 } else {
-                    let mut path_items: Vec<Vec<u8>> =
-                        path.into_iter().map(|a| Vec::from(a)).collect();
+                    let mut path_items: Vec<Vec<u8>> = path.into_iter().map(Vec::from).collect();
                     path_items.push(Vec::from(key));
                     let exists = self
                         .transient_batch_inserts
