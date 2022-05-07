@@ -79,6 +79,7 @@ class Drive {
       this.drive,
       dataContract.toBuffer(),
       blockTime,
+      true,
       useTransaction,
     );
   }
@@ -187,6 +188,7 @@ class Drive {
       this.drive,
       identity.id.toBuffer(),
       identity.toBuffer(),
+      true,
       useTransaction,
     );
   }
