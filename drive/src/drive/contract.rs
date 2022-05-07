@@ -1,11 +1,10 @@
 use crate::contract::Contract;
-use crate::drive::defaults::DEFAULT_HASH_SIZE;
 use crate::drive::object_size_info::KeyInfo::{KeyRef, KeySize};
 use crate::drive::object_size_info::KeyValueInfo::KeyRefRequest;
 use crate::drive::object_size_info::PathKeyElementInfo::{
     PathFixedSizeKeyElement, PathKeyElementSize,
 };
-use crate::drive::object_size_info::PathKeyInfo::{PathFixedSizeKeyRef, PathKeySize};
+use crate::drive::object_size_info::PathKeyInfo::{PathFixedSizeKeyRef};
 use crate::drive::{contract_documents_path, defaults, Drive, RootTree};
 use crate::error::drive::DriveError;
 use crate::error::Error;

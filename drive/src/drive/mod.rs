@@ -4,7 +4,6 @@ pub mod identity;
 pub mod object_size_info;
 
 use crate::contract::{Contract, Document, DocumentType};
-use crate::drive::object_size_info::KeyInfo::KeySize;
 use crate::error::drive::DriveError;
 use crate::error::query::QueryError;
 use crate::error::Error;
