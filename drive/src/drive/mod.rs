@@ -660,6 +660,7 @@ impl Drive {
         owner_id: Option<&[u8]>,
         override_document: bool,
         block_time: f64,
+        apply: bool,
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
         let contract = Contract::from_cbor(contract_cbor, None)?;
@@ -679,37 +680,7 @@ impl Drive {
             },
             override_document,
             block_time,
-            transaction,
-        )
-    }
-
-    pub fn add_document_fee_for_contract_cbor(
-        &self,
-        document_cbor: &[u8],
-        contract_cbor: &[u8],
-        document_type_name: &str,
-        owner_id: Option<&[u8]>,
-        override_document: bool,
-        block_time: f64,
-        transaction: TransactionArg,
-    ) -> Result<(i64, u64), Error> {
-        let contract = Contract::from_cbor(contract_cbor, None)?;
-
-        let document = Document::from_cbor(document_cbor, None, owner_id)?;
-
-        let document_info = DocumentAndSerialization((&document, document_cbor));
-
-        let document_type = contract.document_type_for_name(document_type_name)?;
-
-        self.add_document_fee_for_contract(
-            DocumentAndContractInfo {
-                document_info,
-                contract: &contract,
-                document_type,
-                owner_id,
-            },
-            override_document,
-            block_time,
+            apply,
             transaction,
         )
     }
@@ -722,6 +693,7 @@ impl Drive {
         owner_id: Option<&[u8]>,
         override_document: bool,
         block_time: f64,
+        apply: bool,
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
         let document = Document::from_cbor(document_cbor, None, owner_id)?;
@@ -739,35 +711,7 @@ impl Drive {
             },
             override_document,
             block_time,
-            transaction,
-        )
-    }
-
-    pub fn add_document_fee_cbor_for_contract(
-        &self,
-        document_cbor: &[u8],
-        contract: &Contract,
-        document_type_name: &str,
-        owner_id: Option<&[u8]>,
-        override_document: bool,
-        block_time: f64,
-        transaction: TransactionArg,
-    ) -> Result<(i64, u64), Error> {
-        let document = Document::from_cbor(document_cbor, None, owner_id)?;
-
-        let document_info = DocumentAndSerialization((&document, document_cbor));
-
-        let document_type = contract.document_type_for_name(document_type_name)?;
-
-        self.add_document_fee_for_contract(
-            DocumentAndContractInfo {
-                document_info,
-                contract,
-                document_type,
-                owner_id,
-            },
-            override_document,
-            block_time,
+            apply,
             transaction,
         )
     }
@@ -777,6 +721,7 @@ impl Drive {
         document_and_contract_info: DocumentAndContractInfo,
         override_document: bool,
         block_time: f64,
+        apply: bool,
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
         let mut query_operations: Vec<QueryOperation> = vec![];
@@ -785,29 +730,7 @@ impl Drive {
             document_and_contract_info,
             override_document,
             block_time,
-            true,
-            transaction,
-            &mut query_operations,
-            &mut insert_operations,
-        )?;
-        let fees = calculate_fee(None, Some(query_operations), Some(insert_operations), None)?;
-        Ok(fees)
-    }
-
-    pub fn add_document_fee_for_contract(
-        &self,
-        document_and_contract_info: DocumentAndContractInfo,
-        override_document: bool,
-        block_time: f64,
-        transaction: TransactionArg,
-    ) -> Result<(i64, u64), Error> {
-        let mut query_operations: Vec<QueryOperation> = vec![];
-        let mut insert_operations: Vec<InsertOperation> = vec![];
-        self.add_document_for_contract_operations(
-            document_and_contract_info,
-            override_document,
-            block_time,
-            false,
+            apply,
             transaction,
             &mut query_operations,
             &mut insert_operations,
@@ -1083,6 +1006,7 @@ impl Drive {
         document_type: &str,
         owner_id: Option<&[u8]>,
         block_time: f64,
+        apply: bool,
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
         let contract = Contract::from_cbor(contract_cbor, None)?;
@@ -1096,6 +1020,7 @@ impl Drive {
             document_type,
             owner_id,
             block_time,
+            apply,
             transaction,
         )
     }
@@ -1107,6 +1032,7 @@ impl Drive {
         document_type: &str,
         owner_id: Option<&[u8]>,
         block_time: f64,
+        apply: bool,
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
         let document = Document::from_cbor(document_cbor, None, owner_id)?;
@@ -1118,6 +1044,7 @@ impl Drive {
             document_type,
             owner_id,
             block_time,
+            apply,
             transaction,
         )
     }
@@ -1130,6 +1057,7 @@ impl Drive {
         document_type_name: &str,
         owner_id: Option<&[u8]>,
         block_time: f64,
+        apply: bool,
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
         let mut query_operations: Vec<QueryOperation> = vec![];
@@ -1145,7 +1073,7 @@ impl Drive {
                 owner_id,
             },
             block_time,
-            true,
+            apply,
             transaction,
             &mut query_operations,
             &mut insert_operations,
@@ -1706,6 +1634,7 @@ impl Drive {
             },
             false,
             0.0,
+            false,
             None,
         )
     }
@@ -1771,6 +1700,7 @@ mod tests {
                 Some(&random_owner_id),
                 false,
                 0f64,
+                true,
                 None,
             )
             .expect("expected to insert a document successfully");
@@ -1783,6 +1713,7 @@ mod tests {
                 Some(&random_owner_id),
                 false,
                 0f64,
+                true,
                 None,
             )
             .expect_err("expected not to be able to insert same document twice");
@@ -1795,6 +1726,7 @@ mod tests {
                 Some(&random_owner_id),
                 true,
                 0f64,
+                true,
                 None,
             )
             .expect("expected to override a document successfully");
@@ -1832,6 +1764,7 @@ mod tests {
                 Some(&random_owner_id),
                 false,
                 0f64,
+                true,
                 Some(&db_transaction),
             )
             .expect("expected to insert a document successfully");
@@ -1844,6 +1777,7 @@ mod tests {
                 Some(&random_owner_id),
                 false,
                 0f64,
+                true,
                 Some(&db_transaction),
             )
             .expect_err("expected not to be able to insert same document twice");
@@ -1856,6 +1790,7 @@ mod tests {
                 Some(&random_owner_id),
                 true,
                 0f64,
+                true,
                 Some(&db_transaction),
             )
             .expect("expected to override a document successfully");
@@ -1886,13 +1821,14 @@ mod tests {
 
         let random_owner_id = rand::thread_rng().gen::<[u8; 32]>();
         let (storage_fee, processing_fee) = drive
-            .add_document_fee_cbor_for_contract(
+            .add_document_cbor_for_contract(
                 &dashpay_cr_document_cbor,
                 &contract,
                 "contactRequest",
                 Some(&random_owner_id),
                 false,
                 0f64,
+                false,
                 Some(&db_transaction),
             )
             .expect("expected to get back fee for document insertion successfully");
@@ -1905,6 +1841,7 @@ mod tests {
                 Some(&random_owner_id),
                 false,
                 0f64,
+                true,
                 Some(&db_transaction),
             )
             .expect("expected to insert a document successfully");
@@ -2034,6 +1971,7 @@ mod tests {
                 Some(&random_owner_id),
                 false,
                 0f64,
+                true,
                 Some(&db_transaction),
             )
             .expect("expected to insert a document successfully");
@@ -2045,6 +1983,7 @@ mod tests {
                 "contactRequest",
                 Some(&random_owner_id),
                 0f64,
+                true,
                 Some(&db_transaction),
             )
             .expect_err("expected not to be able to update a non mutable document");
@@ -2057,6 +1996,7 @@ mod tests {
                 Some(&random_owner_id),
                 true,
                 0f64,
+                true,
                 Some(&db_transaction),
             )
             .expect_err("expected not to be able to override a non mutable document");
@@ -2099,6 +2039,7 @@ mod tests {
                 Some(&random_owner_id),
                 false,
                 0f64,
+                true,
                 Some(&db_transaction),
             )
             .expect("expected to insert a document successfully");
@@ -2110,6 +2051,7 @@ mod tests {
                 "profile",
                 Some(&random_owner_id),
                 0f64,
+                true,
                 Some(&db_transaction),
             )
             .expect("expected to update a document with history successfully");
@@ -2133,6 +2075,7 @@ mod tests {
                 Some(&random_owner_id),
                 false,
                 0f64,
+                true,
                 None,
             )
             .expect("expected to insert a document successfully");
@@ -2184,6 +2127,7 @@ mod tests {
                 Some(&random_owner_id),
                 false,
                 0f64,
+                true,
                 Some(&db_transaction),
             )
             .expect("expected to insert a document successfully");
@@ -2247,6 +2191,7 @@ mod tests {
                 },
                 false,
                 0f64,
+                true,
                 Some(&db_transaction),
             )
             .expect("expected to insert a document successfully");
@@ -2307,6 +2252,7 @@ mod tests {
                         },
                         false,
                         0f64,
+                        true,
                         Some(&db_transaction),
                     )
                     .expect("expected to insert a document successfully");
@@ -2418,6 +2364,7 @@ mod tests {
                 },
                 false,
                 0f64,
+                true,
                 Some(&db_transaction),
             )
             .expect("expected to insert a document successfully");
@@ -2517,6 +2464,7 @@ mod tests {
                 },
                 false,
                 0f64,
+                true,
                 Some(&db_transaction),
             )
             .expect("expected to insert a document successfully");
@@ -2548,6 +2496,7 @@ mod tests {
                 },
                 false,
                 0f64,
+                true,
                 Some(&db_transaction),
             )
             .expect("expected to insert a document successfully");
@@ -2675,6 +2624,7 @@ mod tests {
                 },
                 false,
                 0f64,
+                true,
                 Some(&db_transaction),
             )
             .expect("expected to insert a document successfully");
@@ -2706,6 +2656,7 @@ mod tests {
                 },
                 false,
                 0f64,
+                true,
                 Some(&db_transaction),
             )
             .expect("expected to insert a document successfully");
@@ -2766,6 +2717,7 @@ mod tests {
                 },
                 false,
                 0f64,
+                true,
                 Some(&db_transaction),
             )
             .expect("expected to insert a document successfully");
@@ -2847,6 +2799,7 @@ mod tests {
                 Some(&random_owner_id),
                 false,
                 0f64,
+                true,
                 None,
             )
             .expect("expected to insert a document successfully");
@@ -2858,6 +2811,7 @@ mod tests {
                 Some(&random_owner_id),
                 false,
                 0f64,
+                true,
                 None,
             )
             .expect("expected to insert a document successfully");
@@ -2869,6 +2823,7 @@ mod tests {
                 Some(&random_owner_id),
                 false,
                 0f64,
+                true,
                 None,
             )
             .expect("expected to insert a document successfully");
@@ -2897,6 +2852,7 @@ mod tests {
                 Some(&random_owner_id),
                 false,
                 0f64,
+                true,
                 None,
             )
             .expect("expected to insert a document successfully");
@@ -2908,6 +2864,7 @@ mod tests {
                 Some(&random_owner_id),
                 false,
                 0f64,
+                true,
                 None,
             )
             .expect_err(
@@ -2944,6 +2901,7 @@ mod tests {
                 None,
                 true,
                 0f64,
+                true,
                 Some(&db_transaction),
             )
             .expect("should create alice profile");
@@ -2959,6 +2917,7 @@ mod tests {
                 "profile",
                 None,
                 0f64,
+                true,
                 Some(&db_transaction),
             )
             .expect("should update alice profile");
@@ -3005,6 +2964,7 @@ mod tests {
                 },
                 true,
                 0f64,
+                true,
                 None,
             )
             .expect("should create alice profile");
@@ -3029,6 +2989,7 @@ mod tests {
                 "profile",
                 None,
                 0f64,
+                true,
                 None,
             )
             .expect("should update alice profile");
@@ -3083,6 +3044,7 @@ mod tests {
                 },
                 true,
                 0f64,
+                true,
                 Some(&db_transaction),
             )
             .expect("should create alice profile");
@@ -3120,6 +3082,7 @@ mod tests {
                 "profile",
                 None,
                 0f64,
+                true,
                 Some(&db_transaction),
             )
             .expect("should update alice profile");
@@ -3179,6 +3142,7 @@ mod tests {
                 },
                 true,
                 0f64,
+                true,
                 Some(&db_transaction),
             )
             .expect("should create alice profile");
@@ -3243,6 +3207,7 @@ mod tests {
                 "profile",
                 None,
                 0f64,
+                true,
                 Some(&db_transaction),
             )
             .expect("should update alice profile");
@@ -3277,6 +3242,7 @@ mod tests {
                 None,
                 true,
                 0f64,
+                true,
                 Some(&db_transaction),
             )
             .expect("should create dash tld");
@@ -3300,6 +3266,7 @@ mod tests {
                 None,
                 true,
                 0f64,
+                true,
                 Some(&db_transaction),
             )
             .expect("should add random tld");
@@ -3378,6 +3345,7 @@ mod tests {
                 None,
                 true,
                 0f64,
+                true,
                 None,
             )
             .expect("should add document");
@@ -3406,6 +3374,7 @@ mod tests {
                 "indexedDocument",
                 None,
                 0f64,
+                true,
                 None,
             )
             .expect("should update document");

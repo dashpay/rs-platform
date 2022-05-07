@@ -316,8 +316,9 @@ impl DriveWrapper {
         let js_owner_id = cx.argument::<JsBuffer>(3)?;
         let js_override_document = cx.argument::<JsBoolean>(4)?;
         let js_block_time = cx.argument::<JsDate>(5)?;
-        let js_using_transaction = cx.argument::<JsBoolean>(6)?;
-        let js_callback = cx.argument::<JsFunction>(7)?.root(&mut cx);
+        let js_apply = cx.argument::<JsBoolean>(6)?;
+        let js_using_transaction = cx.argument::<JsBoolean>(7)?;
+        let js_callback = cx.argument::<JsFunction>(8)?.root(&mut cx);
 
         let drive = cx
             .this()
@@ -329,6 +330,7 @@ impl DriveWrapper {
         let owner_id = converter::js_buffer_to_vec_u8(js_owner_id, &mut cx);
         let override_document = js_override_document.value(&mut cx);
         let block_time = js_block_time.value(&mut cx);
+        let apply = js_apply.value(&mut cx);
         let using_transaction = js_using_transaction.value(&mut cx);
 
         drive
@@ -340,6 +342,7 @@ impl DriveWrapper {
                     Some(&owner_id),
                     override_document,
                     block_time,
+                    apply,
                     using_transaction.then(|| transaction).flatten(),
                 );
 
@@ -406,6 +409,7 @@ impl DriveWrapper {
                     &document_type_name,
                     Some(&owner_id),
                     block_time,
+                    false,
                     using_transaction.then(|| transaction).flatten(),
                 );
 

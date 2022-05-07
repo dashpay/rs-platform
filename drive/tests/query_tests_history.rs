@@ -133,6 +133,7 @@ pub fn setup(count: u32, seed: u64) -> (Drive, Contract, TempDir) {
                     },
                     true,
                     block_time as f64,
+                    true,
                     Some(&db_transaction),
                 )
                 .expect("document should be inserted");
@@ -899,6 +900,7 @@ fn test_query_historical() {
             },
             true,
             0f64,
+            true,
             Some(&db_transaction),
         )
         .expect("document should be inserted");
@@ -940,6 +942,7 @@ fn test_query_historical() {
             },
             true,
             0f64,
+            true,
             Some(&db_transaction),
         )
         .expect("document should be inserted");

@@ -98,6 +98,7 @@ class Drive {
       document.getOwnerId().toBuffer(),
       true,
       blockTime,
+      true,
       useTransaction,
     );
   }
@@ -116,6 +117,7 @@ class Drive {
       document.getType(),
       document.getOwnerId().toBuffer(),
       blockTime,
+      true,
       useTransaction,
     );
   }

@@ -148,6 +148,7 @@ pub fn setup_family_tests(count: u32, seed: u64) -> (Drive, Contract, TempDir) {
                 },
                 true,
                 0f64,
+                true,
                 Some(&db_transaction),
             )
             .expect("document should be inserted");
@@ -198,6 +199,7 @@ pub fn setup_family_tests_with_nulls(count: u32, seed: u64) -> (Drive, Contract,
                 },
                 true,
                 0f64,
+                true,
                 Some(&db_transaction),
             )
             .expect("document should be inserted");
@@ -300,6 +302,7 @@ pub fn setup_dpns_tests(count: u32, seed: u64) -> (Drive, Contract, TempDir) {
                 },
                 true,
                 0f64,
+                true,
                 Some(&db_transaction),
             )
             .expect("document should be inserted");
@@ -357,6 +360,7 @@ pub fn setup_dpns_test_with_data(path: &str) -> (Drive, Contract, TempDir) {
                     },
                     false,
                     0f64,
+                    true,
                     Some(&db_transaction),
                 )
                 .expect("expected to insert a document successfully");
@@ -395,6 +399,7 @@ fn test_query_many() {
                 },
                 true,
                 0f64,
+                true,
                 Some(&db_transaction),
             )
             .expect("document should be inserted");
@@ -1174,6 +1179,7 @@ fn test_family_query() {
             },
             true,
             0f64,
+            true,
             Some(&db_transaction),
         )
         .expect("document should be inserted");
@@ -1214,6 +1220,7 @@ fn test_family_query() {
             },
             true,
             0f64,
+            true,
             Some(&db_transaction),
         )
         .expect("document should be inserted");

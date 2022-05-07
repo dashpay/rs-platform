@@ -4,7 +4,7 @@ use crate::drive::object_size_info::KeyValueInfo::KeyRefRequest;
 use crate::drive::object_size_info::PathKeyElementInfo::{
     PathFixedSizeKeyElement, PathKeyElementSize,
 };
-use crate::drive::object_size_info::PathKeyInfo::{PathFixedSizeKeyRef};
+use crate::drive::object_size_info::PathKeyInfo::PathFixedSizeKeyRef;
 use crate::drive::{contract_documents_path, defaults, Drive, RootTree};
 use crate::error::drive::DriveError;
 use crate::error::Error;
@@ -588,6 +588,7 @@ mod tests {
                 },
                 false,
                 0f64,
+                false,
                 None,
             )
             .expect("expected to insert a document successfully");
@@ -621,6 +622,7 @@ mod tests {
                 },
                 false,
                 0f64,
+                false,
                 None,
             )
             .expect("expected to insert a document successfully");
