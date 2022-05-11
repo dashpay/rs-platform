@@ -73,6 +73,7 @@ impl FunctionOp {
     pub fn cost(&self, word_count: u32) {}
 }
 
+#[derive(Debug)]
 pub struct QueryOperation {
     pub key_size: u32,
     pub path_size: u32,
@@ -173,6 +174,7 @@ impl QueryOperation {
     }
 }
 
+#[derive(Debug)]
 pub struct InsertOperation {
     pub key_size: u16,
     pub value_size: u32,
@@ -194,7 +196,8 @@ impl InsertOperation {
     }
 
     pub fn for_key_value_size(key_size: usize, value_size: usize) -> Self {
-        let node_value_size = Element::calculate_node_byte_size(value_size, key_size);
+        let serialized_value_size = Element::required_item_space(value_size);
+        let node_value_size = Element::calculate_node_byte_size(serialized_value_size, key_size);
         InsertOperation {
             key_size: key_size as u16,
             value_size: node_value_size as u32,
