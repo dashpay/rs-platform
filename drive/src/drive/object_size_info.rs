@@ -10,6 +10,20 @@ use PathInfo::{PathFixedSizeIterator, PathIterator, PathSize};
 use PathKeyElementInfo::{PathFixedSizeKeyElement, PathKeyElement, PathKeyElementSize};
 use PathKeyInfo::{PathFixedSizeKey, PathFixedSizeKeyRef, PathKey, PathKeyRef, PathKeySize};
 
+#[derive(Clone, PartialEq)]
+pub enum ActionType {
+    Apply,
+    DryRunFee,
+    WorstCaseFeeWithKnownItem,
+    WorstCaseFeeForDocumentType,
+}
+
+impl ActionType {
+    pub fn is_apply(&self) -> bool {
+        self == &Self::Apply
+    }
+}
+
 #[derive(Clone)]
 pub enum PathInfo<'a, const N: usize> {
     /// An into iter Path
@@ -293,6 +307,15 @@ impl<'a, const N: usize> PathKeyElementInfo<'a, N> {
             PathFixedSizeKeyElement((_, key, element)) => element.node_byte_size(key.len()),
         }
     }
+}
+
+pub enum PathKeyForDeletionElementInfo<'a, const N: usize> {
+    /// A triple Path Key and Element
+    PathFixedSizeKeyForDeletion(([&'a [u8]; N], &'a [u8])),
+    /// A triple Path Key and Element
+    PathKeyForDeletion((Vec<Vec<u8>>, &'a [u8])),
+    /// A triple of sum of Path lengths, Key length and Element size
+    PathKeyElementSizeForDeletion((usize, usize, usize)),
 }
 
 pub struct DocumentAndContractInfo<'a> {

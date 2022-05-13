@@ -38,4 +38,9 @@ pub enum DriveError {
     CorruptedDocumentAlreadyExists(&'static str),
     #[error("corrupted document not an item error: {0}")]
     CorruptedDocumentNotItem(&'static str),
+
+    #[error("multiplier not supported error: {0}")]
+    MultiplierNotSupported(&'static str),
+    #[error("multiplier encoding error: {0}")]
+    MultiplierEncodingNotSupported(&'static str),
 }

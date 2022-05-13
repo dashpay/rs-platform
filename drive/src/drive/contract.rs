@@ -1,9 +1,8 @@
 use crate::contract::Contract;
-use crate::drive::object_size_info::KeyInfo::{KeyRef, KeySize};
+use crate::drive::object_size_info::ActionType;
+use crate::drive::object_size_info::KeyInfo::KeyRef;
 use crate::drive::object_size_info::KeyValueInfo::KeyRefRequest;
-use crate::drive::object_size_info::PathKeyElementInfo::{
-    PathFixedSizeKeyElement, PathKeyElementSize,
-};
+use crate::drive::object_size_info::PathKeyElementInfo::PathFixedSizeKeyElement;
 use crate::drive::object_size_info::PathKeyInfo::PathFixedSizeKeyRef;
 use crate::drive::{contract_documents_path, defaults, Drive, RootTree};
 use crate::error::drive::DriveError;
@@ -46,7 +45,7 @@ impl Drive {
         contract_bytes: Element,
         contract: &Contract,
         block_time: f64,
-        apply: bool,
+        action: ActionType,
         transaction: TransactionArg,
         insert_operations: &mut Vec<InsertOperation>,
     ) -> Result<(), Error> {
@@ -56,7 +55,7 @@ impl Drive {
                 contract_root_path,
                 KeyRef(&[0]),
                 transaction,
-                apply,
+                action.is_apply(),
                 insert_operations,
             )?;
             let encoded_time = crate::contract::types::encode_float(block_time)?;
@@ -69,40 +68,31 @@ impl Drive {
                     contract_bytes,
                 )),
                 transaction,
-                apply,
+                action.is_apply(),
                 insert_operations,
             )?;
 
             // we should also insert a reference at 0 to the current value
             let contract_storage_path =
                 contract_keeping_history_storage_time_reference_path(&contract.id, encoded_time);
-            let path_key_element_info = if apply {
+            self.grove_insert(
                 PathFixedSizeKeyElement((
                     contract_keeping_history_storage_path,
                     &[0],
                     Element::Reference(contract_storage_path),
-                ))
-            } else {
-                PathKeyElementSize((
-                    defaults::BASE_CONTRACT_KEEPING_HISTORY_STORAGE_PATH_SIZE,
-                    1,
-                    defaults::BASE_CONTRACT_KEEPING_HISTORY_STORAGE_PATH_SIZE
-                        + defaults::DEFAULT_FLOAT_SIZE,
-                ))
-            };
-            self.grove_insert(path_key_element_info, transaction, apply, insert_operations)?;
+                )),
+                transaction,
+                action.is_apply(),
+                insert_operations,
+            )?;
         } else {
             // the contract is just stored at key 0
-            let path_key_element_info = if apply {
-                PathFixedSizeKeyElement((contract_root_path, &[0], contract_bytes))
-            } else {
-                PathKeyElementSize((
-                    defaults::BASE_CONTRACT_ROOT_PATH_SIZE,
-                    1,
-                    contract_bytes.byte_size(),
-                ))
-            };
-            self.grove_insert(path_key_element_info, transaction, apply, insert_operations)?;
+            self.grove_insert(
+                PathFixedSizeKeyElement((contract_root_path, &[0], contract_bytes)),
+                transaction,
+                action.is_apply(),
+                insert_operations,
+            )?;
         }
         Ok(())
     }
@@ -112,7 +102,7 @@ impl Drive {
         contract_bytes: Element,
         contract: &Contract,
         block_time: f64,
-        apply: bool,
+        action: ActionType,
         transaction: TransactionArg,
         insert_operations: &mut Vec<InsertOperation>,
     ) -> Result<(), Error> {
@@ -120,7 +110,7 @@ impl Drive {
             [Into::<&[u8; 1]>::into(RootTree::ContractDocuments).as_slice()],
             KeyRef(contract.id.as_slice()),
             transaction,
-            apply,
+            action.is_apply(),
             insert_operations,
         )?;
 
@@ -128,19 +118,18 @@ impl Drive {
             contract_bytes,
             contract,
             block_time,
-            apply,
+            action,
             transaction,
             insert_operations,
         )?;
 
         // the documents
         let contract_root_path = contract_root_path(&contract.id);
-        let key_info = if apply { KeyRef(&[1]) } else { KeySize(1) };
         self.grove_insert_empty_tree(
             contract_root_path,
-            key_info,
+            KeyRef(&[1]),
             transaction,
-            apply,
+            action.is_apply(),
             insert_operations,
         )?;
 
@@ -154,7 +143,7 @@ impl Drive {
                 contract_documents_path,
                 KeyRef(type_key.as_bytes()),
                 transaction,
-                apply,
+                action.is_apply(),
                 insert_operations,
             )?;
 
@@ -166,12 +155,11 @@ impl Drive {
             ];
 
             // primary key tree
-            let key_info = if apply { KeyRef(&[0]) } else { KeySize(1) };
             self.grove_insert_empty_tree(
                 type_path,
-                key_info,
+                KeyRef(&[0]),
                 transaction,
-                apply,
+                action.is_apply(),
                 insert_operations,
             )?;
 
@@ -182,7 +170,7 @@ impl Drive {
                     type_path,
                     KeyRef(index.name.as_bytes()),
                     transaction,
-                    apply,
+                    action.is_apply(),
                     insert_operations,
                 )?;
             }
@@ -197,7 +185,7 @@ impl Drive {
         contract: &Contract,
         original_contract: &Contract,
         block_time: f64,
-        apply: bool,
+        action: ActionType,
         transaction: TransactionArg,
         query_operations: &mut Vec<QueryOperation>,
         insert_operations: &mut Vec<InsertOperation>,
@@ -245,7 +233,7 @@ impl Drive {
             contract_bytes,
             contract,
             block_time,
-            apply,
+            action,
             transaction,
             insert_operations,
         )?;
@@ -280,7 +268,7 @@ impl Drive {
                     self.grove_insert_empty_tree_if_not_exists(
                         PathFixedSizeKeyRef((type_path, index.name.as_bytes())),
                         transaction,
-                        apply,
+                        action.is_apply(),
                         query_operations,
                         insert_operations,
                     )?;
@@ -291,7 +279,7 @@ impl Drive {
                     contract_documents_path,
                     KeyRef(type_key.as_bytes()),
                     transaction,
-                    apply,
+                    action.is_apply(),
                     insert_operations,
                 )?;
 
@@ -307,7 +295,7 @@ impl Drive {
                     type_path,
                     KeyRef(&[0]),
                     transaction,
-                    apply,
+                    action.is_apply(),
                     insert_operations,
                 )?;
 
@@ -318,7 +306,7 @@ impl Drive {
                         type_path,
                         KeyRef(index.name.as_bytes()),
                         transaction,
-                        apply,
+                        action.is_apply(),
                         insert_operations,
                     )?;
                 }
@@ -333,12 +321,12 @@ impl Drive {
         contract_cbor: Vec<u8>,
         contract_id: Option<[u8; 32]>,
         block_time: f64,
-        apply: bool,
+        action: ActionType,
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
         // first we need to deserialize the contract
         let contract = Contract::from_cbor(&contract_cbor, contract_id)?;
-        self.apply_contract(&contract, contract_cbor, block_time, apply, transaction)
+        self.apply_contract(&contract, contract_cbor, block_time, action, transaction)
     }
 
     pub fn get_contract(
@@ -395,7 +383,7 @@ impl Drive {
         contract: &Contract,
         contract_serialization: Vec<u8>,
         block_time: f64,
-        apply: bool,
+        action: ActionType,
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
         let mut query_operations: Vec<QueryOperation> = vec![];
@@ -435,7 +423,7 @@ impl Drive {
                     contract,
                     &original_contract,
                     block_time,
-                    apply,
+                    action,
                     transaction,
                     &mut query_operations,
                     &mut insert_operations,
@@ -446,7 +434,7 @@ impl Drive {
                 contract_element,
                 contract,
                 block_time,
-                apply,
+                action,
                 transaction,
                 &mut insert_operations,
             )?;
@@ -460,6 +448,7 @@ impl Drive {
 mod tests {
     use crate::common::json_document_to_cbor;
     use crate::contract::Contract;
+    use crate::drive::object_size_info::ActionType::Apply;
     use crate::drive::object_size_info::{DocumentAndContractInfo, DocumentInfo};
     use crate::drive::Drive;
     use rand::Rng;
@@ -480,7 +469,7 @@ mod tests {
         let contract = Contract::from_cbor(&contract_cbor, None)
             .expect("expected to deserialize the contract");
         drive
-            .apply_contract(&contract, contract_cbor.clone(), 0f64, true, None)
+            .apply_contract(&contract, contract_cbor.clone(), 0f64, Apply, None)
             .expect("expected to apply contract successfully");
 
         (drive, contract, contract_cbor)
@@ -501,7 +490,7 @@ mod tests {
         let contract = Contract::from_cbor(&contract_cbor, None)
             .expect("expected to deserialize the contract");
         drive
-            .apply_contract(&contract, contract_cbor.clone(), 0f64, true, None)
+            .apply_contract(&contract, contract_cbor.clone(), 0f64, Apply, None)
             .expect("expected to apply contract successfully");
 
         (drive, contract, contract_cbor)
@@ -519,13 +508,13 @@ mod tests {
         let initial_contract_cbor = hex::decode("01000000a66324696458209c2b800c5ea525d032a9fda4dda22a896f1e763af5f0e15ae7f93882b7439d77652464656673a1686c6173744e616d65a1647479706566737472696e676724736368656d61783468747470733a2f2f736368656d612e646173682e6f72672f6470702d302d342d302f6d6574612f646174612d636f6e7472616374676f776e657249645820636d3188dfffe62efb10e20347ec6c41b3e49fa31cb757ef4bad6cd8f1c7f4b66776657273696f6e0169646f63756d656e7473a76b756e697175654461746573a56474797065666f626a65637467696e646963657382a3646e616d6566696e6465783166756e69717565f56a70726f7065727469657382a16a2463726561746564417463617363a16a2475706461746564417463617363a2646e616d6566696e646578326a70726f7065727469657381a16a2475706461746564417463617363687265717569726564836966697273744e616d656a246372656174656441746a247570646174656441746a70726f70657274696573a2686c6173744e616d65a1647479706566737472696e676966697273744e616d65a1647479706566737472696e67746164646974696f6e616c50726f70657274696573f46c6e696365446f63756d656e74a46474797065666f626a656374687265717569726564816a246372656174656441746a70726f70657274696573a1646e616d65a1647479706566737472696e67746164646974696f6e616c50726f70657274696573f46e6e6f54696d65446f63756d656e74a36474797065666f626a6563746a70726f70657274696573a1646e616d65a1647479706566737472696e67746164646974696f6e616c50726f70657274696573f46e707265747479446f63756d656e74a46474797065666f626a65637468726571756972656482686c6173744e616d656a247570646174656441746a70726f70657274696573a1686c6173744e616d65a1642472656670232f24646566732f6c6173744e616d65746164646974696f6e616c50726f70657274696573f46e7769746842797465417272617973a56474797065666f626a65637467696e646963657381a2646e616d6566696e646578316a70726f7065727469657381a16e6279746541727261794669656c6463617363687265717569726564816e6279746541727261794669656c646a70726f70657274696573a26e6279746541727261794669656c64a36474797065656172726179686d61784974656d731069627974654172726179f56f6964656e7469666965724669656c64a56474797065656172726179686d61784974656d731820686d696e4974656d73182069627974654172726179f570636f6e74656e744d656469615479706578216170706c69636174696f6e2f782e646173682e6470702e6964656e746966696572746164646974696f6e616c50726f70657274696573f46f696e6465786564446f63756d656e74a56474797065666f626a65637467696e646963657386a3646e616d6566696e6465783166756e69717565f56a70726f7065727469657382a168246f776e6572496463617363a16966697273744e616d656464657363a3646e616d6566696e6465783266756e69717565f56a70726f7065727469657382a168246f776e6572496463617363a1686c6173744e616d656464657363a2646e616d6566696e646578336a70726f7065727469657381a1686c6173744e616d6563617363a2646e616d6566696e646578346a70726f7065727469657382a16a2463726561746564417463617363a16a2475706461746564417463617363a2646e616d6566696e646578356a70726f7065727469657381a16a2475706461746564417463617363a2646e616d6566696e646578366a70726f7065727469657381a16a2463726561746564417463617363687265717569726564846966697273744e616d656a246372656174656441746a24757064617465644174686c6173744e616d656a70726f70657274696573a2686c6173744e616d65a2647479706566737472696e67696d61784c656e6774681901006966697273744e616d65a2647479706566737472696e67696d61784c656e677468190100746164646974696f6e616c50726f70657274696573f4781d6f7074696f6e616c556e69717565496e6465786564446f63756d656e74a56474797065666f626a65637467696e646963657383a3646e616d6566696e6465783166756e69717565f56a70726f7065727469657381a16966697273744e616d656464657363a3646e616d6566696e6465783266756e69717565f56a70726f7065727469657383a168246f776e6572496463617363a16966697273744e616d6563617363a1686c6173744e616d6563617363a3646e616d6566696e6465783366756e69717565f56a70726f7065727469657382a167636f756e74727963617363a1646369747963617363687265717569726564826966697273744e616d65686c6173744e616d656a70726f70657274696573a46463697479a2647479706566737472696e67696d61784c656e67746819010067636f756e747279a2647479706566737472696e67696d61784c656e677468190100686c6173744e616d65a2647479706566737472696e67696d61784c656e6774681901006966697273744e616d65a2647479706566737472696e67696d61784c656e677468190100746164646974696f6e616c50726f70657274696573f4").unwrap();
 
         drive
-            .apply_contract_cbor(initial_contract_cbor, None, 0f64, true, None)
+            .apply_contract_cbor(initial_contract_cbor, None, 0f64, Apply, None)
             .expect("expected to apply contract successfully");
 
         let updated_contract_cbor = hex::decode("01000000a66324696458209c2b800c5ea525d032a9fda4dda22a896f1e763af5f0e15ae7f93882b7439d77652464656673a1686c6173744e616d65a1647479706566737472696e676724736368656d61783468747470733a2f2f736368656d612e646173682e6f72672f6470702d302d342d302f6d6574612f646174612d636f6e7472616374676f776e657249645820636d3188dfffe62efb10e20347ec6c41b3e49fa31cb757ef4bad6cd8f1c7f4b66776657273696f6e0269646f63756d656e7473a86b756e697175654461746573a56474797065666f626a65637467696e646963657382a3646e616d6566696e6465783166756e69717565f56a70726f7065727469657382a16a2463726561746564417463617363a16a2475706461746564417463617363a2646e616d6566696e646578326a70726f7065727469657381a16a2475706461746564417463617363687265717569726564836966697273744e616d656a246372656174656441746a247570646174656441746a70726f70657274696573a2686c6173744e616d65a1647479706566737472696e676966697273744e616d65a1647479706566737472696e67746164646974696f6e616c50726f70657274696573f46c6e696365446f63756d656e74a46474797065666f626a656374687265717569726564816a246372656174656441746a70726f70657274696573a1646e616d65a1647479706566737472696e67746164646974696f6e616c50726f70657274696573f46e6e6f54696d65446f63756d656e74a36474797065666f626a6563746a70726f70657274696573a1646e616d65a1647479706566737472696e67746164646974696f6e616c50726f70657274696573f46e707265747479446f63756d656e74a46474797065666f626a65637468726571756972656482686c6173744e616d656a247570646174656441746a70726f70657274696573a1686c6173744e616d65a1642472656670232f24646566732f6c6173744e616d65746164646974696f6e616c50726f70657274696573f46e7769746842797465417272617973a56474797065666f626a65637467696e646963657381a2646e616d6566696e646578316a70726f7065727469657381a16e6279746541727261794669656c6463617363687265717569726564816e6279746541727261794669656c646a70726f70657274696573a26e6279746541727261794669656c64a36474797065656172726179686d61784974656d731069627974654172726179f56f6964656e7469666965724669656c64a56474797065656172726179686d61784974656d731820686d696e4974656d73182069627974654172726179f570636f6e74656e744d656469615479706578216170706c69636174696f6e2f782e646173682e6470702e6964656e746966696572746164646974696f6e616c50726f70657274696573f46f696e6465786564446f63756d656e74a56474797065666f626a65637467696e646963657386a3646e616d6566696e6465783166756e69717565f56a70726f7065727469657382a168246f776e6572496463617363a16966697273744e616d656464657363a3646e616d6566696e6465783266756e69717565f56a70726f7065727469657382a168246f776e6572496463617363a1686c6173744e616d656464657363a2646e616d6566696e646578336a70726f7065727469657381a1686c6173744e616d6563617363a2646e616d6566696e646578346a70726f7065727469657382a16a2463726561746564417463617363a16a2475706461746564417463617363a2646e616d6566696e646578356a70726f7065727469657381a16a2475706461746564417463617363a2646e616d6566696e646578366a70726f7065727469657381a16a2463726561746564417463617363687265717569726564846966697273744e616d656a246372656174656441746a24757064617465644174686c6173744e616d656a70726f70657274696573a2686c6173744e616d65a2647479706566737472696e67696d61784c656e6774681901006966697273744e616d65a2647479706566737472696e67696d61784c656e677468190100746164646974696f6e616c50726f70657274696573f4716d79417765736f6d65446f63756d656e74a56474797065666f626a65637467696e646963657382a3646e616d656966697273744e616d6566756e69717565f56a70726f7065727469657381a16966697273744e616d6563617363a3646e616d657166697273744e616d654c6173744e616d6566756e69717565f56a70726f7065727469657382a16966697273744e616d6563617363a1686c6173744e616d6563617363687265717569726564846966697273744e616d656a246372656174656441746a24757064617465644174686c6173744e616d656a70726f70657274696573a2686c6173744e616d65a2647479706566737472696e67696d61784c656e6774681901006966697273744e616d65a2647479706566737472696e67696d61784c656e677468190100746164646974696f6e616c50726f70657274696573f4781d6f7074696f6e616c556e69717565496e6465786564446f63756d656e74a56474797065666f626a65637467696e646963657383a3646e616d6566696e6465783166756e69717565f56a70726f7065727469657381a16966697273744e616d656464657363a3646e616d6566696e6465783266756e69717565f56a70726f7065727469657383a168246f776e6572496463617363a16966697273744e616d6563617363a1686c6173744e616d6563617363a3646e616d6566696e6465783366756e69717565f56a70726f7065727469657382a167636f756e74727963617363a1646369747963617363687265717569726564826966697273744e616d65686c6173744e616d656a70726f70657274696573a46463697479a2647479706566737472696e67696d61784c656e67746819010067636f756e747279a2647479706566737472696e67696d61784c656e677468190100686c6173744e616d65a2647479706566737472696e67696d61784c656e6774681901006966697273744e616d65a2647479706566737472696e67696d61784c656e677468190100746164646974696f6e616c50726f70657274696573f4").unwrap();
 
         drive
-            .apply_contract_cbor(updated_contract_cbor, None, 0f64, true, None)
+            .apply_contract_cbor(updated_contract_cbor, None, 0f64, Apply, None)
             .expect("should update initial contract");
     }
 
@@ -557,7 +546,7 @@ mod tests {
                 },
                 false,
                 0f64,
-                false,
+                Apply,
                 None,
             )
             .expect("expected to insert a document successfully");
@@ -591,7 +580,7 @@ mod tests {
                 },
                 false,
                 0f64,
-                false,
+                Apply,
                 None,
             )
             .expect("expected to insert a document successfully");
