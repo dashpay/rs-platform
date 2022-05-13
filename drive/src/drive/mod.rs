@@ -36,6 +36,8 @@ use std::collections::BTreeSet;
 use std::ops::DerefMut;
 use std::path::Path;
 use std::sync::Arc;
+use crate::drive::object_size_info::PathKeyForDeletionElementInfo::{PathFixedSizeKeyForDeletion, PathKeyElementSizeForDeletion};
+use crate::error::fee::FeeError;
 
 pub struct Drive {
     pub grove: GroveDb,
@@ -548,6 +550,7 @@ impl Drive {
                 }
             }
             PathKeyForDeletionElementInfo::PathKeyForDeletion((path, key)) => {
+                let path = path.iter().map(|x| x.as_slice());
                 if let Some(deleted_size) = self
                     .grove
                     .delete(path, key, transaction)
@@ -910,7 +913,7 @@ impl Drive {
                 &document_and_contract_info,
                 block_time,
                 override_document,
-                action,
+                action.clone(),
                 transaction,
                 query_operations,
                 insert_operations,
@@ -1304,7 +1307,7 @@ impl Drive {
                 &document_and_contract_info,
                 block_time,
                 true,
-                action,
+                action.clone(),
                 transaction,
                 query_operations,
                 insert_operations,
@@ -1623,17 +1626,16 @@ impl Drive {
 
         let document = Document::from_cbor(document_bytes.as_slice(), None, owner_id)?;
 
-        match action {
-            Apply => {}
-            DryRunFee => {}
-            WorstCaseFeeWithKnownItem => {}
-            WorstCaseFeeForDocumentType => {}
-        }
+        let path_key_element_info = match action {
+            Apply => { Ok(PathFixedSizeKeyForDeletion((contract_documents_primary_key_path, document_id))) }
+            DryRunFee => { Ok(PathFixedSizeKeyForDeletion((contract_documents_primary_key_path, document_id))) }
+            WorstCaseFeeWithKnownItem => { Err(Error::Fee(FeeError::RequestingWorstCaseDeleteFeeForKnownItem("you can not do this")))}
+            WorstCaseFeeForDocumentType => { Ok(PathKeyElementSizeForDeletion((0,0,0)))}
+        }?;
         // third we need to delete the document for it's primary key
         self.grove_delete(
-            contract_documents_primary_key_path,
-            document_id,
-            action.is_apply(),
+            path_key_element_info,
+            action.clone(),
             transaction,
             delete_operations,
         )?;

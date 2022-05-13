@@ -264,19 +264,19 @@ impl DeleteOperation {
 
     pub fn storage_data_size(&self) -> u32 {
         match self.action {
-            ActionType::Apply => self.value_size + self.key_size,
-            ActionType::DryRunFee => self.value_size + self.key_size,
-            ActionType::WorstCaseFeeWithKnownItem => self.value_size + self.key_size,
+            ActionType::Apply => self.value_size + self.key_size as u32,
+            ActionType::DryRunFee => self.value_size + self.key_size as u32,
+            ActionType::WorstCaseFeeWithKnownItem => self.value_size + self.key_size as u32,
             ActionType::WorstCaseFeeForDocumentType => 0,
         }
     }
 
     pub fn memory_data_size(&self) -> u32 {
         match self.action {
-            ActionType::Apply => self.value_size + self.key_size,
-            ActionType::DryRunFee => self.value_size + self.key_size,
-            ActionType::WorstCaseFeeWithKnownItem => self.value_size + self.key_size,
-            ActionType::WorstCaseFeeForDocumentType => self.value_size + self.key_size,
+            ActionType::Apply => self.value_size + self.key_size as u32,
+            ActionType::DryRunFee => self.value_size + self.key_size as u32,
+            ActionType::WorstCaseFeeWithKnownItem => self.value_size + self.key_size as u32,
+            ActionType::WorstCaseFeeForDocumentType => self.value_size + self.key_size as u32,
         }
     }
 

@@ -118,7 +118,7 @@ impl Drive {
             contract_bytes,
             contract,
             block_time,
-            action,
+            action.clone(),
             transaction,
             insert_operations,
         )?;
@@ -233,7 +233,7 @@ impl Drive {
             contract_bytes,
             contract,
             block_time,
-            action,
+            action.clone(),
             transaction,
             insert_operations,
         )?;

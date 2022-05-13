@@ -10,7 +10,7 @@ use PathInfo::{PathFixedSizeIterator, PathIterator, PathSize};
 use PathKeyElementInfo::{PathFixedSizeKeyElement, PathKeyElement, PathKeyElementSize};
 use PathKeyInfo::{PathFixedSizeKey, PathFixedSizeKeyRef, PathKey, PathKeyRef, PathKeySize};
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum ActionType {
     Apply,
     DryRunFee,
