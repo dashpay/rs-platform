@@ -165,6 +165,7 @@ impl Drive {
                 cached_contracts: RefCell::new(Cache::new(200)),
                 transient_inserts: RefCell::new(BTreeSet::new()),
                 transient_batch_inserts: RefCell::new(BTreeSet::new()),
+                multiplier: RefCell::new(Multiplier::multiplier_for_price(100)?)
             }),
             Err(e) => Err(Error::GroveDB(e)),
         }
