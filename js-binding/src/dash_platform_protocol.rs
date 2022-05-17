@@ -1,8 +1,8 @@
-use std::sync::Arc;
-use wasm_bindgen::prelude::*;
 use dpp::identity::validation::PublicKeysValidator;
 use dpp::identity::IdentityFacade;
 use dpp::version::ProtocolVersionValidator;
+use std::sync::Arc;
+use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen(js_name=DashPlatformProtocol)]
 pub struct DashPlatformProtocol(IdentityFacade);
