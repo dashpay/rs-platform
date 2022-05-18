@@ -227,32 +227,42 @@ impl DeleteOperation {
     pub fn for_empty_tree(key_size: usize, multiplier: u64) -> Self {
         DeleteOperation {
             key_size: key_size as u16,
-            value_size: 0,
-            multiplier,
-        }
-    }
-    pub fn for_key_value(key_size: usize, element: &Element, multiplier: u64) -> Self {
-        let value_size = match element {
-            Element::Item(item) => item.len(),
-            Element::Reference(path) => path.iter().map(|inner| inner.len()).sum(),
-            Element::Tree(_) => 32,
-        };
-        DeleteOperation {
-            key_size: key_size as u16,
-            value_size: value_size as u32,
+            value_size: Element::calculate_node_byte_size(33, key_size) as u32,
             multiplier,
         }
     }
 
-    pub fn data_size(&self) -> u32 {
+    pub fn for_key_value(key_size: usize, element: &Element, multiplier: u64) -> Self {
+        DeleteOperation {
+            key_size: key_size as u16,
+            value_size: element.node_byte_size(key_size) as u32,
+            multiplier,
+        }
+    }
+
+    pub fn for_key_value_size(key_size: usize, value_size: usize, multiplier: u64) -> Self {
+        let serialized_value_size = Element::required_item_space(value_size);
+        let node_value_size = Element::calculate_node_byte_size(serialized_value_size, key_size);
+        DeleteOperation {
+            key_size: key_size as u16,
+            value_size: node_value_size as u32,
+            multiplier,
+        }
+    }
+
+    pub fn storage_data_size(&self) -> u32 {
+        self.value_size + self.key_size as u32
+    }
+
+    pub fn memory_data_size(&self) -> u32 {
         self.value_size + self.key_size as u32
     }
 
     pub fn ephemeral_cost(&self) -> u64 {
-        self.data_size() as u64 * STORAGE_PROCESSING_CREDIT_PER_BYTE
+        self.memory_data_size() as u64 * STORAGE_PROCESSING_CREDIT_PER_BYTE
     }
 
     pub fn storage_cost(&self) -> i64 {
-        -(self.data_size() as i64 * STORAGE_CREDIT_PER_BYTE as i64)
+        -(self.storage_data_size() as i64 * STORAGE_CREDIT_PER_BYTE as i64)
     }
 }

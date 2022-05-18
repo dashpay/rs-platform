@@ -4,6 +4,12 @@ pub mod identity;
 pub mod object_size_info;
 
 use crate::contract::{Contract, Document, DocumentType};
+use crate::drive::object_size_info::KeyInfo::KeySize;
+use crate::drive::object_size_info::KeyValueInfo::KeyValueMaxSize;
+use crate::drive::object_size_info::PathKeyForDeletionElementInfo;
+use crate::drive::object_size_info::PathKeyForDeletionElementInfo::{
+    PathFixedSizeKeyForDeletion, PathKeyElementSizeForDeletion,
+};
 use crate::error::drive::DriveError;
 use crate::error::query::QueryError;
 use crate::error::Error;
@@ -156,34 +162,11 @@ impl Drive {
             Ok(grove) => Ok(Drive {
                 grove,
                 cached_contracts: RefCell::new(Cache::new(200)),
-                // transient_inserts: RefCell::new(BTreeSet::new()),
-                // transient_batch_inserts: RefCell::new(BTreeSet::new()),
             }),
+
             Err(e) => Err(Error::GroveDB(e)),
         }
     }
-
-    // pub fn commit_transaction(&self, transaction: Transaction) -> Result<(), Error> {
-    //     self.transient_inserts.borrow_mut().clear();
-    //     self.transient_batch_inserts.borrow_mut().clear();
-    //     self.grove
-    //         .commit_transaction(transaction)
-    //         .map_err(Error::GroveDB)
-    // }
-    //
-    // pub fn rollback_transaction(&self, transaction: &Transaction) -> Result<(), Error> {
-    //     self.transient_inserts.borrow_mut().clear();
-    //     self.transient_batch_inserts.borrow_mut().clear();
-    //     self.grove
-    //         .rollback_transaction(transaction)
-    //         .map_err(Error::GroveDB)
-    // }
-    //
-    // fn commit_transient_batch_inserts(&self) {
-    //     self.transient_inserts
-    //         .borrow_mut()
-    //         .append(self.transient_batch_inserts.borrow_mut().deref_mut())
-    // }
 
     pub const fn check_protocol_version(_version: u32) -> bool {
         // Temporary disabled due protocol version is dynamic and goes from consensus params
@@ -235,7 +218,6 @@ impl Drive {
         path: P,
         key_info: KeyInfo<'c>,
         transaction: TransactionArg,
-        apply: bool,
         insert_operations: &mut Vec<InsertOperation>,
     ) -> Result<(), Error>
     where
@@ -245,19 +227,14 @@ impl Drive {
         match key_info {
             KeyInfo::KeyRef(key) => {
                 insert_operations.push(InsertOperation::for_empty_tree(key.len()));
-                // if apply {
+
                 self.grove
                     .insert(path, key, Element::empty_tree(), transaction)
                     .map_err(Error::GroveDB)
-                // } else {
-                // let mut path_items: Vec<Vec<u8>> = path.into_iter().map(Vec::from).collect();
-                // path_items.push(Vec::from(key));
-                // self.transient_batch_inserts.borrow_mut().insert(path_items);
-                // Ok(())
-                // }
             }
             KeyInfo::KeySize(key_max_length) => {
                 insert_operations.push(InsertOperation::for_empty_tree(key_max_length)); //32
+
                 Ok(())
             }
             KeyInfo::Key(_) => Err(Error::Drive(DriveError::GroveDBInsertion(
@@ -277,31 +254,20 @@ impl Drive {
         match path_key_info {
             PathKeyInfo::PathKeyRef((path, key)) => {
                 let path = path.iter().map(|x| x.as_slice());
-                // let inserted = if apply {
+
                 let inserted = self.grove.insert_if_not_exists(
                     path.clone(),
                     key,
                     Element::empty_tree(),
                     transaction,
                 )?;
-                // } else {
-                //     true
-                // let mut path_items: Vec<Vec<u8>> = path.clone().map(Vec::from).collect();
-                // path_items.push(Vec::from(key));
-                // let exists = self
-                //     .transient_batch_inserts
-                //     .borrow_mut()
-                //     .contains(&path_items)
-                //     || self.transient_inserts.borrow_mut().contains(&path_items);
-                // if !exists {
-                //     self.transient_batch_inserts.borrow_mut().insert(path_items);
-                // }
-                // !exists
-                // };
+
                 if inserted {
                     insert_operations.push(InsertOperation::for_empty_tree(key.len()));
                 }
+
                 query_operations.push(QueryOperation::for_key_check_in_path(key.len(), path));
+
                 Ok(inserted)
             }
             PathKeyInfo::PathKeySize((path_length, key_length)) => {
@@ -314,36 +280,6 @@ impl Drive {
             }
             PathKeyInfo::PathKey((path, key)) => {
                 let path = path.iter().map(|x| x.as_slice());
-                // let inserted = if apply {
-                let inserted = self.grove.insert_if_not_exists(
-                    path.clone(),
-                    key.as_slice(),
-                    Element::empty_tree(),
-                    transaction,
-                )?;
-                // } else {
-                //     true
-                // let mut path_items: Vec<Vec<u8>> = path.clone().map(Vec::from).collect();
-                // path_items.push(key.clone());
-                // let exists = self
-                //     .transient_batch_inserts
-                //     .borrow_mut()
-                //     .contains(&path_items)
-                //     || self.transient_inserts.borrow_mut().contains(&path_items);
-                // if !exists {
-                //     self.transient_batch_inserts.borrow_mut().insert(path_items);
-                // }
-                // !exists
-                // };
-                if inserted {
-                    insert_operations.push(InsertOperation::for_empty_tree(key.len()));
-                }
-                query_operations.push(QueryOperation::for_key_check_in_path(key.len(), path));
-                Ok(inserted)
-            }
-            PathKeyInfo::PathFixedSizeKey((path, key)) => {
-                let path = path.into_iter();
-                // let inserted = if apply {
 
                 let inserted = self.grove.insert_if_not_exists(
                     path.clone(),
@@ -351,24 +287,31 @@ impl Drive {
                     Element::empty_tree(),
                     transaction,
                 )?;
-                // } else {
-                //     true
-                // let mut path_items: Vec<Vec<u8>> = path.clone().map(Vec::from).collect();
-                // path_items.push(key.clone());
-                // let exists = self
-                //     .transient_batch_inserts
-                //     .borrow_mut()
-                //     .contains(&path_items)
-                //     || self.transient_inserts.borrow_mut().contains(&path_items);
-                // if !exists {
-                //     self.transient_batch_inserts.borrow_mut().insert(path_items);
-                // }
-                // !exists
-                // };
+
                 if inserted {
                     insert_operations.push(InsertOperation::for_empty_tree(key.len()));
                 }
+
                 query_operations.push(QueryOperation::for_key_check_in_path(key.len(), path));
+
+                Ok(inserted)
+            }
+            PathKeyInfo::PathFixedSizeKey((path, key)) => {
+                let path = path.into_iter();
+
+                let inserted = self.grove.insert_if_not_exists(
+                    path.clone(),
+                    key.as_slice(),
+                    Element::empty_tree(),
+                    transaction,
+                )?;
+
+                if inserted {
+                    insert_operations.push(InsertOperation::for_empty_tree(key.len()));
+                }
+
+                query_operations.push(QueryOperation::for_key_check_in_path(key.len(), path));
+
                 Ok(inserted)
             }
             PathKeyInfo::PathFixedSizeKeyRef((path, key)) => {
@@ -382,25 +325,14 @@ impl Drive {
                     )?
                 } else {
                     true
-                    // let mut path_items: Vec<Vec<u8>> = path.clone().map(Vec::from).collect();
-                    // path_items.push(Vec::from(key));
-                    // let exists = self
-                    //     .transient_batch_inserts
-                    //     .borrow_mut()
-                    //     .contains(&path_items)
-                    //     || self
-                    //         .transient_batch_inserts
-                    //         .borrow_mut()
-                    //         .contains(&path_items);
-                    // if !exists {
-                    //     self.transient_batch_inserts.borrow_mut().insert(path_items);
-                    // }
-                    // !exists
                 };
+
                 if inserted {
                     insert_operations.push(InsertOperation::for_empty_tree(key.len()));
                 }
+
                 query_operations.push(QueryOperation::for_key_check_in_path(key.len(), path));
+
                 Ok(inserted)
             }
         }
@@ -459,27 +391,20 @@ impl Drive {
                 let insert_operation = InsertOperation::for_key_value(key.len(), &element);
                 let query_operation =
                     QueryOperation::for_key_check_in_path(key.len(), path_iter.clone());
+
                 let inserted = if apply {
                     self.grove
                         .insert_if_not_exists(path_iter, key, element, transaction)?
                 } else {
                     true
-                    // let mut path_items: Vec<Vec<u8>> = path.into_iter().map(Vec::from).collect();
-                    // path_items.push(Vec::from(key));
-                    // let exists = self
-                    //     .transient_batch_inserts
-                    //     .borrow_mut()
-                    //     .contains(&path_items)
-                    //     || self.transient_inserts.borrow_mut().contains(&path_items);
-                    // if !exists {
-                    //     self.transient_batch_inserts.borrow_mut().insert(path_items);
-                    // }
-                    // !exists
                 };
+
                 if inserted {
                     insert_operations.push(insert_operation);
                 }
+
                 query_operations.push(query_operation);
+
                 Ok(inserted)
             }
             PathKeyElementSize((path_size, key_max_length, element_max_size)) => {
@@ -496,28 +421,20 @@ impl Drive {
                 let insert_operation = InsertOperation::for_key_value(key.len(), &element);
                 let query_operation =
                     QueryOperation::for_key_check_in_path(key.len(), path_iter.clone());
+
                 let inserted = if apply {
                     self.grove
                         .insert_if_not_exists(path_iter, key, element, transaction)?
                 } else {
                     true
-                    // let mut path_items: Vec<Vec<u8>> = path.into_iter().map(Vec::from).collect();
-                    // path_items.push(Vec::from(key));
-                    // let exists = self
-                    //     .transient_batch_inserts
-                    //     .borrow_mut()
-                    //     .contains(&path_items)
-                    //     || self.transient_inserts.borrow_mut().contains(&path_items);
-                    // if !exists {
-                    //     self.transient_batch_inserts.borrow_mut().insert(path_items);
-                    // }
-                    // !exists
                 };
 
                 if inserted {
                     insert_operations.push(insert_operation);
                 }
+
                 query_operations.push(query_operation);
+
                 Ok(inserted)
             }
         }
@@ -552,6 +469,37 @@ impl Drive {
                 Ok(None)
             }
         }
+    }
+
+    fn grove_delete<'a, const N: usize>(
+        &'a self,
+        path_key_element_info: PathKeyForDeletionElementInfo<N>,
+        transaction: TransactionArg,
+        delete_operations: &mut Vec<DeleteOperation>,
+    ) -> Result<(), Error> {
+        match path_key_element_info {
+            PathKeyForDeletionElementInfo::PathFixedSizeKeyForDeletion((path, key)) => {
+                self.grove
+                    .delete(path, key, transaction)
+                    .map_err(Error::GroveDB)?;
+
+                let delete_operation = DeleteOperation::for_key_value_size(key.len(), 0, 1);
+
+                delete_operations.push(delete_operation);
+            }
+
+            PathKeyForDeletionElementInfo::PathKeyElementSizeForDeletion((
+                path_size,
+                key_size,
+                value_size,
+            )) => {
+                let delete_operation = DeleteOperation::for_key_value_size(key_size, value_size, 1);
+
+                delete_operations.push(delete_operation);
+            }
+        }
+
+        Ok(())
     }
 
     // If a document isn't sent to this function then we are just calling to know the query and
@@ -1055,18 +1003,13 @@ impl Drive {
                     insert_operations,
                 )?;
                 if !inserted {
-                    // if !apply {
-                    //     self.commit_transient_batch_inserts();
-                    // }
                     return Err(Error::Drive(DriveError::CorruptedContractIndexes(
                         "index already exists",
                     )));
                 }
             }
         }
-        // if !apply {
-        //     self.commit_transient_batch_inserts();
-        // }
+
         Ok(())
     }
 
@@ -1466,9 +1409,6 @@ impl Drive {
                             insert_operations,
                         )?;
                         if !inserted {
-                            // if !apply {
-                            //     self.commit_transient_batch_inserts();
-                            // }
                             return Err(Error::Drive(DriveError::CorruptedContractIndexes(
                                 "index already exists",
                             )));
@@ -1477,9 +1417,7 @@ impl Drive {
                 }
             }
         }
-        // if !apply {
-        //     self.commit_transient_batch_inserts();
-        // }
+
         Ok(())
     }
 
@@ -1489,6 +1427,7 @@ impl Drive {
         contract: &Contract,
         document_type_name: &str,
         owner_id: Option<&[u8]>,
+        apply: bool,
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
         let mut query_operations: Vec<QueryOperation> = vec![];
@@ -1498,6 +1437,7 @@ impl Drive {
             contract,
             document_type_name,
             owner_id,
+            apply,
             transaction,
             &mut query_operations,
             &mut delete_operations,
@@ -1512,6 +1452,7 @@ impl Drive {
         contract_cbor: &[u8],
         document_type_name: &str,
         owner_id: Option<&[u8]>,
+        apply: bool,
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
         let contract = Contract::from_cbor(contract_cbor, None)?;
@@ -1520,6 +1461,7 @@ impl Drive {
             &contract,
             document_type_name,
             owner_id,
+            apply,
             transaction,
         )
     }
@@ -1530,6 +1472,7 @@ impl Drive {
         contract: &Contract,
         document_type_name: &str,
         owner_id: Option<&[u8]>,
+        apply: bool,
         transaction: TransactionArg,
         query_operations: &mut Vec<QueryOperation>,
         delete_operations: &mut Vec<DeleteOperation>,
@@ -1550,33 +1493,43 @@ impl Drive {
         let contract_documents_primary_key_path =
             contract_documents_primary_key_path(&contract.id, document_type_name);
 
+        let key_value_info = if apply {
+            KeyRefRequest(document_id)
+        } else {
+            KeyValueMaxSize((document_id.len(), document_type.max_size()))
+        };
+
         // next we need to get the document from storage
         let document_element: Option<Element> = self.grove_get(
             contract_documents_primary_key_path,
-            KeyRefRequest(document_id),
+            key_value_info,
             transaction,
             query_operations,
         )?;
 
-        if document_element.is_none() {
-            return Err(Error::Drive(DriveError::DeletingDocumentThatDoesNotExist(
-                "document being deleted does not exist",
-            )));
+        if apply {
+            if document_element.is_none() {
+                return Err(Error::Drive(DriveError::DeletingDocumentThatDoesNotExist(
+                    "document being deleted does not exist",
+                )));
+            }
+
+            let document_bytes: Vec<u8> = match document_element.unwrap() {
+                Element::Item(data) => data,
+                _ => todo!(), // TODO: how should this be handled, possibility that document might not be in storage
+            };
+
+            let document = Document::from_cbor(document_bytes.as_slice(), None, owner_id)?;
         }
 
-        let document_bytes: Vec<u8> = match document_element.unwrap() {
-            Element::Item(data) => data,
-            _ => todo!(), // TODO: how should this be handled, possibility that document might not be in storage
+        let path_key_element_info = if apply {
+            PathFixedSizeKeyForDeletion((contract_documents_primary_key_path, document_id))
+        } else {
+            PathKeyElementSizeForDeletion((0, document_id.len(), document_type.max_size()))
         };
 
-        let document = Document::from_cbor(document_bytes.as_slice(), None, owner_id)?;
-
         // third we need to delete the document for it's primary key
-        self.grove.delete(
-            contract_documents_primary_key_path,
-            document_id,
-            transaction,
-        )?;
+        self.grove_delete(path_key_element_info, transaction, delete_operations)?;
 
         let contract_document_type_path =
             contract_document_type_path(&contract.id, document_type_name);
@@ -1591,9 +1544,11 @@ impl Drive {
                 .iter()
                 .map(|&x| Vec::from(x))
                 .collect();
+
             let top_index_property = index.properties.get(0).ok_or(Error::Drive(
                 DriveError::CorruptedContractIndexes("invalid contract indices"),
             ))?;
+
             index_path.push(Vec::from(top_index_property.name.as_bytes()));
 
             // with the example of the dashpay contract's first index
@@ -3691,16 +3646,16 @@ mod tests {
             .into_vec()
             .expect("should decode base58");
 
-        let (actual_storage_cost, actual_processing_cost) = drive
-            .delete_document_for_contract_cbor(
-                document_id.as_slice(),
-                &contract,
-                "indexedDocument",
-                None,
-                None,
-            )
-            .expect("should delete document");
-
+        // let (actual_storage_cost, actual_processing_cost) = drive
+        //     .delete_document_for_contract_cbor(
+        //         document_id.as_slice(),
+        //         &contract,
+        //         "indexedDocument",
+        //         None,
+        //         None,
+        //     )
+        //     .expect("should delete document");
+        //
         // // Delete document without apply
         //
         // let (predicted_storage_cost, predicted_processing_cost) = drive

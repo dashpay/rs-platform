@@ -426,6 +426,13 @@ impl Drive {
         let key_value_info = if apply {
             KeyRefRequest(&[0])
         } else {
+            // For dry run we assume that contract already exists
+            // and size can't be bigger than a new contract what
+            // user wants to replace it with
+
+            // But to move the flow into worst possible scenario
+            // grove_get will return None so we always follow
+            // insert logic and full-fill all top level indexed fields
             KeyValueMaxSize((1, contract_serialization.len()))
         };
 
