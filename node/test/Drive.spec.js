@@ -238,7 +238,7 @@ describe('Drive', () => {
         );
 
         expect(result).to.have.lengthOf(2);
-        expect(result[0]).to.be.greaterThan(0);
+        // expect(result[0]).to.be.greaterThan(0);
         expect(result[1]).to.be.greaterThan(0);
 
         expect(await drive.getGroveDB().getRootHash()).to.not.deep.equals(initialRootHash);
@@ -261,7 +261,7 @@ describe('Drive', () => {
         );
 
         expect(result).to.have.lengthOf(2);
-        expect(result[0]).to.be.greaterThan(0);
+        expect(result[0]).to.be.lessThan(0);
         expect(result[1]).to.be.greaterThan(0);
 
         expect(await drive.getGroveDB().getRootHash()).to.not.deep.equals(initialRootHash);
@@ -285,10 +285,10 @@ describe('Drive', () => {
       );
 
       expect(result).to.have.lengthOf(2);
-      expect(result[0]).to.be.greaterThan(0);
+      expect(result[0]).to.equals(0);
       expect(result[1]).to.be.greaterThan(0);
 
-      expect(await drive.getGroveDB().getRootHash()).to.not.deep.equals(initialRootHash);
+      expect(await drive.getGroveDB().getRootHash()).to.deep.equals(initialRootHash);
     });
   });
 
