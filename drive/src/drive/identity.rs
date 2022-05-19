@@ -22,7 +22,6 @@ impl Drive {
                 identity_bytes,
             )),
             transaction,
-            apply,
             &mut insert_operations,
         )?;
         calculate_fee(None, None, Some(insert_operations), None)

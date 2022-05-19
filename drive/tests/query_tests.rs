@@ -1804,6 +1804,7 @@ fn test_family_with_nulls_query() {
                 &contract,
                 "person",
                 None,
+                true,
                 Some(&db_transaction),
             )
             .expect("expected to be able to delete the document");

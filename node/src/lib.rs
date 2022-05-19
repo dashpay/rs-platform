@@ -93,12 +93,14 @@ impl DriveWrapper {
                     }
                     DriveMessage::CommitTransaction(callback) => {
                         drive
+                            .grove
                             .commit_transaction(transaction.take().unwrap())
                             .unwrap();
                         callback(&channel);
                     }
                     DriveMessage::RollbackTransaction(callback) => {
                         drive
+                            .grove
                             .rollback_transaction(&transaction.take().unwrap())
                             .unwrap();
                         callback(&channel);
@@ -456,7 +458,8 @@ impl DriveWrapper {
         let js_contract_cbor = cx.argument::<JsBuffer>(1)?;
         let js_document_type_name = cx.argument::<JsString>(2)?;
         let js_using_transaction = cx.argument::<JsBoolean>(3)?;
-        let js_callback = cx.argument::<JsFunction>(4)?.root(&mut cx);
+        let js_apply = cx.argument::<JsBoolean>(4)?;
+        let js_callback = cx.argument::<JsFunction>(5)?.root(&mut cx);
 
         let drive = cx
             .this()
@@ -466,6 +469,7 @@ impl DriveWrapper {
         let contract_cbor = converter::js_buffer_to_vec_u8(js_contract_cbor, &mut cx);
         let document_type_name = js_document_type_name.value(&mut cx);
         let using_transaction = js_using_transaction.value(&mut cx);
+        let apply = js_apply.value(&mut cx);
 
         drive
             .send_to_drive_thread(move |drive: &Drive, transaction, channel| {
@@ -485,6 +489,7 @@ impl DriveWrapper {
                         &contract_cbor,
                         &document_type_name,
                         None,
+                        apply,
                         using_transaction.then(|| transaction).flatten(),
                     );
 

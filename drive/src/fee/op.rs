@@ -221,6 +221,7 @@ pub struct DeleteOperation {
     pub key_size: u16,
     pub value_size: u32,
     pub multiplier: u64,
+    pub refund: bool,
 }
 
 impl DeleteOperation {
@@ -229,6 +230,7 @@ impl DeleteOperation {
             key_size: key_size as u16,
             value_size: Element::calculate_node_byte_size(33, key_size) as u32,
             multiplier,
+            refund: true,
         }
     }
 
@@ -237,16 +239,35 @@ impl DeleteOperation {
             key_size: key_size as u16,
             value_size: element.node_byte_size(key_size) as u32,
             multiplier,
+            refund: true,
         }
     }
 
     pub fn for_key_value_size(key_size: usize, value_size: usize, multiplier: u64) -> Self {
         let serialized_value_size = Element::required_item_space(value_size);
         let node_value_size = Element::calculate_node_byte_size(serialized_value_size, key_size);
+
         DeleteOperation {
             key_size: key_size as u16,
             value_size: node_value_size as u32,
             multiplier,
+            refund: true,
+        }
+    }
+
+    pub fn for_key_value_size_without_refund(
+        key_size: usize,
+        value_size: usize,
+        multiplier: u64,
+    ) -> Self {
+        let serialized_value_size = Element::required_item_space(value_size);
+        let node_value_size = Element::calculate_node_byte_size(serialized_value_size, key_size);
+
+        DeleteOperation {
+            key_size: key_size as u16,
+            value_size: node_value_size as u32,
+            multiplier,
+            refund: false,
         }
     }
 
@@ -263,6 +284,10 @@ impl DeleteOperation {
     }
 
     pub fn storage_cost(&self) -> i64 {
+        if !self.refund {
+            return 0;
+        };
+
         -(self.storage_data_size() as i64 * STORAGE_CREDIT_PER_BYTE as i64)
     }
 }
