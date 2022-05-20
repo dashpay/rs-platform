@@ -36,9 +36,7 @@ use std::sync::Arc;
 
 pub struct Drive {
     pub grove: GroveDb,
-    pub cached_contracts: RefCell<Cache<[u8; 32], Arc<Contract>>>, //HashMap<[u8; 32], Rc<Contract>>>,
-                                                                   // pub transient_inserts: RefCell<BTreeSet<Vec<Vec<u8>>>>,
-                                                                   // pub transient_batch_inserts: RefCell<BTreeSet<Vec<Vec<u8>>>>,
+    pub cached_contracts: RefCell<Cache<[u8; 32], Arc<Contract>>>,
 }
 
 #[repr(u8)]
@@ -230,7 +228,7 @@ impl Drive {
                     .map_err(Error::GroveDB)
             }
             KeyInfo::KeySize(key_max_length) => {
-                insert_operations.push(InsertOperation::for_empty_tree(key_max_length)); //32
+                insert_operations.push(InsertOperation::for_empty_tree(key_max_length));
 
                 Ok(())
             }
