@@ -1,5 +1,6 @@
-use crate::errors;
-use crate::errors::RustConversionError;
+#![allow(clippy::from_over_into)]
+
+use crate::errors::{from_dpp_err, RustConversionError};
 use crate::{bail_js, with_js_error};
 use dpp::data_contract::DataContract;
 use dpp::util::string_encoding::Encoding;
@@ -21,6 +22,7 @@ impl std::convert::From<DataContract> for DataContractWasm {
         DataContractWasm(v)
     }
 }
+
 impl std::convert::Into<DataContract> for DataContractWasm {
     fn into(self) -> DataContract {
         self.0
@@ -119,7 +121,7 @@ impl DataContractWasm {
 
     #[wasm_bindgen(js_name=getDocumentSchema)]
     pub fn get_document_schema(&mut self, doc_type: &str) -> Result<JsValue, JsValue> {
-        let doc_schema = self.0.get_document_schema(doc_type).map_err(errors::from)?;
+        let doc_schema = self.0.get_document_schema(doc_type).map_err(from_dpp_err)?;
         with_js_error!(JsValue::from_serde(doc_schema))
     }
 
@@ -129,7 +131,7 @@ impl DataContractWasm {
             &self
                 .0
                 .get_document_schema_ref(doc_type)
-                .map_err(errors::from)?
+                .map_err(from_dpp_err)?
         ))
     }
 
@@ -164,18 +166,22 @@ impl DataContractWasm {
             ))
             .to_js_value()
         })?;
-        self.0.entropy = Some(entropy);
+        self.0.entropy = entropy;
         Ok(())
     }
 
     #[wasm_bindgen(js_name=getEntropy)]
-    pub fn get_entropy(&mut self) -> Option<Vec<u8>> {
-        self.0.entropy.map(|e| e.to_vec())
+    pub fn get_entropy(&mut self) -> Vec<u8> {
+        self.0.entropy.to_vec()
     }
 
     #[wasm_bindgen(js_name=getBinaryProperties)]
     pub fn get_binary_properties(&self, doc_type: &str) -> Result<JsValue, JsValue> {
-        with_js_error!(JsValue::from_serde(&self.0.get_binary_properties(doc_type)))
+        with_js_error!(JsValue::from_serde(
+            self.0
+                .get_binary_properties(doc_type)
+                .map_err(from_dpp_err)?
+        ))
     }
 
     #[wasm_bindgen(js_name=getMetadata)]
@@ -206,29 +212,29 @@ impl DataContractWasm {
 
     #[wasm_bindgen(js_name=toBuffer)]
     pub fn to_buffer(&self) -> Result<Vec<u8>, JsValue> {
-        self.0.to_buffer().map_err(errors::from)
+        self.0.to_buffer().map_err(from_dpp_err)
     }
 
     #[wasm_bindgen(js_name=hash)]
     pub fn hash(&self) -> Result<Vec<u8>, JsValue> {
-        self.0.hash().map_err(errors::from)
+        self.0.hash().map_err(from_dpp_err)
     }
 
     #[wasm_bindgen(js_name=from)]
     pub fn from(v: JsValue) -> Result<DataContractWasm, JsValue> {
         let json_contract: Value = with_js_error!(v.into_serde())?;
         Ok(DataContract::try_from(json_contract)
-            .map_err(errors::from)?
+            .map_err(from_dpp_err)?
             .into())
     }
 
     #[wasm_bindgen(js_name=from_buffer)]
     pub fn from_buffer(b: Vec<u8>) -> Result<DataContractWasm, JsValue> {
-        Ok(DataContract::from_buffer(b).map_err(errors::from)?.into())
+        Ok(DataContract::from_buffer(b).map_err(from_dpp_err)?.into())
     }
 
     #[wasm_bindgen(js_name=from_string)]
     pub fn from_string(v: &str) -> Result<DataContractWasm, JsValue> {
-        Ok(DataContract::try_from(v).map_err(errors::from)?.into())
+        Ok(DataContract::try_from(v).map_err(from_dpp_err)?.into())
     }
 }

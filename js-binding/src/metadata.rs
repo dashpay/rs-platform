@@ -1,3 +1,5 @@
+#![allow(clippy::from_over_into)]
+
 pub use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
