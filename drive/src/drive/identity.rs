@@ -55,7 +55,7 @@ impl Drive {
 
 #[cfg(test)]
 mod tests {
-    use crate::drive::object_size_info::ActionType::Apply;
+    use crate::drive::object_size_info::ActionType::ItemApply;
     use crate::drive::Drive;
     use crate::identity::Identity;
     use grovedb::Element;
@@ -81,7 +81,7 @@ mod tests {
             .insert_identity(
                 &identity.id,
                 Element::Item(identity_bytes),
-                Apply,
+                ItemApply,
                 Some(&db_transaction),
             )
             .expect("expected to insert identity");

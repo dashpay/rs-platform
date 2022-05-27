@@ -1,5 +1,5 @@
 use crate::contract::Contract;
-use crate::drive::object_size_info::ActionType::Apply;
+use crate::drive::object_size_info::ActionType::ItemApply;
 use crate::drive::Drive;
 use crate::error::structure::StructureError;
 use crate::error::Error;
@@ -23,7 +23,7 @@ pub fn setup_contract(
     let contract =
         Contract::from_cbor(&contract_cbor, contract_id).expect("contract should be deserialized");
     drive
-        .apply_contract_cbor(contract_cbor, contract_id, 0f64, Apply, transaction)
+        .apply_contract_cbor(contract_cbor, contract_id, 0f64, ItemApply, transaction)
         .expect("contract should be applied");
     contract
 }
@@ -37,7 +37,7 @@ pub fn setup_contract_from_hex(
     let contract =
         Contract::from_cbor(&contract_cbor, None).expect("contract should be deserialized");
     drive
-        .apply_contract_cbor(contract_cbor, None, 0f64, Apply, transaction)
+        .apply_contract_cbor(contract_cbor, None, 0f64, ItemApply, transaction)
         .expect("contract should be applied");
     contract
 }

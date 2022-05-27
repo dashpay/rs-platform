@@ -5,12 +5,18 @@ pub mod multiplier;
 pub mod object_size_info;
 
 use crate::contract::{Contract, Document, DocumentType};
+use crate::drive::defaults::BASE_CONTRACT_DOCUMENTS_PRIMARY_KEY_PATH;
 use crate::drive::multiplier::Multiplier;
 use crate::drive::object_size_info::ActionType::{
-    DryRunFee, WorstCaseFeeForDocumentType, WorstCaseFeeWithKnownItem,
+    DryRunFee, ItemApply, WorstCaseFeeForDocumentType, WorstCaseFeeWithKnownItem,
 };
-use crate::drive::object_size_info::{ActionType, PathKeyForDeletionElementInfo};
+use crate::drive::object_size_info::DocumentInfo::OwnedDocument;
+use crate::drive::object_size_info::PathKeyForDeletionElementInfo::{
+    PathFixedSizeKeyForDeletion, PathKeyElementSizeForDeletion,
+};
+use crate::drive::object_size_info::{ActionType, PathKeyForDeletionElementInfo, PathKeyForDeletionUpTreeInfo};
 use crate::error::drive::DriveError;
+use crate::error::fee::FeeError;
 use crate::error::query::QueryError;
 use crate::error::Error;
 use crate::fee::calculate_fee;
@@ -36,8 +42,6 @@ use std::collections::BTreeSet;
 use std::ops::DerefMut;
 use std::path::Path;
 use std::sync::Arc;
-use crate::drive::object_size_info::PathKeyForDeletionElementInfo::{PathFixedSizeKeyForDeletion, PathKeyElementSizeForDeletion};
-use crate::error::fee::FeeError;
 
 pub struct Drive {
     pub grove: GroveDb,
@@ -167,7 +171,7 @@ impl Drive {
                 cached_contracts: RefCell::new(Cache::new(200)),
                 transient_inserts: RefCell::new(BTreeSet::new()),
                 transient_batch_inserts: RefCell::new(BTreeSet::new()),
-                multiplier: RefCell::new(Multiplier::multiplier_for_price(100)?)
+                multiplier: RefCell::new(Multiplier::multiplier_for_price(100)?),
             }),
             Err(e) => Err(Error::GroveDB(e)),
         }
@@ -539,6 +543,9 @@ impl Drive {
     ) -> Result<(), Error> {
         match path_key_element_info {
             PathKeyForDeletionElementInfo::PathFixedSizeKeyForDeletion((path, key)) => {
+                if action != ItemApply {
+                    return Err(Error::Drive(DriveError::InvalidActionType("only the item apply action works for PathFixedSizeKeyForDeletion")))
+                }
                 if let Some(deleted_size) = self
                     .grove
                     .delete(path, key, transaction)
@@ -550,6 +557,9 @@ impl Drive {
                 }
             }
             PathKeyForDeletionElementInfo::PathKeyForDeletion((path, key)) => {
+                if action != ItemApply {
+                    return Err(Error::Drive(DriveError::InvalidActionType("only the item apply action works for PathKeyForDeletion")))
+                }
                 let path = path.iter().map(|x| x.as_slice());
                 if let Some(deleted_size) = self
                     .grove
@@ -566,10 +576,35 @@ impl Drive {
                 key_size,
                 value_size,
             )) => {
+                if action != WorstCaseFeeForDocumentType && action != WorstCaseFeeWithKnownItem {
+                    return Err(Error::Drive(DriveError::InvalidActionType("only the action for worst case fees work for PathKeyElementSizeForDeletion")))
+                }
                 let delete_operation =
                     DeleteOperation::for_key_value_size(key_size, value_size, action, 1);
                 delete_operations.push(delete_operation);
             }
+        }
+        Ok(())
+    }
+
+    fn grove_delete_up_tree_while_empty<'a, const N: usize>(
+        &'a self,
+        path_key_deletion_up_tree_info: PathKeyForDeletionUpTreeInfo<N>,
+        stop_path_height : Option<u16>,
+        action: ActionType,
+        transaction: TransactionArg,
+        delete_operations: &mut Vec<DeleteOperation>,
+    ) -> Result<(), Error> {
+        match path_key_deletion_up_tree_info {
+            PathKeyForDeletionUpTreeInfo::PathFixedSizeKeyForDeletionUpTree((path, key)) => {
+                self.grove.delete_up_tree_while_empty(
+                    path,
+                    key,
+                    stop_path_height,
+                    transaction,
+                )?;
+            }
+            PathKeyForDeletionUpTreeInfo::PathKeyElementSizeForDeletion(_) => {}
         }
         Ok(())
     }
@@ -669,6 +704,11 @@ impl Drive {
                         Element::required_item_space(max_size),
                     ))
                 }
+                OwnedDocument(_) => {
+                    return Err(Error::Drive(DriveError::CorruptedCodeExecution(
+                        "owned document can not be inserted to primary storage",
+                    )));
+                }
             };
             self.grove_insert(
                 path_key_element_info,
@@ -734,6 +774,11 @@ impl Drive {
                     DEFAULT_HASH_SIZE,
                     Element::required_item_space(max_size),
                 )),
+                OwnedDocument(_) => {
+                    return Err(Error::Drive(DriveError::CorruptedCodeExecution(
+                        "owned document can not be inserted to primary storage",
+                    )));
+                }
             };
             self.grove_insert(
                 path_key_element_info,
@@ -753,6 +798,11 @@ impl Drive {
                     DEFAULT_HASH_SIZE,
                     Element::required_item_space(max_size),
                 )),
+                OwnedDocument(_) => {
+                    return Err(Error::Drive(DriveError::CorruptedCodeExecution(
+                        "owned document can not be inserted to primary storage",
+                    )));
+                }
             };
             let inserted = self.grove_insert_if_not_exists(
                 path_key_element_info,
@@ -1074,6 +1124,11 @@ impl Drive {
                     DocumentSize(max_size) => {
                         KeyElementSize((DEFAULT_HASH_SIZE, Element::required_item_space(*max_size)))
                     }
+                    OwnedDocument(_) => {
+                        return Err(Error::Drive(DriveError::CorruptedCodeExecution(
+                            "owned document can not be used for adding a document, use document and serialization instead",
+                        )));
+                    }
                 };
 
                 let path_key_element_info = PathKeyElementInfo::from_path_info_and_key_element(
@@ -1100,6 +1155,11 @@ impl Drive {
                     }
                     DocumentSize(max_size) => {
                         KeyElementSize((1, Element::required_item_space(*max_size)))
+                    }
+                    OwnedDocument(_) => {
+                        return Err(Error::Drive(DriveError::CorruptedCodeExecution(
+                            "owned document can not be used for adding a document, use document and serialization instead",
+                        )));
                     }
                 };
 
@@ -1597,40 +1657,53 @@ impl Drive {
             )));
         }
 
-        // first we need to construct the path for documents on the contract
-        // the path is
-        //  * Document and Contract root tree
-        //  * Contract ID recovered from document
-        //  * 0 to signify Documents and not Contract
-        let contract_documents_primary_key_path =
-            contract_documents_primary_key_path(&contract.id, document_type_name);
+        let (path_key_element_info, document_info) = match action {
+            ItemApply | DryRunFee => {
+                // first we need to construct the path for documents on the contract
+                // the path is
+                //  * Document and Contract root tree
+                //  * Contract ID recovered from document
+                //  * 0 to signify Documents and not Contract
+                let contract_documents_primary_key_path =
+                    contract_documents_primary_key_path(&contract.id, document_type_name);
 
-        // next we need to get the document from storage
-        let document_element: Option<Element> = self.grove_get(
-            contract_documents_primary_key_path,
-            KeyRefRequest(document_id),
-            transaction,
-            query_operations,
-        )?;
+                // next we need to get the document from storage
+                let document_element: Option<Element> = self.grove_get(
+                    contract_documents_primary_key_path,
+                    KeyRefRequest(document_id),
+                    transaction,
+                    query_operations,
+                )?;
 
-        if document_element.is_none() {
-            return Err(Error::Drive(DriveError::DeletingDocumentThatDoesNotExist(
-                "document being deleted does not exist",
-            )));
-        }
+                if document_element.is_none() {
+                    return Err(Error::Drive(DriveError::DeletingDocumentThatDoesNotExist(
+                        "document being deleted does not exist",
+                    )));
+                }
 
-        let document_bytes: Vec<u8> = match document_element.unwrap() {
-            Element::Item(data) => data,
-            _ => todo!(), // TODO: how should this be handled, possibility that document might not be in storage
-        };
+                let document_bytes: Vec<u8> = match document_element.unwrap() {
+                    Element::Item(data) => data,
+                    _ => todo!(), // TODO: how should this be handled, possibility that document might not be in storage
+                };
 
-        let document = Document::from_cbor(document_bytes.as_slice(), None, owner_id)?;
+                let document = Document::from_cbor(document_bytes.as_slice(), None, owner_id)?;
 
-        let path_key_element_info = match action {
-            Apply => { Ok(PathFixedSizeKeyForDeletion((contract_documents_primary_key_path, document_id))) }
-            DryRunFee => { Ok(PathFixedSizeKeyForDeletion((contract_documents_primary_key_path, document_id))) }
-            WorstCaseFeeWithKnownItem => { Err(Error::Fee(FeeError::RequestingWorstCaseDeleteFeeForKnownItem("you can not do this")))}
-            WorstCaseFeeForDocumentType => { Ok(PathKeyElementSizeForDeletion((0,0,0)))}
+                Ok((
+                    PathFixedSizeKeyForDeletion((contract_documents_primary_key_path, document_id)),
+                    OwnedDocument(document),
+                ))
+            }
+            WorstCaseFeeWithKnownItem => Err(Error::Fee(
+                FeeError::RequestingWorstCaseDeleteFeeForKnownItem("you can not do this"),
+            )),
+            WorstCaseFeeForDocumentType => Ok((
+                PathKeyElementSizeForDeletion((
+                    BASE_CONTRACT_DOCUMENTS_PRIMARY_KEY_PATH,
+                    DEFAULT_HASH_SIZE,
+                    0,
+                )),
+                DocumentSize(document_type.max_size()),
+            )),
         }?;
         // third we need to delete the document for it's primary key
         self.grove_delete(
@@ -1660,39 +1733,45 @@ impl Drive {
 
             // with the example of the dashpay contract's first index
             // the index path is now something like Contracts/ContractID/Documents(1)/$ownerId
-            let document_top_field: Vec<u8> = document
-                .get_raw_for_contract(
-                    &top_index_property.name,
-                    document_type_name,
-                    contract,
-                    owner_id,
-                )?
+            let document_top_field_info = document_info
+                .get_raw_for_document_type(&top_index_property.name, document_type, owner_id)?
                 .unwrap_or_default();
 
             // we push the actual value of the index path
-            index_path.push(document_top_field);
+            let path_key_info = document_top_field_info
+                .clone()
+                .add_path::<0>(index_path.clone());
             // the index path is now something like Contracts/ContractID/Documents(1)/$ownerId/<ownerId>
+
+            let mut index_path_info = if document_info.is_document_and_serialization() {
+                PathInfo::PathIterator::<0>(index_path)
+            } else {
+                PathInfo::PathSize(index_path.iter().map(|x| x.len()).sum())
+            };
 
             for i in 1..index.properties.len() {
                 let index_property = index.properties.get(i).ok_or(Error::Drive(
                     DriveError::CorruptedContractIndexes("invalid contract indices"),
                 ))?;
 
+                let index_property_key = KeyRef(index_property.name.as_bytes());
+
                 index_path.push(Vec::from(index_property.name.as_bytes()));
                 // Iteration 1. the index path is now something like Contracts/ContractID/Documents(1)/$ownerId/<ownerId>/toUserId
                 // Iteration 2. the index path is now something like Contracts/ContractID/Documents(1)/$ownerId/<ownerId>/toUserId/<ToUserId>/accountReference
 
-                let document_top_field: Vec<u8> = document
-                    .get_raw_for_contract(
-                        &index_property.name,
-                        document_type_name,
-                        contract,
-                        owner_id,
-                    )?
+                let document_top_field_info = document_info
+                    .get_raw_for_document_type(&index_property.name, document_type, owner_id)?
                     .unwrap_or_default();
 
+                let path_key_info = index_property_key
+                    .clone()
+                    .add_path_info(index_path_info.clone());
+
                 // we push the actual value of the index path
-                index_path.push(document_top_field);
+
+                index_path_info.push(index_property_key)?;
+                index_path.push(document_top_field_info);
                 // Iteration 1. the index path is now something like Contracts/ContractID/Documents(1)/$ownerId/<ownerId>/toUserId/<ToUserId>/
                 // Iteration 2. the index path is now something like Contracts/ContractID/Documents(1)/$ownerId/<ownerId>/toUserId/<ToUserId>/accountReference/<accountReference>
             }
@@ -1798,7 +1877,7 @@ mod tests {
         value_to_cbor,
     };
     use crate::contract::{Contract, Document};
-    use crate::drive::object_size_info::ActionType::{Apply, DryRunFee};
+    use crate::drive::object_size_info::ActionType::{DryRunFee, ItemApply};
     use crate::drive::object_size_info::DocumentInfo::DocumentAndSerialization;
     use crate::drive::object_size_info::{DocumentAndContractInfo, DocumentInfo};
     use crate::drive::{defaults, Drive};
@@ -1828,7 +1907,7 @@ mod tests {
         // let's construct the grovedb structure for the dashpay data contract
         let dashpay_cbor = json_document_to_cbor(dashpay_path, Some(1));
         drive
-            .apply_contract_cbor(dashpay_cbor.clone(), None, 0f64, Apply, None)
+            .apply_contract_cbor(dashpay_cbor.clone(), None, 0f64, ItemApply, None)
             .expect("expected to apply contract successfully");
 
         (drive, dashpay_cbor)
@@ -1852,7 +1931,7 @@ mod tests {
                 Some(&random_owner_id),
                 false,
                 0f64,
-                Apply,
+                ItemApply,
                 None,
             )
             .expect("expected to insert a document successfully");
@@ -1865,7 +1944,7 @@ mod tests {
                 Some(&random_owner_id),
                 false,
                 0f64,
-                Apply,
+                ItemApply,
                 None,
             )
             .expect_err("expected not to be able to insert same document twice");
@@ -1878,7 +1957,7 @@ mod tests {
                 Some(&random_owner_id),
                 true,
                 0f64,
-                Apply,
+                ItemApply,
                 None,
             )
             .expect("expected to override a document successfully");
@@ -1916,7 +1995,7 @@ mod tests {
                 Some(&random_owner_id),
                 false,
                 0f64,
-                Apply,
+                ItemApply,
                 Some(&db_transaction),
             )
             .expect("expected to insert a document successfully");
@@ -1929,7 +2008,7 @@ mod tests {
                 Some(&random_owner_id),
                 false,
                 0f64,
-                Apply,
+                ItemApply,
                 Some(&db_transaction),
             )
             .expect_err("expected not to be able to insert same document twice");
@@ -1942,7 +2021,7 @@ mod tests {
                 Some(&random_owner_id),
                 true,
                 0f64,
-                Apply,
+                ItemApply,
                 Some(&db_transaction),
             )
             .expect("expected to override a document successfully");
@@ -1993,7 +2072,7 @@ mod tests {
                 Some(&random_owner_id),
                 false,
                 0f64,
-                Apply,
+                ItemApply,
                 Some(&db_transaction),
             )
             .expect("expected to insert a document successfully");
@@ -2080,7 +2159,7 @@ mod tests {
                 },
                 false,
                 0f64,
-                Apply,
+                ItemApply,
                 Some(&db_transaction),
                 &mut actual_query_operations,
                 &mut actual_insert_operations,
@@ -2123,7 +2202,7 @@ mod tests {
                 Some(&random_owner_id),
                 false,
                 0f64,
-                Apply,
+                ItemApply,
                 Some(&db_transaction),
             )
             .expect("expected to insert a document successfully");
@@ -2135,7 +2214,7 @@ mod tests {
                 "contactRequest",
                 Some(&random_owner_id),
                 0f64,
-                Apply,
+                ItemApply,
                 Some(&db_transaction),
             )
             .expect_err("expected not to be able to update a non mutable document");
@@ -2148,7 +2227,7 @@ mod tests {
                 Some(&random_owner_id),
                 true,
                 0f64,
-                Apply,
+                ItemApply,
                 Some(&db_transaction),
             )
             .expect_err("expected not to be able to override a non mutable document");
@@ -2191,7 +2270,7 @@ mod tests {
                 Some(&random_owner_id),
                 false,
                 0f64,
-                Apply,
+                ItemApply,
                 Some(&db_transaction),
             )
             .expect("expected to insert a document successfully");
@@ -2203,7 +2282,7 @@ mod tests {
                 "profile",
                 Some(&random_owner_id),
                 0f64,
-                Apply,
+                ItemApply,
                 Some(&db_transaction),
             )
             .expect("expected to update a document with history successfully");
@@ -2227,7 +2306,7 @@ mod tests {
                 Some(&random_owner_id),
                 false,
                 0f64,
-                Apply,
+                ItemApply,
                 None,
             )
             .expect("expected to insert a document successfully");
@@ -2242,7 +2321,7 @@ mod tests {
                 &dashpay_cbor,
                 "profile",
                 Some(&random_owner_id),
-                Apply,
+                ItemApply,
                 None,
             )
             .expect("expected to be able to delete the document");
@@ -2280,7 +2359,7 @@ mod tests {
                 Some(&random_owner_id),
                 false,
                 0f64,
-                Apply,
+                ItemApply,
                 Some(&db_transaction),
             )
             .expect("expected to insert a document successfully");
@@ -2295,7 +2374,7 @@ mod tests {
                 &contract,
                 "profile",
                 Some(&random_owner_id),
-                Apply,
+                ItemApply,
                 Some(&db_transaction),
             )
             .expect("expected to be able to delete the document");
@@ -2345,7 +2424,7 @@ mod tests {
                 },
                 false,
                 0f64,
-                Apply,
+                ItemApply,
                 Some(&db_transaction),
             )
             .expect("expected to insert a document successfully");
@@ -2406,7 +2485,7 @@ mod tests {
                         },
                         false,
                         0f64,
-                        Apply,
+                        ItemApply,
                         Some(&db_transaction),
                     )
                     .expect("expected to insert a document successfully");
@@ -2449,7 +2528,7 @@ mod tests {
                 &contract,
                 "niceDocument",
                 Some(&documents.get(0).unwrap().owner_id),
-                Apply,
+                ItemApply,
                 Some(&db_transaction),
             )
             .expect("expected to be able to delete the document");
@@ -2519,7 +2598,7 @@ mod tests {
                 },
                 false,
                 0f64,
-                Apply,
+                ItemApply,
                 Some(&db_transaction),
             )
             .expect("expected to insert a document successfully");
@@ -2556,7 +2635,7 @@ mod tests {
                 &contract,
                 "person",
                 Some(&random_owner_id),
-                Apply,
+                ItemApply,
                 Some(&db_transaction),
             )
             .expect("expected to be able to delete the document");
@@ -2620,7 +2699,7 @@ mod tests {
                 },
                 false,
                 0f64,
-                Apply,
+                ItemApply,
                 Some(&db_transaction),
             )
             .expect("expected to insert a document successfully");
@@ -2652,7 +2731,7 @@ mod tests {
                 },
                 false,
                 0f64,
-                Apply,
+                ItemApply,
                 Some(&db_transaction),
             )
             .expect("expected to insert a document successfully");
@@ -2684,7 +2763,7 @@ mod tests {
                 &contract,
                 "person",
                 Some(&random_owner_id),
-                Apply,
+                ItemApply,
                 Some(&db_transaction),
             )
             .expect("expected to be able to delete the document");
@@ -2716,7 +2795,7 @@ mod tests {
                 &contract,
                 "person",
                 Some(&random_owner_id),
-                Apply,
+                ItemApply,
                 Some(&db_transaction),
             )
             .expect("expected to be able to delete the document");
@@ -2782,7 +2861,7 @@ mod tests {
                 },
                 false,
                 0f64,
-                Apply,
+                ItemApply,
                 Some(&db_transaction),
             )
             .expect("expected to insert a document successfully");
@@ -2814,7 +2893,7 @@ mod tests {
                 },
                 false,
                 0f64,
-                Apply,
+                ItemApply,
                 Some(&db_transaction),
             )
             .expect("expected to insert a document successfully");
@@ -2846,7 +2925,7 @@ mod tests {
                 &contract,
                 "person",
                 Some(&random_owner_id),
-                Apply,
+                ItemApply,
                 Some(&db_transaction),
             )
             .expect("expected to be able to delete the document");
@@ -2876,7 +2955,7 @@ mod tests {
                 },
                 false,
                 0f64,
-                Apply,
+                ItemApply,
                 Some(&db_transaction),
             )
             .expect("expected to insert a document successfully");
@@ -2896,7 +2975,7 @@ mod tests {
                 &contract,
                 "person",
                 Some(&random_owner_id),
-                Apply,
+                ItemApply,
                 Some(&db_transaction),
             )
             .expect("expected to be able to delete the document");
@@ -2911,7 +2990,7 @@ mod tests {
                 &contract,
                 "person",
                 Some(&random_owner_id),
-                Apply,
+                ItemApply,
                 Some(&db_transaction),
             )
             .expect("expected to be able to delete the document");
@@ -2960,7 +3039,7 @@ mod tests {
                 Some(&random_owner_id),
                 false,
                 0f64,
-                Apply,
+                ItemApply,
                 None,
             )
             .expect("expected to insert a document successfully");
@@ -2972,7 +3051,7 @@ mod tests {
                 Some(&random_owner_id),
                 false,
                 0f64,
-                Apply,
+                ItemApply,
                 None,
             )
             .expect("expected to insert a document successfully");
@@ -2984,7 +3063,7 @@ mod tests {
                 Some(&random_owner_id),
                 false,
                 0f64,
-                Apply,
+                ItemApply,
                 None,
             )
             .expect("expected to insert a document successfully");
@@ -3013,7 +3092,7 @@ mod tests {
                 Some(&random_owner_id),
                 false,
                 0f64,
-                Apply,
+                ItemApply,
                 None,
             )
             .expect("expected to insert a document successfully");
@@ -3025,7 +3104,7 @@ mod tests {
                 Some(&random_owner_id),
                 false,
                 0f64,
-                Apply,
+                ItemApply,
                 None,
             )
             .expect_err(
@@ -3051,7 +3130,7 @@ mod tests {
                 contract_cbor.clone(),
                 None,
                 0f64,
-                Apply,
+                ItemApply,
                 Some(&db_transaction),
             )
             .expect("expected to apply contract successfully");
@@ -3068,7 +3147,7 @@ mod tests {
                 None,
                 true,
                 0f64,
-                Apply,
+                ItemApply,
                 Some(&db_transaction),
             )
             .expect("should create alice profile");
@@ -3084,7 +3163,7 @@ mod tests {
                 "profile",
                 None,
                 0f64,
-                Apply,
+                ItemApply,
                 Some(&db_transaction),
             )
             .expect("should update alice profile");
@@ -3104,7 +3183,7 @@ mod tests {
         let contract = Contract::from_cbor(contract_cbor.as_slice(), None)
             .expect("expected to create contract");
         drive
-            .apply_contract_cbor(contract_cbor.clone(), None, 0f64, Apply, None)
+            .apply_contract_cbor(contract_cbor.clone(), None, 0f64, ItemApply, None)
             .expect("expected to apply contract successfully");
 
         // Create Alice profile
@@ -3131,7 +3210,7 @@ mod tests {
                 },
                 true,
                 0f64,
-                Apply,
+                ItemApply,
                 None,
             )
             .expect("should create alice profile");
@@ -3156,7 +3235,7 @@ mod tests {
                 "profile",
                 None,
                 0f64,
-                Apply,
+                ItemApply,
                 None,
             )
             .expect("should update alice profile");
@@ -3188,7 +3267,7 @@ mod tests {
                 contract_cbor.clone(),
                 None,
                 0f64,
-                Apply,
+                ItemApply,
                 Some(&db_transaction),
             )
             .expect("expected to apply contract successfully");
@@ -3217,7 +3296,7 @@ mod tests {
                 },
                 true,
                 0f64,
-                Apply,
+                ItemApply,
                 Some(&db_transaction),
             )
             .expect("should create alice profile");
@@ -3255,7 +3334,7 @@ mod tests {
                 "profile",
                 None,
                 0f64,
-                Apply,
+                ItemApply,
                 Some(&db_transaction),
             )
             .expect("should update alice profile");
@@ -3292,7 +3371,7 @@ mod tests {
                 contract_cbor.clone(),
                 None,
                 0f64,
-                Apply,
+                ItemApply,
                 Some(&db_transaction),
             )
             .expect("expected to apply contract successfully");
@@ -3321,7 +3400,7 @@ mod tests {
                 },
                 true,
                 0f64,
-                Apply,
+                ItemApply,
                 Some(&db_transaction),
             )
             .expect("should create alice profile");
@@ -3354,7 +3433,7 @@ mod tests {
                 &contract,
                 "profile",
                 None,
-                Apply,
+                ItemApply,
                 Some(&db_transaction),
             )
             .expect("expected to delete document");
@@ -3387,7 +3466,7 @@ mod tests {
                 "profile",
                 None,
                 0f64,
-                Apply,
+                ItemApply,
                 Some(&db_transaction),
             )
             .expect("should update alice profile");
@@ -3411,7 +3490,7 @@ mod tests {
                 contract_cbor.clone(),
                 None,
                 0f64,
-                Apply,
+                ItemApply,
                 Some(&db_transaction),
             )
             .expect("expected to apply contract successfully");
@@ -3428,7 +3507,7 @@ mod tests {
                 None,
                 true,
                 0f64,
-                Apply,
+                ItemApply,
                 Some(&db_transaction),
             )
             .expect("should create dash tld");
@@ -3452,7 +3531,7 @@ mod tests {
                 None,
                 true,
                 0f64,
-                Apply,
+                ItemApply,
                 Some(&db_transaction),
             )
             .expect("should add random tld");
@@ -3503,7 +3582,7 @@ mod tests {
         let contract = value_to_cbor(contract, Some(defaults::PROTOCOL_VERSION));
 
         drive
-            .apply_contract_cbor(contract.clone(), None, 0f64, Apply, None)
+            .apply_contract_cbor(contract.clone(), None, 0f64, ItemApply, None)
             .expect("should create a contract");
 
         // Create document
@@ -3531,7 +3610,7 @@ mod tests {
                 None,
                 true,
                 0f64,
-                Apply,
+                ItemApply,
                 None,
             )
             .expect("should add document");
@@ -3560,7 +3639,7 @@ mod tests {
                 "indexedDocument",
                 None,
                 0f64,
-                Apply,
+                ItemApply,
                 None,
             )
             .expect("should update document");
@@ -3577,7 +3656,7 @@ mod tests {
                 &contract,
                 "indexedDocument",
                 None,
-                Apply,
+                ItemApply,
                 None,
             )
             .expect("should delete document");
