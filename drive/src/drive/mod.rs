@@ -1,6 +1,7 @@
 pub mod defaults;
 pub mod identity;
 pub mod object_size_info;
+pub mod pools;
 
 use crate::contract::{Contract, Document, DocumentType};
 use crate::error::drive::DriveError;
@@ -27,10 +28,12 @@ use object_size_info::{
 use std::cell::RefCell;
 use std::path::Path;
 use std::sync::Arc;
+use crate::drive::pools::PoolInfo;
 
 pub struct Drive {
     pub grove: GroveDb,
     pub cached_contracts: RefCell<Cache<[u8; 32], Arc<Contract>>>, //HashMap<[u8; 32], Rc<Contract>>>,
+    pub pool_info: RefCell<Option<PoolInfo>>,
 }
 
 #[repr(u8)]
@@ -40,6 +43,7 @@ pub enum RootTree {
     ContractDocuments = 1,
     PublicKeyHashesToIdentities = 2,
     Misc = 3,
+    Pools = 4,
 }
 
 pub const STORAGE_COST: i32 = 50;
@@ -63,6 +67,7 @@ impl From<RootTree> for &'static [u8; 1] {
             RootTree::ContractDocuments => &[1],
             RootTree::PublicKeyHashesToIdentities => &[2],
             RootTree::Misc => &[3],
+            RootTree::Pools => &[4],
         }
     }
 }
@@ -175,10 +180,13 @@ fn contract_documents_keeping_history_storage_time_reference_path_size(
 impl Drive {
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
         match GroveDb::open(path) {
-            Ok(grove) => Ok(Drive {
-                grove,
-                cached_contracts: RefCell::new(Cache::new(200)),
-            }),
+            Ok(grove) => {
+                Ok(Drive {
+                    grove,
+                    cached_contracts: RefCell::new(Cache::new(200)),
+                    pool_info: RefCell::new(None),
+                })
+            },
             Err(e) => Err(Error::GroveDB(e)),
         }
     }
@@ -456,7 +464,7 @@ impl Drive {
                 transaction,
                 insert_operations,
             )?;
-            let encoded_time = crate::contract::types::encode_float(block_time)?;
+            let encoded_time = crate::common::encode::encode_float(block_time)?;
             let contract_keeping_history_storage_path =
                 contract_keeping_history_storage_path(&contract.id);
             self.grove_insert(
@@ -851,7 +859,7 @@ impl Drive {
                 query_operations,
                 insert_operations,
             )?;
-            let encoded_time = crate::contract::types::encode_float(block_time)?;
+            let encoded_time = crate::common::encode::encode_float(block_time)?;
             let path_key_element_info = match document_and_contract_info.document_info {
                 DocumentAndSerialization((document, document_cbor)) => {
                     let document_id_in_primary_path =

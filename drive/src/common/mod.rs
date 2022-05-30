@@ -1,3 +1,5 @@
+pub mod encode;
+
 use crate::contract::Contract;
 use crate::drive::Drive;
 use crate::error::structure::StructureError;

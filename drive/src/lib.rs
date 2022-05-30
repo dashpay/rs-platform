@@ -5,3 +5,4 @@ pub mod error;
 pub mod fee;
 pub mod identity;
 pub mod query;
+pub mod pools;
