@@ -2108,8 +2108,6 @@ mod tests {
         let document = Document::from_cbor(&dashpay_cr_document_cbor, None, Some(&owner_id))
             .expect("expected to deserialize document successfully");
 
-        let document_info = DocumentAndSerialization((&document, &dashpay_cr_document_cbor));
-
         let document_type = contract
             .document_type_for_name("contactRequest")
             .expect("expected to get document type successfully");
@@ -2127,7 +2125,7 @@ mod tests {
         drive
             .add_document_for_contract_operations(
                 DocumentAndContractInfo {
-                    document_info: document_info.clone(),
+                    document_info: DocumentAndSerialization((&document, &dashpay_cr_document_cbor)),
                     contract: &contract,
                     document_type,
                     owner_id: Some(&owner_id),
@@ -2152,7 +2150,7 @@ mod tests {
         drive
             .add_document_for_contract_operations(
                 DocumentAndContractInfo {
-                    document_info,
+                    document_info: DocumentAndSerialization((&document, &dashpay_cr_document_cbor)),
                     contract: &contract,
                     document_type,
                     owner_id: Some(&owner_id),

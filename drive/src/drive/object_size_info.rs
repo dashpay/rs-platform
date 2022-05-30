@@ -332,7 +332,6 @@ pub struct DocumentAndContractInfo<'a> {
     pub owner_id: Option<&'a [u8]>,
 }
 
-#[derive(Clone)]
 pub enum DocumentInfo<'a> {
     /// The document ref and it's serialized form
     DocumentAndSerialization((&'a Document, &'a [u8])),
