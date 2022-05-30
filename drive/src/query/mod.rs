@@ -925,9 +925,10 @@ mod tests {
     use crate::contract::{Contract, DocumentType};
     use crate::query::DriveQuery;
     use serde_json::json;
+    use serde_json::Value::Null;
 
     #[test]
-    fn test_invalid_query() {
+    fn test_invalid_query_ranges_different_fields() {
         let query_value = json!({
             "where": [
                 ["firstName", "<", "Gilligan"],
@@ -945,5 +946,188 @@ mod tests {
         let where_cbor = common::value_to_cbor(query_value, None);
         DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &document_type)
             .expect_err("all ranges must be on same field");
+    }
+
+    #[test]
+    fn test_invalid_query_extra_invalid_field() {
+        let query_value = json!({
+            "where": [
+                ["firstName", "<", "Gilligan"],
+            ],
+            "limit": 100,
+            "orderBy": [
+                ["firstName", "asc"],
+                ["lastName", "asc"],
+            ],
+            "invalid": 0,
+        });
+        let contract = Contract::default();
+        let document_type = DocumentType::default();
+
+        let where_cbor = common::value_to_cbor(query_value, None);
+        DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &document_type)
+            .expect_err("fields of queries must of defined supported types (where, limit, orderBy...)");
+    }
+
+    #[test]
+    fn test_invalid_query_conflicting_clauses() {
+        let query_value = json!({
+            "where": [
+                ["firstName", "<", "Gilligan"],
+                ["firstName", ">", "Gilligan"],
+            ],
+            "limit": 100,
+            "orderBy": [
+                ["firstName", "asc"],
+                ["lastName", "asc"],
+            ],
+        });
+        let contract = Contract::default();
+        let document_type = DocumentType::default();
+
+        let where_cbor = common::value_to_cbor(query_value, None);
+        DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &document_type)
+            .expect_err("fields of queries must not contain conflicting clauses");
+    }
+
+    #[test]
+    fn test_valid_query_query_field_at_max_length() {
+        let long_string = "t".repeat(255);
+        let query_value = json!({
+            "where": [
+                ["firstName", "<", long_string],
+            ],
+            "limit": 100,
+            "orderBy": [
+                ["firstName", "asc"],
+                ["lastName", "asc"],
+            ],
+        });
+        let contract = Contract::default();
+        let document_type = DocumentType::default();
+
+        let where_cbor = common::value_to_cbor(query_value, None);
+        DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &document_type)
+            .expect("query should be fine for a 255 byte long string");
+    }
+
+    #[test]
+    fn test_invalid_query_field_too_long() {
+        let too_long_string = "t".repeat(256);
+        let query_value = json!({
+            "where": [
+                ["firstName", "<", too_long_string],
+            ],
+            "limit": 100,
+            "orderBy": [
+                ["firstName", "asc"],
+                ["lastName", "asc"],
+            ],
+        });
+        let contract = Contract::default();
+        let document_type = DocumentType::default();
+
+        let where_cbor = common::value_to_cbor(query_value, None);
+        DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &document_type)
+            .expect_err("fields of queries length must be under 256 bytes long");
+    }
+
+    #[test]
+    fn test_invalid_query_scalar_field_with_null_value() {
+        let query_value = json!({
+            "where": [
+                ["age", "<", Null],
+            ],
+            "limit": 100,
+            "orderBy": [
+                ["age", "asc"],
+            ],
+        });
+        let contract = Contract::default();
+        let document_type = DocumentType::default();
+
+        let where_cbor = common::value_to_cbor(query_value, None);
+        DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &document_type)
+            .expect_err("fields of queries that are numbers can not use Null");
+    }
+
+    #[test]
+    fn test_invalid_query_timestamp_field_with_null_value() {
+        let query_value = json!({
+            "where": [
+                ["birthday", "<", Null],
+            ],
+            "limit": 100,
+            "orderBy": [
+                ["birthday", "asc"],
+            ],
+        });
+        let contract = Contract::default();
+        let document_type = DocumentType::default();
+
+        let where_cbor = common::value_to_cbor(query_value, None);
+        DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &document_type)
+            .expect_err("fields of queries that are numbers can not use Null");
+    }
+
+    #[test]
+    fn test_invalid_query_in_with_empty_array() {
+        let query_value = json!({
+            "where": [
+                ["firstName", "in", []],
+            ],
+            "limit": 100,
+            "orderBy": [
+                ["firstName", "asc"],
+            ],
+        });
+        let contract = Contract::default();
+        let document_type = DocumentType::default();
+
+        let where_cbor = common::value_to_cbor(query_value, None);
+        DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &document_type)
+            .expect_err("fields of queries that are numbers can not use Null");
+    }
+
+    #[test]
+    fn test_invalid_query_in_too_many_elements() {
+        let mut array : Vec<String> = Vec::with_capacity(101);
+        for _ in 0..array.capacity() {
+            array.push(String::from("a"));
+        }
+        let query_value = json!({
+            "where": [
+                ["firstName", "in", array],
+            ],
+            "limit": 100,
+            "orderBy": [
+                ["firstName", "asc"],
+            ],
+        });
+        let contract = Contract::default();
+        let document_type = DocumentType::default();
+
+        let where_cbor = common::value_to_cbor(query_value, None);
+        DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &document_type)
+            .expect_err("fields of queries that are numbers can not use Null");
+    }
+
+    #[test]
+    fn test_invalid_query_in_unique_elements() {
+        let query_value = json!({
+            "where": [
+                ["firstName", "in", ["a", "a"]],
+            ],
+            "limit": 100,
+            "orderBy": [
+                ["firstName", "asc"],
+            ],
+        });
+        let contract = Contract::default();
+        let document_type = DocumentType::default();
+
+        let where_cbor = common::value_to_cbor(query_value, None);
+        DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &document_type)
+            .expect_err("fields of queries that are numbers can not use Null");
     }
 }
