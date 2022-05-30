@@ -27,7 +27,7 @@ use sqlparser::ast::Value::Number;
 use sqlparser::ast::{OrderByExpr, Select, Statement};
 use sqlparser::dialect::GenericDialect;
 use sqlparser::parser::Parser;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::ops::BitXor;
 
 #[derive(Clone, Debug, PartialEq, Default)]
@@ -175,14 +175,14 @@ impl<'a> DriveQuery<'a> {
         contract: &'a Contract,
         document_type: &'a DocumentType,
     ) -> Result<Self, Error> {
-        let query_document: HashMap<String, Value> = ciborium::de::from_reader(query_cbor)
+        let mut query_document: BTreeMap<String, Value> = ciborium::de::from_reader(query_cbor)
             .map_err(|_| Error::Structure(StructureError::InvalidCBOR("unable to decode query")))?;
 
         let limit: u16 = query_document
-            .get("limit")
+            .remove("limit")
             .map_or(Some(defaults::DEFAULT_QUERY_LIMIT), |id_cbor| {
                 if let Value::Integer(b) = id_cbor {
-                    Some(i128::from(*b) as u16)
+                    Some(i128::from(b) as u16)
                 } else {
                     None
                 }
@@ -191,42 +191,44 @@ impl<'a> DriveQuery<'a> {
                 "limit should be a integer from 1 to 100",
             )))?;
 
-        let block_time: Option<f64> = query_document.get("blockTime").and_then(|id_cbor| {
+        let block_time: Option<f64> = query_document.remove("blockTime").and_then(|id_cbor| {
             if let Value::Float(b) = id_cbor {
-                Some(*b)
+                Some(b)
             } else if let Value::Integer(b) = id_cbor {
-                Some(i128::from(*b) as f64)
+                Some(i128::from(b) as f64)
             } else {
                 None
             }
         });
 
         let all_where_clauses: Vec<WhereClause> =
-            query_document.get("where").map_or(Ok(vec![]), |id_cbor| {
-                if let Value::Array(clauses) = id_cbor {
-                    clauses
-                        .iter()
-                        .map(|where_clause| {
-                            if let Value::Array(clauses_components) = where_clause {
-                                WhereClause::from_components(clauses_components)
-                            } else {
-                                Err(Error::Query(QueryError::InvalidFormatWhereClause(
-                                    "where clause must be an array",
-                                )))
-                            }
-                        })
-                        .collect::<Result<Vec<WhereClause>, Error>>()
-                } else {
-                    Err(Error::Query(QueryError::InvalidFormatWhereClause(
-                        "where clause must be an array",
-                    )))
-                }
-            })?;
+            query_document
+                .remove("where")
+                .map_or(Ok(vec![]), |id_cbor| {
+                    if let Value::Array(clauses) = id_cbor {
+                        clauses
+                            .iter()
+                            .map(|where_clause| {
+                                if let Value::Array(clauses_components) = where_clause {
+                                    WhereClause::from_components(clauses_components)
+                                } else {
+                                    Err(Error::Query(QueryError::InvalidFormatWhereClause(
+                                        "where clause must be an array",
+                                    )))
+                                }
+                            })
+                            .collect::<Result<Vec<WhereClause>, Error>>()
+                    } else {
+                        Err(Error::Query(QueryError::InvalidFormatWhereClause(
+                            "where clause must be an array",
+                        )))
+                    }
+                })?;
 
         let internal_clauses = InternalClauses::extract_from_clauses(all_where_clauses)?;
 
-        let start_at_option = query_document.get("startAt");
-        let start_after_option = query_document.get("startAfter");
+        let start_at_option = query_document.remove("startAt");
+        let start_after_option = query_document.remove("startAfter");
         if start_after_option.is_some() && start_at_option.is_some() {
             return Err(Error::Query(QueryError::DuplicateStartConditions(
                 "only one of startAt or startAfter should be provided",
@@ -235,7 +237,7 @@ impl<'a> DriveQuery<'a> {
 
         let mut start_at_included = true;
 
-        let mut start_option: Option<&Value> = None;
+        let mut start_option: Option<Value> = None;
 
         if start_after_option.is_some() {
             start_option = start_after_option;
@@ -246,13 +248,13 @@ impl<'a> DriveQuery<'a> {
         }
 
         let start_at: Option<Vec<u8>> = if start_option.is_some() {
-            bytes_for_system_value(start_option.unwrap())?
+            bytes_for_system_value(&start_option.unwrap())?
         } else {
             None
         };
 
         let order_by: IndexMap<String, OrderClause> = query_document
-            .get("orderBy")
+            .remove("orderBy")
             .map_or(vec![], |id_cbor| {
                 if let Value::Array(clauses) = id_cbor {
                     clauses
@@ -272,6 +274,12 @@ impl<'a> DriveQuery<'a> {
             .iter()
             .map(|order_clause| Ok((order_clause.field.clone(), order_clause.to_owned())))
             .collect::<Result<IndexMap<String, OrderClause>, Error>>()?;
+
+        if !query_document.is_empty() {
+            return Err(Error::Query(QueryError::Unsupported(
+                "unsupported syntax in where clause",
+            )));
+        }
 
         Ok(DriveQuery {
             contract,
@@ -544,12 +552,8 @@ impl<'a> DriveQuery<'a> {
             };
 
             if let Some(primary_key_in_clause) = &self.internal_clauses.primary_key_in_clause {
-                let in_values = match &primary_key_in_clause.value {
-                    Value::Array(array) => Ok(array),
-                    _ => Err(Error::Query(QueryError::InvalidInClause(
-                        "when using in operator you must provide an array of values",
-                    ))),
-                }?;
+                let in_values = primary_key_in_clause.in_values()?;
+
                 match starts_at_key_option {
                     None => {
                         for value in in_values.iter() {
@@ -703,9 +707,9 @@ impl<'a> DriveQuery<'a> {
                     None => (ordered_clauses.last().copied(), false, None),
                     Some(where_clause) => (Some(where_clause), true, None),
                 },
-                Some(where_clause) => match &self.internal_clauses.range_clause {
-                    None => (Some(where_clause), true, None),
-                    Some(range_clause) => (Some(where_clause), true, Some(range_clause)),
+                Some(in_clause) => match &self.internal_clauses.range_clause {
+                    None => (Some(in_clause), true, None),
+                    Some(range_clause) => (Some(in_clause), true, Some(range_clause)),
                 },
             };
 
@@ -922,10 +926,56 @@ impl<'a> DriveQuery<'a> {
 #[cfg(test)]
 mod tests {
     use crate::common;
+    use crate::common::json_document_to_cbor;
     use crate::contract::{Contract, DocumentType};
+    use crate::drive::Drive;
     use crate::query::DriveQuery;
     use serde_json::json;
     use serde_json::Value::Null;
+    use tempfile::TempDir;
+
+    fn setup_family_contract() -> (Drive, Contract) {
+        let tmp_dir = TempDir::new().unwrap();
+        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+
+        drive
+            .create_root_tree(None)
+            .expect("expected to create root tree successfully");
+
+        let contract_path = "tests/supporting_files/contract/family/family-contract.json";
+
+        // let's construct the grovedb structure for the dashpay data contract
+        let contract_cbor = json_document_to_cbor(contract_path, Some(1));
+        let contract = Contract::from_cbor(&contract_cbor, None)
+            .expect("expected to deserialize the contract");
+        drive
+            .apply_contract(&contract, contract_cbor.clone(), 0f64, None)
+            .expect("expected to apply contract successfully");
+
+        (drive, contract)
+    }
+
+    fn setup_family_birthday_contract() -> (Drive, Contract) {
+        let tmp_dir = TempDir::new().unwrap();
+        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+
+        drive
+            .create_root_tree(None)
+            .expect("expected to create root tree successfully");
+
+        let contract_path =
+            "tests/supporting_files/contract/family/family-contract-with-birthday.json";
+
+        // let's construct the grovedb structure for the dashpay data contract
+        let contract_cbor = json_document_to_cbor(contract_path, Some(1));
+        let contract = Contract::from_cbor(&contract_cbor, None)
+            .expect("expected to deserialize the contract");
+        drive
+            .apply_contract(&contract, contract_cbor.clone(), 0f64, None)
+            .expect("expected to apply contract successfully");
+
+        (drive, contract)
+    }
 
     #[test]
     fn test_invalid_query_ranges_different_fields() {
@@ -965,8 +1015,9 @@ mod tests {
         let document_type = DocumentType::default();
 
         let where_cbor = common::value_to_cbor(query_value, None);
-        DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &document_type)
-            .expect_err("fields of queries must of defined supported types (where, limit, orderBy...)");
+        DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &document_type).expect_err(
+            "fields of queries must of defined supported types (where, limit, orderBy...)",
+        );
     }
 
     #[test]
@@ -982,12 +1033,35 @@ mod tests {
                 ["lastName", "asc"],
             ],
         });
+
         let contract = Contract::default();
         let document_type = DocumentType::default();
 
         let where_cbor = common::value_to_cbor(query_value, None);
-        DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &document_type)
-            .expect_err("fields of queries must not contain conflicting clauses");
+        let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &document_type)
+            .expect_err("the query should not be created");
+    }
+
+    #[test]
+    fn test_valid_query_groupable_meeting_clauses() {
+        let query_value = json!({
+            "where": [
+                ["firstName", "<=", "Gilligan"],
+                ["firstName", ">", "Gilligan"],
+            ],
+            "limit": 100,
+            "orderBy": [
+                ["firstName", "asc"],
+                ["lastName", "asc"],
+            ],
+        });
+
+        let contract = Contract::default();
+        let document_type = DocumentType::default();
+
+        let where_cbor = common::value_to_cbor(query_value, None);
+        let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &document_type)
+            .expect("the query should be created");
     }
 
     #[test]
@@ -1013,6 +1087,12 @@ mod tests {
 
     #[test]
     fn test_invalid_query_field_too_long() {
+        let (drive, contract) = setup_family_contract();
+
+        let document_type = contract
+            .document_type_for_name("person")
+            .expect("expected to get a document type");
+
         let too_long_string = "t".repeat(256);
         let query_value = json!({
             "where": [
@@ -1024,54 +1104,104 @@ mod tests {
                 ["lastName", "asc"],
             ],
         });
-        let contract = Contract::default();
-        let document_type = DocumentType::default();
 
         let where_cbor = common::value_to_cbor(query_value, None);
-        DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &document_type)
+        let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &document_type)
+            .expect("fields of queries length must be under 256 bytes long");
+        query
+            .execute_no_proof(&drive, None)
             .expect_err("fields of queries length must be under 256 bytes long");
     }
 
+    // Eventually we want to error with weird Null values
+    // #[test]
+    // fn test_invalid_query_scalar_field_with_null_value() {
+    //     let (drive, contract) = setup_family_contract();
+    //
+    //     let document_type = contract
+    //         .document_type_for_name("person")
+    //         .expect("expected to get a document type");
+    //
+    //     let query_value = json!({
+    //         "where": [
+    //             ["age", "<", Null],
+    //         ],
+    //         "limit": 100,
+    //         "orderBy": [
+    //             ["age", "asc"],
+    //         ],
+    //     });
+    //
+    //     let where_cbor = common::value_to_cbor(query_value, None);
+    //     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &document_type)
+    //         .expect("The query itself should be valid for a null type");
+    //     query
+    //         .execute_no_proof(&drive, None)
+    //         .expect_err("a Null value doesn't make sense for an integer");
+    // }
+
+    // Eventually we want to error with weird Null values
+    //
+    // #[test]
+    // fn test_invalid_query_timestamp_field_with_null_value() {
+    //     let (drive, contract) = setup_family_birthday_contract();
+    //
+    //     let document_type = contract
+    //         .document_type_for_name("person")
+    //         .expect("expected to get a document type");
+    //
+    //     let query_value = json!({
+    //         "where": [
+    //             ["birthday", "<", Null],
+    //         ],
+    //         "limit": 100,
+    //         "orderBy": [
+    //             ["birthday", "asc"],
+    //         ],
+    //     });
+    //
+    //     let where_cbor = common::value_to_cbor(query_value, None);
+    //     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &document_type)
+    //         .expect("The query itself should be valid for a null type");
+    //     query
+    //         .execute_no_proof(&drive, None)
+    //         .expect_err("the value can not be less than Null");
+    // }
+
     #[test]
-    fn test_invalid_query_scalar_field_with_null_value() {
+    fn test_valid_query_timestamp_field_with_null_value() {
+        let (drive, contract) = setup_family_birthday_contract();
+
+        let document_type = contract
+            .document_type_for_name("person")
+            .expect("expected to get a document type");
+
         let query_value = json!({
             "where": [
-                ["age", "<", Null],
-            ],
-            "limit": 100,
-            "orderBy": [
-                ["age", "asc"],
-            ],
-        });
-        let contract = Contract::default();
-        let document_type = DocumentType::default();
-
-        let where_cbor = common::value_to_cbor(query_value, None);
-        DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &document_type)
-            .expect_err("fields of queries that are numbers can not use Null");
-    }
-
-    #[test]
-    fn test_invalid_query_timestamp_field_with_null_value() {
-        let query_value = json!({
-            "where": [
-                ["birthday", "<", Null],
+                ["birthday", ">=", Null],
             ],
             "limit": 100,
             "orderBy": [
                 ["birthday", "asc"],
             ],
         });
-        let contract = Contract::default();
-        let document_type = DocumentType::default();
 
         let where_cbor = common::value_to_cbor(query_value, None);
-        DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &document_type)
-            .expect_err("fields of queries that are numbers can not use Null");
+        let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &document_type)
+            .expect("The query itself should be valid for a null type");
+        query
+            .execute_no_proof(&drive, None)
+            .expect("a Null value doesn't make sense for a float");
     }
 
     #[test]
     fn test_invalid_query_in_with_empty_array() {
+        let (drive, contract) = setup_family_contract();
+
+        let document_type = contract
+            .document_type_for_name("person")
+            .expect("expected to get a document type");
+
         let query_value = json!({
             "where": [
                 ["firstName", "in", []],
@@ -1081,17 +1211,25 @@ mod tests {
                 ["firstName", "asc"],
             ],
         });
-        let contract = Contract::default();
-        let document_type = DocumentType::default();
 
         let where_cbor = common::value_to_cbor(query_value, None);
-        DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &document_type)
-            .expect_err("fields of queries that are numbers can not use Null");
+        let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &document_type)
+            .expect("query should be valid for empty array");
+
+        query
+            .execute_no_proof(&drive, None)
+            .expect_err("query should not be able to execute for empty array");
     }
 
     #[test]
     fn test_invalid_query_in_too_many_elements() {
-        let mut array : Vec<String> = Vec::with_capacity(101);
+        let (drive, contract) = setup_family_contract();
+
+        let document_type = contract
+            .document_type_for_name("person")
+            .expect("expected to get a document type");
+
+        let mut array: Vec<String> = Vec::with_capacity(101);
         for _ in 0..array.capacity() {
             array.push(String::from("a"));
         }
@@ -1104,16 +1242,24 @@ mod tests {
                 ["firstName", "asc"],
             ],
         });
-        let contract = Contract::default();
-        let document_type = DocumentType::default();
 
         let where_cbor = common::value_to_cbor(query_value, None);
-        DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &document_type)
-            .expect_err("fields of queries that are numbers can not use Null");
+        let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &document_type)
+            .expect("query is valid for too many elements");
+
+        query
+            .execute_no_proof(&drive, None)
+            .expect_err("query should not be able to execute with too many elements");
     }
 
     #[test]
     fn test_invalid_query_in_unique_elements() {
+        let (drive, contract) = setup_family_contract();
+
+        let document_type = contract
+            .document_type_for_name("person")
+            .expect("expected to get a document type");
+
         let query_value = json!({
             "where": [
                 ["firstName", "in", ["a", "a"]],
@@ -1123,11 +1269,17 @@ mod tests {
                 ["firstName", "asc"],
             ],
         });
-        let contract = Contract::default();
-        let document_type = DocumentType::default();
 
         let where_cbor = common::value_to_cbor(query_value, None);
-        DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &document_type)
-            .expect_err("fields of queries that are numbers can not use Null");
+
+        // The is actually valid, however executing it is not
+        // This is in order to optimize query execution
+
+        let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &document_type)
+            .expect("the query should be created");
+
+        query
+            .execute_no_proof(&drive, None)
+            .expect_err("there should be no duplicates values for In query");
     }
 }

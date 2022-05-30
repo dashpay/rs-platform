@@ -1,4 +1,5 @@
 use crate::contract::Contract;
+use crate::drive::defaults::DEFAULT_HASH_SIZE;
 use crate::drive::Drive;
 use crate::error::structure::StructureError;
 use crate::error::Error;

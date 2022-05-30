@@ -1,9 +1,11 @@
+use crate::common::value_to_cbor;
 use crate::contract::{Document, DocumentType};
 use crate::error::query::QueryError;
 use crate::error::Error;
 use ciborium::value::{Integer, Value};
 use grovedb::Query;
 use sqlparser::ast;
+use std::cmp::Ordering;
 use std::collections::{BTreeSet, HashMap};
 use WhereOperator::{
     Between, BetweenExcludeBounds, BetweenExcludeLeft, BetweenExcludeRight, Equal, GreaterThan,
@@ -155,6 +157,74 @@ impl<'a> WhereClause {
     pub fn is_identifier(&self) -> bool {
         self.field == "$id"
     }
+
+    pub fn in_values(&self) -> Result<&Vec<Value>, Error> {
+        let in_values = match &self.value {
+            Value::Array(array) => Ok(array),
+            _ => Err(Error::Query(QueryError::InvalidInClause(
+                "when using in operator you must provide an array of values",
+            ))),
+        }?;
+
+        let len = in_values.len();
+        if len == 0 {
+            return Err(Error::Query(QueryError::InvalidInClause(
+                "in clause must at least 1 value",
+            )));
+        }
+
+        if len > 100 {
+            return Err(Error::Query(QueryError::InvalidInClause(
+                "in clause must at most 100 values",
+            )));
+        }
+
+        // Throw an error if there are duplicates
+        if (1..in_values.len()).any(|i| in_values[i..].contains(&in_values[i - 1])) {
+            return Err(Error::Query(QueryError::InvalidInClause(
+                "there should be no duplicates values for In query",
+            )));
+        }
+        Ok(in_values)
+    }
+
+    pub fn less_than(&self, other: &Self, allow_eq: bool) -> Result<bool, Error> {
+        match (&self.value, &other.value) {
+            (Value::Integer(x), Value::Integer(y)) => {
+                if allow_eq {
+                    Ok(x.le(y))
+                } else {
+                    Ok(x.lt(y))
+                }
+            }
+            (Value::Bytes(x), Value::Bytes(y)) => {
+                if allow_eq {
+                    Ok(x.le(y))
+                } else {
+                    Ok(x.lt(y))
+                }
+            }
+            (Value::Float(x), Value::Float(y)) => {
+                if allow_eq {
+                    Ok(x.le(y))
+                } else {
+                    Ok(x.lt(y))
+                }
+            }
+            (Value::Text(x), Value::Text(y)) => {
+                if allow_eq {
+                    Ok(x.le(y))
+                } else {
+                    Ok(x.lt(y))
+                }
+            }
+            _ => Err(Error::Query(QueryError::RangeClausesNotGroupable(
+                "range clauses can not be coherently grouped",
+            ))),
+        }
+    }
+
+    pub fn more_than(&self, other: WhereClause) {}
 
     pub fn from_components(clause_components: &'a [Value]) -> Result<Self, Error> {
         if clause_components.len() != 3 {
@@ -387,6 +457,14 @@ impl<'a> WhereClause {
                             }
                             .ok_or_else(lower_upper_error)?;
 
+                        if upper_bounds_clause
+                            .less_than(lower_bounds_clause, operator == BetweenExcludeBounds)?
+                        {
+                            return Err(Error::Query(QueryError::MultipleRangeClauses(
+                                "lower bounds must be under upper bounds",
+                            )));
+                        }
+
                         Ok(Some(WhereClause {
                             field: groupable_range_clauses.first().unwrap().field.clone(),
                             operator,
@@ -486,12 +564,8 @@ impl<'a> WhereClause {
                 }
             }
             In => {
-                let in_values = match &self.value {
-                    Value::Array(array) => Ok(array),
-                    _ => Err(Error::Query(QueryError::InvalidInClause(
-                        "when using in operator you must provide an array of values",
-                    ))),
-                }?;
+                let in_values = self.in_values()?;
+
                 match starts_at_key_option {
                     None => {
                         for value in in_values.iter() {
@@ -924,10 +998,8 @@ mod tests {
     use ciborium::value::Value;
 
     #[test]
-    fn test_allowed_query_pairs() {
+    fn test_allowed_sup_query_pairs() {
         let allowed_pairs_test_cases = [
-            [LessThan, GreaterThan],
-            [LessThan, GreaterThanOrEquals],
             [GreaterThan, LessThan],
             [GreaterThan, LessThanOrEquals],
             [GreaterThanOrEquals, LessThanOrEquals],
@@ -948,6 +1020,53 @@ mod tests {
             let (_, range_clause, _) = WhereClause::group_clauses(&where_clauses)
                 .expect("expected to have groupable pair");
             range_clause.expect("expected to have range clause returned");
+        }
+    }
+
+    #[test]
+    fn test_allowed_inf_query_pairs() {
+        let allowed_pairs_test_cases = [
+            [LessThan, GreaterThan],
+            [LessThan, GreaterThanOrEquals],
+            [LessThanOrEquals, GreaterThanOrEquals],
+        ];
+        for query_pair in allowed_pairs_test_cases {
+            let where_clauses = vec![
+                WhereClause {
+                    field: "a".to_string(),
+                    operator: *query_pair.get(0).unwrap(),
+                    value: Value::Float(1.0),
+                },
+                WhereClause {
+                    field: "a".to_string(),
+                    operator: *query_pair.get(1).unwrap(),
+                    value: Value::Float(0.0),
+                },
+            ];
+            let (_, range_clause, _) = WhereClause::group_clauses(&where_clauses)
+                .expect("expected to have groupable pair");
+            range_clause.expect("expected to have range clause returned");
+        }
+    }
+
+    #[test]
+    fn test_query_pairs_incoherent_same_value() {
+        let allowed_pairs_test_cases = [[LessThan, GreaterThan], [GreaterThan, LessThan]];
+        for query_pair in allowed_pairs_test_cases {
+            let where_clauses = vec![
+                WhereClause {
+                    field: "a".to_string(),
+                    operator: *query_pair.get(0).unwrap(),
+                    value: Value::Float(1.0),
+                },
+                WhereClause {
+                    field: "a".to_string(),
+                    operator: *query_pair.get(1).unwrap(),
+                    value: Value::Float(1.0),
+                },
+            ];
+            WhereClause::group_clauses(&where_clauses)
+                .expect_err("expected to have an error returned");
         }
     }
 
