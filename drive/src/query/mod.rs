@@ -182,7 +182,12 @@ impl<'a> DriveQuery<'a> {
             .remove("limit")
             .map_or(Some(defaults::DEFAULT_QUERY_LIMIT), |id_cbor| {
                 if let Value::Integer(b) = id_cbor {
-                    Some(i128::from(b) as u16)
+                    let reduced = i128::from(b) as u64;
+                    if reduced == 0 || reduced > (defaults::DEFAULT_QUERY_LIMIT as u64) {
+                        None
+                    } else {
+                        Some(reduced as u16)
+                    }
                 } else {
                     None
                 }
@@ -1281,5 +1286,85 @@ mod tests {
         query
             .execute_no_proof(&drive, None)
             .expect_err("there should be no duplicates values for In query");
+    }
+
+    #[test]
+    fn test_invalid_query_starts_with_empty_string() {
+        let query_value = json!({
+            "where": [
+                ["firstName", "startsWith", ""],
+            ],
+            "limit": 100,
+            "orderBy": [
+                ["firstName", "asc"],
+            ],
+        });
+
+        let contract = Contract::default();
+        let document_type = DocumentType::default();
+
+        let where_cbor = common::value_to_cbor(query_value, None);
+        let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &document_type)
+            .expect_err("starts with can not start with an empty string");
+    }
+
+    #[test]
+    fn test_invalid_query_limit_too_high() {
+        let query_value = json!({
+            "where": [
+                ["firstName", "startsWith", "a"],
+            ],
+            "limit": 101,
+            "orderBy": [
+                ["firstName", "asc"],
+            ],
+        });
+
+        let contract = Contract::default();
+        let document_type = DocumentType::default();
+
+        let where_cbor = common::value_to_cbor(query_value, None);
+        let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &document_type)
+            .expect_err("starts with can not start with an empty string");
+    }
+
+    #[test]
+    fn test_invalid_query_limit_too_low() {
+        let query_value = json!({
+            "where": [
+                ["firstName", "startsWith", "a"],
+            ],
+            "limit": -1,
+            "orderBy": [
+                ["firstName", "asc"],
+            ],
+        });
+
+        let contract = Contract::default();
+        let document_type = DocumentType::default();
+
+        let where_cbor = common::value_to_cbor(query_value, None);
+        let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &document_type)
+            .expect_err("starts with can not start with an empty string");
+    }
+
+    #[test]
+    fn test_invalid_query_limit_zero() {
+        let query_value = json!({
+            "where": [
+                ["firstName", "startsWith", "a"],
+            ],
+            "limit": 0,
+            "orderBy": [
+                ["firstName", "asc"],
+            ],
+        });
+
+        let contract = Contract::default();
+        let document_type = DocumentType::default();
+
+        let where_cbor = common::value_to_cbor(query_value, None);
+        let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &document_type)
+            .expect_err("starts with can not start with an empty string");
     }
 }

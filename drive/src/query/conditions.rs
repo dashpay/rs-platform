@@ -477,6 +477,16 @@ impl<'a> WhereClause {
                 }
             } else if non_groupable_range_clauses.len() == 1 && groupable_range_clauses.is_empty() {
                 let where_clause = *non_groupable_range_clauses.get(0).unwrap();
+                if where_clause.operator == StartsWith {
+                    // Starts with must null be against an empty string
+                    if let Value::Text(text) = &where_clause.value {
+                        if text == "" {
+                            return Err(Error::Query(QueryError::StartsWithIllegalString(
+                                "starts with can not start with an empty string",
+                            )));
+                        }
+                    }
+                }
                 if known_fields.contains(where_clause.field.as_str()) {
                     Err(Error::Query(QueryError::DuplicateNonGroupableClauseSameField(
                     "a non groupable range clause has same field as an equality or in clause",
