@@ -195,15 +195,11 @@ describe('Drive', () => {
     });
 
     it('should not update a document with dry run flag', async () => {
-      // Create a document
       const documentWithoutIndices = documents[0];
 
-      await drive.createDocument(documentWithoutIndices, blockTime, false, true);
-
-      // Update the document
       documentWithoutIndices.set('name', 'Bob');
 
-      const result = await drive.updateDocument(documentWithoutIndices, blockTime);
+      const result = await drive.updateDocument(documentWithoutIndices, blockTime, false, true);
 
       expect(result).to.have.lengthOf(2);
       expect(result[0]).to.be.greaterThan(0);

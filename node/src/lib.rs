@@ -390,7 +390,7 @@ impl DriveWrapper {
         let js_document_type_name = cx.argument::<JsString>(2)?;
         let js_owner_id = cx.argument::<JsBuffer>(3)?;
         let js_block_time = cx.argument::<JsDate>(4)?;
-        let js_apply = cx.argument::<JsBoolean>(6)?;
+        let js_apply = cx.argument::<JsBoolean>(5)?;
         let js_using_transaction = cx.argument::<JsBoolean>(6)?;
         let js_callback = cx.argument::<JsFunction>(7)?.root(&mut cx);
 
@@ -532,7 +532,7 @@ impl DriveWrapper {
     fn js_insert_identity_cbor(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         let js_identity_id = cx.argument::<JsBuffer>(0)?;
         let js_identity_cbor = cx.argument::<JsBuffer>(1)?;
-        let js_apply = cx.argument::<JsBoolean>(3)?;
+        let js_apply = cx.argument::<JsBoolean>(2)?;
         let js_using_transaction = cx.argument::<JsBoolean>(3)?;
         let js_callback = cx.argument::<JsFunction>(4)?.root(&mut cx);
 
