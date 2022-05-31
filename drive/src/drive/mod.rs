@@ -28,12 +28,10 @@ use object_size_info::{
 use std::cell::RefCell;
 use std::path::Path;
 use std::sync::Arc;
-use crate::drive::pools::PoolInfo;
 
 pub struct Drive {
     pub grove: GroveDb,
     pub cached_contracts: RefCell<Cache<[u8; 32], Arc<Contract>>>, //HashMap<[u8; 32], Rc<Contract>>>,
-    pub pool_info: RefCell<Option<PoolInfo>>,
 }
 
 #[repr(u8)]
@@ -184,7 +182,6 @@ impl Drive {
                 Ok(Drive {
                     grove,
                     cached_contracts: RefCell::new(Cache::new(200)),
-                    pool_info: RefCell::new(None),
                 })
             },
             Err(e) => Err(Error::GroveDB(e)),
