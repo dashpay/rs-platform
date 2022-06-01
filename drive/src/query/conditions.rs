@@ -1,11 +1,9 @@
-use crate::common::value_to_cbor;
 use crate::contract::{Document, DocumentType};
 use crate::error::query::QueryError;
 use crate::error::Error;
 use ciborium::value::{Integer, Value};
 use grovedb::Query;
 use sqlparser::ast;
-use std::cmp::Ordering;
 use std::collections::{BTreeSet, HashMap};
 use WhereOperator::{
     Between, BetweenExcludeBounds, BetweenExcludeLeft, BetweenExcludeRight, Equal, GreaterThan,
@@ -223,8 +221,6 @@ impl<'a> WhereClause {
             ))),
         }
     }
-
-    pub fn more_than(&self, other: WhereClause) {}
 
     pub fn from_components(clause_components: &'a [Value]) -> Result<Self, Error> {
         if clause_components.len() != 3 {
@@ -480,7 +476,7 @@ impl<'a> WhereClause {
                 if where_clause.operator == StartsWith {
                     // Starts with must null be against an empty string
                     if let Value::Text(text) = &where_clause.value {
-                        if text == "" {
+                        if text.is_empty() {
                             return Err(Error::Query(QueryError::StartsWithIllegalString(
                                 "starts with can not start with an empty string",
                             )));
