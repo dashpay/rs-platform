@@ -3,6 +3,14 @@ use crate::drive::{Drive, RootTree};
 use crate::error::drive::DriveError;
 use crate::error::Error;
 
+const FEE_DISTRIBUTION_TABLE: [f64; 50] = [
+    0.050, 0.048, 0.046, 0.044, 0.042, 0.040, 0.038, 0.037, 0.035, 0.034,
+    0.032, 0.031, 0.029, 0.028, 0.027, 0.026, 0.025, 0.024, 0.023, 0.022,
+    0.021, 0.020, 0.019, 0.018, 0.018, 0.017, 0.016, 0.015, 0.015, 0.014,
+    0.013, 0.012, 0.012, 0.011, 0.010, 0.009, 0.009, 0.008, 0.007, 0.006,
+    0.006, 0.005, 0.004, 0.004, 0.003, 0.003, 0.002, 0.002, 0.001, 0.001,
+];
+
 pub struct FeePool<'f> {
     genesis_time_key: &'static [u8],
     storage_credit_pool_key: &'static [u8],
@@ -80,8 +88,55 @@ impl<'f> FeePool<'f> {
         }
     }
 
+    pub fn get_storage_pool_credit(&self, transaction: TransactionArg) -> Result<Option<f64>, Error> {
+        match self.drive.grove.get(FeePool::get_path(), self.storage_credit_pool_key, transaction) {
+            Ok(element) => {
+                if let Element::Item(item) = element {
+                    let credit = f64::from_le_bytes(item.as_slice().try_into().expect("expected item to be of length 8"));
+
+                    Ok(Some(credit))
+                } else {
+                    Err(Error::Drive(DriveError::CorruptedEpochElement("fee pool storage_credit_pool must be an item")))
+                }
+            }
+            Err(err) => {
+                match err {
+                    grovedb::Error::PathKeyNotFound(_) => Ok(None),
+                    _ => Err(Error::Drive(DriveError::CorruptedCodeExecution("internal grovedb error")))
+                }
+            }
+        }
+    }
+
     pub fn distribute_storage_distribution_pool(&self, epoch_index: u16, transaction: TransactionArg) -> Result<(), Error> {
-        // TODO: implement storage fee distribution
+        match self.get_storage_pool_credit(transaction)? {
+            Some(mut credit) => {
+                let mut year = 1;
+                let mut epoch_of_the_year = 1;
+
+                for index in epoch_index..epoch_index + 1000 {
+                    let epoch = Epoch::new(index, self.drive);
+
+                    let credit_distribution_percent = FEE_DISTRIBUTION_TABLE[year * (epoch_of_the_year - 1)];
+
+                    let credit_share = credit * credit_distribution_percent;
+
+                    epoch.update_storage_fee(credit_share, transaction)?;
+
+                    credit -= credit_share;
+
+                    epoch_of_the_year += 1;
+
+                    if epoch_of_the_year > 20 {
+                        year += 1;
+                    }
+                }
+
+                self.update_storage_pool_credit(credit, transaction)?;
+            }
+            None => (),
+        }
+
         Ok(())
     }
 
@@ -200,6 +255,36 @@ impl<'e> Epoch<'e> {
                         // if fee path was not found init it with 0
                         self.drive.grove
                             .insert(self.get_path(), self.processing_fee_key, Element::Item(processing_fee.to_le_bytes().to_vec()), transaction)
+                            .map_err(Error::GroveDB)
+                    },
+                    _ => Err(Error::Drive(DriveError::CorruptedCodeExecution("internal grovedb error")))
+                }
+            }
+        }
+    }
+
+    pub fn update_storage_fee(&self, storage_fee: f64, transaction: TransactionArg) -> Result<(), Error> {
+        match self.drive.grove.get(self.get_path(), self.storage_fee_key, transaction) {
+            Ok(element) => {
+                if let Element::Item(item) = element {
+                    let fee = f64::from_le_bytes(item.as_slice().try_into().expect("expected item to be of length 8"));
+
+                    // in case fee is set updated it
+                    self.drive.grove
+                        .insert(self.get_path(), self.storage_fee_key, Element::Item((fee + storage_fee).to_le_bytes().to_vec()), transaction)
+                        .map_err(Error::GroveDB)?;
+
+                    Ok(())
+                } else {
+                    Err(Error::Drive(DriveError::CorruptedEpochElement("epoch storage_fee must be an item")))
+                }
+            }
+            Err(err) => {
+                match err {
+                    grovedb::Error::PathKeyNotFound(_) => {
+                        // if fee path was not found init it with 0
+                        self.drive.grove
+                            .insert(self.get_path(), self.processing_fee_key, Element::Item(storage_fee.to_le_bytes().to_vec()), transaction)
                             .map_err(Error::GroveDB)
                     },
                     _ => Err(Error::Drive(DriveError::CorruptedCodeExecution("internal grovedb error")))
