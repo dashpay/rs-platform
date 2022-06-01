@@ -16,7 +16,6 @@ pub struct Epoch<'e> {
     storage_fee_key: &'static [u8],
     first_proposer_height_key: &'static [u8],
     proposers_key: &'static [u8],
-    proposers_count_key: &'static [u8],
     drive: &'e Drive,
 }
 
@@ -56,7 +55,7 @@ impl<'f> FeePool<'f> {
         Ok(())
     }
 
-    pub fn update_storage_poll_credit(&self, storage_fee: f64, transaction: TransactionArg) -> Result<(), Error> {
+    pub fn update_storage_pool_credit(&self, storage_fee: f64, transaction: TransactionArg) -> Result<(), Error> {
         match self.drive.grove.get(FeePool::get_path(), self.storage_credit_pool_key, transaction) {
             Ok(element) => {
                 if let Element::Item(item) = element {
@@ -120,7 +119,7 @@ impl<'f> FeePool<'f> {
         next_epoch.update_processing_fee(processing_fees, transaction)?;
 
         // update storage credit pool
-        self.update_storage_poll_credit(storage_fees, transaction)?;
+        self.update_storage_pool_credit(storage_fees, transaction)?;
 
         // update proposers
         next_epoch.update_proposers(vec!(proposer_pro_tx_hash), transaction)?;
@@ -138,7 +137,6 @@ impl<'e> Epoch<'e> {
             storage_fee_key: "s".as_bytes(),
             first_proposer_height_key: "c".as_bytes(),
             proposers_key: "m".as_bytes(),
-            proposers_count_key: "c".as_bytes(),
             drive
         }
     }
@@ -210,33 +208,13 @@ impl<'e> Epoch<'e> {
         }
     }
 
-    pub fn get_proposers_count(&self, transaction: TransactionArg) -> Result<u16, Error> {
-        match self.drive.grove.get(self.get_proposers_path(), self.proposers_count_key, transaction) {
-            Ok(element) => {
-                if let Element::Item(item) = element {
-                    let count = u16::from_le_bytes(item.as_slice().try_into().expect("invalid item length"));
-                    
-                    Ok(count)
-                } else {
-                    Err(Error::Drive(DriveError::CorruptedEpochElement("epoch proposer count must be an item")))
-                }
-            }
-            Err(err) => {
-                match err {
-                    grovedb::Error::PathKeyNotFound(e) => Err(Error::Drive(DriveError::CorruptedProposersCountPathElement(e))),
-                    _ => Err(Error::Drive(DriveError::CorruptedCodeExecution("internal grovedb error")))
-                }
-            }
-        }
-    }
-
-    pub fn get_proposer(&self, proposer_tx_hash: &[u8; 32], transaction: TransactionArg) -> Result<Option<Vec<u8>>, Error> {
+    pub fn get_proposer_block_count(&self, proposer_tx_hash: &[u8; 32], transaction: TransactionArg) -> Result<Option<u64>, Error> {
         match self.drive.grove.get(self.get_proposers_path(), proposer_tx_hash, transaction) {
             Ok(element) => {
                 if let Element::Item(item) = element {
-                    Ok(Some(item))
+                    Ok(Some(u64::from_le_bytes(item.as_slice().try_into().expect("invalid item length"))))
                 } else {
-                    Err(Error::Drive(DriveError::CorruptedEpochElement("epoch proposer must be an item")))
+                    Err(Error::Drive(DriveError::CorruptedEpochElement("epoch proposer block count must be an item")))
                 }
             }
             Err(err) => {
@@ -252,22 +230,19 @@ impl<'e> Epoch<'e> {
         match self.drive.grove.get(self.get_path(), self.proposers_key, transaction) {
             Ok(element) => {
                 if let Element::Tree(_) = element {
-                    let count: u16 = self.get_proposers_count(transaction)?;
-
                     for (_, proposer_tx_hash) in proposer_tx_hashes.iter().enumerate() {
-                        match self.get_proposer(proposer_tx_hash, transaction) {
-                            Ok(Some(_)) => (),
+                        match self.get_proposer_block_count(proposer_tx_hash, transaction) {
+                            Ok(Some(block_count)) => {
+                                // update block count
+                                self.drive.grove
+                                    .insert(self.get_proposers_path(), proposer_tx_hash, Element::Item((block_count + 1).to_le_bytes().to_vec()), transaction)
+                                    .map_err(Error::GroveDB)?;
+                            },
                             Ok(None) => {
                                 // insert new hash
                                 self.drive.grove
-                                    .insert(self.get_proposers_path(), proposer_tx_hash, Element::Item(proposer_tx_hash.to_vec()), transaction)
+                                    .insert(self.get_proposers_path(), proposer_tx_hash, Element::Item(1u64.to_le_bytes().to_vec()), transaction)
                                     .map_err(Error::GroveDB)?;
-
-                                // increase the counter
-                                self.drive.grove
-                                    .insert(self.get_proposers_path(), self.proposers_count_key, Element::Item((count + 1).to_le_bytes().to_vec()), transaction)
-                                    .map_err(Error::GroveDB)?;
-                                
                             },
                             Err(_) => {
                                 return Err(Error::Drive(DriveError::CorruptedCodeExecution("internal grovedb error")));
@@ -283,13 +258,9 @@ impl<'e> Epoch<'e> {
             Err(err) => {
                 match err {
                     grovedb::Error::PathKeyNotFound(_) => {
-                        // if fee path was not found init it with 0
+                        // if fee path was not found init it
                         self.drive.grove
                             .insert(self.get_path(), self.proposers_key, Element::empty_tree(), transaction)
-                            .map_err(Error::GroveDB)?;
-
-                        self.drive.grove
-                            .insert(self.get_proposers_path(), self.proposers_count_key, Element::Item(0u16.to_le_bytes().to_vec()), transaction)
                             .map_err(Error::GroveDB)
                     },
                     _ => Err(Error::Drive(DriveError::CorruptedCodeExecution("internal grovedb error")))
