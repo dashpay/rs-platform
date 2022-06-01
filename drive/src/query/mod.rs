@@ -1118,7 +1118,7 @@ mod tests {
             .expect_err("fields of queries length must be under 256 bytes long");
     }
 
-    // Eventually we want to error with weird Null values
+    // TODO: Eventually we want to error with weird Null values
     // #[test]
     // fn test_invalid_query_scalar_field_with_null_value() {
     //     let (drive, contract) = setup_family_contract();
@@ -1145,7 +1145,7 @@ mod tests {
     //         .expect_err("a Null value doesn't make sense for an integer");
     // }
 
-    // Eventually we want to error with weird Null values
+    // TODO: Eventually we want to error with weird Null values
     //
     // #[test]
     // fn test_invalid_query_timestamp_field_with_null_value() {
