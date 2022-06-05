@@ -2542,11 +2542,6 @@ fn test_dpns_query_start_after() {
         .expect("contract should have a domain document type");
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &domain_document_type)
         .expect("query should be built");
-    let mut query_operations: Vec<QueryOperation> = vec![];
-    let path_query = query
-        .construct_path_query_operations(&drive, Some(&db_transaction), &mut query_operations)
-        .expect("expected to construct a path query");
-    println!("{:#?}", path_query);
     let (results, _, _) = query
         .execute_no_proof(&drive, Some(&db_transaction))
         .expect("proof should be executed");
@@ -2870,11 +2865,6 @@ fn test_dpns_query_start_at_with_null_id() {
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &domain_document_type)
         .expect("query should be built");
 
-    let mut query_operations: Vec<QueryOperation> = vec![];
-    let path_query = query
-        .construct_path_query_operations(&drive, Some(&db_transaction), &mut query_operations)
-        .expect("expected to construct a path query");
-    println!("{:#?}", path_query);
     let (results, _, _) = query
         .execute_no_proof(&drive, Some(&db_transaction))
         .expect("proof should be executed");
@@ -3048,11 +3038,12 @@ fn test_dpns_query_start_after_with_null_id() {
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &domain_document_type)
         .expect("query should be built");
 
-    let mut query_operations: Vec<QueryOperation> = vec![];
-    let path_query = query
-        .construct_path_query_operations(&drive, Some(&db_transaction), &mut query_operations)
-        .expect("expected to construct a path query");
-    println!("{:#?}", path_query);
+    // We are commenting this out on purpose to make it easier to find
+    // let mut query_operations: Vec<QueryOperation> = vec![];
+    // let path_query = query
+    //     .construct_path_query_operations(&drive, Some(&db_transaction), &mut query_operations)
+    //     .expect("expected to construct a path query");
+    // println!("{:#?}", path_query);
     let (results, _, _) = query
         .execute_no_proof(&drive, Some(&db_transaction))
         .expect("proof should be executed");
@@ -3231,11 +3222,6 @@ fn test_dpns_query_start_after_with_null_id_desc() {
         .expect("contract should have a domain document type");
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &domain_document_type)
         .expect("query should be built");
-    let mut query_operations: Vec<QueryOperation> = vec![];
-    let path_query = query
-        .construct_path_query_operations(&drive, Some(&db_transaction), &mut query_operations)
-        .expect("expected to construct a path query");
-    println!("{:#?}", path_query);
     let (results, _, _) = query
         .execute_no_proof(&drive, Some(&db_transaction))
         .expect("proof should be executed");
