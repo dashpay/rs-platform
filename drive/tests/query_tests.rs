@@ -2730,7 +2730,7 @@ fn test_dpns_query_start_after_desc() {
 }
 
 #[test]
-fn test_dpns_query_start_after_with_null_id() {
+fn test_dpns_query_start_at_with_null_id() {
     // The point of this test is to test the situation where we have a start at inside an index with a null value
     // While dpns doesn't really support this, other contracts might allow null values.
     // We are just using the DPNS contract because it is handy.
@@ -2898,7 +2898,182 @@ fn test_dpns_query_start_after_with_null_id() {
         })
         .collect();
 
-    let a_names = ["".to_string(), "".to_string(), "amalle".to_string()];
+    let a_names = ["".to_string(), "amalle".to_string(), "anna-diane".to_string()];
+
+    assert_eq!(names, a_names);
+}
+
+
+#[test]
+fn test_dpns_query_start_after_with_null_id() {
+    // The point of this test is to test the situation where we have a start at inside an index with a null value
+    // While dpns doesn't really support this, other contracts might allow null values.
+    // We are just using the DPNS contract because it is handy.
+    let (drive, contract, _tmp_dir) = setup_dpns_tests(10, 11456);
+
+    let document_type = contract
+        .document_type_for_name("domain")
+        .expect("expected to get document type");
+
+    let db_transaction = drive.grove.start_transaction();
+
+    let mut rng = rand::rngs::StdRng::seed_from_u64(11456);
+
+    let domain0_id = Vec::from(rng.gen::<[u8; 32]>());
+    let domain0 = Domain {
+        id: domain0_id.clone(),
+        owner_id: Vec::from(rng.gen::<[u8; 32]>()),
+        label: None,
+        normalized_label: None,
+        normalized_parent_domain_name: "dash".to_string(),
+        records: Records {
+            dash_unique_identity_id: Vec::from(rng.gen::<[u8; 32]>()),
+        },
+        preorder_salt: Vec::from(rng.gen::<[u8; 32]>()),
+        subdomain_rules: false,
+    };
+
+    let value0 = serde_json::to_value(&domain0).expect("serialized domain");
+    let document_cbor0 =
+        common::value_to_cbor(value0, Some(rs_drive::drive::defaults::PROTOCOL_VERSION));
+    let document0 = Document::from_cbor(document_cbor0.as_slice(), None, None)
+        .expect("document should be properly deserialized");
+
+    drive
+        .add_document_for_contract(
+            DocumentAndContractInfo {
+                document_info: DocumentAndSerialization((&document0, &document_cbor0)),
+                contract: &contract,
+                document_type,
+                owner_id: None,
+            },
+            true,
+            0f64,
+            true,
+            Some(&db_transaction),
+        )
+        .expect("document should be inserted");
+
+    let domain1_id = Vec::from(rng.gen::<[u8; 32]>());
+
+    let domain1 = Domain {
+        id: domain1_id,
+        owner_id: Vec::from(rng.gen::<[u8; 32]>()),
+        label: None,
+        normalized_label: None,
+        normalized_parent_domain_name: "dash".to_string(),
+        records: Records {
+            dash_unique_identity_id: Vec::from(rng.gen::<[u8; 32]>()),
+        },
+        preorder_salt: Vec::from(rng.gen::<[u8; 32]>()),
+        subdomain_rules: false,
+    };
+
+    let value1 = serde_json::to_value(&domain1).expect("serialized domain");
+    let document_cbor1 =
+        common::value_to_cbor(value1, Some(rs_drive::drive::defaults::PROTOCOL_VERSION));
+    let document1 = Document::from_cbor(document_cbor1.as_slice(), None, None)
+        .expect("document should be properly deserialized");
+
+    drive
+        .add_document_for_contract(
+            DocumentAndContractInfo {
+                document_info: DocumentAndSerialization((&document1, &document_cbor1)),
+                contract: &contract,
+                document_type,
+                owner_id: None,
+            },
+            true,
+            0f64,
+            true,
+            Some(&db_transaction),
+        )
+        .expect("document should be inserted");
+
+    drive
+        .grove
+        .commit_transaction(db_transaction)
+        .expect("transaction should be committed");
+
+    let db_transaction = drive.grove.start_transaction();
+
+    let root_hash = drive
+        .grove
+        .root_hash(Some(&db_transaction))
+        .expect("there is always a root hash");
+    assert_eq!(
+        root_hash.expect("cannot get root hash").as_slice(),
+        vec![
+            196, 130, 12, 66, 209, 12, 55, 227, 234, 62, 145, 200, 36, 129, 102, 3, 218, 33, 112,
+            148, 41, 67, 102, 12, 107, 82, 44, 208, 2, 207, 130, 198
+        ]
+    );
+
+    // let all_names = [
+    //     "".to_string(), x2
+    //     "amalle".to_string(),
+    //     "anna-diane".to_string(),
+    //     "atalanta".to_string(),
+    //     "eden".to_string(),
+    //     "laureen".to_string(),
+    //     "leone".to_string(),
+    //     "marilyn".to_string(),
+    //     "minna".to_string(),
+    //     "mora".to_string(),
+    //     "phillie".to_string(),
+    // ];
+
+    // A query getting one element starting with a in dash parent domain asc
+
+    let encoded_start_at = bs58::encode(domain0_id).into_string();
+
+    let query_value = json!({
+        "where": [
+            ["normalizedParentDomainName", "==", "dash"]
+        ],
+        "startAfter":  encoded_start_at,
+        "limit": 2,
+        "orderBy": [
+            ["normalizedLabel", "asc"]
+        ]
+    });
+    let where_cbor = common::value_to_cbor(query_value, None);
+    let domain_document_type = contract
+        .document_types
+        .get("domain")
+        .expect("contract should have a domain document type");
+    let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &domain_document_type)
+        .expect("query should be built");
+
+    let mut query_operations: Vec<QueryOperation> = vec![];
+    let path_query = query
+        .construct_path_query_operations(&drive, Some(&db_transaction), &mut query_operations)
+        .expect("expected to construct a path query");
+    println!("{:#?}", path_query);
+    let (results, _, _) = query
+        .execute_no_proof(&drive, Some(&db_transaction))
+        .expect("proof should be executed");
+    let names: Vec<String> = results
+        .into_iter()
+        .map(|result| {
+            let document = Document::from_cbor(result.as_slice(), None, None)
+                .expect("we should be able to deserialize the cbor");
+            let normalized_label_value = document
+                .properties
+                .get("normalizedLabel")
+                .expect("we should be able to get the first name");
+            if normalized_label_value.is_null() {
+                String::from("")
+            } else {
+                let normalized_label = normalized_label_value
+                    .as_text()
+                    .expect("the normalized label should be a string");
+                String::from(normalized_label)
+            }
+        })
+        .collect();
+
+    let a_names = ["amalle".to_string(), "anna-diane".to_string()];
 
     assert_eq!(names, a_names);
 }

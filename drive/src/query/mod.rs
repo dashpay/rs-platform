@@ -864,25 +864,6 @@ impl<'a> DriveQuery<'a> {
                                 .flatten()
                                 .unwrap_or_default();
 
-                            let mut inner_query = Self::inner_query_from_starts_at(
-                                starts_at_document,
-                                left_to_right,
-                            )?;
-                            DriveQuery::recursive_insert_on_query(
-                                Some(&mut inner_query),
-                                left_over,
-                                unique,
-                                starts_at_document,
-                                left_to_right,
-                                order_by,
-                            )?;
-
-                            query.add_conditional_subquery(
-                                QueryItem::Key(start_at_key.clone()),
-                                Some(first.name.as_bytes().to_vec()),
-                                Some(inner_query),
-                            );
-
                             // We should always include if we have left_over
                             let non_conditional_included = !left_over.is_empty() | *included;
 
@@ -896,7 +877,7 @@ impl<'a> DriveQuery<'a> {
                                 Some(&mut non_conditional_query),
                                 left_over,
                                 unique,
-                                &None,
+                                starts_at_document,
                                 left_to_right,
                                 order_by,
                             )?;
