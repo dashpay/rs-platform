@@ -715,6 +715,29 @@ impl<'a> DriveQuery<'a> {
         inner_query
     }
 
+    fn inner_query_starts_from_key(
+        start_at_key: Vec<u8>,
+        left_to_right: bool,
+        included: bool,
+    ) -> Query {
+        // We only need items after the start at document
+        let mut inner_query = Query::new_with_direction(left_to_right);
+        if left_to_right {
+            if included {
+                inner_query.insert_range_from(start_at_key..);
+            } else {
+                inner_query.insert_range_after(start_at_key..);
+            }
+        } else {
+            if included {
+                inner_query.insert_range_to_inclusive(..=start_at_key);
+            } else {
+                inner_query.insert_range_to(..start_at_key);
+            }
+        }
+        inner_query
+    }
+
     // We are passing in starts_at_document 4 parameters
     // The document
     // The document type (borrowed)
@@ -762,7 +785,8 @@ impl<'a> DriveQuery<'a> {
         left_over_index_properties: &[&IndexProperty],
         unique: bool,
         starts_at_document: &Option<(Document, &DocumentType, &IndexProperty, bool)>, //for key level, included
-        left_to_right: bool,
+        default_left_to_right: bool,
+        order_by: Option<&IndexMap<String, OrderClause>>,
     ) -> Result<Option<Query>, Error> {
         match left_over_index_properties.split_first() {
             None => {
@@ -774,7 +798,7 @@ impl<'a> DriveQuery<'a> {
                             // In the case things are NULL we allow to have multiple values
                             let inner_query = Self::inner_query_from_starts_at_for_id(
                                 starts_at_document,
-                                left_to_right,
+                                true, //for ids we always go left to right
                             );
                             query.add_conditional_subquery(
                                 QueryItem::Key(b"".to_vec()),
@@ -785,13 +809,15 @@ impl<'a> DriveQuery<'a> {
                         false => {
                             query.set_subquery_key(vec![0]);
                             // we just get all by document id order ascending
-                            let full_query =
-                                Self::inner_query_from_starts_at_for_id(&None, left_to_right);
+                            let full_query = Self::inner_query_from_starts_at_for_id(
+                                &None,
+                                default_left_to_right,
+                            );
                             query.set_subquery(full_query);
 
                             let inner_query = Self::inner_query_from_starts_at_for_id(
                                 starts_at_document,
-                                left_to_right,
+                                default_left_to_right,
                             );
 
                             query.add_conditional_subquery(
@@ -804,29 +830,18 @@ impl<'a> DriveQuery<'a> {
                 }
                 Ok(None)
             }
-            Some((first, left_over)) => match query {
-                None => {
-                    let mut inner_query =
-                        Self::inner_query_from_starts_at(starts_at_document, left_to_right)?;
-                    DriveQuery::recursive_insert_on_query(
-                        Some(&mut inner_query),
-                        left_over,
-                        unique,
-                        starts_at_document,
-                        left_to_right,
-                    )?;
-                    Ok(Some(inner_query))
-                }
-                Some(query) => {
-                    if let Some((document, document_type, indexed_property, included)) =
-                        starts_at_document
-                    {
-                        let start_at_key = document
-                            .get_raw_for_document_type(first.name.as_str(), document_type, None)
-                            .ok()
-                            .flatten()
-                            .unwrap_or_default();
+            Some((first, left_over)) => {
+                let left_to_right = if let Some(order_by) = order_by {
+                    order_by
+                        .get(first.name.as_str())
+                        .map(|order_clause| order_clause.ascending)
+                        .unwrap_or(first.ascending)
+                } else {
+                    first.ascending
+                };
 
+                match query {
+                    None => {
                         let mut inner_query =
                             Self::inner_query_from_starts_at(starts_at_document, left_to_right)?;
                         DriveQuery::recursive_insert_on_query(
@@ -835,46 +850,76 @@ impl<'a> DriveQuery<'a> {
                             unique,
                             starts_at_document,
                             left_to_right,
+                            order_by,
                         )?;
-
-                        query.add_conditional_subquery(
-                            QueryItem::Key(start_at_key.clone()),
-                            Some(first.name.as_bytes().to_vec()),
-                            Some(inner_query),
-                        );
-
-                        let mut inner_query =
-                            Self::inner_query_from_starts_at(starts_at_document, first.ascending)?;
-                        DriveQuery::recursive_insert_on_query(
-                            Some(&mut inner_query),
-                            left_over,
-                            unique,
-                            &None,
-                            first.ascending,
-                        )?;
-
-                        query.add_conditional_subquery(
-                            Self::query_item_for_starts_at_key(start_at_key, first.ascending),
-                            Some(first.name.as_bytes().to_vec()),
-                            Some(inner_query),
-                        );
-                    } else {
-                        let mut inner_query = Query::new_with_direction(first.ascending);
-                        inner_query.insert_all();
-                        DriveQuery::recursive_insert_on_query(
-                            Some(&mut inner_query),
-                            left_over,
-                            unique,
-                            starts_at_document,
-                            left_to_right,
-                        )?;
-
-                        query.set_subquery(inner_query);
-                        query.set_subquery_key(first.name.as_bytes().to_vec());
+                        Ok(Some(inner_query))
                     }
-                    Ok(None)
+                    Some(query) => {
+                        if let Some((document, document_type, indexed_property, included)) =
+                            starts_at_document
+                        {
+                            let start_at_key = document
+                                .get_raw_for_document_type(first.name.as_str(), document_type, None)
+                                .ok()
+                                .flatten()
+                                .unwrap_or_default();
+
+                            let mut inner_query = Self::inner_query_from_starts_at(
+                                starts_at_document,
+                                left_to_right,
+                            )?;
+                            DriveQuery::recursive_insert_on_query(
+                                Some(&mut inner_query),
+                                left_over,
+                                unique,
+                                starts_at_document,
+                                left_to_right,
+                                order_by,
+                            )?;
+
+                            query.add_conditional_subquery(
+                                QueryItem::Key(start_at_key.clone()),
+                                Some(first.name.as_bytes().to_vec()),
+                                Some(inner_query),
+                            );
+
+                            // We should always include if we have left_over
+                            let non_conditional_included = !left_over.is_empty() | *included;
+
+                            let mut non_conditional_query = Self::inner_query_starts_from_key(
+                                start_at_key,
+                                left_to_right,
+                                non_conditional_included,
+                            );
+
+                            DriveQuery::recursive_insert_on_query(
+                                Some(&mut non_conditional_query),
+                                left_over,
+                                unique,
+                                &None,
+                                left_to_right,
+                                order_by,
+                            )?;
+
+                            query.set_subquery(non_conditional_query);
+                        } else {
+                            let mut inner_query = Query::new_with_direction(first.ascending);
+                            inner_query.insert_all();
+                            DriveQuery::recursive_insert_on_query(
+                                Some(&mut inner_query),
+                                left_over,
+                                unique,
+                                starts_at_document,
+                                left_to_right,
+                                order_by,
+                            )?;
+                            query.set_subquery(inner_query);
+                        }
+                        query.set_subquery_key(first.name.as_bytes().to_vec());
+                        Ok(None)
+                    }
                 }
-            },
+            }
         }
     }
 
@@ -956,6 +1001,7 @@ impl<'a> DriveQuery<'a> {
                         (document, self.document_type, first_index, included)
                     }),
                     first_index.ascending,
+                    None,
                 )?
                 .expect("Index must have left over properties if no last clause")
             }
@@ -973,9 +1019,18 @@ impl<'a> DriveQuery<'a> {
                     true
                 };
 
+                // We should set the starts at document to be included for the query if there are
+                // left over index properties.
+
+                let query_starts_at_document = if left_over_index_properties.is_empty() {
+                    &starts_at_document
+                } else {
+                    &None
+                };
+
                 let mut query = where_clause.to_path_query(
                     self.document_type,
-                    &starts_at_document,
+                    query_starts_at_document,
                     left_to_right,
                 )?;
 
@@ -998,6 +1053,7 @@ impl<'a> DriveQuery<'a> {
                                 (document, self.document_type, last_index_property, included)
                             }),
                             left_to_right,
+                            Some(&self.order_by),
                         )?;
                     }
                     Some(subquery_where_clause) => {
@@ -1027,6 +1083,7 @@ impl<'a> DriveQuery<'a> {
                                 (document, self.document_type, last_index_property, included)
                             }),
                             left_to_right,
+                            Some(&self.order_by),
                         )?;
                         let subindex = subquery_where_clause.field.as_bytes().to_vec();
                         query.set_subquery_key(subindex);
