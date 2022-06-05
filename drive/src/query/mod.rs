@@ -36,7 +36,7 @@ pub struct InternalClauses {
     pub primary_key_equal_clause: Option<WhereClause>,
     pub in_clause: Option<WhereClause>,
     pub range_clause: Option<WhereClause>,
-    pub equal_clauses: HashMap<String, WhereClause>,
+    pub equal_clauses: BTreeMap<String, WhereClause>,
 }
 
 impl InternalClauses {
