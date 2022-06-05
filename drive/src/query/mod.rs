@@ -32,11 +32,11 @@ use std::ops::BitXor;
 
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct InternalClauses {
-    primary_key_in_clause: Option<WhereClause>,
-    primary_key_equal_clause: Option<WhereClause>,
-    in_clause: Option<WhereClause>,
-    range_clause: Option<WhereClause>,
-    equal_clauses: HashMap<String, WhereClause>,
+    pub primary_key_in_clause: Option<WhereClause>,
+    pub primary_key_equal_clause: Option<WhereClause>,
+    pub in_clause: Option<WhereClause>,
+    pub range_clause: Option<WhereClause>,
+    pub equal_clauses: HashMap<String, WhereClause>,
 }
 
 impl InternalClauses {
