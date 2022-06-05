@@ -2898,11 +2898,14 @@ fn test_dpns_query_start_at_with_null_id() {
         })
         .collect();
 
-    let a_names = ["".to_string(), "amalle".to_string(), "anna-diane".to_string()];
+    let a_names = [
+        "".to_string(),
+        "amalle".to_string(),
+        "anna-diane".to_string(),
+    ];
 
     assert_eq!(names, a_names);
 }
-
 
 #[test]
 fn test_dpns_query_start_after_with_null_id() {
