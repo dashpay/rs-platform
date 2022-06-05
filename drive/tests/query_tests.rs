@@ -7,7 +7,6 @@ use rs_drive::drive::object_size_info::DocumentAndContractInfo;
 use rs_drive::drive::object_size_info::DocumentInfo::DocumentAndSerialization;
 use rs_drive::drive::Drive;
 use rs_drive::error::{query::QueryError, Error};
-use rs_drive::fee::op::QueryOperation;
 use rs_drive::query::DriveQuery;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -812,27 +811,6 @@ fn test_family_basic_queries() {
     ];
 
     assert_eq!(names, expected_between_names);
-
-    // A query getting all people who's first name is between Chris and Noellyn included
-    // However here there will be a startAt of the ID of Kevina
-
-    // Let's first get the ID of Kevina
-    let ids: HashMap<String, Vec<u8>> = results
-        .into_iter()
-        .map(|result| {
-            let document = Document::from_cbor(result.as_slice(), None, None)
-                .expect("we should be able to deserialize the cbor");
-            let name_value = document
-                .properties
-                .get("firstName")
-                .expect("we should be able to get the first name");
-            let name = name_value
-                .as_text()
-                .expect("the first name should be a string")
-                .to_string();
-            (name, Vec::from(document.id))
-        })
-        .collect();
 
     // A query getting back elements having specific names
 

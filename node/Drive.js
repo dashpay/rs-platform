@@ -62,7 +62,7 @@ class Drive {
 
   /**
    * @param {boolean} [useTransaction=false]
-   * @returns {Promise<void>}
+   * @returns {Promise<[number, number]>}
    */
   async createRootTree(useTransaction = false) {
     return driveCreateRootTreeAsync.call(this.drive, useTransaction);
@@ -72,7 +72,7 @@ class Drive {
    * @param {DataContract} dataContract
    * @param {Date} blockTime
    * @param {boolean} [useTransaction=false]
-   * @returns {Promise<void>}
+   * @returns {Promise<[number, number]>}
    */
   async applyContract(dataContract, blockTime, useTransaction = false) {
     return driveApplyContractAsync.call(
@@ -88,7 +88,7 @@ class Drive {
    * @param {Document} document
    * @param {Date} blockTime
    * @param {boolean} [useTransaction=false]
-   * @returns {Promise<void>}
+   * @returns {Promise<[number, number]>}
    */
   async createDocument(document, blockTime, useTransaction = false) {
     return driveCreateDocumentAsync.call(
@@ -108,7 +108,7 @@ class Drive {
    * @param {Document} document
    * @param {Date} blockTime
    * @param {boolean} [useTransaction=false]
-   * @returns {Promise<void>}
+   * @returns {Promise<[number, number]>}
    */
   async updateDocument(document, blockTime, useTransaction = false) {
     return driveUpdateDocumentAsync.call(
@@ -128,7 +128,7 @@ class Drive {
    * @param {string} documentType
    * @param {Identifier} documentId
    * @param {boolean} [useTransaction=false]
-   * @returns {Promise<void>}
+   * @returns {Promise<[number, number]>}
    */
   async deleteDocument(
     dataContract,
@@ -156,12 +156,12 @@ class Drive {
    * @param [query.startAfter]
    * @param [query.orderBy]
    * @param {Boolean} [useTransaction=false]
-   * @returns {Promise<Document[]>}
+   * @returns {Promise<[Document[], number]>}
    */
   async queryDocuments(dataContract, documentType, query = {}, useTransaction = false) {
     const encodedQuery = await cbor.encodeAsync(query);
 
-    const [encodedDocuments] = await driveQueryDocumentsAsync.call(
+    const [encodedDocuments, , processingFee] = await driveQueryDocumentsAsync.call(
       this.drive,
       encodedQuery,
       dataContract.id.toBuffer(),
@@ -169,19 +169,24 @@ class Drive {
       useTransaction,
     );
 
-    return encodedDocuments.map((encodedDocument) => {
+    const documents = encodedDocuments.map((encodedDocument) => {
       const [protocolVersion, rawDocument] = decodeProtocolEntity(encodedDocument);
 
       rawDocument.$protocolVersion = protocolVersion;
 
       return new Document(rawDocument, dataContract);
     });
+
+    return [
+      documents,
+      processingFee,
+    ];
   }
 
   /**
-   * @param {DataContract} dataContract
+   * @param {DataContract} identity
    * @param {boolean} [useTransaction=false]
-   * @returns {Promise<void>}
+   * @returns {Promise<[number, number]>}
    */
   async insertIdentity(identity, useTransaction = false) {
     return driveInsertIdentityAsync.call(
