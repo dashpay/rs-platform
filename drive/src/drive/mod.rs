@@ -21,7 +21,7 @@ use crate::error::query::QueryError;
 use crate::error::Error;
 use crate::fee::calculate_fee;
 use crate::fee::op::{DeleteOperation, InsertOperation, QueryOperation};
-use crate::query::DriveQuery;
+use crate::query::{DriveQuery, GroveError};
 use defaults::{CONTRACT_DOCUMENTS_PATH_HEIGHT, DEFAULT_HASH_SIZE};
 use grovedb::{Element, GroveDb, Transaction, TransactionArg};
 use moka::sync::Cache;
@@ -1008,7 +1008,7 @@ impl Drive {
                 insert_operations,
             )?;
 
-            let mut all_fields_null = document_top_field.is_empty();
+            let mut any_fields_null = document_top_field.is_empty();
 
             let mut index_path_info = if document_and_contract_info
                 .document_info
@@ -1070,7 +1070,7 @@ impl Drive {
                     insert_operations,
                 )?;
 
-                all_fields_null &= document_index_field.is_empty();
+                any_fields_null |= document_index_field.is_empty();
 
                 // we push the actual value of the index path
                 index_path_info.push(document_index_field)?;
@@ -1097,7 +1097,7 @@ impl Drive {
 
             // unique indexes will be stored under key "0"
             // non unique indices should have a tree at key "0" that has all elements based off of primary key
-            if !index.unique || all_fields_null {
+            if !index.unique || any_fields_null {
                 let key_path_info = KeyRef(&[0]);
 
                 let path_key_info = key_path_info.add_path_info(index_path_info.clone());
@@ -2107,7 +2107,6 @@ mod tests {
         let owner_id = rand::thread_rng().gen::<[u8; 32]>();
         let document = Document::from_cbor(&dashpay_cr_document_cbor, None, Some(&owner_id))
             .expect("expected to deserialize document successfully");
-
         let document_type = contract
             .document_type_for_name("contactRequest")
             .expect("expected to get document type successfully");
