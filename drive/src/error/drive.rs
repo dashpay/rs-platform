@@ -51,4 +51,12 @@ pub enum DriveError {
     CorruptedStorageCreditPoolPathElement(String),
     #[error("corrupted proposers count element path error: {0}")]
     CorruptedProposersCountPathElement(String),
+    #[error("corrupted first proposed block height element path error: {0}")]
+    CorruptedFirstProposedBlockHeightPathElement(String),
+    #[error("corrupted epoch storage credit element path error: {0}")]
+    CorruptedStorageCreditPathElement(String),
+    #[error("corrupted epoch processing credit element path error: {0}")]
+    CorruptedProcessingCreditPathElement(String),
+    #[error("corrupted proposers query error: {0}")]
+    CorruptedProposersQuery(String),
 }
