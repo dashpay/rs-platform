@@ -98,13 +98,16 @@ impl<'f> FeePool<'f> {
         }
     }
 
-    pub fn get_current_epoch_index(&self, block_time: i64, transaction: TransactionArg) -> Result<(u16, bool), Error> {
+    pub fn get_current_epoch_index(&self, block_time: i64, previous_block_time: i64, transaction: TransactionArg) -> Result<(u16, bool), Error> {
         let genesis_time = self.get_genesis_time(transaction)?;
+
+        let prev_epoch_index = (previous_block_time - genesis_time) as f64 / 1576800000.0;
+        let prev_epoch_index_floored = prev_epoch_index.floor();
 
         let epoch_index = (block_time - genesis_time) as f64 / 1576800000.0;
         let epoch_index_floored = epoch_index.floor();
 
-        let is_epoch_change = false; // TODO: find a proper way of knowing epoch change
+        let is_epoch_change = epoch_index_floored > prev_epoch_index_floored;
 
         Ok((epoch_index_floored as u16, is_epoch_change))
     }
@@ -601,7 +604,7 @@ impl Drive {
         Ok(())
     }
 
-    pub fn process_block(&self, block_height: u64, block_time: i64, proposer_pro_tx_hash: [u8;32], processing_fees: f64, storage_fees: f64, transaction: TransactionArg)  -> Result<(), Error> {
+    pub fn process_block(&self, block_height: u64, block_time: i64, previous_block_time: i64, proposer_pro_tx_hash: [u8;32], processing_fees: f64, storage_fees: f64, transaction: TransactionArg)  -> Result<(), Error> {
         if block_height == 1 {
             let genesis_time = Utc::now().timestamp();
             self.init_fee_pool(genesis_time, transaction)?;
@@ -609,7 +612,7 @@ impl Drive {
 
         let fee_pool = FeePool::new(self);
 
-        let (epoch_index, is_epoch_change) = fee_pool.get_current_epoch_index(block_time, transaction)?;
+        let (epoch_index, is_epoch_change) = fee_pool.get_current_epoch_index(block_time, previous_block_time, transaction)?;
 
         if is_epoch_change {
             fee_pool.distribute_storage_distribution_pool(epoch_index, transaction)?;
@@ -676,6 +679,10 @@ mod tests {
 
         let db_transaction = drive.grove.start_transaction();
 
+        drive
+            .create_root_tree(Some(&db_transaction))
+            .expect("expected to create root tree successfully");
+
         let fee_pool = FeePool::new(&drive);
 
         fee_pool.init(1654622858842, Some(&db_transaction)).expect("should init fee pool");
@@ -700,6 +707,10 @@ mod tests {
     fn test_epoch_init() {
         let tmp_dir = TempDir::new().unwrap();
         let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+
+        drive
+            .create_root_tree(None)
+            .expect("expected to create root tree successfully");
 
         let db_transaction = drive.grove.start_transaction();
 
