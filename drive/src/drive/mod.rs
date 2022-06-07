@@ -3,7 +3,10 @@ pub mod defaults;
 pub mod identity;
 pub mod object_size_info;
 
+use crate::contract::flags::StorageFlags;
 use crate::contract::{Contract, Document, DocumentType};
+use crate::drive::object_size_info::KeyInfo::KeySize;
+use crate::drive::object_size_info::PathKeyInfo::{PathFixedSizeKey, PathKey, PathKeyRef};
 use crate::error::drive::DriveError;
 use crate::error::query::QueryError;
 use crate::error::Error;
@@ -234,6 +237,7 @@ impl Drive {
         &'a self,
         path: P,
         key_info: KeyInfo<'c>,
+        storage_flags: &StorageFlags,
         transaction: TransactionArg,
         apply: bool,
         insert_operations: &mut Vec<InsertOperation>,
@@ -243,11 +247,16 @@ impl Drive {
         <P as IntoIterator>::IntoIter: ExactSizeIterator + DoubleEndedIterator + Clone,
     {
         match key_info {
-            KeyInfo::KeyRef(key) => {
+            KeyRef(key) => {
                 insert_operations.push(InsertOperation::for_empty_tree(key.len()));
                 if apply {
                     self.grove
-                        .insert(path, key, Element::empty_tree(), transaction)
+                        .insert(
+                            path,
+                            key,
+                            Element::empty_tree_with_flags(storage_flags.to_element_flags()),
+                            transaction,
+                        )
                         .map_err(Error::GroveDB)
                 } else {
                     let mut path_items: Vec<Vec<u8>> = path.into_iter().map(Vec::from).collect();
@@ -256,11 +265,11 @@ impl Drive {
                     Ok(())
                 }
             }
-            KeyInfo::KeySize(key_max_length) => {
+            KeySize(key_max_length) => {
                 insert_operations.push(InsertOperation::for_empty_tree(key_max_length));
                 Ok(())
             }
-            KeyInfo::Key(_) => Err(Error::Drive(DriveError::GroveDBInsertion(
+            Key(_) => Err(Error::Drive(DriveError::GroveDBInsertion(
                 "only a key ref can be inserted into groveDB",
             ))),
         }
@@ -269,19 +278,20 @@ impl Drive {
     fn grove_insert_empty_tree_if_not_exists<'a, 'c, const N: usize>(
         &'a self,
         path_key_info: PathKeyInfo<'c, N>,
+        storage_flags: &StorageFlags,
         transaction: TransactionArg,
         apply: bool,
         query_operations: &mut Vec<QueryOperation>,
         insert_operations: &mut Vec<InsertOperation>,
     ) -> Result<bool, Error> {
         match path_key_info {
-            PathKeyInfo::PathKeyRef((path, key)) => {
+            PathKeyRef((path, key)) => {
                 let path = path.iter().map(|x| x.as_slice());
                 let inserted = if apply {
                     self.grove.insert_if_not_exists(
                         path.clone(),
                         key,
-                        Element::empty_tree(),
+                        Element::empty_tree_with_flags(storage_flags.to_element_flags()),
                         transaction,
                     )?
                 } else {
@@ -303,7 +313,7 @@ impl Drive {
                 query_operations.push(QueryOperation::for_key_check_in_path(key.len(), path));
                 Ok(inserted)
             }
-            PathKeyInfo::PathKeySize((path_length, key_length)) => {
+            PathKeySize((path_length, key_length)) => {
                 insert_operations.push(InsertOperation::for_empty_tree(key_length));
                 query_operations.push(QueryOperation::for_key_check_with_path_length(
                     key_length,
@@ -311,13 +321,13 @@ impl Drive {
                 ));
                 Ok(true)
             }
-            PathKeyInfo::PathKey((path, key)) => {
+            PathKey((path, key)) => {
                 let path = path.iter().map(|x| x.as_slice());
                 let inserted = if apply {
                     self.grove.insert_if_not_exists(
                         path.clone(),
                         key.as_slice(),
-                        Element::empty_tree(),
+                        Element::empty_tree_with_flags(storage_flags.to_element_flags()),
                         transaction,
                     )?
                 } else {
@@ -339,13 +349,13 @@ impl Drive {
                 query_operations.push(QueryOperation::for_key_check_in_path(key.len(), path));
                 Ok(inserted)
             }
-            PathKeyInfo::PathFixedSizeKey((path, key)) => {
+            PathFixedSizeKey((path, key)) => {
                 let path = path.into_iter();
                 let inserted = if apply {
                     self.grove.insert_if_not_exists(
                         path.clone(),
                         key.as_slice(),
-                        Element::empty_tree(),
+                        Element::empty_tree_with_flags(storage_flags.to_element_flags()),
                         transaction,
                     )?
                 } else {
@@ -367,13 +377,13 @@ impl Drive {
                 query_operations.push(QueryOperation::for_key_check_in_path(key.len(), path));
                 Ok(inserted)
             }
-            PathKeyInfo::PathFixedSizeKeyRef((path, key)) => {
+            PathFixedSizeKeyRef((path, key)) => {
                 let path = path.into_iter();
                 let inserted = if apply {
                     self.grove.insert_if_not_exists(
                         path.clone(),
                         key,
-                        Element::empty_tree(),
+                        Element::empty_tree_with_flags(storage_flags.to_element_flags()),
                         transaction,
                     )?
                 } else {
@@ -485,7 +495,7 @@ impl Drive {
                 query_operations.push(query_operation);
                 Ok(true)
             }
-            PathKeyElementInfo::PathFixedSizeKeyElement((path, key, element)) => {
+            PathFixedSizeKeyElement((path, key, element)) => {
                 let path_iter = path.into_iter();
                 let insert_operation = InsertOperation::for_key_value(key.len(), &element);
                 let query_operation =
@@ -565,20 +575,28 @@ impl Drive {
         let primary_key_path =
             contract_documents_primary_key_path(&contract.id, document_type.name.as_str());
         if document_type.documents_keep_history {
-            let path_key_info = if let DocumentAndSerialization((document, _)) =
-                document_and_contract_info.document_info
-            {
-                PathFixedSizeKeyRef((primary_key_path, document.id.as_slice()))
-            } else {
-                PathKeySize((
-                    crate::drive::defaults::BASE_CONTRACT_DOCUMENTS_PRIMARY_KEY_PATH
-                        + document_type.name.len(),
-                    DEFAULT_HASH_SIZE,
-                ))
-            };
+            let (path_key_info, storage_flags) =
+                if let DocumentAndSerialization((document, _, storage_flags)) =
+                    document_and_contract_info.document_info
+                {
+                    (
+                        PathFixedSizeKeyRef((primary_key_path, document.id.as_slice())),
+                        storage_flags.clone(),
+                    )
+                } else {
+                    (
+                        PathKeySize((
+                            defaults::BASE_CONTRACT_DOCUMENTS_PRIMARY_KEY_PATH
+                                + document_type.name.len(),
+                            DEFAULT_HASH_SIZE,
+                        )),
+                        StorageFlags::default(),
+                    )
+                };
             // we first insert an empty tree if the document is new
             self.grove_insert_empty_tree_if_not_exists(
                 path_key_info,
+                &storage_flags,
                 transaction,
                 apply,
                 query_operations,
@@ -586,8 +604,9 @@ impl Drive {
             )?;
             let encoded_time = crate::contract::types::encode_float(block_time)?;
             let path_key_element_info = match document_and_contract_info.document_info {
-                DocumentAndSerialization((document, document_cbor)) => {
-                    let element = Element::Item(Vec::from(document_cbor));
+                DocumentAndSerialization((document, document_cbor, storage_flags)) => {
+                    let element =
+                        Element::Item(Vec::from(document_cbor), storage_flags.to_element_flags());
                     let document_id_in_primary_path =
                         contract_documents_keeping_history_primary_key_path_for_document_id(
                             &contract.id,
@@ -614,50 +633,52 @@ impl Drive {
             };
             self.grove_insert(path_key_element_info, transaction, apply, insert_operations)?;
 
-            let path_key_element_info = if let DocumentAndSerialization((document, _)) =
-                document_and_contract_info.document_info
-            {
-                // we should also insert a reference at 0 to the current value
-                // todo: we could construct this only once
-                let document_id_in_primary_path =
-                    contract_documents_keeping_history_primary_key_path_for_document_id(
-                        &contract.id,
-                        document_type.name.as_str(),
-                        document.id.as_slice(),
-                    );
-                let contract_storage_path =
-                    contract_documents_keeping_history_storage_time_reference_path(
-                        &contract.id,
-                        document_type.name.as_str(),
-                        document.id.as_slice(),
-                        encoded_time,
-                    );
-                PathFixedSizeKeyElement((
-                    document_id_in_primary_path,
-                    &[0],
-                    Element::Reference(contract_storage_path),
-                ))
-            } else {
-                let path_max_length =
-                    contract_documents_keeping_history_primary_key_path_for_document_id_size(
-                        document_type.name.len(),
-                    );
-                let reference_max_size =
-                    contract_documents_keeping_history_storage_time_reference_path_size(
-                        document_type.name.len(),
-                    );
-                PathKeyElementSize((
-                    path_max_length,
-                    1,
-                    Element::required_item_space(reference_max_size),
-                ))
-            };
+            let path_key_element_info =
+                if let DocumentAndSerialization((document, _, storage_flags)) =
+                    document_and_contract_info.document_info
+                {
+                    // we should also insert a reference at 0 to the current value
+                    // todo: we could construct this only once
+                    let document_id_in_primary_path =
+                        contract_documents_keeping_history_primary_key_path_for_document_id(
+                            &contract.id,
+                            document_type.name.as_str(),
+                            document.id.as_slice(),
+                        );
+                    let contract_storage_path =
+                        contract_documents_keeping_history_storage_time_reference_path(
+                            &contract.id,
+                            document_type.name.as_str(),
+                            document.id.as_slice(),
+                            encoded_time,
+                        );
+                    PathFixedSizeKeyElement((
+                        document_id_in_primary_path,
+                        &[0],
+                        Element::Reference(contract_storage_path, storage_flags.to_element_flags()),
+                    ))
+                } else {
+                    let path_max_length =
+                        contract_documents_keeping_history_primary_key_path_for_document_id_size(
+                            document_type.name.len(),
+                        );
+                    let reference_max_size =
+                        contract_documents_keeping_history_storage_time_reference_path_size(
+                            document_type.name.len(),
+                        );
+                    PathKeyElementSize((
+                        path_max_length,
+                        1,
+                        Element::required_item_space(reference_max_size),
+                    ))
+                };
 
             self.grove_insert(path_key_element_info, transaction, apply, insert_operations)?;
         } else if insert_without_check {
             let path_key_element_info = match document_and_contract_info.document_info {
-                DocumentAndSerialization((document, document_cbor)) => {
-                    let element = Element::Item(Vec::from(document_cbor));
+                DocumentAndSerialization((document, document_cbor, storage_flags)) => {
+                    let element =
+                        Element::Item(Vec::from(document_cbor), storage_flags.to_element_flags());
                     PathFixedSizeKeyElement((primary_key_path, document.id.as_slice(), element))
                 }
                 DocumentSize(max_size) => PathKeyElementSize((
@@ -670,8 +691,9 @@ impl Drive {
             self.grove_insert(path_key_element_info, transaction, apply, insert_operations)?;
         } else {
             let path_key_element_info = match document_and_contract_info.document_info {
-                DocumentAndSerialization((document, document_cbor)) => {
-                    let element = Element::Item(Vec::from(document_cbor));
+                DocumentAndSerialization((document, document_cbor, storage_flags)) => {
+                    let element =
+                        Element::Item(Vec::from(document_cbor), storage_flags.to_element_flags());
                     PathFixedSizeKeyElement((primary_key_path, document.id.as_slice(), element))
                 }
                 DocumentSize(max_size) => PathKeyElementSize((
@@ -709,6 +731,7 @@ impl Drive {
         owner_id: Option<&[u8]>,
         override_document: bool,
         block_time: f64,
+        epoch: u16,
         apply: bool,
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
@@ -716,7 +739,9 @@ impl Drive {
 
         let document = Document::from_cbor(document_cbor, None, owner_id)?;
 
-        let document_info = DocumentAndSerialization((&document, document_cbor));
+        let storage_flags = StorageFlags { epoch };
+
+        let document_info = DocumentAndSerialization((&document, document_cbor, &storage_flags));
 
         let document_type = contract.document_type_for_name(document_type_name)?;
 
@@ -742,12 +767,15 @@ impl Drive {
         owner_id: Option<&[u8]>,
         override_document: bool,
         block_time: f64,
+        epoch: u16,
         apply: bool,
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
         let document = Document::from_cbor(document_cbor, None, owner_id)?;
 
-        let document_info = DocumentAndSerialization((&document, document_cbor));
+        let storage_flags = StorageFlags { epoch };
+
+        let document_info = DocumentAndSerialization((&document, document_cbor, &storage_flags));
 
         let document_type = contract.document_type_for_name(document_type_name)?;
 
@@ -846,6 +874,9 @@ impl Drive {
                 insert_operations,
             )?;
         }
+
+        let storage_flags = document_and_contract_info.document_info.get_storage_flags();
+
         // fourth we need to store a reference to the document for each index
         for index in &document_and_contract_info.document_type.indices {
             // at this point the contract path is to the contract documents
@@ -879,6 +910,7 @@ impl Drive {
             // here we are inserting an empty tree that will have a subtree of all other index properties
             self.grove_insert_empty_tree_if_not_exists(
                 path_key_info,
+                &storage_flags,
                 transaction,
                 apply,
                 query_operations,
@@ -923,6 +955,7 @@ impl Drive {
                 // here we are inserting an empty tree that will have a subtree of all other index properties
                 self.grove_insert_empty_tree_if_not_exists(
                     path_key_info,
+                    &storage_flags,
                     transaction,
                     apply,
                     query_operations,
@@ -941,6 +974,7 @@ impl Drive {
                 // here we are inserting an empty tree that will have a subtree of all other index properties
                 self.grove_insert_empty_tree_if_not_exists(
                     path_key_info,
+                    &storage_flags,
                     transaction,
                     apply,
                     query_operations,
@@ -959,6 +993,7 @@ impl Drive {
                 primary_key_path: [&[u8]; 5],
                 document: &Document,
                 document_type: &DocumentType,
+                storage_flags: &StorageFlags,
             ) -> Element {
                 // we need to construct the reference to the original document
                 let mut reference_path = primary_key_path
@@ -969,7 +1004,7 @@ impl Drive {
                 if document_type.documents_keep_history {
                     reference_path.push(vec![0]);
                 }
-                Element::Reference(reference_path)
+                Element::Reference(reference_path, storage_flags.to_element_flags())
             }
 
             // unique indexes will be stored under key "0"
@@ -981,6 +1016,7 @@ impl Drive {
                 // here we are inserting an empty tree that will have a subtree of all other index properties
                 self.grove_insert_empty_tree_if_not_exists(
                     path_key_info,
+                    &storage_flags,
                     transaction,
                     apply,
                     query_operations,
@@ -990,11 +1026,12 @@ impl Drive {
                 index_path_info.push(Key(vec![0]))?;
 
                 let key_element_info = match &document_and_contract_info.document_info {
-                    DocumentAndSerialization((document, _)) => {
+                    DocumentAndSerialization((document, _, storage_flags)) => {
                         let document_reference = make_document_reference(
                             primary_key_path,
                             document,
                             document_and_contract_info.document_type,
+                            storage_flags,
                         );
                         KeyElement((document.id.as_slice(), document_reference))
                     }
@@ -1012,11 +1049,12 @@ impl Drive {
                 self.grove_insert(path_key_element_info, transaction, apply, insert_operations)?;
             } else {
                 let key_element_info = match &document_and_contract_info.document_info {
-                    DocumentAndSerialization((document, _)) => {
+                    DocumentAndSerialization((document, _, storage_flags)) => {
                         let document_reference = make_document_reference(
                             primary_key_path,
                             document,
                             document_and_contract_info.document_type,
+                            storage_flags,
                         );
                         KeyElement((&[0], document_reference))
                     }
@@ -1061,6 +1099,7 @@ impl Drive {
         document_type: &str,
         owner_id: Option<&[u8]>,
         block_time: f64,
+        epoch: u16,
         apply: bool,
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
@@ -1075,6 +1114,7 @@ impl Drive {
             document_type,
             owner_id,
             block_time,
+            epoch,
             apply,
             transaction,
         )
@@ -1087,6 +1127,7 @@ impl Drive {
         document_type: &str,
         owner_id: Option<&[u8]>,
         block_time: f64,
+        epoch: u16,
         apply: bool,
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
@@ -1099,6 +1140,7 @@ impl Drive {
             document_type,
             owner_id,
             block_time,
+            epoch,
             apply,
             transaction,
         )
@@ -1112,6 +1154,7 @@ impl Drive {
         document_type_name: &str,
         owner_id: Option<&[u8]>,
         block_time: f64,
+        epoch: u16,
         apply: bool,
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
@@ -1120,9 +1163,15 @@ impl Drive {
 
         let document_type = contract.document_type_for_name(document_type_name)?;
 
+        let storage_flags = StorageFlags { epoch };
+
         self.update_document_for_contract_operations(
             DocumentAndContractInfo {
-                document_info: DocumentInfo::DocumentAndSerialization((document, document_cbor)),
+                document_info: DocumentInfo::DocumentAndSerialization((
+                    document,
+                    document_cbor,
+                    &storage_flags,
+                )),
                 contract,
                 document_type,
                 owner_id,
@@ -1173,7 +1222,7 @@ impl Drive {
         let document_type = document_and_contract_info.document_type;
         let owner_id = document_and_contract_info.owner_id;
 
-        if let DocumentAndSerialization((document, _document_cbor)) =
+        if let DocumentAndSerialization((document, _document_cbor, storage_flags)) =
             document_and_contract_info.document_info
         {
             // we need to construct the path for documents on the contract
@@ -1197,7 +1246,8 @@ impl Drive {
                 // if the document keeps history the value will at 0 will always point to the most recent version
                 reference_path.push(vec![0]);
             }
-            let document_reference = Element::Reference(reference_path);
+            let document_reference =
+                Element::Reference(reference_path, storage_flags.to_element_flags());
 
             // next we need to get the old document from storage
             let old_document_element: Element = if document_type.documents_keep_history {
@@ -1235,17 +1285,18 @@ impl Drive {
                 insert_operations,
             )?;
 
-            let old_document = if let Element::Item(old_document_cbor) = old_document_element {
-                Ok(Document::from_cbor(
-                    old_document_cbor.as_slice(),
-                    None,
-                    owner_id,
-                )?)
-            } else {
-                Err(Error::Drive(DriveError::CorruptedDocumentNotItem(
-                    "old document is not an item",
-                )))
-            }?;
+            let old_document =
+                if let Element::Item(old_document_cbor, old_element_flags) = old_document_element {
+                    Ok(Document::from_cbor(
+                        old_document_cbor.as_slice(),
+                        None,
+                        owner_id,
+                    )?)
+                } else {
+                    Err(Error::Drive(DriveError::CorruptedDocumentNotItem(
+                        "old document is not an item",
+                    )))
+                }?;
 
             // fourth we need to store a reference to the document for each index
             for index in &document_type.indices {
@@ -1290,6 +1341,7 @@ impl Drive {
                             index_path.clone(),
                             document_top_field.as_slice(),
                         )),
+                        storage_flags,
                         transaction,
                         apply,
                         query_operations,
@@ -1338,6 +1390,7 @@ impl Drive {
                                 index_path.clone(),
                                 index_property.name.as_bytes(),
                             )),
+                            storage_flags,
                             transaction,
                             apply,
                             query_operations,
@@ -1358,6 +1411,7 @@ impl Drive {
                                 index_path.clone(),
                                 document_index_field.as_slice(),
                             )),
+                            storage_flags,
                             transaction,
                             apply,
                             query_operations,
@@ -1410,6 +1464,7 @@ impl Drive {
                         // here we are inserting an empty tree that will have a subtree of all other index properties
                         self.grove_insert_empty_tree_if_not_exists(
                             PathKeyInfo::PathKeyRef::<0>((index_path.clone(), &[0])),
+                            storage_flags,
                             transaction,
                             apply,
                             query_operations,
@@ -1537,7 +1592,7 @@ impl Drive {
         }
 
         let document_bytes: Vec<u8> = match document_element.unwrap() {
-            Element::Item(data) => data,
+            Element::Item(data, storage_flags) => data,
             _ => todo!(), // TODO: how should this be handled, possibility that document might not be in storage
         };
 
@@ -1707,6 +1762,7 @@ mod tests {
         cbor_from_hex, json_document_to_cbor, setup_contract, setup_contract_from_hex,
         value_to_cbor,
     };
+    use crate::contract::flags::StorageFlags;
     use crate::contract::{Contract, Document};
     use crate::drive::object_size_info::DocumentInfo::DocumentAndSerialization;
     use crate::drive::object_size_info::{DocumentAndContractInfo, DocumentInfo};
@@ -1737,7 +1793,7 @@ mod tests {
         // let's construct the grovedb structure for the dashpay data contract
         let dashpay_cbor = json_document_to_cbor(dashpay_path, Some(1));
         drive
-            .apply_contract_cbor(dashpay_cbor.clone(), None, 0f64, true, None)
+            .apply_contract_cbor(dashpay_cbor.clone(), None, 0f64, 0, true, None)
             .expect("expected to apply contract successfully");
 
         (drive, dashpay_cbor)
@@ -1761,6 +1817,7 @@ mod tests {
                 Some(&random_owner_id),
                 false,
                 0f64,
+                0,
                 true,
                 None,
             )
@@ -1774,6 +1831,7 @@ mod tests {
                 Some(&random_owner_id),
                 false,
                 0f64,
+                0,
                 true,
                 None,
             )
@@ -1787,6 +1845,7 @@ mod tests {
                 Some(&random_owner_id),
                 true,
                 0f64,
+                0,
                 true,
                 None,
             )
@@ -1825,6 +1884,7 @@ mod tests {
                 Some(&random_owner_id),
                 false,
                 0f64,
+                0,
                 true,
                 Some(&db_transaction),
             )
@@ -1838,6 +1898,7 @@ mod tests {
                 Some(&random_owner_id),
                 false,
                 0f64,
+                0,
                 true,
                 Some(&db_transaction),
             )
@@ -1851,6 +1912,7 @@ mod tests {
                 Some(&random_owner_id),
                 true,
                 0f64,
+                0,
                 true,
                 Some(&db_transaction),
             )
@@ -1889,6 +1951,7 @@ mod tests {
                 Some(&random_owner_id),
                 false,
                 0f64,
+                0,
                 false,
                 Some(&db_transaction),
             )
@@ -1902,6 +1965,7 @@ mod tests {
                 Some(&random_owner_id),
                 false,
                 0f64,
+                0,
                 true,
                 Some(&db_transaction),
             )
@@ -1938,7 +2002,10 @@ mod tests {
         let document = Document::from_cbor(&dashpay_cr_document_cbor, None, Some(&owner_id))
             .expect("expected to deserialize document successfully");
 
-        let document_info = DocumentAndSerialization((&document, &dashpay_cr_document_cbor));
+        let storage_flags = StorageFlags { epoch: 0 };
+
+        let document_info =
+            DocumentAndSerialization((&document, &dashpay_cr_document_cbor, &storage_flags));
 
         let document_type = contract
             .document_type_for_name("contactRequest")
@@ -2032,6 +2099,7 @@ mod tests {
                 Some(&random_owner_id),
                 false,
                 0f64,
+                0,
                 true,
                 Some(&db_transaction),
             )
@@ -2044,6 +2112,7 @@ mod tests {
                 "contactRequest",
                 Some(&random_owner_id),
                 0f64,
+                0,
                 true,
                 Some(&db_transaction),
             )
@@ -2057,6 +2126,7 @@ mod tests {
                 Some(&random_owner_id),
                 true,
                 0f64,
+                0,
                 true,
                 Some(&db_transaction),
             )
@@ -2100,6 +2170,7 @@ mod tests {
                 Some(&random_owner_id),
                 false,
                 0f64,
+                0,
                 true,
                 Some(&db_transaction),
             )
@@ -2112,6 +2183,7 @@ mod tests {
                 "profile",
                 Some(&random_owner_id),
                 0f64,
+                0,
                 true,
                 Some(&db_transaction),
             )
@@ -2136,6 +2208,7 @@ mod tests {
                 Some(&random_owner_id),
                 false,
                 0f64,
+                0,
                 true,
                 None,
             )
@@ -2188,6 +2261,7 @@ mod tests {
                 Some(&random_owner_id),
                 false,
                 0f64,
+                0,
                 true,
                 Some(&db_transaction),
             )
@@ -2239,12 +2313,15 @@ mod tests {
             .document_type_for_name("domain")
             .expect("expected to get a document type");
 
+        let storage_flags = StorageFlags { epoch: 0 };
+
         drive
             .add_document_for_contract(
                 DocumentAndContractInfo {
-                    document_info: DocumentInfo::DocumentAndSerialization((
+                    document_info: DocumentAndSerialization((
                         &document,
                         &dpns_domain_document_cbor,
+                        &storage_flags,
                     )),
                     contract: &contract,
                     document_type,
@@ -2288,6 +2365,8 @@ mod tests {
             "01000000aa6324696458208d2a661748268018725cf0dc612c74cf1e8621dc86c5e9cc64d2bbe17a2f855a6524747970656c6e696365446f63756d656e74656f726465720468246f776e657249645820cac675648b485d2606a53fca9942cb7bfdf34e08cee1ebe6e0e74e8502ac6c80686c6173744e616d65674b656e6e65647969247265766973696f6e016966697273744e616d65644c656f6e6a246372656174656441741b0000017f933437206a247570646174656441741b0000017f933437206f2464617461436f6e747261637449645820e8f72680f2e3910c95e1497a2b0029d9f7374891ac1f39ab1cfe3ae63336b9a9"
         ];
 
+        let storage_flags = StorageFlags { epoch: 0 };
+
         let documents: Vec<Document> = document_hexes
             .iter()
             .map(|document_hex| {
@@ -2306,6 +2385,7 @@ mod tests {
                             document_info: DocumentInfo::DocumentAndSerialization((
                                 &document,
                                 &document_cbor,
+                                &storage_flags,
                             )),
                             contract: &contract,
                             document_type,
@@ -2412,12 +2492,15 @@ mod tests {
             .document_type_for_name("person")
             .expect("expected to get a document type");
 
+        let storage_flags = StorageFlags { epoch: 0 };
+
         drive
             .add_document_for_contract(
                 DocumentAndContractInfo {
                     document_info: DocumentInfo::DocumentAndSerialization((
                         &document,
                         &person_document_cbor,
+                        &storage_flags,
                     )),
                     contract: &contract,
                     document_type,
@@ -2512,12 +2595,15 @@ mod tests {
             .document_type_for_name("person")
             .expect("expected to get a document type");
 
+        let storage_flags = StorageFlags { epoch: 0 };
+
         drive
             .add_document_for_contract(
                 DocumentAndContractInfo {
                     document_info: DocumentInfo::DocumentAndSerialization((
                         &document,
                         &person_document_cbor,
+                        &storage_flags,
                     )),
                     contract: &contract,
                     document_type,
@@ -2544,12 +2630,15 @@ mod tests {
             .document_type_for_name("person")
             .expect("expected to get a document type");
 
+        let storage_flags = StorageFlags { epoch: 0 };
+
         drive
             .add_document_for_contract(
                 DocumentAndContractInfo {
                     document_info: DocumentInfo::DocumentAndSerialization((
                         &document,
                         &person_document_cbor,
+                        &storage_flags,
                     )),
                     contract: &contract,
                     document_type,
@@ -2672,12 +2761,15 @@ mod tests {
             .document_type_for_name("person")
             .expect("expected to get a document type");
 
+        let storage_flags = StorageFlags { epoch: 0 };
+
         drive
             .add_document_for_contract(
                 DocumentAndContractInfo {
                     document_info: DocumentInfo::DocumentAndSerialization((
                         &document,
                         &person_document_cbor,
+                        &storage_flags,
                     )),
                     contract: &contract,
                     document_type,
@@ -2704,12 +2796,15 @@ mod tests {
             .document_type_for_name("person")
             .expect("expected to get a document type");
 
+        let storage_flags = StorageFlags { epoch: 0 };
+
         drive
             .add_document_for_contract(
                 DocumentAndContractInfo {
                     document_info: DocumentInfo::DocumentAndSerialization((
                         &document,
                         &person_document_cbor,
+                        &storage_flags,
                     )),
                     contract: &contract,
                     document_type,
@@ -2765,12 +2860,15 @@ mod tests {
         let document = Document::from_cbor(&person_document_cbor, None, Some(&random_owner_id))
             .expect("expected to deserialize the document");
 
+        let storage_flags = StorageFlags { epoch: 0 };
+
         drive
             .add_document_for_contract(
                 DocumentAndContractInfo {
                     document_info: DocumentInfo::DocumentAndSerialization((
                         &document,
                         &person_document_cbor,
+                        &storage_flags,
                     )),
                     contract: &contract,
                     document_type,
@@ -2860,6 +2958,7 @@ mod tests {
                 Some(&random_owner_id),
                 false,
                 0f64,
+                0,
                 true,
                 None,
             )
@@ -2872,6 +2971,7 @@ mod tests {
                 Some(&random_owner_id),
                 false,
                 0f64,
+                0,
                 true,
                 None,
             )
@@ -2884,6 +2984,7 @@ mod tests {
                 Some(&random_owner_id),
                 false,
                 0f64,
+                0,
                 true,
                 None,
             )
@@ -2913,6 +3014,7 @@ mod tests {
                 Some(&random_owner_id),
                 false,
                 0f64,
+                0,
                 true,
                 None,
             )
@@ -2925,6 +3027,7 @@ mod tests {
                 Some(&random_owner_id),
                 false,
                 0f64,
+                0,
                 true,
                 None,
             )
@@ -2951,6 +3054,7 @@ mod tests {
                 contract_cbor.clone(),
                 None,
                 0f64,
+                0,
                 true,
                 Some(&db_transaction),
             )
@@ -2968,6 +3072,7 @@ mod tests {
                 None,
                 true,
                 0f64,
+                0,
                 true,
                 Some(&db_transaction),
             )
@@ -2984,6 +3089,7 @@ mod tests {
                 "profile",
                 None,
                 0f64,
+                0,
                 true,
                 Some(&db_transaction),
             )
@@ -3004,7 +3110,7 @@ mod tests {
         let contract = Contract::from_cbor(contract_cbor.as_slice(), None)
             .expect("expected to create contract");
         drive
-            .apply_contract_cbor(contract_cbor.clone(), None, 0f64, true, None)
+            .apply_contract_cbor(contract_cbor.clone(), None, 0f64, 0, true, None)
             .expect("expected to apply contract successfully");
 
         // Create Alice profile
@@ -3018,12 +3124,15 @@ mod tests {
             .document_type_for_name("profile")
             .expect("expected to get a document type");
 
+        let storage_flags = StorageFlags { epoch: 0 };
+
         drive
             .add_document_for_contract(
                 DocumentAndContractInfo {
                     document_info: DocumentInfo::DocumentAndSerialization((
                         &alice_profile,
                         alice_profile_cbor.as_slice(),
+                        &storage_flags,
                     )),
                     contract: &contract,
                     document_type,
@@ -3056,6 +3165,7 @@ mod tests {
                 "profile",
                 None,
                 0f64,
+                0,
                 true,
                 None,
             )
@@ -3088,6 +3198,7 @@ mod tests {
                 contract_cbor.clone(),
                 None,
                 0f64,
+                0,
                 true,
                 Some(&db_transaction),
             )
@@ -3104,12 +3215,15 @@ mod tests {
             .document_type_for_name("profile")
             .expect("expected to get a document type");
 
+        let storage_flags = StorageFlags { epoch: 0 };
+
         drive
             .add_document_for_contract(
                 DocumentAndContractInfo {
                     document_info: DocumentInfo::DocumentAndSerialization((
                         &alice_profile,
                         alice_profile_cbor.as_slice(),
+                        &storage_flags,
                     )),
                     contract: &contract,
                     document_type,
@@ -3155,6 +3269,7 @@ mod tests {
                 "profile",
                 None,
                 0f64,
+                0,
                 true,
                 Some(&db_transaction),
             )
@@ -3192,6 +3307,7 @@ mod tests {
                 contract_cbor.clone(),
                 None,
                 0f64,
+                0,
                 true,
                 Some(&db_transaction),
             )
@@ -3208,12 +3324,15 @@ mod tests {
             .document_type_for_name("profile")
             .expect("expected to get a document type");
 
+        let storage_flags = StorageFlags { epoch: 0 };
+
         drive
             .add_document_for_contract(
                 DocumentAndContractInfo {
                     document_info: DocumentInfo::DocumentAndSerialization((
                         &alice_profile,
                         alice_profile_cbor.as_slice(),
+                        &storage_flags,
                     )),
                     contract: &contract,
                     document_type,
@@ -3286,6 +3405,7 @@ mod tests {
                 "profile",
                 None,
                 0f64,
+                0,
                 true,
                 Some(&db_transaction),
             )
@@ -3310,6 +3430,7 @@ mod tests {
                 contract_cbor.clone(),
                 None,
                 0f64,
+                0,
                 true,
                 Some(&db_transaction),
             )
@@ -3327,6 +3448,7 @@ mod tests {
                 None,
                 true,
                 0f64,
+                0,
                 true,
                 Some(&db_transaction),
             )
@@ -3351,6 +3473,7 @@ mod tests {
                 None,
                 true,
                 0f64,
+                0,
                 true,
                 Some(&db_transaction),
             )
@@ -3402,7 +3525,7 @@ mod tests {
         let contract = value_to_cbor(contract, Some(defaults::PROTOCOL_VERSION));
 
         drive
-            .apply_contract_cbor(contract.clone(), None, 0f64, true, None)
+            .apply_contract_cbor(contract.clone(), None, 0f64, 0, true, None)
             .expect("should create a contract");
 
         // Create document
@@ -3430,6 +3553,7 @@ mod tests {
                 None,
                 true,
                 0f64,
+                0,
                 true,
                 None,
             )
@@ -3459,6 +3583,7 @@ mod tests {
                 "indexedDocument",
                 None,
                 0f64,
+                0,
                 true,
                 None,
             )

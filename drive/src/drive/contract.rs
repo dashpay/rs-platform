@@ -1,3 +1,4 @@
+use crate::contract::flags::StorageFlags;
 use crate::contract::Contract;
 use crate::drive::object_size_info::KeyInfo::{KeyRef, KeySize};
 use crate::drive::object_size_info::KeyValueInfo::KeyRefRequest;
@@ -43,7 +44,7 @@ fn contract_keeping_history_storage_time_reference_path(
 impl Drive {
     fn add_contract_to_storage(
         &self,
-        contract_bytes: Element,
+        contract_element: Element,
         contract: &Contract,
         block_time: f64,
         apply: bool,
@@ -52,9 +53,13 @@ impl Drive {
     ) -> Result<(), Error> {
         let contract_root_path = contract_root_path(&contract.id);
         if contract.keeps_history {
+            let storage_flags =
+                StorageFlags::from_element_flags(contract_element.get_flags().clone())?;
+
             self.grove_insert_empty_tree(
                 contract_root_path,
                 KeyRef(&[0]),
+                &storage_flags,
                 transaction,
                 apply,
                 insert_operations,
@@ -66,7 +71,7 @@ impl Drive {
                 PathFixedSizeKeyElement((
                     contract_keeping_history_storage_path,
                     encoded_time.as_slice(),
-                    contract_bytes,
+                    contract_element,
                 )),
                 transaction,
                 apply,
@@ -80,7 +85,7 @@ impl Drive {
                 PathFixedSizeKeyElement((
                     contract_keeping_history_storage_path,
                     &[0],
-                    Element::Reference(contract_storage_path),
+                    Element::Reference(contract_storage_path, contract_element.get_flags().clone()),
                 ))
             } else {
                 PathKeyElementSize((
@@ -94,12 +99,12 @@ impl Drive {
         } else {
             // the contract is just stored at key 0
             let path_key_element_info = if apply {
-                PathFixedSizeKeyElement((contract_root_path, &[0], contract_bytes))
+                PathFixedSizeKeyElement((contract_root_path, &[0], contract_element))
             } else {
                 PathKeyElementSize((
                     defaults::BASE_CONTRACT_ROOT_PATH_SIZE,
                     1,
-                    contract_bytes.byte_size(),
+                    contract_element.byte_size(),
                 ))
             };
             self.grove_insert(path_key_element_info, transaction, apply, insert_operations)?;
@@ -109,23 +114,26 @@ impl Drive {
 
     fn insert_contract(
         &self,
-        contract_bytes: Element,
+        contract_element: Element,
         contract: &Contract,
         block_time: f64,
         apply: bool,
         transaction: TransactionArg,
         insert_operations: &mut Vec<InsertOperation>,
     ) -> Result<(), Error> {
+        let storage_flags = StorageFlags::from_element_flags(contract_element.get_flags().clone())?;
+
         self.grove_insert_empty_tree(
             [Into::<&[u8; 1]>::into(RootTree::ContractDocuments).as_slice()],
             KeyRef(contract.id.as_slice()),
+            &storage_flags,
             transaction,
             apply,
             insert_operations,
         )?;
 
         self.add_contract_to_storage(
-            contract_bytes,
+            contract_element,
             contract,
             block_time,
             apply,
@@ -139,6 +147,7 @@ impl Drive {
         self.grove_insert_empty_tree(
             contract_root_path,
             key_info,
+            &storage_flags,
             transaction,
             apply,
             insert_operations,
@@ -153,6 +162,7 @@ impl Drive {
             self.grove_insert_empty_tree(
                 contract_documents_path,
                 KeyRef(type_key.as_bytes()),
+                &storage_flags,
                 transaction,
                 apply,
                 insert_operations,
@@ -170,6 +180,7 @@ impl Drive {
             self.grove_insert_empty_tree(
                 type_path,
                 key_info,
+                &storage_flags,
                 transaction,
                 apply,
                 insert_operations,
@@ -181,6 +192,7 @@ impl Drive {
                 self.grove_insert_empty_tree(
                     type_path,
                     KeyRef(index.name.as_bytes()),
+                    &storage_flags,
                     transaction,
                     apply,
                     insert_operations,
@@ -193,7 +205,7 @@ impl Drive {
 
     fn update_contract(
         &self,
-        contract_bytes: Element,
+        contract_element: Element,
         contract: &Contract,
         original_contract: &Contract,
         block_time: f64,
@@ -242,13 +254,15 @@ impl Drive {
 
         // this will override the previous contract if we do not keep history
         self.add_contract_to_storage(
-            contract_bytes,
+            contract_element,
             contract,
             block_time,
             apply,
             transaction,
             insert_operations,
         )?;
+
+        let storage_flags = StorageFlags::from_element_flags(contract_element.get_flags().clone())?;
 
         let contract_documents_path = contract_documents_path(&contract.id);
         for (type_key, document_type) in &contract.document_types {
@@ -279,6 +293,7 @@ impl Drive {
                     // toDo: we can save a little by only inserting on new indexes
                     self.grove_insert_empty_tree_if_not_exists(
                         PathFixedSizeKeyRef((type_path, index.name.as_bytes())),
+                        &storage_flags,
                         transaction,
                         apply,
                         query_operations,
@@ -290,6 +305,7 @@ impl Drive {
                 self.grove_insert_empty_tree(
                     contract_documents_path,
                     KeyRef(type_key.as_bytes()),
+                    &storage_flags,
                     transaction,
                     apply,
                     insert_operations,
@@ -306,6 +322,7 @@ impl Drive {
                 self.grove_insert_empty_tree(
                     type_path,
                     KeyRef(&[0]),
+                    &storage_flags,
                     transaction,
                     apply,
                     insert_operations,
@@ -317,6 +334,7 @@ impl Drive {
                     self.grove_insert_empty_tree(
                         type_path,
                         KeyRef(index.name.as_bytes()),
+                        &storage_flags,
                         transaction,
                         apply,
                         insert_operations,
@@ -333,12 +351,20 @@ impl Drive {
         contract_cbor: Vec<u8>,
         contract_id: Option<[u8; 32]>,
         block_time: f64,
+        epoch: u16,
         apply: bool,
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
         // first we need to deserialize the contract
         let contract = Contract::from_cbor(&contract_cbor, contract_id)?;
-        self.apply_contract(&contract, contract_cbor, block_time, apply, transaction)
+        self.apply_contract(
+            &contract,
+            contract_cbor,
+            block_time,
+            apply,
+            StorageFlags { epoch },
+            transaction,
+        )
     }
 
     pub fn get_contract(
@@ -348,7 +374,9 @@ impl Drive {
     ) -> Result<Option<Arc<Contract>>, Error> {
         let cached_contracts = self.cached_contracts.borrow();
         match cached_contracts.get(&contract_id) {
-            None => self.fetch_contract(contract_id, transaction),
+            None => self
+                .fetch_contract(contract_id, transaction)
+                .map(|(c, _)| c),
             Some(contract) => {
                 let contract_ref = Arc::clone(&contract);
                 Ok(Some(contract_ref))
@@ -374,15 +402,16 @@ impl Drive {
         &self,
         contract_id: [u8; 32],
         transaction: TransactionArg,
-    ) -> Result<Option<Arc<Contract>>, Error> {
+    ) -> Result<(Option<Arc<Contract>>, StorageFlags), Error> {
         let stored_element = self
             .grove
             .get(contract_root_path(&contract_id), &[0], transaction)?;
-        if let Element::Item(stored_contract_bytes) = stored_element {
+        if let Element::Item(stored_contract_bytes, elementFlag) = stored_element {
             let contract = Arc::new(Contract::from_cbor(&stored_contract_bytes, None)?);
             let cached_contracts = self.cached_contracts.borrow();
             cached_contracts.insert(contract_id, Arc::clone(&contract));
-            Ok(Some(Arc::clone(&contract)))
+            let flags = StorageFlags::from_element_flags(elementFlag)?;
+            Ok((Some(Arc::clone(&contract)), flags))
         } else {
             Err(Error::Drive(DriveError::CorruptedContractPath(
                 "contract path did not refer to a contract element",
@@ -396,6 +425,7 @@ impl Drive {
         contract_serialization: Vec<u8>,
         block_time: f64,
         apply: bool,
+        storage_flags: StorageFlags,
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
         let mut query_operations: Vec<QueryOperation> = vec![];
@@ -413,7 +443,7 @@ impl Drive {
         ) {
             already_exists = true;
             match stored_element {
-                Element::Item(stored_contract_bytes) => {
+                Element::Item(stored_contract_bytes, _) => {
                     if contract_serialization != stored_contract_bytes {
                         original_contract_stored_data = stored_contract_bytes;
                     }
@@ -424,7 +454,8 @@ impl Drive {
             }
         };
 
-        let contract_element = Element::Item(contract_serialization);
+        let contract_element =
+            Element::Item(contract_serialization, storage_flags.to_element_flags());
 
         if already_exists {
             if !original_contract_stored_data.is_empty() {
@@ -459,6 +490,7 @@ impl Drive {
 #[cfg(test)]
 mod tests {
     use crate::common::json_document_to_cbor;
+    use crate::contract::flags::StorageFlags;
     use crate::contract::Contract;
     use crate::drive::object_size_info::{DocumentAndContractInfo, DocumentInfo};
     use crate::drive::Drive;
@@ -480,7 +512,14 @@ mod tests {
         let contract = Contract::from_cbor(&contract_cbor, None)
             .expect("expected to deserialize the contract");
         drive
-            .apply_contract(&contract, contract_cbor.clone(), 0f64, true, None)
+            .apply_contract(
+                &contract,
+                contract_cbor.clone(),
+                0f64,
+                true,
+                StorageFlags { epoch: 0 },
+                None,
+            )
             .expect("expected to apply contract successfully");
 
         (drive, contract, contract_cbor)
@@ -501,7 +540,14 @@ mod tests {
         let contract = Contract::from_cbor(&contract_cbor, None)
             .expect("expected to deserialize the contract");
         drive
-            .apply_contract(&contract, contract_cbor.clone(), 0f64, true, None)
+            .apply_contract(
+                &contract,
+                contract_cbor.clone(),
+                0f64,
+                true,
+                StorageFlags { epoch: 0 },
+                None,
+            )
             .expect("expected to apply contract successfully");
 
         (drive, contract, contract_cbor)
@@ -519,13 +565,13 @@ mod tests {
         let initial_contract_cbor = hex::decode("01000000a66324696458209c2b800c5ea525d032a9fda4dda22a896f1e763af5f0e15ae7f93882b7439d77652464656673a1686c6173744e616d65a1647479706566737472696e676724736368656d61783468747470733a2f2f736368656d612e646173682e6f72672f6470702d302d342d302f6d6574612f646174612d636f6e7472616374676f776e657249645820636d3188dfffe62efb10e20347ec6c41b3e49fa31cb757ef4bad6cd8f1c7f4b66776657273696f6e0169646f63756d656e7473a76b756e697175654461746573a56474797065666f626a65637467696e646963657382a3646e616d6566696e6465783166756e69717565f56a70726f7065727469657382a16a2463726561746564417463617363a16a2475706461746564417463617363a2646e616d6566696e646578326a70726f7065727469657381a16a2475706461746564417463617363687265717569726564836966697273744e616d656a246372656174656441746a247570646174656441746a70726f70657274696573a2686c6173744e616d65a1647479706566737472696e676966697273744e616d65a1647479706566737472696e67746164646974696f6e616c50726f70657274696573f46c6e696365446f63756d656e74a46474797065666f626a656374687265717569726564816a246372656174656441746a70726f70657274696573a1646e616d65a1647479706566737472696e67746164646974696f6e616c50726f70657274696573f46e6e6f54696d65446f63756d656e74a36474797065666f626a6563746a70726f70657274696573a1646e616d65a1647479706566737472696e67746164646974696f6e616c50726f70657274696573f46e707265747479446f63756d656e74a46474797065666f626a65637468726571756972656482686c6173744e616d656a247570646174656441746a70726f70657274696573a1686c6173744e616d65a1642472656670232f24646566732f6c6173744e616d65746164646974696f6e616c50726f70657274696573f46e7769746842797465417272617973a56474797065666f626a65637467696e646963657381a2646e616d6566696e646578316a70726f7065727469657381a16e6279746541727261794669656c6463617363687265717569726564816e6279746541727261794669656c646a70726f70657274696573a26e6279746541727261794669656c64a36474797065656172726179686d61784974656d731069627974654172726179f56f6964656e7469666965724669656c64a56474797065656172726179686d61784974656d731820686d696e4974656d73182069627974654172726179f570636f6e74656e744d656469615479706578216170706c69636174696f6e2f782e646173682e6470702e6964656e746966696572746164646974696f6e616c50726f70657274696573f46f696e6465786564446f63756d656e74a56474797065666f626a65637467696e646963657386a3646e616d6566696e6465783166756e69717565f56a70726f7065727469657382a168246f776e6572496463617363a16966697273744e616d656464657363a3646e616d6566696e6465783266756e69717565f56a70726f7065727469657382a168246f776e6572496463617363a1686c6173744e616d656464657363a2646e616d6566696e646578336a70726f7065727469657381a1686c6173744e616d6563617363a2646e616d6566696e646578346a70726f7065727469657382a16a2463726561746564417463617363a16a2475706461746564417463617363a2646e616d6566696e646578356a70726f7065727469657381a16a2475706461746564417463617363a2646e616d6566696e646578366a70726f7065727469657381a16a2463726561746564417463617363687265717569726564846966697273744e616d656a246372656174656441746a24757064617465644174686c6173744e616d656a70726f70657274696573a2686c6173744e616d65a2647479706566737472696e67696d61784c656e6774681901006966697273744e616d65a2647479706566737472696e67696d61784c656e677468190100746164646974696f6e616c50726f70657274696573f4781d6f7074696f6e616c556e69717565496e6465786564446f63756d656e74a56474797065666f626a65637467696e646963657383a3646e616d6566696e6465783166756e69717565f56a70726f7065727469657381a16966697273744e616d656464657363a3646e616d6566696e6465783266756e69717565f56a70726f7065727469657383a168246f776e6572496463617363a16966697273744e616d6563617363a1686c6173744e616d6563617363a3646e616d6566696e6465783366756e69717565f56a70726f7065727469657382a167636f756e74727963617363a1646369747963617363687265717569726564826966697273744e616d65686c6173744e616d656a70726f70657274696573a46463697479a2647479706566737472696e67696d61784c656e67746819010067636f756e747279a2647479706566737472696e67696d61784c656e677468190100686c6173744e616d65a2647479706566737472696e67696d61784c656e6774681901006966697273744e616d65a2647479706566737472696e67696d61784c656e677468190100746164646974696f6e616c50726f70657274696573f4").unwrap();
 
         drive
-            .apply_contract_cbor(initial_contract_cbor, None, 0f64, true, None)
+            .apply_contract_cbor(initial_contract_cbor, None, 0f64, 0, true, None)
             .expect("expected to apply contract successfully");
 
         let updated_contract_cbor = hex::decode("01000000a66324696458209c2b800c5ea525d032a9fda4dda22a896f1e763af5f0e15ae7f93882b7439d77652464656673a1686c6173744e616d65a1647479706566737472696e676724736368656d61783468747470733a2f2f736368656d612e646173682e6f72672f6470702d302d342d302f6d6574612f646174612d636f6e7472616374676f776e657249645820636d3188dfffe62efb10e20347ec6c41b3e49fa31cb757ef4bad6cd8f1c7f4b66776657273696f6e0269646f63756d656e7473a86b756e697175654461746573a56474797065666f626a65637467696e646963657382a3646e616d6566696e6465783166756e69717565f56a70726f7065727469657382a16a2463726561746564417463617363a16a2475706461746564417463617363a2646e616d6566696e646578326a70726f7065727469657381a16a2475706461746564417463617363687265717569726564836966697273744e616d656a246372656174656441746a247570646174656441746a70726f70657274696573a2686c6173744e616d65a1647479706566737472696e676966697273744e616d65a1647479706566737472696e67746164646974696f6e616c50726f70657274696573f46c6e696365446f63756d656e74a46474797065666f626a656374687265717569726564816a246372656174656441746a70726f70657274696573a1646e616d65a1647479706566737472696e67746164646974696f6e616c50726f70657274696573f46e6e6f54696d65446f63756d656e74a36474797065666f626a6563746a70726f70657274696573a1646e616d65a1647479706566737472696e67746164646974696f6e616c50726f70657274696573f46e707265747479446f63756d656e74a46474797065666f626a65637468726571756972656482686c6173744e616d656a247570646174656441746a70726f70657274696573a1686c6173744e616d65a1642472656670232f24646566732f6c6173744e616d65746164646974696f6e616c50726f70657274696573f46e7769746842797465417272617973a56474797065666f626a65637467696e646963657381a2646e616d6566696e646578316a70726f7065727469657381a16e6279746541727261794669656c6463617363687265717569726564816e6279746541727261794669656c646a70726f70657274696573a26e6279746541727261794669656c64a36474797065656172726179686d61784974656d731069627974654172726179f56f6964656e7469666965724669656c64a56474797065656172726179686d61784974656d731820686d696e4974656d73182069627974654172726179f570636f6e74656e744d656469615479706578216170706c69636174696f6e2f782e646173682e6470702e6964656e746966696572746164646974696f6e616c50726f70657274696573f46f696e6465786564446f63756d656e74a56474797065666f626a65637467696e646963657386a3646e616d6566696e6465783166756e69717565f56a70726f7065727469657382a168246f776e6572496463617363a16966697273744e616d656464657363a3646e616d6566696e6465783266756e69717565f56a70726f7065727469657382a168246f776e6572496463617363a1686c6173744e616d656464657363a2646e616d6566696e646578336a70726f7065727469657381a1686c6173744e616d6563617363a2646e616d6566696e646578346a70726f7065727469657382a16a2463726561746564417463617363a16a2475706461746564417463617363a2646e616d6566696e646578356a70726f7065727469657381a16a2475706461746564417463617363a2646e616d6566696e646578366a70726f7065727469657381a16a2463726561746564417463617363687265717569726564846966697273744e616d656a246372656174656441746a24757064617465644174686c6173744e616d656a70726f70657274696573a2686c6173744e616d65a2647479706566737472696e67696d61784c656e6774681901006966697273744e616d65a2647479706566737472696e67696d61784c656e677468190100746164646974696f6e616c50726f70657274696573f4716d79417765736f6d65446f63756d656e74a56474797065666f626a65637467696e646963657382a3646e616d656966697273744e616d6566756e69717565f56a70726f7065727469657381a16966697273744e616d6563617363a3646e616d657166697273744e616d654c6173744e616d6566756e69717565f56a70726f7065727469657382a16966697273744e616d6563617363a1686c6173744e616d6563617363687265717569726564846966697273744e616d656a246372656174656441746a24757064617465644174686c6173744e616d656a70726f70657274696573a2686c6173744e616d65a2647479706566737472696e67696d61784c656e6774681901006966697273744e616d65a2647479706566737472696e67696d61784c656e677468190100746164646974696f6e616c50726f70657274696573f4781d6f7074696f6e616c556e69717565496e6465786564446f63756d656e74a56474797065666f626a65637467696e646963657383a3646e616d6566696e6465783166756e69717565f56a70726f7065727469657381a16966697273744e616d656464657363a3646e616d6566696e6465783266756e69717565f56a70726f7065727469657383a168246f776e6572496463617363a16966697273744e616d6563617363a1686c6173744e616d6563617363a3646e616d6566696e6465783366756e69717565f56a70726f7065727469657382a167636f756e74727963617363a1646369747963617363687265717569726564826966697273744e616d65686c6173744e616d656a70726f70657274696573a46463697479a2647479706566737472696e67696d61784c656e67746819010067636f756e747279a2647479706566737472696e67696d61784c656e677468190100686c6173744e616d65a2647479706566737472696e67696d61784c656e6774681901006966697273744e616d65a2647479706566737472696e67696d61784c656e677468190100746164646974696f6e616c50726f70657274696573f4").unwrap();
 
         drive
-            .apply_contract_cbor(updated_contract_cbor, None, 0f64, true, None)
+            .apply_contract_cbor(updated_contract_cbor, None, 0f64, 0, true, None)
             .expect("should update initial contract");
     }
 
@@ -543,6 +589,8 @@ mod tests {
 
         assert!(nested_value.is_some());
 
+        let storage_flags = StorageFlags { epoch: 0 };
+
         let random_owner_id = rand::thread_rng().gen::<[u8; 32]>();
         drive
             .add_document_for_contract(
@@ -550,6 +598,7 @@ mod tests {
                     document_info: DocumentInfo::DocumentAndSerialization((
                         &document,
                         document.to_cbor().as_slice(),
+                        &storage_flags,
                     )),
                     contract: &contract,
                     document_type,
@@ -577,6 +626,8 @@ mod tests {
 
         assert!(ref_value.is_some());
 
+        let storage_flags = StorageFlags { epoch: 0 };
+
         let random_owner_id = rand::thread_rng().gen::<[u8; 32]>();
         drive
             .add_document_for_contract(
@@ -584,6 +635,7 @@ mod tests {
                     document_info: DocumentInfo::DocumentAndSerialization((
                         &document,
                         document.to_cbor().as_slice(),
+                        &storage_flags,
                     )),
                     contract: &contract,
                     document_type,

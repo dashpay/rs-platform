@@ -1,4 +1,5 @@
 mod defaults;
+pub mod flags;
 pub mod types;
 
 use crate::common::{
@@ -16,6 +17,7 @@ use crate::error::structure::StructureError;
 use crate::error::Error;
 use byteorder::{BigEndian, WriteBytesExt};
 use ciborium::value::{Value as CborValue, Value};
+use flags::StorageFlags;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
