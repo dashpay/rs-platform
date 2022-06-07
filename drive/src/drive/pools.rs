@@ -261,7 +261,7 @@ impl<'f> FeePool<'f> {
 
                 self.drive.insert_identity_cbor(
                     Some(pay_to_id), 
-                    vec!(), // identity.to_cbor(), // TODO: we need this method
+                    identity.to_cbor(),
                     transaction,
                 )?;
             }
@@ -646,5 +646,75 @@ impl Drive {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::drive::Drive;
+    use crate::drive::pools::{FeePool, Epoch};
+    use crate::error::Error;
+    use crate::error::drive::DriveError;
+
+    use tempfile::TempDir;
+
+    #[test]
+    fn test_fee_pool_new() {
+        let tmp_dir = TempDir::new().unwrap();
+        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+
+        let fee_pool = FeePool::new(&drive);
+
+        assert_eq!(fee_pool.genesis_time_key, "g".as_bytes());
+        assert_eq!(fee_pool.storage_credit_pool_key, "s".as_bytes());
+    }
+
+    #[test]
+    fn test_fee_pool_init() {
+        let tmp_dir = TempDir::new().unwrap();
+        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+
+        let db_transaction = drive.grove.start_transaction();
+
+        let fee_pool = FeePool::new(&drive);
+
+        fee_pool.init(1654622858842, Some(&db_transaction)).expect("should init fee pool");
+    }
+
+    #[test]
+    fn test_epoch_new() {
+        let tmp_dir = TempDir::new().unwrap();
+        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+
+        let epoch = Epoch::new(1u16, &drive);
+
+        assert_eq!(epoch.index, 1u16);
+        assert_eq!(epoch.key, 1u16.to_le_bytes());
+        assert_eq!(epoch.processing_fee_key, "p".as_bytes());
+        assert_eq!(epoch.storage_fee_key, "s".as_bytes());
+        assert_eq!(epoch.first_proposer_height_key, "c".as_bytes());
+        assert_eq!(epoch.proposers_key, "m".as_bytes());
+    }
+
+    #[test]
+    fn test_epoch_init() {
+        let tmp_dir = TempDir::new().unwrap();
+        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+
+        let db_transaction = drive.grove.start_transaction();
+
+        let epoch = Epoch::new(0u16, &drive);
+
+        match epoch.init(Some(&db_transaction)) {
+            Ok(_) => assert!(false, "should return an error for 0 based epoch"),
+            Err(e) => {
+                // TODO: validate error
+                assert!(true);
+            },
+        };
+
+        let epoch = Epoch::new(1u16, &drive);
+
+        epoch.init(Some(&db_transaction)).expect("should init epoch with index 1");
     }
 }
