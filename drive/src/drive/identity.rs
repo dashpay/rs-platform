@@ -1,3 +1,4 @@
+use crate::contract::flags::StorageFlags;
 use crate::drive::object_size_info::PathKeyElementInfo::PathFixedSizeKeyElement;
 use crate::drive::{Drive, RootTree};
 use crate::error::Error;
@@ -5,7 +6,6 @@ use crate::fee::calculate_fee;
 use crate::fee::op::InsertOperation;
 use crate::identity::Identity;
 use grovedb::{Element, TransactionArg};
-use crate::contract::flags::StorageFlags;
 
 impl Drive {
     fn insert_identity(
@@ -46,9 +46,7 @@ impl Drive {
 
         let epoch = self.epoch_info.borrow().current_epoch;
 
-        let storage_flags = StorageFlags {
-            epoch
-        };
+        let storage_flags = StorageFlags { epoch };
 
         self.insert_identity(
             identity_id.as_slice(),
@@ -61,11 +59,11 @@ impl Drive {
 
 #[cfg(test)]
 mod tests {
+    use crate::contract::flags::StorageFlags;
     use crate::drive::Drive;
     use crate::identity::Identity;
     use grovedb::Element;
     use tempfile::TempDir;
-    use crate::contract::flags::StorageFlags;
 
     #[test]
     fn test_insert_identity() {
@@ -83,9 +81,7 @@ mod tests {
         let identity = Identity::from_cbor(identity_bytes.as_slice())
             .expect("expected to deserialize an identity");
 
-        let storage_flags = StorageFlags {
-            epoch : 0
-        };
+        let storage_flags = StorageFlags { epoch: 0 };
 
         drive
             .insert_identity(

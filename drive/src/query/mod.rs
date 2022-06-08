@@ -11,6 +11,7 @@ use crate::error::drive::DriveError;
 use crate::error::query::QueryError;
 use crate::error::structure::StructureError;
 use crate::error::Error;
+use crate::error::Error::GroveDB;
 use crate::fee::calculate_fee;
 use crate::fee::op::QueryOperation;
 use ciborium::value::Value;
@@ -29,7 +30,6 @@ use sqlparser::dialect::GenericDialect;
 use sqlparser::parser::Parser;
 use std::collections::{BTreeMap, HashMap};
 use std::ops::BitXor;
-use crate::error::Error::GroveDB;
 
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct InternalClauses {
@@ -1119,7 +1119,10 @@ impl<'a> DriveQuery<'a> {
         let mut query_operations: Vec<QueryOperation> = vec![];
         let path_query =
             self.construct_path_query_operations(drive, transaction, &mut query_operations)?;
-        drive.grove.get_proved_path_query(&path_query, transaction).map_err(Error::GroveDB)
+        drive
+            .grove
+            .get_proved_path_query(&path_query, transaction)
+            .map_err(Error::GroveDB)
     }
 
     pub fn execute_no_proof(
@@ -1156,13 +1159,13 @@ impl<'a> DriveQuery<'a> {
 mod tests {
     use crate::common;
     use crate::common::json_document_to_cbor;
+    use crate::contract::flags::StorageFlags;
     use crate::contract::{Contract, DocumentType};
     use crate::drive::Drive;
     use crate::query::DriveQuery;
     use serde_json::json;
     use serde_json::Value::Null;
     use tempfile::TempDir;
-    use crate::contract::flags::StorageFlags;
 
     fn setup_family_contract() -> (Drive, Contract) {
         let tmp_dir = TempDir::new().unwrap();
@@ -1178,11 +1181,16 @@ mod tests {
         let contract_cbor = json_document_to_cbor(contract_path, Some(1));
         let contract = Contract::from_cbor(&contract_cbor, None)
             .expect("expected to deserialize the contract");
-        let storage_flags = StorageFlags {
-            epoch: 0
-        };
+        let storage_flags = StorageFlags { epoch: 0 };
         drive
-            .apply_contract(&contract, contract_cbor.clone(), 0f64, true, storage_flags, None)
+            .apply_contract(
+                &contract,
+                contract_cbor.clone(),
+                0f64,
+                true,
+                storage_flags,
+                None,
+            )
             .expect("expected to apply contract successfully");
 
         (drive, contract)
@@ -1203,11 +1211,16 @@ mod tests {
         let contract_cbor = json_document_to_cbor(contract_path, Some(1));
         let contract = Contract::from_cbor(&contract_cbor, None)
             .expect("expected to deserialize the contract");
-        let storage_flags = StorageFlags {
-            epoch: 0
-        };
+        let storage_flags = StorageFlags { epoch: 0 };
         drive
-            .apply_contract(&contract, contract_cbor.clone(), 0f64, true, storage_flags, None)
+            .apply_contract(
+                &contract,
+                contract_cbor.clone(),
+                0f64,
+                true,
+                storage_flags,
+                None,
+            )
             .expect("expected to apply contract successfully");
 
         (drive, contract)

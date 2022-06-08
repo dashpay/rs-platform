@@ -5,6 +5,7 @@ pub mod object_size_info;
 
 use crate::contract::flags::StorageFlags;
 use crate::contract::{Contract, Document, DocumentType};
+use crate::drive::defaults::STORAGE_FLAGS_SIZE;
 use crate::drive::object_size_info::KeyInfo::KeySize;
 use crate::drive::object_size_info::PathKeyInfo::{PathFixedSizeKey, PathKey, PathKeyRef};
 use crate::error::drive::DriveError;
@@ -33,10 +34,9 @@ use std::collections::BTreeSet;
 use std::ops::DerefMut;
 use std::path::Path;
 use std::sync::Arc;
-use crate::drive::defaults::STORAGE_FLAGS_SIZE;
 
 pub struct EpochInfo {
-    current_epoch: u16
+    current_epoch: u16,
 }
 
 pub struct Drive {
@@ -132,7 +132,8 @@ fn contract_documents_keeping_history_primary_key_path_for_document_id<'a>(
 fn contract_documents_keeping_history_primary_key_path_for_document_id_size(
     document_type_name_len: usize,
 ) -> usize {
-    defaults::BASE_CONTRACT_DOCUMENTS_KEEPING_HISTORY_PRIMARY_KEY_PATH_FOR_DOCUMENT_ID_SIZE + document_type_name_len
+    defaults::BASE_CONTRACT_DOCUMENTS_KEEPING_HISTORY_PRIMARY_KEY_PATH_FOR_DOCUMENT_ID_SIZE
+        + document_type_name_len
 }
 
 fn contract_documents_keeping_history_storage_time_reference_path(
@@ -165,7 +166,7 @@ impl Drive {
             Ok(grove) => Ok(Drive {
                 grove,
                 cached_contracts: RefCell::new(Cache::new(200)),
-                epoch_info: RefCell::new(EpochInfo{current_epoch:0}),
+                epoch_info: RefCell::new(EpochInfo { current_epoch: 0 }),
                 transient_inserts: RefCell::new(BTreeSet::new()),
                 transient_batch_inserts: RefCell::new(BTreeSet::new()),
             }),
@@ -689,8 +690,7 @@ impl Drive {
                     PathFixedSizeKeyElement((primary_key_path, document.id.as_slice(), element))
                 }
                 DocumentSize(max_size) => PathKeyElementSize((
-                    defaults::BASE_CONTRACT_DOCUMENTS_PRIMARY_KEY_PATH
-                        + document_type.name.len(),
+                    defaults::BASE_CONTRACT_DOCUMENTS_PRIMARY_KEY_PATH + document_type.name.len(),
                     DEFAULT_HASH_SIZE,
                     Element::required_item_space(max_size, STORAGE_FLAGS_SIZE),
                 )),
@@ -704,8 +704,7 @@ impl Drive {
                     PathFixedSizeKeyElement((primary_key_path, document.id.as_slice(), element))
                 }
                 DocumentSize(max_size) => PathKeyElementSize((
-                    defaults::BASE_CONTRACT_DOCUMENTS_PRIMARY_KEY_PATH
-                        + document_type.name.len(),
+                    defaults::BASE_CONTRACT_DOCUMENTS_PRIMARY_KEY_PATH + document_type.name.len(),
                     DEFAULT_HASH_SIZE,
                     Element::required_item_space(max_size, STORAGE_FLAGS_SIZE),
                 )),
@@ -1044,9 +1043,10 @@ impl Drive {
                         );
                         KeyElement((document.id.as_slice(), document_reference))
                     }
-                    DocumentSize(max_size) => {
-                        KeyElementSize((DEFAULT_HASH_SIZE, Element::required_item_space(*max_size, STORAGE_FLAGS_SIZE)))
-                    }
+                    DocumentSize(max_size) => KeyElementSize((
+                        DEFAULT_HASH_SIZE,
+                        Element::required_item_space(*max_size, STORAGE_FLAGS_SIZE),
+                    )),
                 };
 
                 let path_key_element_info = PathKeyElementInfo::from_path_info_and_key_element(
@@ -1067,9 +1067,10 @@ impl Drive {
                         );
                         KeyElement((&[0], document_reference))
                     }
-                    DocumentSize(max_size) => {
-                        KeyElementSize((1, Element::required_item_space(*max_size, STORAGE_FLAGS_SIZE)))
-                    }
+                    DocumentSize(max_size) => KeyElementSize((
+                        1,
+                        Element::required_item_space(*max_size, STORAGE_FLAGS_SIZE),
+                    )),
                 };
 
                 let path_key_element_info = PathKeyElementInfo::from_path_info_and_key_element(
@@ -1754,7 +1755,12 @@ impl Drive {
                 "contract not found",
             )))?;
         let document_type = contract.document_type_for_name(document_type_name)?;
-        self.query_documents_from_contract_as_grove_proof(&contract, document_type, query_cbor, transaction)
+        self.query_documents_from_contract_as_grove_proof(
+            &contract,
+            document_type,
+            query_cbor,
+            transaction,
+        )
     }
 
     pub fn query_documents_from_contract_cbor_as_grove_proof(
@@ -1768,7 +1774,12 @@ impl Drive {
 
         let document_type = contract.document_type_for_name(document_type_name.as_str())?;
 
-        self.query_documents_from_contract_as_grove_proof(&contract, document_type, query_cbor, transaction)
+        self.query_documents_from_contract_as_grove_proof(
+            &contract,
+            document_type,
+            query_cbor,
+            transaction,
+        )
     }
 
     pub fn query_documents_from_contract_as_grove_proof(

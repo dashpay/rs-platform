@@ -54,8 +54,7 @@ impl Drive {
         let contract_root_path = contract_root_path(&contract.id);
         if contract.keeps_history {
             let element_flags = contract_element.get_flags().clone();
-            let storage_flags =
-                StorageFlags::from_element_flags(element_flags.clone())?;
+            let storage_flags = StorageFlags::from_element_flags(element_flags.clone())?;
 
             self.grove_insert_empty_tree(
                 contract_root_path,
