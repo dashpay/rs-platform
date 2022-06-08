@@ -640,7 +640,9 @@ impl DriveWrapper {
         Ok(cx.undefined())
     }
 
-    fn js_create_and_execute_query_as_grove_proof(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+    fn js_create_and_execute_query_as_grove_proof(
+        mut cx: FunctionContext,
+    ) -> JsResult<JsUndefined> {
         let js_query_cbor = cx.argument::<JsBuffer>(0)?;
         let js_contract_id = cx.argument::<JsBuffer>(1)?;
         let js_document_type_name = cx.argument::<JsString>(2)?;

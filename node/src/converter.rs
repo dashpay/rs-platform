@@ -26,9 +26,9 @@ pub fn js_object_to_element<'a, C: Context<'a>>(
 
     let value = js_object.get(cx, "value")?;
 
-    let element_string: String = js_element_type.value(cx);
+    let element_type_string: String = js_element_type.value(cx);
 
-    match element_string.as_str() {
+    match element_type_string.as_str() {
         "item" => {
             let js_buffer = value.downcast_or_throw::<JsBuffer, _>(cx)?;
             let item = js_buffer_to_vec_u8(js_buffer, cx);
@@ -61,7 +61,7 @@ pub fn js_object_to_element<'a, C: Context<'a>>(
                 storage_flags.to_element_flags(),
             ))
         }
-        _ => cx.throw_error(format!("Unexpected element type {}", element_string)),
+        _ => cx.throw_error(format!("Unexpected element type {}", element_type_string)),
     }
 }
 
