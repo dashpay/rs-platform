@@ -26,6 +26,8 @@ const MN_REWARD_SHARES_CONTRACT_ID: [u8; 32] = [
 
 const MN_REWARD_SHARES_DOCUMENT_TYPE: &'static str = "rewardShare";
 
+const EPOCH_CHANGE_TIME: f64 = 1576800000.0;
+
 pub struct FeePool<'f> {
     genesis_time_key: &'static [u8],
     storage_credit_pool_key: &'static [u8],
@@ -58,6 +60,11 @@ impl<'f> FeePool<'f> {
     }
 
     pub fn init(&self, genesis_time: i64, transaction: TransactionArg) -> Result<(), Error> {
+        // init fee pool subtree
+        self.drive.grove
+            .insert([], FeePool::get_path()[0], Element::empty_tree(), transaction)
+            .map_err(Error::GroveDB)?;
+
         // We must encode and store the genesis time
         self.drive.grove
             .insert(FeePool::get_path(), self.genesis_time_key, Element::Item(genesis_time.to_le_bytes().to_vec()), transaction)
@@ -79,32 +86,25 @@ impl<'f> FeePool<'f> {
     }
 
     pub fn get_genesis_time(&self, transaction: TransactionArg) -> Result<i64, Error> {
-        match self.drive.grove.get(FeePool::get_path(), self.genesis_time_key, transaction) {
-            Ok(element) => {
-                if let Element::Item(item) = element {
-                    let genesis_time = i64::from_le_bytes(item.as_slice().try_into().expect("invalid item length in bytes"));
+        let element = self.drive.grove.get(FeePool::get_path(), self.genesis_time_key, transaction)
+            .map_err(Error::GroveDB)?;
+        
+        if let Element::Item(item) = element {
+            let genesis_time = i64::from_le_bytes(item.as_slice().try_into().expect("invalid item length in bytes"));
 
-                    Ok(genesis_time)
-                } else {
-                    Err(Error::Drive(DriveError::CorruptedEpochElement("fee pool genesis_time must be an item")))
-                }
-            }
-            Err(err) => {
-                match err {
-                    grovedb::Error::PathKeyNotFound(e) => Err(Error::Drive(DriveError::CorruptedGenesisElementPath(e))),
-                    _ => Err(Error::Drive(DriveError::CorruptedCodeExecution("internal grovedb error")))
-                }
-            }
+            Ok(genesis_time)
+        } else {
+            Err(Error::Drive(DriveError::CorruptedEpochElement("fee pool genesis_time must be an item")))
         }
     }
 
     pub fn get_current_epoch_index(&self, block_time: i64, previous_block_time: i64, transaction: TransactionArg) -> Result<(u16, bool), Error> {
         let genesis_time = self.get_genesis_time(transaction)?;
 
-        let prev_epoch_index = (previous_block_time - genesis_time) as f64 / 1576800000.0;
+        let prev_epoch_index = (previous_block_time - genesis_time) as f64 / EPOCH_CHANGE_TIME;
         let prev_epoch_index_floored = prev_epoch_index.floor();
 
-        let epoch_index = (block_time - genesis_time) as f64 / 1576800000.0;
+        let epoch_index = (block_time - genesis_time) as f64 / EPOCH_CHANGE_TIME;
         let epoch_index_floored = epoch_index.floor();
 
         let is_epoch_change = epoch_index_floored > prev_epoch_index_floored;
@@ -113,84 +113,34 @@ impl<'f> FeePool<'f> {
     }
 
     pub fn update_storage_pool_credit(&self, storage_fee: f64, transaction: TransactionArg) -> Result<(), Error> {
-        match self.drive.grove.get(FeePool::get_path(), self.storage_credit_pool_key, transaction) {
-            Ok(element) => {
-                if let Element::Item(item) = element {
-                    let credit = f64::from_le_bytes(item.as_slice().try_into().expect("expected item to be of length 8"));
+        let element =  self.drive.grove.get(FeePool::get_path(), self.storage_credit_pool_key, transaction) 
+            .map_err(Error::GroveDB)?;
 
-                    // in case credit is set update it
-                    self.drive.grove
-                        .insert(FeePool::get_path(), self.storage_credit_pool_key, Element::Item((credit + storage_fee).to_le_bytes().to_vec()), transaction)
-                        .map_err(Error::GroveDB)?;
+        if let Element::Item(item) = element {
+            let credit = f64::from_le_bytes(item.as_slice().try_into().expect("expected item to be of length 8"));
 
-                    Ok(())
-                } else {
-                    Err(Error::Drive(DriveError::CorruptedEpochElement("fee pool storage_credit_pool must be an item")))
-                }
-            }
-            Err(err) => {
-                match err {
-                    grovedb::Error::PathKeyNotFound(e) => Err(Error::Drive(DriveError::CorruptedStorageCreditPoolPathElement(e))),
-                    _ => Err(Error::Drive(DriveError::CorruptedCodeExecution("internal grovedb error")))
-                }
-            }
+            // in case credit is set update it
+            self.drive.grove
+                .insert(FeePool::get_path(), self.storage_credit_pool_key, Element::Item((credit + storage_fee).to_le_bytes().to_vec()), transaction)
+                .map_err(Error::GroveDB)?;
+
+            Ok(())
+        } else {
+            Err(Error::Drive(DriveError::CorruptedEpochElement("fee pool storage_credit_pool must be an item")))
         }
     }
 
-    pub fn get_storage_pool_credit(&self, transaction: TransactionArg) -> Result<Option<f64>, Error> {
-        match self.drive.grove.get(FeePool::get_path(), self.storage_credit_pool_key, transaction) {
-            Ok(element) => {
-                if let Element::Item(item) = element {
-                    let credit = f64::from_le_bytes(item.as_slice().try_into().expect("expected item to be of length 8"));
+    pub fn get_storage_pool_credit(&self, transaction: TransactionArg) -> Result<f64, Error> {
+        let element =  self.drive.grove.get(FeePool::get_path(), self.storage_credit_pool_key, transaction)
+            .map_err(Error::GroveDB)?; 
 
-                    Ok(Some(credit))
-                } else {
-                    Err(Error::Drive(DriveError::CorruptedEpochElement("fee pool storage_credit_pool must be an item")))
-                }
-            }
-            Err(err) => {
-                match err {
-                    grovedb::Error::PathKeyNotFound(_) => Ok(None),
-                    _ => Err(Error::Drive(DriveError::CorruptedCodeExecution("internal grovedb error")))
-                }
-            }
+        if let Element::Item(item) = element {
+            let credit = f64::from_le_bytes(item.as_slice().try_into().expect("expected item to be of length 8"));
+
+            Ok(credit)
+        } else {
+            Err(Error::Drive(DriveError::CorruptedEpochElement("fee pool storage_credit_pool must be an item")))
         }
-    }
-
-    pub fn distribute_storage_distribution_pool(&self, epoch_index: u16, transaction: TransactionArg) -> Result<(), Error> {
-        match self.get_storage_pool_credit(transaction)? {
-            Some(mut credit) => {
-                let mut year = 1;
-                let mut epoch_of_the_year = 1;
-
-                for index in epoch_index..epoch_index + 1000 {
-                    if epoch_index == 0 {
-                        return Err(Error::Drive(DriveError::CorruptedCodeExecution("epoch should never be 0")))
-                    }
-
-                    let epoch = Epoch::new(index, self.drive);
-
-                    let credit_distribution_percent = FEE_DISTRIBUTION_TABLE[year * (epoch_of_the_year - 1)];
-
-                    let credit_share = credit * credit_distribution_percent;
-
-                    epoch.update_storage_fee(credit_share, transaction)?;
-
-                    credit -= credit_share;
-
-                    epoch_of_the_year += 1;
-
-                    if epoch_of_the_year > 20 {
-                        year += 1;
-                    }
-                }
-
-                self.update_storage_pool_credit(credit, transaction)?;
-            }
-            None => (),
-        }
-
-        Ok(())
     }
 
     pub fn get_oldest_epoch(&self, epoch_index: u16, transaction: TransactionArg) -> Result<Epoch, Error> {
@@ -206,6 +156,39 @@ impl<'f> FeePool<'f> {
 
         self.get_oldest_epoch(epoch_index - 1, transaction)
     }  
+
+    pub fn distribute_storage_distribution_pool(&self, epoch_index: u16, transaction: TransactionArg) -> Result<(), Error> {
+        let mut credit = self.get_storage_pool_credit(transaction)?;
+
+        let mut year = 1;
+        let mut epoch_of_the_year = 1;
+
+        for index in epoch_index..epoch_index + 1000 {
+            if epoch_index == 0 {
+                return Err(Error::Drive(DriveError::CorruptedCodeExecution("epoch should never be 0")))
+            }
+
+            let epoch = Epoch::new(index, self.drive);
+
+            let credit_distribution_percent = FEE_DISTRIBUTION_TABLE[year * (epoch_of_the_year - 1)];
+
+            let credit_share = credit * credit_distribution_percent;
+
+            epoch.update_storage_fee(credit_share, transaction)?;
+
+            credit -= credit_share;
+
+            epoch_of_the_year += 1;
+
+            if epoch_of_the_year > 20 {
+                year += 1;
+            }
+        }
+
+        self.update_storage_pool_credit(credit, transaction)?;
+
+        Ok(())
+    }
 
     pub fn distribute_fees_to_proposers(&self, epoch_index: u16, block_height: u64, transaction: TransactionArg) -> Result<(), Error> {
         if epoch_index == 0 {
@@ -247,7 +230,7 @@ impl<'f> FeePool<'f> {
                     .as_bytes()
                     .expect("shoul be able to get as bytes");
 
-                let mut identity = self.drive.get_identity(pay_to_id, transaction)?.expect("identity to be found");
+                let mut identity = self.drive.get_identity(pay_to_id, transaction)?;
 
                 let share_percentage_integer: u64 = document.properties.get("percentage")
                     .expect("should be able to get percentage")
@@ -361,38 +344,24 @@ impl<'e> Epoch<'e> {
     }
 
     pub fn get_storage_credit(&self, transaction: TransactionArg) -> Result<f64, Error> {
-        match self.drive.grove.get(self.get_path(), self.storage_fee_key, transaction) {
-            Ok(element) => {
-                if let Element::Item(item) = element {
-                    Ok(f64::from_le_bytes(item.as_slice().try_into().expect("invalid item length")))
-                } else {
-                    Err(Error::Drive(DriveError::CorruptedEpochElement("epoch storage fee must be an item")))
-                }
-            }
-            Err(err) => {
-                match err {
-                    grovedb::Error::PathKeyNotFound(e) => Err(Error::Drive(DriveError::CorruptedStorageCreditPathElement(e))),
-                    _ => Err(Error::Drive(DriveError::CorruptedCodeExecution("internal grovedb error")))
-                }
-            }
+        let element = self.drive.grove.get(self.get_path(), self.storage_fee_key, transaction)
+            .map_err(Error::GroveDB)?;
+
+        if let Element::Item(item) = element {
+            Ok(f64::from_le_bytes(item.as_slice().try_into().expect("invalid item length")))
+        } else {
+            Err(Error::Drive(DriveError::CorruptedEpochElement("epoch storage fee must be an item")))
         }
     }
 
     pub fn get_processing_credit(&self, transaction: TransactionArg) -> Result<f64, Error> {
-        match self.drive.grove.get(self.get_path(), self.processing_fee_key, transaction) {
-            Ok(element) => {
-                if let Element::Item(item) = element {
-                    Ok(f64::from_le_bytes(item.as_slice().try_into().expect("invalid item length")))
-                } else {
-                    Err(Error::Drive(DriveError::CorruptedEpochElement("epoch processing fee must be an item")))
-                }
-            }
-            Err(err) => {
-                match err {
-                    grovedb::Error::PathKeyNotFound(e) => Err(Error::Drive(DriveError::CorruptedProcessingCreditPathElement(e))),
-                    _ => Err(Error::Drive(DriveError::CorruptedCodeExecution("internal grovedb error")))
-                }
-            }
+        let element = self.drive.grove.get(self.get_path(), self.processing_fee_key, transaction) 
+            .map_err(Error::GroveDB)?;
+
+        if let Element::Item(item) = element {
+            Ok(f64::from_le_bytes(item.as_slice().try_into().expect("invalid item length")))
+        } else {
+            Err(Error::Drive(DriveError::CorruptedEpochElement("epoch processing fee must be an item")))
         }
     }
 
@@ -405,20 +374,13 @@ impl<'e> Epoch<'e> {
     }
 
     pub fn get_first_proposed_block_height(&self, transaction: TransactionArg) -> Result<u64, Error> {
-        match self.drive.grove.get(self.get_path(), self.first_proposer_height_key, transaction) {
-            Ok(element) => {
-                if let Element::Item(item) = element {
-                    Ok(u64::from_le_bytes(item.as_slice().try_into().expect("invalid item length")))
-                } else {
-                    Err(Error::Drive(DriveError::CorruptedEpochElement("epoch first proposed block height must be an item")))
-                }
-            }
-            Err(err) => {
-                match err {
-                    grovedb::Error::PathKeyNotFound(e) => Err(Error::Drive(DriveError::CorruptedProposersCountPathElement(e))),
-                    _ => Err(Error::Drive(DriveError::CorruptedCodeExecution("internal grovedb error")))
-                }
-            }
+        let element = self.drive.grove.get(self.get_path(), self.first_proposer_height_key, transaction)
+            .map_err(Error::GroveDB)?;
+
+        if let Element::Item(item) = element {
+            Ok(u64::from_le_bytes(item.as_slice().try_into().expect("invalid item length")))
+        } else {
+            Err(Error::Drive(DriveError::CorruptedEpochElement("epoch first proposed block height must be an item")))
         }
     }
 
@@ -554,7 +516,7 @@ impl<'e> Epoch<'e> {
             Ok(result) => Ok(result),
             Err(err) => {
                 match err {
-                    grovedb::Error::PathKeyNotFound(_) => Ok(true),
+                    grovedb::Error::PathNotFound(_) => Ok(true),
                     _ => Err(Error::Drive(DriveError::CorruptedCodeExecution("internal grovedb error")))
                 }
             }
@@ -578,19 +540,15 @@ impl<'e> Epoch<'e> {
 
         let path_queries = [&path_query];
 
-        match self.drive.grove.get_path_queries(&path_queries, transaction) {
-            //TODO: find a way on how to get pro_tx_hash (which is a key) here
-            Ok(elements) => {
-                let result: Vec<(Vec<u8>, u64)> = elements.into_iter().map(|e| (vec!(), u64::from_le_bytes(e.try_into().expect("to have length of 8")))).collect();
-                Ok(result)
-            },
-            Err(err) => {
-                match err {
-                    grovedb::Error::InvalidQuery(e) => Err(Error::Drive(DriveError::CorruptedProposersQuery(String::from(e)))),
-                    _ => Err(Error::Drive(DriveError::CorruptedCodeExecution("internal grovedb error")))
-                }
-            }
-        }
+        let elements = self.drive.grove.get_path_queries(&path_queries, transaction)
+            .map_err(Error::GroveDB)?;
+
+        let result: Vec<(Vec<u8>, u64)> = elements
+            .into_iter()
+            .map(|e| (vec!(), u64::from_le_bytes(e.try_into().expect("to have length of 8"))))
+            .collect();
+
+        Ok(result)
     }
 }
 
@@ -631,23 +589,16 @@ impl Drive {
         Ok(())
     }
 
-    pub fn get_identity(&self, id: &[u8], transaction: TransactionArg) -> Result<Option<Identity>, Error> {
-        match self.grove.get([Into::<&[u8; 1]>::into(RootTree::Identities).as_slice()], id, transaction) {
-            Ok(element) => {
-                if let Element::Item(identity_cbor) = element {
-                    let identity = Identity::from_cbor(identity_cbor.as_slice())?;
+    pub fn get_identity(&self, id: &[u8], transaction: TransactionArg) -> Result<Identity, Error> {
+        let element = self.grove.get([Into::<&[u8; 1]>::into(RootTree::Identities).as_slice()], id, transaction)
+            .map_err(Error::GroveDB)?;
+             
+        if let Element::Item(identity_cbor) = element {
+            let identity = Identity::from_cbor(identity_cbor.as_slice())?;
 
-                    Ok(Some(identity))
-                } else {
-                    Err(Error::Drive(DriveError::CorruptedEpochElement("identity must be an item")))
-                }
-            }
-            Err(err) => {
-                match err {
-                    grovedb::Error::PathKeyNotFound(_) => Ok(None),
-                    _ => Err(Error::Drive(DriveError::CorruptedCodeExecution("internal grovedb error")))
-                }
-            }
+            Ok(identity)
+        } else {
+            Err(Error::Drive(DriveError::CorruptedEpochElement("identity must be an item")))
         }
     }
 }
@@ -655,10 +606,10 @@ impl Drive {
 #[cfg(test)]
 mod tests {
     use crate::drive::Drive;
-    use crate::drive::pools::{FeePool, Epoch};
+    use crate::drive::pools::{FeePool, Epoch, EPOCH_CHANGE_TIME};
     use crate::error::Error;
-    use crate::error::drive::DriveError;
-
+    
+    use grovedb::{Query, PathQuery, SizedQuery};
     use tempfile::TempDir;
 
     #[test]
@@ -685,7 +636,124 @@ mod tests {
 
         let fee_pool = FeePool::new(&drive);
 
-        fee_pool.init(1654622858842, Some(&db_transaction)).expect("should init fee pool");
+        fee_pool.init(1654622858842, Some(&db_transaction))
+            .expect("should init fee pool");
+
+        let genesis_time = fee_pool.get_genesis_time(Some(&db_transaction))
+            .expect("to get genesis time");
+
+        assert_eq!(genesis_time, 1654622858842);
+
+        let storage_pool_credit = fee_pool.get_storage_pool_credit(Some(&db_transaction))
+            .expect("to get storage pool credit");
+
+        assert_eq!(storage_pool_credit, 0f64);
+
+        // Check we have 1000 epochs in a tree
+        let path_as_vec: Vec<Vec<u8>> = FeePool::get_path()
+            .iter()
+            .map(|slice| slice.to_vec())
+            .collect();
+
+        let path_query = PathQuery::new(
+            path_as_vec,
+            SizedQuery::new(
+                Query::new(),
+                Some(1001),
+                None,
+            ), 
+        );
+
+        let path_queries = [&path_query];
+
+        let elements = drive.grove.get_path_queries(&path_queries, Some(&db_transaction))
+            .map_err(Error::GroveDB).expect("to get epoch elements from the fee pool tree");
+
+        // TODO: construct a proper query to check number of epochs created
+        assert_eq!(elements.len(), 999);
+    }
+
+    #[test]
+    fn test_fee_pool_update_and_get_storage_pool_credit() {
+        let tmp_dir = TempDir::new().unwrap();
+        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+
+        let db_transaction = drive.grove.start_transaction();
+
+        drive
+            .create_root_tree(Some(&db_transaction))
+            .expect("expected to create root tree successfully");
+
+        let fee_pool = FeePool::new(&drive);
+
+        fee_pool.init(1654622858842, Some(&db_transaction))
+            .expect("should init fee pool");
+
+        let storage_fee = 0.42;
+
+        fee_pool.update_storage_pool_credit(storage_fee, Some(&db_transaction))
+            .expect("to update storage pool credit");
+
+        let stored_storage_fee = fee_pool.get_storage_pool_credit(Some(&db_transaction))
+            .expect("to get storage pool credit");
+
+        assert_eq!(storage_fee, stored_storage_fee);
+    }
+
+    #[test]
+    fn test_fee_pool_get_current_epoch_index() {
+        let tmp_dir = TempDir::new().unwrap();
+        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+
+        let db_transaction = drive.grove.start_transaction();
+
+        drive
+            .create_root_tree(Some(&db_transaction))
+            .expect("expected to create root tree successfully");
+
+        let fee_pool = FeePool::new(&drive);
+
+        let genesis_time = 1654622858842;
+        let genesis_plus_one_epoch_time = genesis_time + EPOCH_CHANGE_TIME as i64;
+
+        fee_pool.init(genesis_time, Some(&db_transaction))
+            .expect("should init fee pool");
+
+        let (current_epoch_index, is_epoch_change) = fee_pool.get_current_epoch_index(genesis_plus_one_epoch_time, genesis_time, Some(&db_transaction))
+            .expect("to get current epoch index");
+
+        assert_eq!(current_epoch_index, 1);
+        assert_eq!(is_epoch_change, true);
+
+        let (current_epoch_index, is_epoch_change) = fee_pool.get_current_epoch_index(genesis_plus_one_epoch_time + 10, genesis_plus_one_epoch_time, Some(&db_transaction))
+            .expect("to get current epoch index");
+
+        assert_eq!(current_epoch_index, 1);
+        assert_eq!(is_epoch_change, false);
+    }
+
+    #[test]
+    fn test_fee_pool_get_oldest_epoch() {
+        let tmp_dir = TempDir::new().unwrap();
+        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+
+        let db_transaction = drive.grove.start_transaction();
+
+        drive
+            .create_root_tree(Some(&db_transaction))
+            .expect("expected to create root tree successfully");
+
+        let fee_pool = FeePool::new(&drive);
+
+        fee_pool.init(1654622858842, Some(&db_transaction))
+            .expect("should init fee pool");
+
+        let epoch = fee_pool.get_oldest_epoch(10, Some(&db_transaction))
+            .expect("to get oldest epoch");
+
+        assert_eq!(epoch.index, 10);
+
+        // TODO: insert some proposers and test epoch at index 1
     }
 
     #[test]
@@ -714,6 +782,11 @@ mod tests {
 
         let db_transaction = drive.grove.start_transaction();
 
+        let fee_pool = FeePool::new(&drive);
+
+        fee_pool.init(1654622858842, Some(&db_transaction))
+            .expect("should init fee pool");
+
         let epoch = Epoch::new(0u16, &drive);
 
         match epoch.init(Some(&db_transaction)) {
@@ -727,5 +800,36 @@ mod tests {
         let epoch = Epoch::new(1u16, &drive);
 
         epoch.init(Some(&db_transaction)).expect("should init epoch with index 1");
+    }
+
+    #[test]
+    fn test_epoch_update_processing_fee() {
+        let tmp_dir = TempDir::new().unwrap();
+        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+
+        drive
+            .create_root_tree(None)
+            .expect("expected to create root tree successfully");
+
+        let db_transaction = drive.grove.start_transaction();
+
+        let fee_pool = FeePool::new(&drive);
+
+        fee_pool.init(1654622858842, Some(&db_transaction))
+            .expect("should init fee pool");
+
+        let epoch = Epoch::new(1u16, &drive);
+
+        epoch.init(Some(&db_transaction)).expect("should init epoch with index 1");
+
+        let processing_fee = 0.42;
+
+        epoch.update_processing_fee(processing_fee, Some(&db_transaction))
+            .expect("to update processing fee");
+
+        let stored_processing_fee = epoch.get_processing_credit(Some(&db_transaction))
+            .expect("to get processing fee");
+
+        assert_eq!(processing_fee, stored_processing_fee);
     }
 }
