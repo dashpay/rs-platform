@@ -33,9 +33,15 @@ use std::collections::BTreeSet;
 use std::ops::DerefMut;
 use std::path::Path;
 use std::sync::Arc;
+use crate::drive::defaults::STORAGE_FLAGS_SIZE;
+
+pub struct EpochInfo {
+    current_epoch: u16
+}
 
 pub struct Drive {
     pub grove: GroveDb,
+    pub epoch_info: RefCell<EpochInfo>,
     pub cached_contracts: RefCell<Cache<[u8; 32], Arc<Contract>>>, //HashMap<[u8; 32], Rc<Contract>>>,
     pub transient_inserts: RefCell<BTreeSet<Vec<Vec<u8>>>>,
     pub transient_batch_inserts: RefCell<BTreeSet<Vec<Vec<u8>>>>,
@@ -126,7 +132,7 @@ fn contract_documents_keeping_history_primary_key_path_for_document_id<'a>(
 fn contract_documents_keeping_history_primary_key_path_for_document_id_size(
     document_type_name_len: usize,
 ) -> usize {
-    crate::drive::defaults::BASE_CONTRACT_DOCUMENTS_KEEPING_HISTORY_PRIMARY_KEY_PATH_FOR_DOCUMENT_ID_SIZE + document_type_name_len
+    defaults::BASE_CONTRACT_DOCUMENTS_KEEPING_HISTORY_PRIMARY_KEY_PATH_FOR_DOCUMENT_ID_SIZE + document_type_name_len
 }
 
 fn contract_documents_keeping_history_storage_time_reference_path(
@@ -149,7 +155,7 @@ fn contract_documents_keeping_history_storage_time_reference_path(
 fn contract_documents_keeping_history_storage_time_reference_path_size(
     document_type_name_len: usize,
 ) -> usize {
-    crate::drive::defaults::BASE_CONTRACT_DOCUMENTS_KEEPING_HISTORY_STORAGE_TIME_REFERENCE_PATH
+    defaults::BASE_CONTRACT_DOCUMENTS_KEEPING_HISTORY_STORAGE_TIME_REFERENCE_PATH
         + document_type_name_len
 }
 
@@ -159,6 +165,7 @@ impl Drive {
             Ok(grove) => Ok(Drive {
                 grove,
                 cached_contracts: RefCell::new(Cache::new(200)),
+                epoch_info: RefCell::new(EpochInfo{current_epoch:0}),
                 transient_inserts: RefCell::new(BTreeSet::new()),
                 transient_batch_inserts: RefCell::new(BTreeSet::new()),
             }),
@@ -627,7 +634,7 @@ impl Drive {
                     PathKeyElementSize((
                         path_max_length,
                         8_usize,
-                        Element::required_item_space(max_size),
+                        Element::required_item_space(max_size, STORAGE_FLAGS_SIZE),
                     ))
                 }
             };
@@ -669,7 +676,7 @@ impl Drive {
                     PathKeyElementSize((
                         path_max_length,
                         1,
-                        Element::required_item_space(reference_max_size),
+                        Element::required_item_space(reference_max_size, STORAGE_FLAGS_SIZE),
                     ))
                 };
 
@@ -682,10 +689,10 @@ impl Drive {
                     PathFixedSizeKeyElement((primary_key_path, document.id.as_slice(), element))
                 }
                 DocumentSize(max_size) => PathKeyElementSize((
-                    crate::drive::defaults::BASE_CONTRACT_DOCUMENTS_PRIMARY_KEY_PATH
+                    defaults::BASE_CONTRACT_DOCUMENTS_PRIMARY_KEY_PATH
                         + document_type.name.len(),
                     DEFAULT_HASH_SIZE,
-                    Element::required_item_space(max_size),
+                    Element::required_item_space(max_size, STORAGE_FLAGS_SIZE),
                 )),
             };
             self.grove_insert(path_key_element_info, transaction, apply, insert_operations)?;
@@ -697,10 +704,10 @@ impl Drive {
                     PathFixedSizeKeyElement((primary_key_path, document.id.as_slice(), element))
                 }
                 DocumentSize(max_size) => PathKeyElementSize((
-                    crate::drive::defaults::BASE_CONTRACT_DOCUMENTS_PRIMARY_KEY_PATH
+                    defaults::BASE_CONTRACT_DOCUMENTS_PRIMARY_KEY_PATH
                         + document_type.name.len(),
                     DEFAULT_HASH_SIZE,
-                    Element::required_item_space(max_size),
+                    Element::required_item_space(max_size, STORAGE_FLAGS_SIZE),
                 )),
             };
             let inserted = self.grove_insert_if_not_exists(
@@ -731,13 +738,14 @@ impl Drive {
         owner_id: Option<&[u8]>,
         override_document: bool,
         block_time: f64,
-        epoch: u16,
         apply: bool,
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
         let contract = Contract::from_cbor(contract_cbor, None)?;
 
         let document = Document::from_cbor(document_cbor, None, owner_id)?;
+
+        let epoch = self.epoch_info.borrow().current_epoch;
 
         let storage_flags = StorageFlags { epoch };
 
@@ -767,11 +775,12 @@ impl Drive {
         owner_id: Option<&[u8]>,
         override_document: bool,
         block_time: f64,
-        epoch: u16,
         apply: bool,
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
         let document = Document::from_cbor(document_cbor, None, owner_id)?;
+
+        let epoch = self.epoch_info.borrow().current_epoch;
 
         let storage_flags = StorageFlags { epoch };
 
@@ -1036,7 +1045,7 @@ impl Drive {
                         KeyElement((document.id.as_slice(), document_reference))
                     }
                     DocumentSize(max_size) => {
-                        KeyElementSize((DEFAULT_HASH_SIZE, Element::required_item_space(*max_size)))
+                        KeyElementSize((DEFAULT_HASH_SIZE, Element::required_item_space(*max_size, STORAGE_FLAGS_SIZE)))
                     }
                 };
 
@@ -1059,7 +1068,7 @@ impl Drive {
                         KeyElement((&[0], document_reference))
                     }
                     DocumentSize(max_size) => {
-                        KeyElementSize((1, Element::required_item_space(*max_size)))
+                        KeyElementSize((1, Element::required_item_space(*max_size, STORAGE_FLAGS_SIZE)))
                     }
                 };
 
@@ -1099,7 +1108,6 @@ impl Drive {
         document_type: &str,
         owner_id: Option<&[u8]>,
         block_time: f64,
-        epoch: u16,
         apply: bool,
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
@@ -1114,7 +1122,6 @@ impl Drive {
             document_type,
             owner_id,
             block_time,
-            epoch,
             apply,
             transaction,
         )
@@ -1127,7 +1134,6 @@ impl Drive {
         document_type: &str,
         owner_id: Option<&[u8]>,
         block_time: f64,
-        epoch: u16,
         apply: bool,
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
@@ -1140,7 +1146,6 @@ impl Drive {
             document_type,
             owner_id,
             block_time,
-            epoch,
             apply,
             transaction,
         )
@@ -1154,7 +1159,6 @@ impl Drive {
         document_type_name: &str,
         owner_id: Option<&[u8]>,
         block_time: f64,
-        epoch: u16,
         apply: bool,
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
@@ -1162,6 +1166,8 @@ impl Drive {
         let mut insert_operations: Vec<InsertOperation> = vec![];
 
         let document_type = contract.document_type_for_name(document_type_name)?;
+
+        let epoch = self.epoch_info.borrow().current_epoch;
 
         let storage_flags = StorageFlags { epoch };
 
@@ -1735,6 +1741,48 @@ impl Drive {
         query.execute_no_proof(self, transaction)
     }
 
+    pub fn query_documents_as_grove_proof(
+        &self,
+        query_cbor: &[u8],
+        contract_id: [u8; 32],
+        document_type_name: &str,
+        transaction: TransactionArg,
+    ) -> Result<Vec<u8>, Error> {
+        let contract = self
+            .get_contract(contract_id, transaction)?
+            .ok_or(Error::Query(QueryError::ContractNotFound(
+                "contract not found",
+            )))?;
+        let document_type = contract.document_type_for_name(document_type_name)?;
+        self.query_documents_from_contract_as_grove_proof(&contract, document_type, query_cbor, transaction)
+    }
+
+    pub fn query_documents_from_contract_cbor_as_grove_proof(
+        &self,
+        contract_cbor: &[u8],
+        document_type_name: String,
+        query_cbor: &[u8],
+        transaction: TransactionArg,
+    ) -> Result<Vec<u8>, Error> {
+        let contract = Contract::from_cbor(contract_cbor, None)?;
+
+        let document_type = contract.document_type_for_name(document_type_name.as_str())?;
+
+        self.query_documents_from_contract_as_grove_proof(&contract, document_type, query_cbor, transaction)
+    }
+
+    pub fn query_documents_from_contract_as_grove_proof(
+        &self,
+        contract: &Contract,
+        document_type: &DocumentType,
+        query_cbor: &[u8],
+        transaction: TransactionArg,
+    ) -> Result<Vec<u8>, Error> {
+        let query = DriveQuery::from_cbor(query_cbor, contract, document_type)?;
+
+        query.execute_with_proof(self, transaction)
+    }
+
     pub fn worst_case_fee_for_document_type_with_name(
         &self,
         contract: &Contract,
@@ -1793,7 +1841,7 @@ mod tests {
         // let's construct the grovedb structure for the dashpay data contract
         let dashpay_cbor = json_document_to_cbor(dashpay_path, Some(1));
         drive
-            .apply_contract_cbor(dashpay_cbor.clone(), None, 0f64, 0, true, None)
+            .apply_contract_cbor(dashpay_cbor.clone(), None, 0f64, true, None)
             .expect("expected to apply contract successfully");
 
         (drive, dashpay_cbor)
@@ -1817,7 +1865,6 @@ mod tests {
                 Some(&random_owner_id),
                 false,
                 0f64,
-                0,
                 true,
                 None,
             )
@@ -1831,7 +1878,6 @@ mod tests {
                 Some(&random_owner_id),
                 false,
                 0f64,
-                0,
                 true,
                 None,
             )
@@ -1845,7 +1891,6 @@ mod tests {
                 Some(&random_owner_id),
                 true,
                 0f64,
-                0,
                 true,
                 None,
             )
@@ -1884,7 +1929,6 @@ mod tests {
                 Some(&random_owner_id),
                 false,
                 0f64,
-                0,
                 true,
                 Some(&db_transaction),
             )
@@ -1898,7 +1942,6 @@ mod tests {
                 Some(&random_owner_id),
                 false,
                 0f64,
-                0,
                 true,
                 Some(&db_transaction),
             )
@@ -1912,7 +1955,6 @@ mod tests {
                 Some(&random_owner_id),
                 true,
                 0f64,
-                0,
                 true,
                 Some(&db_transaction),
             )
@@ -1951,7 +1993,6 @@ mod tests {
                 Some(&random_owner_id),
                 false,
                 0f64,
-                0,
                 false,
                 Some(&db_transaction),
             )
@@ -1965,7 +2006,6 @@ mod tests {
                 Some(&random_owner_id),
                 false,
                 0f64,
-                0,
                 true,
                 Some(&db_transaction),
             )
@@ -2099,7 +2139,6 @@ mod tests {
                 Some(&random_owner_id),
                 false,
                 0f64,
-                0,
                 true,
                 Some(&db_transaction),
             )
@@ -2112,7 +2151,6 @@ mod tests {
                 "contactRequest",
                 Some(&random_owner_id),
                 0f64,
-                0,
                 true,
                 Some(&db_transaction),
             )
@@ -2126,7 +2164,6 @@ mod tests {
                 Some(&random_owner_id),
                 true,
                 0f64,
-                0,
                 true,
                 Some(&db_transaction),
             )
@@ -2170,7 +2207,6 @@ mod tests {
                 Some(&random_owner_id),
                 false,
                 0f64,
-                0,
                 true,
                 Some(&db_transaction),
             )
@@ -2183,7 +2219,6 @@ mod tests {
                 "profile",
                 Some(&random_owner_id),
                 0f64,
-                0,
                 true,
                 Some(&db_transaction),
             )
@@ -2208,7 +2243,6 @@ mod tests {
                 Some(&random_owner_id),
                 false,
                 0f64,
-                0,
                 true,
                 None,
             )
@@ -2261,7 +2295,6 @@ mod tests {
                 Some(&random_owner_id),
                 false,
                 0f64,
-                0,
                 true,
                 Some(&db_transaction),
             )
@@ -2958,7 +2991,6 @@ mod tests {
                 Some(&random_owner_id),
                 false,
                 0f64,
-                0,
                 true,
                 None,
             )
@@ -2971,7 +3003,6 @@ mod tests {
                 Some(&random_owner_id),
                 false,
                 0f64,
-                0,
                 true,
                 None,
             )
@@ -2984,7 +3015,6 @@ mod tests {
                 Some(&random_owner_id),
                 false,
                 0f64,
-                0,
                 true,
                 None,
             )
@@ -3014,7 +3044,6 @@ mod tests {
                 Some(&random_owner_id),
                 false,
                 0f64,
-                0,
                 true,
                 None,
             )
@@ -3027,7 +3056,6 @@ mod tests {
                 Some(&random_owner_id),
                 false,
                 0f64,
-                0,
                 true,
                 None,
             )
@@ -3054,7 +3082,6 @@ mod tests {
                 contract_cbor.clone(),
                 None,
                 0f64,
-                0,
                 true,
                 Some(&db_transaction),
             )
@@ -3072,7 +3099,6 @@ mod tests {
                 None,
                 true,
                 0f64,
-                0,
                 true,
                 Some(&db_transaction),
             )
@@ -3089,7 +3115,6 @@ mod tests {
                 "profile",
                 None,
                 0f64,
-                0,
                 true,
                 Some(&db_transaction),
             )
@@ -3110,7 +3135,7 @@ mod tests {
         let contract = Contract::from_cbor(contract_cbor.as_slice(), None)
             .expect("expected to create contract");
         drive
-            .apply_contract_cbor(contract_cbor.clone(), None, 0f64, 0, true, None)
+            .apply_contract_cbor(contract_cbor.clone(), None, 0f64, true, None)
             .expect("expected to apply contract successfully");
 
         // Create Alice profile
@@ -3165,7 +3190,6 @@ mod tests {
                 "profile",
                 None,
                 0f64,
-                0,
                 true,
                 None,
             )
@@ -3198,7 +3222,6 @@ mod tests {
                 contract_cbor.clone(),
                 None,
                 0f64,
-                0,
                 true,
                 Some(&db_transaction),
             )
@@ -3269,7 +3292,6 @@ mod tests {
                 "profile",
                 None,
                 0f64,
-                0,
                 true,
                 Some(&db_transaction),
             )
@@ -3307,7 +3329,6 @@ mod tests {
                 contract_cbor.clone(),
                 None,
                 0f64,
-                0,
                 true,
                 Some(&db_transaction),
             )
@@ -3405,7 +3426,6 @@ mod tests {
                 "profile",
                 None,
                 0f64,
-                0,
                 true,
                 Some(&db_transaction),
             )
@@ -3430,7 +3450,6 @@ mod tests {
                 contract_cbor.clone(),
                 None,
                 0f64,
-                0,
                 true,
                 Some(&db_transaction),
             )
@@ -3448,7 +3467,6 @@ mod tests {
                 None,
                 true,
                 0f64,
-                0,
                 true,
                 Some(&db_transaction),
             )
@@ -3473,7 +3491,6 @@ mod tests {
                 None,
                 true,
                 0f64,
-                0,
                 true,
                 Some(&db_transaction),
             )
@@ -3525,7 +3542,7 @@ mod tests {
         let contract = value_to_cbor(contract, Some(defaults::PROTOCOL_VERSION));
 
         drive
-            .apply_contract_cbor(contract.clone(), None, 0f64, 0, true, None)
+            .apply_contract_cbor(contract.clone(), None, 0f64, true, None)
             .expect("should create a contract");
 
         // Create document
@@ -3553,7 +3570,6 @@ mod tests {
                 None,
                 true,
                 0f64,
-                0,
                 true,
                 None,
             )
@@ -3583,7 +3599,6 @@ mod tests {
                 "indexedDocument",
                 None,
                 0f64,
-                0,
                 true,
                 None,
             )

@@ -6,7 +6,7 @@ use grovedb::ElementFlags;
 // Struct Definitions
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct StorageFlags {
-    pub(crate) epoch: u16,
+    pub epoch: u16,
 }
 
 impl StorageFlags {

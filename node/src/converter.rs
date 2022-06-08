@@ -3,9 +3,9 @@ use neon::{borrow::Borrow, prelude::*};
 
 fn element_to_string(element: &Element) -> &'static str {
     match element {
-        Element::Item(_) => "item",
-        Element::Reference(_) => "reference",
-        Element::Tree(_) => "tree",
+        Element::Item(..) => "item",
+        Element::Reference(..) => "reference",
+        Element::Tree(..) => "tree",
     }
 }
 
@@ -54,12 +54,12 @@ pub fn element_to_js_object<'a, C: Context<'a>>(
     js_object.set(cx, "type", js_type_string)?;
 
     let js_value: Handle<JsValue> = match element {
-        Element::Item(item) => {
+        Element::Item(item, _) => {
             let js_buffer = JsBuffer::external(cx, item);
             js_buffer.upcast()
         }
-        Element::Reference(reference) => nested_vecs_to_js(reference, cx)?,
-        Element::Tree(tree) => {
+        Element::Reference(reference, _) => nested_vecs_to_js(reference, cx)?,
+        Element::Tree(tree, _) => {
             let js_buffer = JsBuffer::external(cx, tree);
             js_buffer.upcast()
         }

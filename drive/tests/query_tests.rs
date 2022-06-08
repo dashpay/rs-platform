@@ -16,6 +16,7 @@ use std::io::{self, BufRead};
 use std::option::Option::None;
 use std::sync::Arc;
 use tempfile::TempDir;
+use rs_drive::contract::flags::StorageFlags;
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -138,10 +139,12 @@ pub fn setup_family_tests(count: u32, seed: u64) -> (Drive, Contract, TempDir) {
             .document_type_for_name("person")
             .expect("expected to get document type");
 
+        let storage_flags = StorageFlags { epoch : 0};
+
         drive
             .add_document_for_contract(
                 DocumentAndContractInfo {
-                    document_info: DocumentAndSerialization((&document, &document_cbor)),
+                    document_info: DocumentAndSerialization((&document, &document_cbor, &storage_flags)),
                     contract: &contract,
                     document_type,
                     owner_id: None,
@@ -189,10 +192,12 @@ pub fn setup_family_tests_with_nulls(count: u32, seed: u64) -> (Drive, Contract,
             .document_type_for_name("person")
             .expect("expected to get document type");
 
+        let storage_flags = StorageFlags { epoch : 0};
+
         drive
             .add_document_for_contract(
                 DocumentAndContractInfo {
-                    document_info: DocumentAndSerialization((&document, &document_cbor)),
+                    document_info: DocumentAndSerialization((&document, &document_cbor, &storage_flags)),
                     contract: &contract,
                     document_type,
                     owner_id: None,
@@ -293,10 +298,12 @@ pub fn setup_dpns_tests(count: u32, seed: u64) -> (Drive, Contract, TempDir) {
             .document_type_for_name("domain")
             .expect("expected to get document type");
 
+        let storage_flags = StorageFlags { epoch : 0};
+
         drive
             .add_document_for_contract(
                 DocumentAndContractInfo {
-                    document_info: DocumentAndSerialization((&document, &document_cbor)),
+                    document_info: DocumentAndSerialization((&document, &document_cbor, &storage_flags)),
                     contract: &contract,
                     document_type,
                     owner_id: None,
@@ -351,10 +358,12 @@ pub fn setup_dpns_test_with_data(path: &str) -> (Drive, Contract, TempDir) {
                 .document_type_for_name("domain")
                 .expect("expected to get document type");
 
+            let storage_flags = StorageFlags { epoch : 0};
+
             drive
                 .add_document_for_contract(
                     DocumentAndContractInfo {
-                        document_info: DocumentAndSerialization((&domain, &domain_cbor)),
+                        document_info: DocumentAndSerialization((&domain, &domain_cbor, &storage_flags)),
                         contract: &contract,
                         document_type,
                         owner_id: None,
@@ -390,10 +399,12 @@ fn test_query_many() {
             .document_type_for_name("person")
             .expect("expected to get document type");
 
+        let storage_flags = StorageFlags { epoch : 0};
+
         drive
             .add_document_for_contract(
                 DocumentAndContractInfo {
-                    document_info: DocumentAndSerialization((&document, &document_cbor)),
+                    document_info: DocumentAndSerialization((&document, &document_cbor, &storage_flags)),
                     contract: &contract,
                     document_type,
                     owner_id: None,
@@ -1052,10 +1063,12 @@ fn test_family_basic_queries() {
         .document_type_for_name("person")
         .expect("expected to get document type");
 
+    let storage_flags = StorageFlags { epoch : 0};
+
     drive
         .add_document_for_contract(
             DocumentAndContractInfo {
-                document_info: DocumentAndSerialization((&document, &person_cbor)),
+                document_info: DocumentAndSerialization((&document, &person_cbor, &storage_flags)),
                 contract: &contract,
                 document_type,
                 owner_id: None,
@@ -1093,10 +1106,12 @@ fn test_family_basic_queries() {
         .document_type_for_name("person")
         .expect("expected to get document type");
 
+    let storage_flags = StorageFlags { epoch : 0};
+
     drive
         .add_document_for_contract(
             DocumentAndContractInfo {
-                document_info: DocumentAndSerialization((&document, &person_cbor)),
+                document_info: DocumentAndSerialization((&document, &person_cbor, &storage_flags)),
                 contract: &contract,
                 document_type,
                 owner_id: None,
@@ -2737,10 +2752,12 @@ fn test_dpns_query_start_at_with_null_id() {
     let document0 = Document::from_cbor(document_cbor0.as_slice(), None, None)
         .expect("document should be properly deserialized");
 
+    let storage_flags = StorageFlags { epoch : 0};
+
     drive
         .add_document_for_contract(
             DocumentAndContractInfo {
-                document_info: DocumentAndSerialization((&document0, &document_cbor0)),
+                document_info: DocumentAndSerialization((&document0, &document_cbor0, &storage_flags)),
                 contract: &contract,
                 document_type,
                 owner_id: None,
@@ -2773,10 +2790,11 @@ fn test_dpns_query_start_at_with_null_id() {
     let document1 = Document::from_cbor(document_cbor1.as_slice(), None, None)
         .expect("document should be properly deserialized");
 
+    let storage_flags = StorageFlags { epoch : 0};
     drive
         .add_document_for_contract(
             DocumentAndContractInfo {
-                document_info: DocumentAndSerialization((&document1, &document_cbor1)),
+                document_info: DocumentAndSerialization((&document1, &document_cbor1, &storage_flags)),
                 contract: &contract,
                 document_type,
                 owner_id: None,
@@ -2910,10 +2928,12 @@ fn test_dpns_query_start_after_with_null_id() {
     let document0 = Document::from_cbor(document_cbor0.as_slice(), None, None)
         .expect("document should be properly deserialized");
 
+    let storage_flags = StorageFlags { epoch : 0};
+
     drive
         .add_document_for_contract(
             DocumentAndContractInfo {
-                document_info: DocumentAndSerialization((&document0, &document_cbor0)),
+                document_info: DocumentAndSerialization((&document0, &document_cbor0, &storage_flags)),
                 contract: &contract,
                 document_type,
                 owner_id: None,
@@ -2946,10 +2966,12 @@ fn test_dpns_query_start_after_with_null_id() {
     let document1 = Document::from_cbor(document_cbor1.as_slice(), None, None)
         .expect("document should be properly deserialized");
 
+    let storage_flags = StorageFlags { epoch : 0};
+
     drive
         .add_document_for_contract(
             DocumentAndContractInfo {
-                document_info: DocumentAndSerialization((&document1, &document_cbor1)),
+                document_info: DocumentAndSerialization((&document1, &document_cbor1, &storage_flags)),
                 contract: &contract,
                 document_type,
                 owner_id: None,
@@ -3085,10 +3107,12 @@ fn test_dpns_query_start_after_with_null_id_desc() {
     let document0 = Document::from_cbor(document_cbor0.as_slice(), None, None)
         .expect("document should be properly deserialized");
 
+    let storage_flags = StorageFlags { epoch : 0};
+
     drive
         .add_document_for_contract(
             DocumentAndContractInfo {
-                document_info: DocumentAndSerialization((&document0, &document_cbor0)),
+                document_info: DocumentAndSerialization((&document0, &document_cbor0, &storage_flags)),
                 contract: &contract,
                 document_type,
                 owner_id: None,
@@ -3121,10 +3145,12 @@ fn test_dpns_query_start_after_with_null_id_desc() {
     let document1 = Document::from_cbor(document_cbor1.as_slice(), None, None)
         .expect("document should be properly deserialized");
 
+    let storage_flags = StorageFlags { epoch : 0};
+
     drive
         .add_document_for_contract(
             DocumentAndContractInfo {
-                document_info: DocumentAndSerialization((&document1, &document_cbor1)),
+                document_info: DocumentAndSerialization((&document1, &document_cbor1, &storage_flags)),
                 contract: &contract,
                 document_type,
                 owner_id: None,

@@ -187,7 +187,7 @@ fn test_root_hash(drive: &Drive, db_transaction: &Transaction) {
     drive.grove.insert(
         [Into::<&[u8; 1]>::into(RootTree::Identities).as_slice()],
         hex::decode("f00100b0c1e3762b8bc1421e113c76b2a635c5930b9abf2b336583be5987a715").unwrap().as_slice(),
-        Element::Item(hex::decode("01000000a46269645820f00100b0c1e3762b8bc1421e113c76b2a635c5930b9abf2b336583be5987a7156762616c616e636500687265766973696f6e006a7075626c69634b65797381a662696400646461746158210328f474ce2d61d6fdb45c1fb437ddbf167924e6af3303c167f64d8c8857e39ca564747970650067707572706f73650068726561644f6e6c79f76d73656375726974794c6576656c00").unwrap()),
+        Element::new_item(hex::decode("01000000a46269645820f00100b0c1e3762b8bc1421e113c76b2a635c5930b9abf2b336583be5987a7156762616c616e636500687265766973696f6e006a7075626c69634b65797381a662696400646461746158210328f474ce2d61d6fdb45c1fb437ddbf167924e6af3303c167f64d8c8857e39ca564747970650067707572706f73650068726561644f6e6c79f76d73656375726974794c6576656c00").unwrap()),
         Some(db_transaction),
     ).expect("should insert");
 
@@ -223,7 +223,7 @@ fn test_root_hash(drive: &Drive, db_transaction: &Transaction) {
             hex::decode("6198bae2a577044d7975f4d1a06a8d13a9eab9b0")
                 .unwrap()
                 .as_slice(),
-            Element::Item(
+            Element::new_item(
                 hex::decode(
                     "815820f00100b0c1e3762b8bc1421e113c76b2a635c5930b9abf2b336583be5987a715",
                 )

@@ -12,6 +12,7 @@ use serde_json::json;
 use std::collections::{BTreeMap, HashMap};
 use std::option::Option::None;
 use tempfile::TempDir;
+use rs_drive::contract::flags::StorageFlags;
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -123,10 +124,12 @@ pub fn setup(count: u32, seed: u64) -> (Drive, Contract, TempDir) {
                 .document_type_for_name("person")
                 .expect("expected to get document type");
 
+            let storage_flags = StorageFlags { epoch : 0};
+
             drive
                 .add_document_for_contract(
                     DocumentAndContractInfo {
-                        document_info: DocumentAndSerialization((&document, &document_cbor)),
+                        document_info: DocumentAndSerialization((&document, &document_cbor, &storage_flags)),
                         contract: &contract,
                         document_type,
                         owner_id: None,
@@ -890,10 +893,12 @@ fn test_query_historical() {
         .document_type_for_name("person")
         .expect("expected to get document type");
 
+    let storage_flags = StorageFlags { epoch : 0};
+
     drive
         .add_document_for_contract(
             DocumentAndContractInfo {
-                document_info: DocumentAndSerialization((&document, &person_cbor)),
+                document_info: DocumentAndSerialization((&document, &person_cbor, &storage_flags)),
                 contract: &contract,
                 document_type,
                 owner_id: None,
@@ -932,10 +937,12 @@ fn test_query_historical() {
         .document_type_for_name("person")
         .expect("expected to get document type");
 
+    let storage_flags = StorageFlags { epoch : 0};
+
     drive
         .add_document_for_contract(
             DocumentAndContractInfo {
-                document_info: DocumentAndSerialization((&document, &person_cbor)),
+                document_info: DocumentAndSerialization((&document, &person_cbor, &storage_flags)),
                 contract: &contract,
                 document_type,
                 owner_id: None,
