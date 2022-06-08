@@ -1,5 +1,6 @@
 use grovedb::{Element, PathQuery, Query, SizedQuery};
 use neon::{borrow::Borrow, prelude::*};
+use rs_drive::contract::flags::StorageFlags;
 
 fn element_to_string(element: &Element) -> &'static str {
     match element {
@@ -13,33 +14,52 @@ pub fn js_object_to_element<'a, C: Context<'a>>(
     js_object: Handle<JsObject>,
     cx: &mut C,
 ) -> NeonResult<Element> {
-    let js_element_string = js_object.get(cx, "type")?.to_string(cx)?;
+    let js_element_type = js_object.get(cx, "type")?.to_string(cx)?;
+    let js_element_epoch = js_object
+        .get(cx, "epoch")?
+        .downcast_or_throw::<JsNumber, _>(cx)?;
+
+    let epoch = u16::try_from(js_element_epoch.value(cx) as i64)
+        .or_else(|_| cx.throw_range_error("`epoch` must fit in u16"))?;
+
+    let storage_flags = StorageFlags { epoch };
+
     let value = js_object.get(cx, "value")?;
 
-    let element_string: String = js_element_string.value(cx);
+    let element_string: String = js_element_type.value(cx);
 
     match element_string.as_str() {
         "item" => {
             let js_buffer = value.downcast_or_throw::<JsBuffer, _>(cx)?;
             let item = js_buffer_to_vec_u8(js_buffer, cx);
-            Ok(Element::Item(item))
+
+            Ok(Element::new_item_with_flags(
+                item,
+                storage_flags.to_element_flags(),
+            ))
         }
         "reference" => {
             let js_array = value.downcast_or_throw::<JsArray, _>(cx)?;
             let reference = js_array_of_buffers_to_vec(js_array, cx)?;
-            Ok(Element::Reference(reference))
+
+            Ok(Element::new_reference_with_flags(
+                reference,
+                storage_flags.to_element_flags(),
+            ))
         }
         "tree" => {
             let js_buffer = value.downcast_or_throw::<JsBuffer, _>(cx)?;
             let tree_vec = js_buffer_to_vec_u8(js_buffer, cx);
-            Ok(Element::Tree(tree_vec.try_into().or_else(
-                |v: Vec<u8>| {
+
+            Ok(Element::new_tree_with_flags(
+                tree_vec.try_into().or_else(|v: Vec<u8>| {
                     cx.throw_error(format!(
                         "Tree buffer is expected to be 32 bytes long, but got {}",
                         v.len()
                     ))
-                },
-            )?))
+                })?,
+                storage_flags.to_element_flags(),
+            ))
         }
         _ => cx.throw_error(format!("Unexpected element type {}", element_string)),
     }
