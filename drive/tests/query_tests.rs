@@ -16,7 +16,9 @@ use std::fs::File;
 use std::io::{self, BufRead};
 use std::option::Option::None;
 use std::sync::Arc;
+use grovedb::GroveDb;
 use tempfile::TempDir;
+use rs_drive::error::Error::GroveDB;
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -493,7 +495,7 @@ fn test_family_basic_queries() {
     let (results, _, _) = query
         .execute_no_proof(&drive, Some(&db_transaction))
         .expect("proof should be executed");
-    let names: Vec<String> = results
+    let names: Vec<String> = results.clone()
         .into_iter()
         .map(|result| {
             let document = Document::from_cbor(result.as_slice(), None, None)
@@ -510,6 +512,10 @@ fn test_family_basic_queries() {
         .collect();
 
     assert_eq!(names, all_names);
+
+    let proof_results = query.execute_with_proof_only_get_elements(&drive, None).expect("we should be able to a proof");
+
+    assert_eq!(results, proof_results);
 
     // A query getting all people who's first name is Chris (which should exist)
 
@@ -3273,7 +3279,7 @@ fn test_dpns_query_start_after_with_null_id_desc() {
     let (results, _, _) = query
         .execute_no_proof(&drive, Some(&db_transaction))
         .expect("proof should be executed");
-    let docs: Vec<Vec<u8>> = results
+    let docs: Vec<Vec<u8>> = results.clone()
         .into_iter()
         .map(|result| {
             let document = Document::from_cbor(result.as_slice(), None, None)
@@ -3281,6 +3287,10 @@ fn test_dpns_query_start_after_with_null_id_desc() {
             Vec::from(document.id)
         })
         .collect();
+
+    let proof_results = query.execute_with_proof_only_get_elements(&drive, None).expect("we should be able to a proof");
+
+    assert_eq!(results, proof_results);
 
     // The explanation is a little interesting
     // domain1 is smaller than domain0

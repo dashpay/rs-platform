@@ -1125,6 +1125,23 @@ impl<'a> DriveQuery<'a> {
             .map_err(Error::GroveDB)
     }
 
+    pub fn execute_with_proof_only_get_elements(
+        self,
+        drive: &Drive,
+        transaction: TransactionArg,
+    ) -> Result<Vec<Vec<u8>>, Error> {
+        let mut query_operations: Vec<QueryOperation> = vec![];
+        let path_query =
+            self.construct_path_query_operations(drive, transaction, &mut query_operations)?;
+        let proof = drive
+            .grove
+            .get_proved_path_query(&path_query, transaction)
+            .map_err(Error::GroveDB)?;
+        let (_, key_value_elements) = GroveDb::execute_proof(proof.as_slice(), &path_query).map_err(Error::GroveDB)?;
+
+        Ok(key_value_elements.into_iter().map(|(key, value) | value).collect())
+    }
+
     pub fn execute_no_proof(
         &self,
         drive: &Drive,
