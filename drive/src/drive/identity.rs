@@ -16,14 +16,12 @@ impl Drive {
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
         let mut insert_operations: Vec<InsertOperation> = vec![];
-        self.grove_insert(
+        self.batch_insert(
             PathFixedSizeKeyElement((
                 [Into::<&[u8; 1]>::into(RootTree::Identities).as_slice()],
                 identity_key,
                 identity_bytes,
             )),
-            transaction,
-            apply,
             &mut insert_operations,
         )?;
         calculate_fee(None, None, Some(insert_operations), None)

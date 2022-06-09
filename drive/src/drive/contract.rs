@@ -56,25 +56,21 @@ impl Drive {
             let element_flags = contract_element.get_flags().clone();
             let storage_flags = StorageFlags::from_element_flags(element_flags.clone())?;
 
-            self.grove_insert_empty_tree(
+            self.batch_insert_empty_tree(
                 contract_root_path,
                 KeyRef(&[0]),
                 &storage_flags,
-                transaction,
-                apply,
                 insert_operations,
             )?;
             let encoded_time = crate::contract::types::encode_float(block_time)?;
             let contract_keeping_history_storage_path =
                 contract_keeping_history_storage_path(&contract.id);
-            self.grove_insert(
+            self.batch_insert(
                 PathFixedSizeKeyElement((
                     contract_keeping_history_storage_path,
                     encoded_time.as_slice(),
                     contract_element,
                 )),
-                transaction,
-                apply,
                 insert_operations,
             )?;
 
@@ -95,7 +91,7 @@ impl Drive {
                         + defaults::DEFAULT_FLOAT_SIZE,
                 ))
             };
-            self.grove_insert(path_key_element_info, transaction, apply, insert_operations)?;
+            self.batch_insert(path_key_element_info, insert_operations)?;
         } else {
             // the contract is just stored at key 0
             let path_key_element_info = if apply {
@@ -107,7 +103,7 @@ impl Drive {
                     contract_element.byte_size(),
                 ))
             };
-            self.grove_insert(path_key_element_info, transaction, apply, insert_operations)?;
+            self.batch_insert(path_key_element_info, insert_operations)?;
         }
         Ok(())
     }
@@ -123,12 +119,10 @@ impl Drive {
     ) -> Result<(), Error> {
         let storage_flags = StorageFlags::from_element_flags(contract_element.get_flags().clone())?;
 
-        self.grove_insert_empty_tree(
+        self.batch_insert_empty_tree(
             [Into::<&[u8; 1]>::into(RootTree::ContractDocuments).as_slice()],
             KeyRef(contract.id.as_slice()),
             &storage_flags,
-            transaction,
-            apply,
             insert_operations,
         )?;
 
@@ -144,12 +138,10 @@ impl Drive {
         // the documents
         let contract_root_path = contract_root_path(&contract.id);
         let key_info = if apply { KeyRef(&[1]) } else { KeySize(1) };
-        self.grove_insert_empty_tree(
+        self.batch_insert_empty_tree(
             contract_root_path,
             key_info,
             &storage_flags,
-            transaction,
-            apply,
             insert_operations,
         )?;
 
@@ -159,12 +151,10 @@ impl Drive {
         let contract_documents_path = contract_documents_path(&contract.id);
 
         for (type_key, document_type) in &contract.document_types {
-            self.grove_insert_empty_tree(
+            self.batch_insert_empty_tree(
                 contract_documents_path,
                 KeyRef(type_key.as_bytes()),
                 &storage_flags,
-                transaction,
-                apply,
                 insert_operations,
             )?;
 
@@ -177,24 +167,20 @@ impl Drive {
 
             // primary key tree
             let key_info = if apply { KeyRef(&[0]) } else { KeySize(1) };
-            self.grove_insert_empty_tree(
+            self.batch_insert_empty_tree(
                 type_path,
                 key_info,
                 &storage_flags,
-                transaction,
-                apply,
                 insert_operations,
             )?;
 
             // for each type we should insert the indices that are top level
             for index in document_type.top_level_indices()? {
                 // toDo: change this to be a reference by index
-                self.grove_insert_empty_tree(
+                self.batch_insert_empty_tree(
                     type_path,
                     KeyRef(index.name.as_bytes()),
                     &storage_flags,
-                    transaction,
-                    apply,
                     insert_operations,
                 )?;
             }
@@ -293,23 +279,20 @@ impl Drive {
                 // for each type we should insert the indices that are top level
                 for index in document_type.top_level_indices()? {
                     // toDo: we can save a little by only inserting on new indexes
-                    self.grove_insert_empty_tree_if_not_exists(
+                    self.batch_insert_empty_tree_if_not_exists(
                         PathFixedSizeKeyRef((type_path, index.name.as_bytes())),
                         &storage_flags,
                         transaction,
-                        apply,
                         query_operations,
                         insert_operations,
                     )?;
                 }
             } else {
                 // We can just insert this directly because the original document type already exists
-                self.grove_insert_empty_tree(
+                self.batch_insert_empty_tree(
                     contract_documents_path,
                     KeyRef(type_key.as_bytes()),
                     &storage_flags,
-                    transaction,
-                    apply,
                     insert_operations,
                 )?;
 
@@ -321,24 +304,20 @@ impl Drive {
                 ];
 
                 // primary key tree
-                self.grove_insert_empty_tree(
+                self.batch_insert_empty_tree(
                     type_path,
                     KeyRef(&[0]),
                     &storage_flags,
-                    transaction,
-                    apply,
                     insert_operations,
                 )?;
 
                 // for each type we should insert the indices that are top level
                 for index in document_type.top_level_indices()? {
                     // toDo: change this to be a reference by index
-                    self.grove_insert_empty_tree(
+                    self.batch_insert_empty_tree(
                         type_path,
                         KeyRef(index.name.as_bytes()),
                         &storage_flags,
-                        transaction,
-                        apply,
                         insert_operations,
                     )?;
                 }
