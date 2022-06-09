@@ -946,7 +946,7 @@ impl Drive {
                 }
             }
         }
-
+        println!("{:#?}", insert_operations);
         self.grove.apply_batch(InsertOperation::grovedb_operations(insert_operations), transaction)?;
         Ok(())
     }

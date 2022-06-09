@@ -176,11 +176,13 @@ impl QueryOperation {
     }
 }
 
+#[derive(Debug)]
 pub struct SizeOfInsertOperation {
     pub key_size: u16,
     pub value_size: u32,
 }
 
+#[derive(Debug)]
 pub enum InsertOperation {
     GroveInsertOperation(GroveDbOp),
     WorstCaseInsertOperation(SizeOfInsertOperation),

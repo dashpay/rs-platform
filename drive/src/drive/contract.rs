@@ -48,7 +48,6 @@ impl Drive {
         contract: &Contract,
         block_time: f64,
         apply: bool,
-        transaction: TransactionArg,
         insert_operations: &mut Vec<InsertOperation>,
     ) -> Result<(), Error> {
         let contract_root_path = contract_root_path(&contract.id);
@@ -131,7 +130,6 @@ impl Drive {
             contract,
             block_time,
             apply,
-            transaction,
             insert_operations,
         )?;
 
@@ -185,7 +183,10 @@ impl Drive {
                 )?;
             }
         }
-
+        println!("contract inserts {:#?}", insert_operations);
+        if apply {
+            self.grove.apply_batch(InsertOperation::grovedb_operations(insert_operations), transaction)?;
+        }
         Ok(())
     }
 
@@ -246,7 +247,6 @@ impl Drive {
             contract,
             block_time,
             apply,
-            transaction,
             insert_operations,
         )?;
 
@@ -322,6 +322,10 @@ impl Drive {
                     )?;
                 }
             }
+        }
+
+        if apply {
+            self.grove.apply_batch(InsertOperation::grovedb_operations(insert_operations), transaction)?;
         }
 
         Ok(())
