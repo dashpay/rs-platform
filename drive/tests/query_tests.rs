@@ -2077,8 +2077,14 @@ fn test_family_with_nulls_query() {
 
     assert_eq!(names, all_names);
 
+    let (proof_root_hash, proof_results) = query
+        .execute_with_proof_only_get_elements(&drive, None)
+        .expect("we should be able to a proof");
+    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(results, proof_results);
+
     let ids: Vec<String> = results
-        .into_iter()
+        .iter()
         .map(|result| {
             let document = Document::from_cbor(result.as_slice(), None, None)
                 .expect("we should be able to deserialize the cbor");
@@ -2104,6 +2110,7 @@ fn test_family_with_nulls_query() {
         .grove
         .commit_transaction(db_transaction)
         .expect("unable to commit transaction");
+
 }
 
 #[test]
