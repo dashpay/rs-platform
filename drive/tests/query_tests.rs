@@ -2158,6 +2158,18 @@ fn test_query_with_cached_contract() {
 
     assert_eq!(results.len(), 10);
 
+    let person_document_type = contract
+        .document_types
+        .get("person")
+        .expect("contract should have a person document type");
+    let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &person_document_type)
+        .expect("query should be built");
+    let (proof_root_hash, proof_results) = query
+        .execute_with_proof_only_get_elements(&drive, None)
+        .expect("we should be able to a proof");
+    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(results, proof_results);
+
     let contract_ref = drive
         .get_cached_contract(contract.id)
         .expect("expected to be able to get contract")
