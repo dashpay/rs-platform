@@ -2110,7 +2110,6 @@ fn test_family_with_nulls_query() {
         .grove
         .commit_transaction(db_transaction)
         .expect("unable to commit transaction");
-
 }
 
 #[test]
