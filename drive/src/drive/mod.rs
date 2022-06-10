@@ -13,7 +13,7 @@ use crate::error::query::QueryError;
 use crate::error::Error;
 use crate::fee::calculate_fee;
 use crate::fee::op::{DeleteOperation, InsertOperation, QueryOperation};
-use crate::query::{DriveQuery, GroveError};
+use crate::query::DriveQuery;
 use defaults::{CONTRACT_DOCUMENTS_PATH_HEIGHT, DEFAULT_HASH_SIZE};
 use grovedb::{Element, GroveDb, Transaction, TransactionArg};
 use moka::sync::Cache;
@@ -1292,18 +1292,17 @@ impl Drive {
                 insert_operations,
             )?;
 
-            let old_document =
-                if let Element::Item(old_document_cbor, old_element_flags) = old_document_element {
-                    Ok(Document::from_cbor(
-                        old_document_cbor.as_slice(),
-                        None,
-                        owner_id,
-                    )?)
-                } else {
-                    Err(Error::Drive(DriveError::CorruptedDocumentNotItem(
-                        "old document is not an item",
-                    )))
-                }?;
+            let old_document = if let Element::Item(old_document_cbor, _) = old_document_element {
+                Ok(Document::from_cbor(
+                    old_document_cbor.as_slice(),
+                    None,
+                    owner_id,
+                )?)
+            } else {
+                Err(Error::Drive(DriveError::CorruptedDocumentNotItem(
+                    "old document is not an item",
+                )))
+            }?;
 
             // fourth we need to store a reference to the document for each index
             for index in &document_type.indices {
@@ -1599,7 +1598,7 @@ impl Drive {
         }
 
         let document_bytes: Vec<u8> = match document_element.unwrap() {
-            Element::Item(data, storage_flags) => data,
+            Element::Item(data, _) => data,
             _ => todo!(), // TODO: how should this be handled, possibility that document might not be in storage
         };
 

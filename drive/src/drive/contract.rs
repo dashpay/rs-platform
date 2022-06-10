@@ -85,7 +85,7 @@ impl Drive {
                 PathFixedSizeKeyElement((
                     contract_keeping_history_storage_path,
                     &[0],
-                    Element::Reference(contract_storage_path, element_flags.clone()),
+                    Element::Reference(contract_storage_path, element_flags),
                 ))
             } else {
                 PathKeyElementSize((
@@ -410,11 +410,11 @@ impl Drive {
         let stored_element = self
             .grove
             .get(contract_root_path(&contract_id), &[0], transaction)?;
-        if let Element::Item(stored_contract_bytes, elementFlag) = stored_element {
+        if let Element::Item(stored_contract_bytes, element_flag) = stored_element {
             let contract = Arc::new(Contract::from_cbor(&stored_contract_bytes, None)?);
             let cached_contracts = self.cached_contracts.borrow();
             cached_contracts.insert(contract_id, Arc::clone(&contract));
-            let flags = StorageFlags::from_element_flags(elementFlag)?;
+            let flags = StorageFlags::from_element_flags(element_flag)?;
             Ok((Some(Arc::clone(&contract)), flags))
         } else {
             Err(Error::Drive(DriveError::CorruptedContractPath(

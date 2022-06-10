@@ -4,7 +4,7 @@ use byteorder::{BigEndian, ReadBytesExt};
 use grovedb::ElementFlags;
 
 // Struct Definitions
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct StorageFlags {
     pub epoch: u16,
 }

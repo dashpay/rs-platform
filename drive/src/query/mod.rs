@@ -11,7 +11,6 @@ use crate::error::drive::DriveError;
 use crate::error::query::QueryError;
 use crate::error::structure::StructureError;
 use crate::error::Error;
-use crate::error::Error::GroveDB;
 use crate::fee::calculate_fee;
 use crate::fee::op::QueryOperation;
 use ciborium::value::Value;
@@ -28,7 +27,7 @@ use sqlparser::ast::Value::Number;
 use sqlparser::ast::{OrderByExpr, Select, Statement};
 use sqlparser::dialect::GenericDialect;
 use sqlparser::parser::Parser;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use std::ops::BitXor;
 
 #[derive(Clone, Debug, PartialEq, Default)]
