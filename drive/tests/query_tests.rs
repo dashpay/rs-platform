@@ -513,8 +513,6 @@ fn test_family_basic_queries() {
 
     assert_eq!(names, all_names);
 
-    // dbg!(results.len());
-    // dbg!(&results);
     let (proof_root_hash, proof_results) = query
         .execute_with_proof_only_get_elements(&drive, None)
         .expect("we should be able to a proof");
@@ -540,8 +538,6 @@ fn test_family_basic_queries() {
         .expect("query should be executed");
     assert_eq!(results.len(), 1);
 
-    // dbg!(results.len());
-    // dbg!(&results);
     let (proof_root_hash, proof_results) = drive
         .query_documents_from_contract_as_grove_proof_only_get_elements(
             &contract,
@@ -575,8 +571,6 @@ fn test_family_basic_queries() {
 
     assert_eq!(results.len(), 1);
 
-    // dbg!(results.len());
-    // dbg!(&results);
     let (proof_root_hash, proof_results) = drive
         .query_documents_from_contract_as_grove_proof_only_get_elements(
             &contract,
@@ -586,6 +580,7 @@ fn test_family_basic_queries() {
         )
         .expect("query should be executed");
     assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(results, proof_results);
 
     let document = Document::from_cbor(results.first().unwrap().as_slice(), None, None)
         .expect("we should be able to deserialize the cbor");
@@ -624,6 +619,17 @@ fn test_family_basic_queries() {
 
     assert_eq!(results.len(), 1);
 
+    let (proof_root_hash, proof_results) = drive
+        .query_documents_from_contract_as_grove_proof_only_get_elements(
+            &contract,
+            person_document_type,
+            query_cbor.as_slice(),
+            None,
+        )
+        .expect("query should be executed");
+    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(results, proof_results);
+
     // A query getting all people who's first name is Adey, order by lastName (which should exist)
 
     let query_value = json!({
@@ -647,6 +653,17 @@ fn test_family_basic_queries() {
         .expect("query should be executed");
 
     assert_eq!(results.len(), 1);
+
+    let (proof_root_hash, proof_results) = drive
+        .query_documents_from_contract_as_grove_proof_only_get_elements(
+            &contract,
+            person_document_type,
+            query_cbor.as_slice(),
+            None,
+        )
+        .expect("query should be executed");
+    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(results, proof_results);
 
     let document = Document::from_cbor(results.first().unwrap().as_slice(), None, None)
         .expect("we should be able to deserialize the cbor");
@@ -680,6 +697,17 @@ fn test_family_basic_queries() {
 
     assert_eq!(results.len(), 0);
 
+    let (proof_root_hash, proof_results) = drive
+        .query_documents_from_contract_as_grove_proof_only_get_elements(
+            &contract,
+            person_document_type,
+            query_cbor.as_slice(),
+            None,
+        )
+        .expect("query should be executed");
+    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(results, proof_results);
+
     // A query getting a middle name
 
     let query_value = json!({
@@ -700,6 +728,17 @@ fn test_family_basic_queries() {
         .expect("query should be executed");
 
     assert_eq!(results.len(), 1);
+
+    let (proof_root_hash, proof_results) = drive
+        .query_documents_from_contract_as_grove_proof_only_get_elements(
+            &contract,
+            person_document_type,
+            query_cbor.as_slice(),
+            None,
+        )
+        .expect("query should be executed");
+    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(results, proof_results);
 
     // A query getting all people who's first name is before Chris
 
@@ -922,7 +961,7 @@ fn test_family_basic_queries() {
         .execute_no_proof(&drive, None)
         .expect("proof should be executed");
     let names: Vec<String> = results
-        .into_iter()
+        .iter()
         .map(|result| {
             let document = Document::from_cbor(result.as_slice(), None, None)
                 .expect("we should be able to deserialize the cbor");
@@ -938,6 +977,12 @@ fn test_family_basic_queries() {
         .collect();
 
     assert_eq!(names, expected_between_names);
+
+    let (proof_root_hash, proof_results) = query
+        .execute_with_proof_only_get_elements(&drive, None)
+        .expect("we should be able to a proof");
+    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(results, proof_results);
 
     let query_value = json!({
         "where": [
@@ -984,12 +1029,11 @@ fn test_family_basic_queries() {
 
     assert_eq!(names, expected_reversed_between_names);
 
-    // dbg!(results.len());
-    // let (proof_root_hash, proof_results) = query
-    //     .execute_with_proof_only_get_elements(&drive, None)
-    //     .expect("we should be able to a proof");
-    // assert_eq!(root_hash, Some(proof_root_hash));
-    // assert_eq!(results, proof_results);
+    let (proof_root_hash, proof_results) = query
+        .execute_with_proof_only_get_elements(&drive, None)
+        .expect("we should be able to a proof");
+    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(results, proof_results);
 
     // A query getting back elements having specific names and over a certain age
 
@@ -1039,6 +1083,12 @@ fn test_family_basic_queries() {
 
     assert_eq!(names, expected_names_45_over);
 
+    let (proof_root_hash, proof_results) = query
+        .execute_with_proof_only_get_elements(&drive, None)
+        .expect("we should be able to a proof");
+    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(results, proof_results);
+
     // A query getting back elements having specific names and over a certain age
 
     let query_value = json!({
@@ -1087,6 +1137,12 @@ fn test_family_basic_queries() {
     ];
 
     assert_eq!(names, expected_names_over_48);
+
+    let (proof_root_hash, proof_results) = query
+        .execute_with_proof_only_get_elements(&drive, None)
+        .expect("we should be able to a proof");
+    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(results, proof_results);
 
     let ages: HashMap<String, u8> = results
         .into_iter()
@@ -1230,6 +1286,20 @@ fn test_family_basic_queries() {
         .expect("query should be executed");
 
     assert_eq!(results.len(), 1);
+
+    // TODO: Add test for proofs after transaction
+    // drive.grove.commit_transaction(db_transaction).expect("unable to commit transaction");
+    // let (proof_root_hash, proof_results) = drive
+    //     .query_documents_from_contract_as_grove_proof_only_get_elements(
+    //         &contract,
+    //         person_document_type,
+    //         query_cbor.as_slice(),
+    //         None,
+    //     )
+    //     .expect("query should be executed");
+    // assert_eq!(root_hash, Some(proof_root_hash));
+    // assert_eq!(results, proof_results);
+    // let db_transaction = drive.grove.start_transaction();
 
     // fetching by $id with order by
 
