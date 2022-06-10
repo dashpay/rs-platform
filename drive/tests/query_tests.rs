@@ -1683,7 +1683,7 @@ fn test_family_starts_at_queries() {
         .expect("proof should be executed");
 
     let reduced_names_after: Vec<String> = results
-        .into_iter()
+        .iter()
         .map(|result| {
             let document = Document::from_cbor(result.as_slice(), None, None)
                 .expect("we should be able to deserialize the cbor");
@@ -1705,6 +1705,12 @@ fn test_family_starts_at_queries() {
     ];
 
     assert_eq!(reduced_names_after, expected_reduced_names);
+
+    let (proof_root_hash, proof_results) = query
+        .execute_with_proof_only_get_elements(&drive, None)
+        .expect("we should be able to a proof");
+    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(results, proof_results);
 
     // Now lets try startsAfter
 
@@ -1731,7 +1737,7 @@ fn test_family_starts_at_queries() {
         .expect("proof should be executed");
 
     let reduced_names_after: Vec<String> = results
-        .into_iter()
+        .iter()
         .map(|result| {
             let document = Document::from_cbor(result.as_slice(), None, None)
                 .expect("we should be able to deserialize the cbor");
@@ -1749,6 +1755,12 @@ fn test_family_starts_at_queries() {
     let expected_reduced_names = ["Meta".to_string(), "Noellyn".to_string()];
 
     assert_eq!(reduced_names_after, expected_reduced_names);
+
+    let (proof_root_hash, proof_results) = query
+        .execute_with_proof_only_get_elements(&drive, None)
+        .expect("we should be able to a proof");
+    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(results, proof_results);
 
     let query_value = json!({
         "where": [
@@ -1773,7 +1785,7 @@ fn test_family_starts_at_queries() {
         .expect("proof should be executed");
 
     let reduced_names_after: Vec<String> = results
-        .into_iter()
+        .iter()
         .map(|result| {
             let document = Document::from_cbor(result.as_slice(), None, None)
                 .expect("we should be able to deserialize the cbor");
@@ -1795,6 +1807,12 @@ fn test_family_starts_at_queries() {
     ];
 
     assert_eq!(reduced_names_after, expected_reduced_names);
+
+    let (proof_root_hash, proof_results) = query
+        .execute_with_proof_only_get_elements(&drive, None)
+        .expect("we should be able to a proof");
+    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(results, proof_results);
 
     // Now lets try startsAfter
 
@@ -1822,7 +1840,7 @@ fn test_family_starts_at_queries() {
     assert_eq!(results.len(), 2);
 
     let reduced_names_after: Vec<String> = results
-        .into_iter()
+        .iter()
         .map(|result| {
             let document = Document::from_cbor(result.as_slice(), None, None)
                 .expect("we should be able to deserialize the cbor");
@@ -1840,6 +1858,12 @@ fn test_family_starts_at_queries() {
     let expected_reduced_names = ["Gilligan".to_string(), "Dalia".to_string()];
 
     assert_eq!(reduced_names_after, expected_reduced_names);
+
+    let (proof_root_hash, proof_results) = query
+        .execute_with_proof_only_get_elements(&drive, None)
+        .expect("we should be able to a proof");
+    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(results, proof_results);
 }
 
 #[test]
