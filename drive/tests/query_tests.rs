@@ -1,3 +1,4 @@
+use grovedb::GroveDb;
 use rand::seq::SliceRandom;
 use rand::{Rng, SeedableRng};
 use rs_drive::common;
@@ -7,6 +8,7 @@ use rs_drive::contract::{Contract, Document};
 use rs_drive::drive::object_size_info::DocumentAndContractInfo;
 use rs_drive::drive::object_size_info::DocumentInfo::DocumentAndSerialization;
 use rs_drive::drive::Drive;
+use rs_drive::error::Error::GroveDB;
 use rs_drive::error::{query::QueryError, Error};
 use rs_drive::query::DriveQuery;
 use serde::{Deserialize, Serialize};
@@ -16,9 +18,7 @@ use std::fs::File;
 use std::io::{self, BufRead};
 use std::option::Option::None;
 use std::sync::Arc;
-use grovedb::GroveDb;
 use tempfile::TempDir;
-use rs_drive::error::Error::GroveDB;
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -495,8 +495,8 @@ fn test_family_basic_queries() {
     let (results, _, _) = query
         .execute_no_proof(&drive, Some(&db_transaction))
         .expect("proof should be executed");
-    let names: Vec<String> = results.clone()
-        .into_iter()
+    let names: Vec<String> = results
+        .iter()
         .map(|result| {
             let document = Document::from_cbor(result.as_slice(), None, None)
                 .expect("we should be able to deserialize the cbor");
@@ -513,12 +513,15 @@ fn test_family_basic_queries() {
 
     assert_eq!(names, all_names);
 
-    let proof_results = query.execute_with_proof_only_get_elements(&drive, None).expect("we should be able to a proof");
-
+    // dbg!(results.len());
+    // dbg!(&results);
+    let (proof_root_hash, proof_results) = query
+        .execute_with_proof_only_get_elements(&drive, None)
+        .expect("we should be able to a proof");
+    assert_eq!(root_hash, Some(proof_root_hash));
     assert_eq!(results, proof_results);
 
-    // A query getting all people who's first name is Chris (which should exist)
-
+    // A query getting all people who's first name is Adey (which should exist)
     let query_value = json!({
         "where": [
             ["firstName", "==", "Adey"]
@@ -535,8 +538,20 @@ fn test_family_basic_queries() {
     let (results, _, _) = drive
         .query_documents_from_contract(&contract, person_document_type, query_cbor.as_slice(), None)
         .expect("query should be executed");
-
     assert_eq!(results.len(), 1);
+
+    // dbg!(results.len());
+    // dbg!(&results);
+    let (proof_root_hash, proof_results) = drive
+        .query_documents_from_contract_as_grove_proof_only_get_elements(
+            &contract,
+            person_document_type,
+            query_cbor.as_slice(),
+            None,
+        )
+        .expect("query should be executed");
+    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(results, proof_results);
 
     // A query getting all people who's first name is Adey and lastName Randolf
 
@@ -559,6 +574,18 @@ fn test_family_basic_queries() {
         .expect("query should be executed");
 
     assert_eq!(results.len(), 1);
+
+    // dbg!(results.len());
+    // dbg!(&results);
+    let (proof_root_hash, proof_results) = drive
+        .query_documents_from_contract_as_grove_proof_only_get_elements(
+            &contract,
+            person_document_type,
+            query_cbor.as_slice(),
+            None,
+        )
+        .expect("query should be executed");
+    assert_eq!(root_hash, Some(proof_root_hash));
 
     let document = Document::from_cbor(results.first().unwrap().as_slice(), None, None)
         .expect("we should be able to deserialize the cbor");
@@ -696,7 +723,7 @@ fn test_family_basic_queries() {
         .execute_no_proof(&drive, None)
         .expect("proof should be executed");
     let names: Vec<String> = results
-        .into_iter()
+        .iter()
         .map(|result| {
             let document = Document::from_cbor(result.as_slice(), None, None)
                 .expect("we should be able to deserialize the cbor");
@@ -718,6 +745,12 @@ fn test_family_basic_queries() {
         "Celinda".to_string(),
     ];
     assert_eq!(names, expected_names_before_chris);
+
+    let (proof_root_hash, proof_results) = query
+        .execute_with_proof_only_get_elements(&drive, None)
+        .expect("we should be able to a proof");
+    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(results, proof_results);
 
     // A query getting all people who's first name starts with C
 
@@ -741,7 +774,7 @@ fn test_family_basic_queries() {
         .execute_no_proof(&drive, None)
         .expect("proof should be executed");
     let names: Vec<String> = results
-        .into_iter()
+        .iter()
         .map(|result| {
             let document = Document::from_cbor(result.as_slice(), None, None)
                 .expect("we should be able to deserialize the cbor");
@@ -758,6 +791,12 @@ fn test_family_basic_queries() {
 
     let expected_names_starting_with_c = ["Cammi".to_string(), "Celinda".to_string()];
     assert_eq!(names, expected_names_starting_with_c);
+
+    let (proof_root_hash, proof_results) = query
+        .execute_with_proof_only_get_elements(&drive, None)
+        .expect("we should be able to a proof");
+    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(results, proof_results);
 
     // A query getting all people who's first name starts with C, but limit to 1 and be descending
 
@@ -781,7 +820,7 @@ fn test_family_basic_queries() {
         .execute_no_proof(&drive, None)
         .expect("proof should be executed");
     let names: Vec<String> = results
-        .into_iter()
+        .iter()
         .map(|result| {
             let document = Document::from_cbor(result.as_slice(), None, None)
                 .expect("we should be able to deserialize the cbor");
@@ -798,6 +837,12 @@ fn test_family_basic_queries() {
 
     let expected_names_starting_with_c_desc_1 = ["Celinda".to_string()];
     assert_eq!(names, expected_names_starting_with_c_desc_1);
+
+    let (proof_root_hash, proof_results) = query
+        .execute_with_proof_only_get_elements(&drive, None)
+        .expect("we should be able to a proof");
+    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(results, proof_results);
 
     // A query getting all people who's first name is between Chris and Noellyn included
 
@@ -848,6 +893,12 @@ fn test_family_basic_queries() {
     ];
 
     assert_eq!(names, expected_between_names);
+
+    let (proof_root_hash, proof_results) = query
+        .execute_with_proof_only_get_elements(&drive, None)
+        .expect("we should be able to a proof");
+    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(results, proof_results);
 
     // A query getting back elements having specific names
 
@@ -908,7 +959,7 @@ fn test_family_basic_queries() {
         .execute_no_proof(&drive, None)
         .expect("proof should be executed");
     let names: Vec<String> = results
-        .into_iter()
+        .iter()
         .map(|result| {
             let document = Document::from_cbor(result.as_slice(), None, None)
                 .expect("we should be able to deserialize the cbor");
@@ -932,6 +983,13 @@ fn test_family_basic_queries() {
     ];
 
     assert_eq!(names, expected_reversed_between_names);
+
+    // dbg!(results.len());
+    // let (proof_root_hash, proof_results) = query
+    //     .execute_with_proof_only_get_elements(&drive, None)
+    //     .expect("we should be able to a proof");
+    // assert_eq!(root_hash, Some(proof_root_hash));
+    // assert_eq!(results, proof_results);
 
     // A query getting back elements having specific names and over a certain age
 
@@ -3279,7 +3337,8 @@ fn test_dpns_query_start_after_with_null_id_desc() {
     let (results, _, _) = query
         .execute_no_proof(&drive, Some(&db_transaction))
         .expect("proof should be executed");
-    let docs: Vec<Vec<u8>> = results.clone()
+    let docs: Vec<Vec<u8>> = results
+        .clone()
         .into_iter()
         .map(|result| {
             let document = Document::from_cbor(result.as_slice(), None, None)
@@ -3288,7 +3347,9 @@ fn test_dpns_query_start_after_with_null_id_desc() {
         })
         .collect();
 
-    let proof_results = query.execute_with_proof_only_get_elements(&drive, None).expect("we should be able to a proof");
+    // TODO: Add test back
+    let (proof_root_hash, proof_results) = query.execute_with_proof_only_get_elements(&drive, None).expect("we should be able to a proof");
+    dbg!(results.len());
 
     assert_eq!(results, proof_results);
 

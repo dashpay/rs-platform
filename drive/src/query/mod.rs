@@ -1129,17 +1129,40 @@ impl<'a> DriveQuery<'a> {
         self,
         drive: &Drive,
         transaction: TransactionArg,
-    ) -> Result<Vec<Vec<u8>>, Error> {
+    ) -> Result<([u8; 32], Vec<Vec<u8>>), Error> {
         let mut query_operations: Vec<QueryOperation> = vec![];
         let path_query =
             self.construct_path_query_operations(drive, transaction, &mut query_operations)?;
+        dbg!(&path_query);
         let proof = drive
             .grove
             .get_proved_path_query(&path_query, transaction)
             .map_err(Error::GroveDB)?;
-        let (_, key_value_elements) = GroveDb::execute_proof(proof.as_slice(), &path_query).map_err(Error::GroveDB)?;
+        let (root_hash, key_value_elements) =
+            GroveDb::execute_proof(proof.as_slice(), &path_query).map_err(Error::GroveDB)?;
+        // dbg!(key_value_elements.len());
+        // dbg!(&key_value_elements);
 
-        Ok(key_value_elements.into_iter().map(|(key, value) | value).collect())
+        let values = key_value_elements
+            .into_iter()
+            .map(|(key, value)| {
+                dbg!(&key);
+                let element = Element::deserialize(&value).unwrap();
+                // TODO: remove panics
+                match element {
+                    Element::Item(val, _) => val,
+                    Element::Tree(_, _) => {
+                        // panic!("path query should only point to items: got trees")
+                        vec![]
+                    }
+                    Element::Reference(..) => {
+                        panic!("path query should only point to items: got reference")
+                    }
+                }
+            })
+            .collect::<Vec<Vec<u8>>>();
+
+        Ok((root_hash, values))
     }
 
     pub fn execute_no_proof(

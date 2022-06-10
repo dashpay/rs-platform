@@ -1794,6 +1794,18 @@ impl Drive {
         query.execute_with_proof(self, transaction)
     }
 
+    pub fn query_documents_from_contract_as_grove_proof_only_get_elements(
+        &self,
+        contract: &Contract,
+        document_type: &DocumentType,
+        query_cbor: &[u8],
+        transaction: TransactionArg,
+    ) -> Result<([u8; 32], Vec<Vec<u8>>), Error> {
+        let query = DriveQuery::from_cbor(query_cbor, contract, document_type)?;
+
+        query.execute_with_proof_only_get_elements(self, transaction)
+    }
+
     pub fn worst_case_fee_for_document_type_with_name(
         &self,
         contract: &Contract,
