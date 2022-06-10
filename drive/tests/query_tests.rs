@@ -2230,7 +2230,7 @@ fn test_dpns_query() {
         .execute_no_proof(&drive, Some(&db_transaction))
         .expect("proof should be executed");
     let names: Vec<String> = results
-        .into_iter()
+        .iter()
         .map(|result| {
             let document = Document::from_cbor(result.as_slice(), None, None)
                 .expect("we should be able to deserialize the cbor");
@@ -2246,6 +2246,12 @@ fn test_dpns_query() {
         .collect();
 
     assert_eq!(names, all_names);
+
+    let (proof_root_hash, proof_results) = query
+        .execute_with_proof_only_get_elements(&drive, None)
+        .expect("we should be able to a proof");
+    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(results, proof_results);
 
     // A query getting all elements starting with a in dash parent domain
 
@@ -2270,8 +2276,7 @@ fn test_dpns_query() {
         .execute_no_proof(&drive, Some(&db_transaction))
         .expect("proof should be executed");
     let names: Vec<String> = results
-        .clone()
-        .into_iter()
+        .iter()
         .map(|result| {
             let document = Document::from_cbor(result.as_slice(), None, None)
                 .expect("we should be able to deserialize the cbor");
@@ -2293,6 +2298,12 @@ fn test_dpns_query() {
     ];
 
     assert_eq!(names, a_names);
+
+    let (proof_root_hash, proof_results) = query
+        .execute_with_proof_only_get_elements(&drive, None)
+        .expect("we should be able to a proof");
+    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(results, proof_results);
 
     let ids: Vec<String> = results
         .into_iter()
@@ -2339,7 +2350,7 @@ fn test_dpns_query() {
         .execute_no_proof(&drive, Some(&db_transaction))
         .expect("proof should be executed");
     let names: Vec<String> = results
-        .into_iter()
+        .iter()
         .map(|result| {
             let document = Document::from_cbor(result.as_slice(), None, None)
                 .expect("we should be able to deserialize the cbor");
@@ -2357,6 +2368,12 @@ fn test_dpns_query() {
     let a_names = ["anna-diane".to_string()];
 
     assert_eq!(names, a_names);
+
+    let (proof_root_hash, proof_results) = query
+        .execute_with_proof_only_get_elements(&drive, None)
+        .expect("we should be able to a proof");
+    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(results, proof_results);
 
     // A query getting one element starting with a in dash parent domain desc
 
@@ -2386,8 +2403,7 @@ fn test_dpns_query() {
         .execute_no_proof(&drive, Some(&db_transaction))
         .expect("proof should be executed");
     let names: Vec<String> = results
-        .clone()
-        .into_iter()
+        .iter()
         .map(|result| {
             let document = Document::from_cbor(result.as_slice(), None, None)
                 .expect("we should be able to deserialize the cbor");
@@ -2405,6 +2421,12 @@ fn test_dpns_query() {
     let a_names = ["anna-diane".to_string()];
 
     assert_eq!(names, a_names);
+
+    let (proof_root_hash, proof_results) = query
+        .execute_with_proof_only_get_elements(&drive, None)
+        .expect("we should be able to a proof");
+    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(results, proof_results);
 
     let record_id_base64: Vec<String> = results
         .into_iter()
@@ -2450,7 +2472,7 @@ fn test_dpns_query() {
         .execute_no_proof(&drive, Some(&db_transaction))
         .expect("proof should be executed");
     let names: Vec<String> = results
-        .into_iter()
+        .iter()
         .map(|result| {
             let document = Document::from_cbor(result.as_slice(), None, None)
                 .expect("we should be able to deserialize the cbor");
@@ -2472,6 +2494,12 @@ fn test_dpns_query() {
     ];
 
     assert_eq!(names, a_names);
+
+    let (proof_root_hash, proof_results) = query
+        .execute_with_proof_only_get_elements(&drive, None)
+        .expect("we should be able to a proof");
+    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(results, proof_results);
 
     // A query getting 2 elements asc by the dashUniqueIdentityId
 
@@ -2495,7 +2523,7 @@ fn test_dpns_query() {
         .execute_no_proof(&drive, Some(&db_transaction))
         .expect("proof should be executed");
     let names: Vec<String> = results
-        .into_iter()
+        .iter()
         .map(|result| {
             let document = Document::from_cbor(result.as_slice(), None, None)
                 .expect("we should be able to deserialize the cbor");
@@ -2513,6 +2541,12 @@ fn test_dpns_query() {
     let a_names = ["minna".to_string(), "marilyn".to_string()];
 
     assert_eq!(names, a_names);
+
+    let (proof_root_hash, proof_results) = query
+        .execute_with_proof_only_get_elements(&drive, None)
+        .expect("we should be able to a proof");
+    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(results, proof_results);
 
     // A query getting all elements
 
@@ -2533,6 +2567,12 @@ fn test_dpns_query() {
         .expect("proof should be executed");
 
     assert_eq!(results.len(), 10);
+
+    let (proof_root_hash, proof_results) = query
+        .execute_with_proof_only_get_elements(&drive, None)
+        .expect("we should be able to a proof");
+    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(results, proof_results);
 }
 
 #[test]
