@@ -2809,7 +2809,7 @@ fn test_dpns_query_start_after() {
         .execute_no_proof(&drive, Some(&db_transaction))
         .expect("proof should be executed");
     let names: Vec<String> = results
-        .into_iter()
+        .iter()
         .map(|result| {
             let document = Document::from_cbor(result.as_slice(), None, None)
                 .expect("we should be able to deserialize the cbor");
@@ -2827,6 +2827,12 @@ fn test_dpns_query_start_after() {
     let a_names = ["atalanta".to_string(), "eden".to_string()];
 
     assert_eq!(names, a_names);
+
+    let (proof_root_hash, proof_results) = query
+        .execute_with_proof_only_get_elements(&drive, None)
+        .expect("we should be able to a proof");
+    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(results, proof_results);
 }
 
 #[test]
@@ -2888,7 +2894,7 @@ fn test_dpns_query_start_at_desc() {
         .execute_no_proof(&drive, Some(&db_transaction))
         .expect("proof should be executed");
     let names: Vec<String> = results
-        .into_iter()
+        .iter()
         .map(|result| {
             let document = Document::from_cbor(result.as_slice(), None, None)
                 .expect("we should be able to deserialize the cbor");
@@ -2906,6 +2912,12 @@ fn test_dpns_query_start_at_desc() {
     let a_names = ["anna-diane".to_string(), "amalle".to_string()];
 
     assert_eq!(names, a_names);
+
+    let (proof_root_hash, proof_results) = query
+        .execute_with_proof_only_get_elements(&drive, None)
+        .expect("we should be able to a proof");
+    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(results, proof_results);
 }
 
 #[test]
@@ -2967,7 +2979,7 @@ fn test_dpns_query_start_after_desc() {
         .execute_no_proof(&drive, Some(&db_transaction))
         .expect("proof should be executed");
     let names: Vec<String> = results
-        .into_iter()
+        .iter()
         .map(|result| {
             let document = Document::from_cbor(result.as_slice(), None, None)
                 .expect("we should be able to deserialize the cbor");
@@ -2985,6 +2997,12 @@ fn test_dpns_query_start_after_desc() {
     let a_names = ["amalle".to_string()];
 
     assert_eq!(names, a_names);
+
+    let (proof_root_hash, proof_results) = query
+        .execute_with_proof_only_get_elements(&drive, None)
+        .expect("we should be able to a proof");
+    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(results, proof_results);
 }
 
 #[test]
@@ -3143,7 +3161,7 @@ fn test_dpns_query_start_at_with_null_id() {
         .execute_no_proof(&drive, Some(&db_transaction))
         .expect("proof should be executed");
     let names: Vec<String> = results
-        .into_iter()
+        .iter()
         .map(|result| {
             let document = Document::from_cbor(result.as_slice(), None, None)
                 .expect("we should be able to deserialize the cbor");
@@ -3169,6 +3187,12 @@ fn test_dpns_query_start_at_with_null_id() {
     ];
 
     assert_eq!(names, a_names);
+
+    let (proof_root_hash, proof_results) = query
+        .execute_with_proof_only_get_elements(&drive, None)
+        .expect("we should be able to a proof");
+    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(results, proof_results);
 }
 
 #[test]
@@ -3334,7 +3358,7 @@ fn test_dpns_query_start_after_with_null_id() {
         .execute_no_proof(&drive, Some(&db_transaction))
         .expect("proof should be executed");
     let names: Vec<String> = results
-        .into_iter()
+        .iter()
         .map(|result| {
             let document = Document::from_cbor(result.as_slice(), None, None)
                 .expect("we should be able to deserialize the cbor");
@@ -3356,6 +3380,12 @@ fn test_dpns_query_start_after_with_null_id() {
     let a_names = ["amalle".to_string(), "anna-diane".to_string()];
 
     assert_eq!(names, a_names);
+
+    let (proof_root_hash, proof_results) = query
+        .execute_with_proof_only_get_elements(&drive, None)
+        .expect("we should be able to a proof");
+    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(results, proof_results);
 }
 
 #[test]
@@ -3533,12 +3563,10 @@ fn test_dpns_query_start_after_with_null_id_desc() {
         })
         .collect();
 
-    // TODO: Add test back
     let (proof_root_hash, proof_results) = query
         .execute_with_proof_only_get_elements(&drive, None)
         .expect("we should be able to a proof");
-    dbg!(results.len());
-
+    assert_eq!(root_hash, Some(proof_root_hash));
     assert_eq!(results, proof_results);
 
     // The explanation is a little interesting
@@ -3574,7 +3602,7 @@ fn test_dpns_query_start_after_with_null_id_desc() {
         .execute_no_proof(&drive, Some(&db_transaction))
         .expect("proof should be executed");
     let docs: Vec<Vec<u8>> = results
-        .into_iter()
+        .iter()
         .map(|result| {
             let document = Document::from_cbor(result.as_slice(), None, None)
                 .expect("we should be able to deserialize the cbor");
@@ -3589,6 +3617,11 @@ fn test_dpns_query_start_after_with_null_id_desc() {
     let expected_docs = [domain1_id, domain0_id];
 
     assert_eq!(docs, expected_docs);
+    let (proof_root_hash, proof_results) = query
+        .execute_with_proof_only_get_elements(&drive, None)
+        .expect("we should be able to a proof");
+    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(results, proof_results);
 
     // A query getting one element starting with a in dash parent domain asc
 
@@ -3617,7 +3650,7 @@ fn test_dpns_query_start_after_with_null_id_desc() {
         .execute_no_proof(&drive, Some(&db_transaction))
         .expect("proof should be executed");
     let names: Vec<String> = results
-        .into_iter()
+        .iter()
         .map(|result| {
             let document = Document::from_cbor(result.as_slice(), None, None)
                 .expect("we should be able to deserialize the cbor");
@@ -3639,4 +3672,10 @@ fn test_dpns_query_start_after_with_null_id_desc() {
     let a_names = ["amalle".to_string(), "".to_string()];
 
     assert_eq!(names, a_names);
+
+    let (proof_root_hash, proof_results) = query
+        .execute_with_proof_only_get_elements(&drive, None)
+        .expect("we should be able to a proof");
+    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(results, proof_results);
 }
