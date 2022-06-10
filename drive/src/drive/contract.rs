@@ -1,5 +1,5 @@
-use crate::contract::flags::StorageFlags;
 use crate::contract::Contract;
+use crate::drive::flags::StorageFlags;
 use crate::drive::object_size_info::KeyInfo::{KeyRef, KeySize};
 use crate::drive::object_size_info::KeyValueInfo::KeyRefRequest;
 use crate::drive::object_size_info::PathKeyElementInfo::{
@@ -494,8 +494,8 @@ impl Drive {
 #[cfg(test)]
 mod tests {
     use crate::common::json_document_to_cbor;
-    use crate::contract::flags::StorageFlags;
     use crate::contract::Contract;
+    use crate::drive::flags::StorageFlags;
     use crate::drive::object_size_info::{DocumentAndContractInfo, DocumentInfo};
     use crate::drive::Drive;
     use rand::Rng;

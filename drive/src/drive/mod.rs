@@ -1,9 +1,9 @@
 pub mod contract;
 pub mod defaults;
+pub mod flags;
 pub mod identity;
 pub mod object_size_info;
 
-use crate::contract::flags::StorageFlags;
 use crate::contract::{Contract, Document, DocumentType};
 use crate::drive::defaults::STORAGE_FLAGS_SIZE;
 use crate::drive::object_size_info::KeyInfo::KeySize;
@@ -15,6 +15,7 @@ use crate::fee::calculate_fee;
 use crate::fee::op::{DeleteOperation, InsertOperation, QueryOperation};
 use crate::query::DriveQuery;
 use defaults::{CONTRACT_DOCUMENTS_PATH_HEIGHT, DEFAULT_HASH_SIZE};
+use flags::StorageFlags;
 use grovedb::{Element, GroveDb, Transaction, TransactionArg};
 use moka::sync::Cache;
 use object_size_info::DocumentInfo::{DocumentAndSerialization, DocumentSize};
@@ -1832,8 +1833,8 @@ mod tests {
         cbor_from_hex, json_document_to_cbor, setup_contract, setup_contract_from_hex,
         value_to_cbor,
     };
-    use crate::contract::flags::StorageFlags;
     use crate::contract::{Contract, Document};
+    use crate::drive::flags::StorageFlags;
     use crate::drive::object_size_info::DocumentInfo::DocumentAndSerialization;
     use crate::drive::object_size_info::{DocumentAndContractInfo, DocumentInfo};
     use crate::drive::{defaults, Drive};

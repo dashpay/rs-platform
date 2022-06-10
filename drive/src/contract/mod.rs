@@ -1,5 +1,4 @@
 mod defaults;
-pub mod flags;
 pub mod types;
 
 use crate::common::{

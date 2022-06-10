@@ -1,6 +1,6 @@
 use grovedb::{Element, PathQuery, Query, SizedQuery};
 use neon::{borrow::Borrow, prelude::*};
-use rs_drive::contract::flags::StorageFlags;
+use rs_drive::drive::flags::StorageFlags;
 
 fn element_to_string(element: &Element) -> &'static str {
     match element {

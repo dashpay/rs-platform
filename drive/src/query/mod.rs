@@ -1198,8 +1198,8 @@ impl<'a> DriveQuery<'a> {
 mod tests {
     use crate::common;
     use crate::common::json_document_to_cbor;
-    use crate::contract::flags::StorageFlags;
     use crate::contract::{Contract, DocumentType};
+    use crate::drive::flags::StorageFlags;
     use crate::drive::Drive;
     use crate::query::DriveQuery;
     use serde_json::json;
