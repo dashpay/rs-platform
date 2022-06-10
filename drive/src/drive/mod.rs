@@ -1,7 +1,7 @@
 pub mod defaults;
+pub mod fee_pools;
 pub mod identity;
 pub mod object_size_info;
-pub mod pools;
 
 use crate::contract::{Contract, Document, DocumentType};
 use crate::error::drive::DriveError;
@@ -9,6 +9,7 @@ use crate::error::query::QueryError;
 use crate::error::Error;
 use crate::fee::calculate_fee;
 use crate::fee::op::{DeleteOperation, InsertOperation, QueryOperation};
+use crate::identity::Identity;
 use crate::query::DriveQuery;
 use defaults::{CONTRACT_DOCUMENTS_PATH_HEIGHT, DEFAULT_HASH_SIZE};
 use grovedb::{Element, GroveDb, TransactionArg};
@@ -178,12 +179,10 @@ fn contract_documents_keeping_history_storage_time_reference_path_size(
 impl Drive {
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
         match GroveDb::open(path) {
-            Ok(grove) => {
-                Ok(Drive {
-                    grove,
-                    cached_contracts: RefCell::new(Cache::new(200)),
-                })
-            },
+            Ok(grove) => Ok(Drive {
+                grove,
+                cached_contracts: RefCell::new(Cache::new(200)),
+            }),
             Err(e) => Err(Error::GroveDB(e)),
         }
     }
@@ -1916,6 +1915,31 @@ impl Drive {
             0.0,
             None,
         )
+    }
+
+    pub fn fetch_identity(
+        &self,
+        id: &[u8],
+        transaction: TransactionArg,
+    ) -> Result<Identity, Error> {
+        let element = self
+            .grove
+            .get(
+                [Into::<&[u8; 1]>::into(RootTree::Identities).as_slice()],
+                id,
+                transaction,
+            )
+            .map_err(Error::GroveDB)?;
+
+        if let Element::Item(identity_cbor) = element {
+            let identity = Identity::from_cbor(identity_cbor.as_slice())?;
+
+            Ok(identity)
+        } else {
+            Err(Error::Drive(DriveError::CorruptedEpochElement(
+                "identity must be an item",
+            )))
+        }
     }
 }
 

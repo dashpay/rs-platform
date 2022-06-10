@@ -4,6 +4,7 @@ use crate::fee::op::{BaseOp, DeleteOperation, InsertOperation, QueryOperation};
 use enum_map::EnumMap;
 
 pub mod op;
+pub(crate) mod pools;
 
 pub fn calculate_fee(
     base_operations: Option<EnumMap<BaseOp, u64>>,
