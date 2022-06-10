@@ -39,24 +39,6 @@ pub enum DriveError {
     #[error("corrupted document not an item error: {0}")]
     CorruptedDocumentNotItem(&'static str),
 
-    #[error("corrupted genesis element error: {0}")]
-    CorruptedGenesisElement(&'static str),
-    #[error("corrupted genesis element path error: {0}")]
-    CorruptedGenesisElementPath(String),
-    #[error("corrupted epoch element error: {0}")]
-    CorruptedEpochElement(&'static str),
-    #[error("corrupted epoch element path error: {0}")]
-    CorruptedEpochElementPath(String),
-    #[error("corrupted storage credit pool element path error: {0}")]
-    CorruptedStorageCreditPoolPathElement(String),
-    #[error("corrupted proposers count element path error: {0}")]
-    CorruptedProposersCountPathElement(String),
-    #[error("corrupted first proposed block height element path error: {0}")]
-    CorruptedFirstProposedBlockHeightPathElement(String),
-    #[error("corrupted epoch storage credit element path error: {0}")]
-    CorruptedStorageCreditPathElement(String),
-    #[error("corrupted epoch processing credit element path error: {0}")]
-    CorruptedProcessingCreditPathElement(String),
-    #[error("corrupted proposers query error: {0}")]
-    CorruptedProposersQuery(String),
+    #[error("corrupted element flags error: {0}")]
+    CorruptedElementFlags(&'static str),
 }

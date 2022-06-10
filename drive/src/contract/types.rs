@@ -10,7 +10,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 use crate::common::encode::{encode_float, encode_signed_integer};
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum DocumentFieldType {
     Integer,
     Number,

@@ -2,6 +2,7 @@ use rand::seq::SliceRandom;
 use rand::{Rng, SeedableRng};
 use rs_drive::common;
 use rs_drive::contract::{Contract, Document};
+use rs_drive::drive::flags::StorageFlags;
 use rs_drive::drive::object_size_info::DocumentAndContractInfo;
 use rs_drive::drive::object_size_info::DocumentInfo::DocumentAndSerialization;
 use rs_drive::drive::Drive;
@@ -123,16 +124,23 @@ pub fn setup(count: u32, seed: u64) -> (Drive, Contract, TempDir) {
                 .document_type_for_name("person")
                 .expect("expected to get document type");
 
+            let storage_flags = StorageFlags { epoch: 0 };
+
             drive
                 .add_document_for_contract(
                     DocumentAndContractInfo {
-                        document_info: DocumentAndSerialization((&document, &document_cbor)),
+                        document_info: DocumentAndSerialization((
+                            &document,
+                            &document_cbor,
+                            &storage_flags,
+                        )),
                         contract: &contract,
                         document_type,
                         owner_id: None,
                     },
                     true,
                     block_time as f64,
+                    true,
                     Some(&db_transaction),
                 )
                 .expect("document should be inserted");
@@ -158,8 +166,8 @@ fn test_query_historical() {
     assert_eq!(
         root_hash.expect("cannot get root hash").as_slice(),
         vec![
-            137, 193, 34, 204, 185, 74, 170, 109, 71, 9, 110, 13, 159, 52, 138, 229, 181, 203, 88,
-            13, 184, 0, 246, 212, 248, 28, 19, 172, 70, 186, 15, 234
+            61, 186, 193, 171, 235, 220, 81, 55, 187, 86, 227, 222, 69, 202, 9, 12, 251, 109, 248,
+            217, 108, 148, 71, 54, 227, 170, 213, 120, 21, 24, 12, 110
         ]
     );
 
@@ -889,16 +897,19 @@ fn test_query_historical() {
         .document_type_for_name("person")
         .expect("expected to get document type");
 
+    let storage_flags = StorageFlags { epoch: 0 };
+
     drive
         .add_document_for_contract(
             DocumentAndContractInfo {
-                document_info: DocumentAndSerialization((&document, &person_cbor)),
+                document_info: DocumentAndSerialization((&document, &person_cbor, &storage_flags)),
                 contract: &contract,
                 document_type,
                 owner_id: None,
             },
             true,
             0f64,
+            true,
             Some(&db_transaction),
         )
         .expect("document should be inserted");
@@ -930,16 +941,19 @@ fn test_query_historical() {
         .document_type_for_name("person")
         .expect("expected to get document type");
 
+    let storage_flags = StorageFlags { epoch: 0 };
+
     drive
         .add_document_for_contract(
             DocumentAndContractInfo {
-                document_info: DocumentAndSerialization((&document, &person_cbor)),
+                document_info: DocumentAndSerialization((&document, &person_cbor, &storage_flags)),
                 contract: &contract,
                 document_type,
                 owner_id: None,
             },
             true,
             0f64,
+            true,
             Some(&db_transaction),
         )
         .expect("document should be inserted");
@@ -1278,7 +1292,13 @@ fn test_query_historical() {
     let contract_cbor = hex::decode("01000000a5632469645820b0248cd9a27f86d05badf475dd9ff574d63219cd60c52e2be1e540c2fdd713336724736368656d61783468747470733a2f2f736368656d612e646173682e6f72672f6470702d302d342d302f6d6574612f646174612d636f6e7472616374676f776e6572496458204c9bf0db6ae315c85465e9ef26e6a006de9673731d08d14881945ddef1b5c5f26776657273696f6e0169646f63756d656e7473a267636f6e74616374a56474797065666f626a65637467696e646963657381a3646e616d656f6f6e7765724964546f55736572496466756e69717565f56a70726f7065727469657382a168246f776e6572496463617363a168746f557365724964636173636872657175697265648268746f557365724964697075626c69634b65796a70726f70657274696573a268746f557365724964a56474797065656172726179686d61784974656d731820686d696e4974656d73182069627974654172726179f570636f6e74656e744d656469615479706578216170706c69636174696f6e2f782e646173682e6470702e6964656e746966696572697075626c69634b6579a36474797065656172726179686d61784974656d73182169627974654172726179f5746164646974696f6e616c50726f70657274696573f46770726f66696c65a56474797065666f626a65637467696e646963657381a3646e616d65676f776e6572496466756e69717565f56a70726f7065727469657381a168246f776e6572496463617363687265717569726564826961766174617255726c6561626f75746a70726f70657274696573a26561626f7574a2647479706566737472696e67696d61784c656e67746818ff6961766174617255726ca3647479706566737472696e6766666f726d61746375726c696d61784c656e67746818ff746164646974696f6e616c50726f70657274696573f4").unwrap();
 
     drive
-        .apply_contract_cbor(contract_cbor.clone(), None, 0f64, Some(&db_transaction))
+        .apply_contract_cbor(
+            contract_cbor.clone(),
+            None,
+            0f64,
+            true,
+            Some(&db_transaction),
+        )
         .expect("expected to apply contract successfully");
 
     let query_value = json!({
@@ -1366,8 +1386,8 @@ fn test_query_historical() {
     assert_eq!(
         root_hash.expect("cannot get root hash").as_slice(),
         vec![
-            17, 174, 123, 35, 185, 226, 133, 245, 130, 254, 27, 4, 102, 87, 63, 165, 251, 234, 214,
-            168, 120, 175, 145, 223, 214, 254, 175, 24, 54, 121, 66, 236
+            160, 99, 252, 166, 225, 36, 68, 39, 181, 54, 116, 180, 29, 1, 16, 24, 65, 248, 9, 21,
+            44, 228, 28, 146, 9, 45, 27, 233, 145, 87, 73, 220
         ]
     );
 }

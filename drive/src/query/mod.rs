@@ -27,16 +27,16 @@ use sqlparser::ast::Value::Number;
 use sqlparser::ast::{OrderByExpr, Select, Statement};
 use sqlparser::dialect::GenericDialect;
 use sqlparser::parser::Parser;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::ops::BitXor;
 
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct InternalClauses {
-    primary_key_in_clause: Option<WhereClause>,
-    primary_key_equal_clause: Option<WhereClause>,
-    in_clause: Option<WhereClause>,
-    range_clause: Option<WhereClause>,
-    equal_clauses: HashMap<String, WhereClause>,
+    pub primary_key_in_clause: Option<WhereClause>,
+    pub primary_key_equal_clause: Option<WhereClause>,
+    pub in_clause: Option<WhereClause>,
+    pub range_clause: Option<WhereClause>,
+    pub equal_clauses: BTreeMap<String, WhereClause>,
 }
 
 impl InternalClauses {
@@ -175,14 +175,19 @@ impl<'a> DriveQuery<'a> {
         contract: &'a Contract,
         document_type: &'a DocumentType,
     ) -> Result<Self, Error> {
-        let query_document: HashMap<String, Value> = ciborium::de::from_reader(query_cbor)
+        let mut query_document: BTreeMap<String, Value> = ciborium::de::from_reader(query_cbor)
             .map_err(|_| Error::Structure(StructureError::InvalidCBOR("unable to decode query")))?;
 
         let limit: u16 = query_document
-            .get("limit")
+            .remove("limit")
             .map_or(Some(defaults::DEFAULT_QUERY_LIMIT), |id_cbor| {
                 if let Value::Integer(b) = id_cbor {
-                    Some(i128::from(*b) as u16)
+                    let reduced = i128::from(b) as u64;
+                    if reduced == 0 || reduced > (defaults::DEFAULT_QUERY_LIMIT as u64) {
+                        None
+                    } else {
+                        Some(reduced as u16)
+                    }
                 } else {
                     None
                 }
@@ -191,42 +196,44 @@ impl<'a> DriveQuery<'a> {
                 "limit should be a integer from 1 to 100",
             )))?;
 
-        let block_time: Option<f64> = query_document.get("blockTime").and_then(|id_cbor| {
+        let block_time: Option<f64> = query_document.remove("blockTime").and_then(|id_cbor| {
             if let Value::Float(b) = id_cbor {
-                Some(*b)
+                Some(b)
             } else if let Value::Integer(b) = id_cbor {
-                Some(i128::from(*b) as f64)
+                Some(i128::from(b) as f64)
             } else {
                 None
             }
         });
 
         let all_where_clauses: Vec<WhereClause> =
-            query_document.get("where").map_or(Ok(vec![]), |id_cbor| {
-                if let Value::Array(clauses) = id_cbor {
-                    clauses
-                        .iter()
-                        .map(|where_clause| {
-                            if let Value::Array(clauses_components) = where_clause {
-                                WhereClause::from_components(clauses_components)
-                            } else {
-                                Err(Error::Query(QueryError::InvalidFormatWhereClause(
-                                    "where clause must be an array",
-                                )))
-                            }
-                        })
-                        .collect::<Result<Vec<WhereClause>, Error>>()
-                } else {
-                    Err(Error::Query(QueryError::InvalidFormatWhereClause(
-                        "where clause must be an array",
-                    )))
-                }
-            })?;
+            query_document
+                .remove("where")
+                .map_or(Ok(vec![]), |id_cbor| {
+                    if let Value::Array(clauses) = id_cbor {
+                        clauses
+                            .iter()
+                            .map(|where_clause| {
+                                if let Value::Array(clauses_components) = where_clause {
+                                    WhereClause::from_components(clauses_components)
+                                } else {
+                                    Err(Error::Query(QueryError::InvalidFormatWhereClause(
+                                        "where clause must be an array",
+                                    )))
+                                }
+                            })
+                            .collect::<Result<Vec<WhereClause>, Error>>()
+                    } else {
+                        Err(Error::Query(QueryError::InvalidFormatWhereClause(
+                            "where clause must be an array",
+                        )))
+                    }
+                })?;
 
         let internal_clauses = InternalClauses::extract_from_clauses(all_where_clauses)?;
 
-        let start_at_option = query_document.get("startAt");
-        let start_after_option = query_document.get("startAfter");
+        let start_at_option = query_document.remove("startAt");
+        let start_after_option = query_document.remove("startAfter");
         if start_after_option.is_some() && start_at_option.is_some() {
             return Err(Error::Query(QueryError::DuplicateStartConditions(
                 "only one of startAt or startAfter should be provided",
@@ -235,7 +242,7 @@ impl<'a> DriveQuery<'a> {
 
         let mut start_at_included = true;
 
-        let mut start_option: Option<&Value> = None;
+        let mut start_option: Option<Value> = None;
 
         if start_after_option.is_some() {
             start_option = start_after_option;
@@ -246,13 +253,13 @@ impl<'a> DriveQuery<'a> {
         }
 
         let start_at: Option<Vec<u8>> = if start_option.is_some() {
-            bytes_for_system_value(start_option.unwrap())?
+            bytes_for_system_value(&start_option.unwrap())?
         } else {
             None
         };
 
         let order_by: IndexMap<String, OrderClause> = query_document
-            .get("orderBy")
+            .remove("orderBy")
             .map_or(vec![], |id_cbor| {
                 if let Value::Array(clauses) = id_cbor {
                     clauses
@@ -272,6 +279,12 @@ impl<'a> DriveQuery<'a> {
             .iter()
             .map(|order_clause| Ok((order_clause.field.clone(), order_clause.to_owned())))
             .collect::<Result<IndexMap<String, OrderClause>, Error>>()?;
+
+        if !query_document.is_empty() {
+            return Err(Error::Query(QueryError::Unsupported(
+                "unsupported syntax in where clause",
+            )));
+        }
 
         Ok(DriveQuery {
             contract,
@@ -467,7 +480,7 @@ impl<'a> DriveQuery<'a> {
                         "expected a value",
                     )))?;
 
-                if let Element::Item(item) = start_at_document {
+                if let Element::Item(item, _) = start_at_document {
                     let document = Document::from_cbor(item.as_slice(), None, None)?;
                     Ok(Some((document, self.start_at_included)))
                 } else {
@@ -544,12 +557,8 @@ impl<'a> DriveQuery<'a> {
             };
 
             if let Some(primary_key_in_clause) = &self.internal_clauses.primary_key_in_clause {
-                let in_values = match &primary_key_in_clause.value {
-                    Value::Array(array) => Ok(array),
-                    _ => Err(Error::Query(QueryError::InvalidInClause(
-                        "when using in operator you must provide an array of values",
-                    ))),
-                }?;
+                let in_values = primary_key_in_clause.in_values()?;
+
                 match starts_at_key_option {
                     None => {
                         for value in in_values.iter() {
@@ -686,6 +695,224 @@ impl<'a> DriveQuery<'a> {
         Ok(index)
     }
 
+    fn query_item_for_starts_at_key(starts_at_key: Vec<u8>, left_to_right: bool) -> QueryItem {
+        if left_to_right {
+            QueryItem::RangeAfter(starts_at_key..)
+        } else {
+            QueryItem::RangeTo(..starts_at_key)
+        }
+    }
+
+    fn inner_query_from_starts_at_for_id(
+        starts_at_document: &Option<(Document, &DocumentType, &IndexProperty, bool)>,
+        left_to_right: bool,
+    ) -> Query {
+        // We only need items after the start at document
+        let mut inner_query = Query::new_with_direction(left_to_right);
+
+        if let Some((document, _, _, included)) = starts_at_document {
+            let start_at_key = document.id.to_vec();
+            if *included {
+                inner_query.insert_range_from(start_at_key..)
+            } else {
+                inner_query.insert_range_after(start_at_key..)
+            }
+        } else {
+            // No starts at document, take all NULL items
+            inner_query.insert_all();
+        }
+        inner_query
+    }
+
+    fn inner_query_starts_from_key(
+        start_at_key: Vec<u8>,
+        left_to_right: bool,
+        included: bool,
+    ) -> Query {
+        // We only need items after the start at document
+        let mut inner_query = Query::new_with_direction(left_to_right);
+        if left_to_right {
+            if included {
+                inner_query.insert_range_from(start_at_key..);
+            } else {
+                inner_query.insert_range_after(start_at_key..);
+            }
+        } else {
+            if included {
+                inner_query.insert_range_to_inclusive(..=start_at_key);
+            } else {
+                inner_query.insert_range_to(..start_at_key);
+            }
+        }
+        inner_query
+    }
+
+    // We are passing in starts_at_document 4 parameters
+    // The document
+    // The document type (borrowed)
+    // The index property (borrowed)
+    // if the element itself should be included. ie StartAt vs StartAfter
+    fn inner_query_from_starts_at(
+        starts_at_document: &Option<(Document, &DocumentType, &IndexProperty, bool)>,
+        left_to_right: bool,
+    ) -> Result<Query, Error> {
+        let mut inner_query = Query::new_with_direction(left_to_right);
+        if let Some((document, document_type, indexed_property, included)) = starts_at_document {
+            // We only need items after the start at document
+            let start_at_key = document.get_raw_for_document_type(
+                indexed_property.name.as_str(),
+                &document_type,
+                None,
+            )?;
+            // We want to get items starting at the start key
+            if let Some(start_at_key) = start_at_key {
+                if left_to_right {
+                    if *included {
+                        inner_query.insert_range_from(start_at_key..)
+                    } else {
+                        inner_query.insert_range_after(start_at_key..)
+                    }
+                } else if *included {
+                    inner_query.insert_range_to_inclusive(..=start_at_key)
+                } else {
+                    inner_query.insert_range_to(..start_at_key)
+                }
+            } else if left_to_right {
+                inner_query.insert_all();
+            } else {
+                inner_query.insert_key(vec![]);
+            }
+        } else {
+            // No starts at document, take all NULL items
+            inner_query.insert_all();
+        }
+        Ok(inner_query)
+    }
+
+    fn recursive_insert_on_query(
+        query: Option<&mut Query>,
+        left_over_index_properties: &[&IndexProperty],
+        unique: bool,
+        starts_at_document: &Option<(Document, &DocumentType, &IndexProperty, bool)>, //for key level, included
+        default_left_to_right: bool,
+        order_by: Option<&IndexMap<String, OrderClause>>,
+    ) -> Result<Option<Query>, Error> {
+        match left_over_index_properties.split_first() {
+            None => {
+                if let Some(query) = query {
+                    match unique {
+                        true => {
+                            query.set_subquery_key(vec![0]);
+
+                            // In the case things are NULL we allow to have multiple values
+                            let inner_query = Self::inner_query_from_starts_at_for_id(
+                                starts_at_document,
+                                true, //for ids we always go left to right
+                            );
+                            query.add_conditional_subquery(
+                                QueryItem::Key(b"".to_vec()),
+                                Some(vec![0]),
+                                Some(inner_query),
+                            );
+                        }
+                        false => {
+                            query.set_subquery_key(vec![0]);
+                            // we just get all by document id order ascending
+                            let full_query = Self::inner_query_from_starts_at_for_id(
+                                &None,
+                                default_left_to_right,
+                            );
+                            query.set_subquery(full_query);
+
+                            let inner_query = Self::inner_query_from_starts_at_for_id(
+                                starts_at_document,
+                                default_left_to_right,
+                            );
+
+                            query.add_conditional_subquery(
+                                QueryItem::Key(b"".to_vec()),
+                                Some(vec![0]),
+                                Some(inner_query),
+                            );
+                        }
+                    }
+                }
+                Ok(None)
+            }
+            Some((first, left_over)) => {
+                let left_to_right = if let Some(order_by) = order_by {
+                    order_by
+                        .get(first.name.as_str())
+                        .map(|order_clause| order_clause.ascending)
+                        .unwrap_or(first.ascending)
+                } else {
+                    first.ascending
+                };
+
+                match query {
+                    None => {
+                        let mut inner_query =
+                            Self::inner_query_from_starts_at(starts_at_document, left_to_right)?;
+                        DriveQuery::recursive_insert_on_query(
+                            Some(&mut inner_query),
+                            left_over,
+                            unique,
+                            starts_at_document,
+                            left_to_right,
+                            order_by,
+                        )?;
+                        Ok(Some(inner_query))
+                    }
+                    Some(query) => {
+                        if let Some((document, document_type, indexed_property, included)) =
+                            starts_at_document
+                        {
+                            let start_at_key = document
+                                .get_raw_for_document_type(first.name.as_str(), document_type, None)
+                                .ok()
+                                .flatten()
+                                .unwrap_or_default();
+
+                            // We should always include if we have left_over
+                            let non_conditional_included = !left_over.is_empty() | *included;
+
+                            let mut non_conditional_query = Self::inner_query_starts_from_key(
+                                start_at_key,
+                                left_to_right,
+                                non_conditional_included,
+                            );
+
+                            DriveQuery::recursive_insert_on_query(
+                                Some(&mut non_conditional_query),
+                                left_over,
+                                unique,
+                                starts_at_document,
+                                left_to_right,
+                                order_by,
+                            )?;
+
+                            query.set_subquery(non_conditional_query);
+                        } else {
+                            let mut inner_query = Query::new_with_direction(first.ascending);
+                            inner_query.insert_all();
+                            DriveQuery::recursive_insert_on_query(
+                                Some(&mut inner_query),
+                                left_over,
+                                unique,
+                                starts_at_document,
+                                left_to_right,
+                                order_by,
+                            )?;
+                            query.set_subquery(inner_query);
+                        }
+                        query.set_subquery_key(first.name.as_bytes().to_vec());
+                        Ok(None)
+                    }
+                }
+            }
+        }
+    }
+
     pub fn get_non_primary_key_path_query(
         &self,
         document_type_path: Vec<Vec<u8>>,
@@ -703,9 +930,9 @@ impl<'a> DriveQuery<'a> {
                     None => (ordered_clauses.last().copied(), false, None),
                     Some(where_clause) => (Some(where_clause), true, None),
                 },
-                Some(where_clause) => match &self.internal_clauses.range_clause {
-                    None => (Some(where_clause), true, None),
-                    Some(range_clause) => (Some(where_clause), true, Some(range_clause)),
+                Some(in_clause) => match &self.internal_clauses.range_clause {
+                    None => (Some(in_clause), true, None),
+                    Some(range_clause) => (Some(in_clause), true, Some(range_clause)),
                 },
             };
 
@@ -749,58 +976,25 @@ impl<'a> DriveQuery<'a> {
                 })
                 .collect::<Result<Vec<Vec<u8>>, Error>>()?;
 
-        fn recursive_insert(
-            query: Option<&mut Query>,
-            left_over_index_properties: &[&IndexProperty],
-            unique: bool,
-        ) -> Option<Query> {
-            match left_over_index_properties.split_first() {
-                None => {
-                    if let Some(query) = query {
-                        match unique {
-                            true => {
-                                query.set_subquery_key(vec![0]);
-
-                                // In the case things are NULL we allow to have multiple values
-                                let mut full_query = Query::new();
-                                full_query.insert_all();
-
-                                query.add_conditional_subquery(
-                                    QueryItem::Key(b"".to_vec()),
-                                    Some(vec![0]),
-                                    Some(full_query),
-                                );
-                            }
-                            false => {
-                                query.set_subquery_key(vec![0]);
-                                // we just get all by document id order ascending
-                                let mut full_query = Query::new();
-                                full_query.insert_all();
-                                query.set_subquery(full_query);
-                            }
-                        }
-                    }
-                    None
-                }
-                Some((first, left_over)) => {
-                    let mut inner_query = Query::new_with_direction(first.ascending);
-                    inner_query.insert_all();
-                    recursive_insert(Some(&mut inner_query), left_over, unique);
-                    match query {
-                        None => Some(inner_query),
-                        Some(query) => {
-                            query.set_subquery(inner_query);
-                            query.set_subquery_key(first.name.as_bytes().to_vec());
-                            None
-                        }
-                    }
-                }
-            }
-        }
-
         let final_query = match last_clause {
-            None => recursive_insert(None, left_over_index_properties.as_slice(), index.unique)
-                .expect("Index must have left over properties if no last clause"),
+            None => {
+                // There is no last_clause which means we are using an index most likely because of an order_by, however we have no
+                // clauses, in this case we should use the first value of the index.
+                let first_index = index.properties.first().ok_or(Error::Drive(
+                    DriveError::CorruptedContractIndexes("index must have properties"),
+                ))?; // Index must have properties
+                Self::recursive_insert_on_query(
+                    None,
+                    left_over_index_properties.as_slice(),
+                    index.unique,
+                    &starts_at_document.map(|(document, included)| {
+                        (document, self.document_type, first_index, included)
+                    }),
+                    first_index.ascending,
+                    None,
+                )?
+                .expect("Index must have left over properties if no last clause")
+            }
             Some(where_clause) => {
                 let left_to_right = if where_clause.operator.is_range() {
                     let order_clause: &OrderClause = self
@@ -815,38 +1009,73 @@ impl<'a> DriveQuery<'a> {
                     true
                 };
 
+                // We should set the starts at document to be included for the query if there are
+                // left over index properties.
+
+                let query_starts_at_document = if left_over_index_properties.is_empty() {
+                    &starts_at_document
+                } else {
+                    &None
+                };
+
                 let mut query = where_clause.to_path_query(
                     self.document_type,
-                    &starts_at_document,
+                    query_starts_at_document,
                     left_to_right,
                 )?;
 
                 match subquery_clause {
                     None => {
-                        recursive_insert(
+                        // There is a last_clause, but no subquery_clause, we should use the index property of the last clause
+                        // We need to get the terminal indexes unused by clauses.
+                        let last_index_property = index
+                            .properties
+                            .iter()
+                            .find(|field| where_clause.field == field.name)
+                            .ok_or(Error::Drive(DriveError::CorruptedContractIndexes(
+                                "index must have last_clause field",
+                            )))?;
+                        Self::recursive_insert_on_query(
                             Some(&mut query),
                             left_over_index_properties.as_slice(),
                             index.unique,
-                        );
+                            &starts_at_document.map(|(document, included)| {
+                                (document, self.document_type, last_index_property, included)
+                            }),
+                            left_to_right,
+                            Some(&self.order_by),
+                        )?;
                     }
-                    Some(where_clause) => {
+                    Some(subquery_where_clause) => {
                         let order_clause: &OrderClause = self
                             .order_by
-                            .get(where_clause.field.as_str())
+                            .get(subquery_where_clause.field.as_str())
                             .ok_or(Error::Query(QueryError::MissingOrderByForRange(
                                 "query must have an orderBy field for each range element",
                             )))?;
-                        let mut subquery = where_clause.to_path_query(
+                        let mut subquery = subquery_where_clause.to_path_query(
                             self.document_type,
                             &starts_at_document,
                             order_clause.ascending,
                         )?;
-                        recursive_insert(
+                        let last_index_property = index
+                            .properties
+                            .iter()
+                            .find(|field| subquery_where_clause.field == field.name)
+                            .ok_or(Error::Drive(DriveError::CorruptedContractIndexes(
+                                "index must have subquery_clause field",
+                            )))?;
+                        Self::recursive_insert_on_query(
                             Some(&mut subquery),
                             left_over_index_properties.as_slice(),
                             index.unique,
-                        );
-                        let subindex = where_clause.field.as_bytes().to_vec();
+                            &starts_at_document.map(|(document, included)| {
+                                (document, self.document_type, last_index_property, included)
+                            }),
+                            left_to_right,
+                            Some(&self.order_by),
+                        )?;
+                        let subindex = subquery_where_clause.field.as_bytes().to_vec();
                         query.set_subquery_key(subindex);
                         query.set_subquery(subquery);
                     }
@@ -883,10 +1112,56 @@ impl<'a> DriveQuery<'a> {
 
     pub fn execute_with_proof(
         self,
-        _grove: &GroveDb,
-        _transaction: TransactionArg,
+        drive: &Drive,
+        transaction: TransactionArg,
     ) -> Result<Vec<u8>, Error> {
-        todo!()
+        let mut query_operations: Vec<QueryOperation> = vec![];
+        let path_query =
+            self.construct_path_query_operations(drive, transaction, &mut query_operations)?;
+        drive
+            .grove
+            .get_proved_path_query(&path_query, transaction)
+            .map_err(Error::GroveDB)
+    }
+
+    pub fn execute_with_proof_only_get_elements(
+        self,
+        drive: &Drive,
+        transaction: TransactionArg,
+    ) -> Result<([u8; 32], Vec<Vec<u8>>), Error> {
+        let mut query_operations: Vec<QueryOperation> = vec![];
+        let path_query =
+            self.construct_path_query_operations(drive, transaction, &mut query_operations)?;
+        dbg!(&path_query);
+        let proof = drive
+            .grove
+            .get_proved_path_query(&path_query, transaction)
+            .map_err(Error::GroveDB)?;
+        let (root_hash, key_value_elements) =
+            GroveDb::execute_proof(proof.as_slice(), &path_query).map_err(Error::GroveDB)?;
+        // dbg!(key_value_elements.len());
+        // dbg!(&key_value_elements);
+
+        let values = key_value_elements
+            .into_iter()
+            .map(|(key, value)| {
+                dbg!(&key);
+                let element = Element::deserialize(&value).unwrap();
+                // TODO: remove panics
+                match element {
+                    Element::Item(val, _) => val,
+                    Element::Tree(_, _) => {
+                        // panic!("path query should only point to items: got trees")
+                        vec![]
+                    }
+                    Element::Reference(..) => {
+                        panic!("path query should only point to items: got reference")
+                    }
+                }
+            })
+            .collect::<Vec<Vec<u8>>>();
+
+        Ok((root_hash, values))
     }
 
     pub fn execute_no_proof(
@@ -922,12 +1197,76 @@ impl<'a> DriveQuery<'a> {
 #[cfg(test)]
 mod tests {
     use crate::common;
+    use crate::common::json_document_to_cbor;
     use crate::contract::{Contract, DocumentType};
+    use crate::drive::flags::StorageFlags;
+    use crate::drive::Drive;
     use crate::query::DriveQuery;
     use serde_json::json;
+    use serde_json::Value::Null;
+    use tempfile::TempDir;
+
+    fn setup_family_contract() -> (Drive, Contract) {
+        let tmp_dir = TempDir::new().unwrap();
+        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+
+        drive
+            .create_root_tree(None)
+            .expect("expected to create root tree successfully");
+
+        let contract_path = "tests/supporting_files/contract/family/family-contract.json";
+
+        // let's construct the grovedb structure for the dashpay data contract
+        let contract_cbor = json_document_to_cbor(contract_path, Some(1));
+        let contract = Contract::from_cbor(&contract_cbor, None)
+            .expect("expected to deserialize the contract");
+        let storage_flags = StorageFlags { epoch: 0 };
+        drive
+            .apply_contract(
+                &contract,
+                contract_cbor.clone(),
+                0f64,
+                true,
+                storage_flags,
+                None,
+            )
+            .expect("expected to apply contract successfully");
+
+        (drive, contract)
+    }
+
+    fn setup_family_birthday_contract() -> (Drive, Contract) {
+        let tmp_dir = TempDir::new().unwrap();
+        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+
+        drive
+            .create_root_tree(None)
+            .expect("expected to create root tree successfully");
+
+        let contract_path =
+            "tests/supporting_files/contract/family/family-contract-with-birthday.json";
+
+        // let's construct the grovedb structure for the dashpay data contract
+        let contract_cbor = json_document_to_cbor(contract_path, Some(1));
+        let contract = Contract::from_cbor(&contract_cbor, None)
+            .expect("expected to deserialize the contract");
+        let storage_flags = StorageFlags { epoch: 0 };
+        drive
+            .apply_contract(
+                &contract,
+                contract_cbor.clone(),
+                0f64,
+                true,
+                storage_flags,
+                None,
+            )
+            .expect("expected to apply contract successfully");
+
+        (drive, contract)
+    }
 
     #[test]
-    fn test_invalid_query() {
+    fn test_invalid_query_ranges_different_fields() {
         let query_value = json!({
             "where": [
                 ["firstName", "<", "Gilligan"],
@@ -945,5 +1284,370 @@ mod tests {
         let where_cbor = common::value_to_cbor(query_value, None);
         DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &document_type)
             .expect_err("all ranges must be on same field");
+    }
+
+    #[test]
+    fn test_invalid_query_extra_invalid_field() {
+        let query_value = json!({
+            "where": [
+                ["firstName", "<", "Gilligan"],
+            ],
+            "limit": 100,
+            "orderBy": [
+                ["firstName", "asc"],
+                ["lastName", "asc"],
+            ],
+            "invalid": 0,
+        });
+        let contract = Contract::default();
+        let document_type = DocumentType::default();
+
+        let where_cbor = common::value_to_cbor(query_value, None);
+        DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &document_type).expect_err(
+            "fields of queries must of defined supported types (where, limit, orderBy...)",
+        );
+    }
+
+    #[test]
+    fn test_invalid_query_conflicting_clauses() {
+        let query_value = json!({
+            "where": [
+                ["firstName", "<", "Gilligan"],
+                ["firstName", ">", "Gilligan"],
+            ],
+            "limit": 100,
+            "orderBy": [
+                ["firstName", "asc"],
+                ["lastName", "asc"],
+            ],
+        });
+
+        let contract = Contract::default();
+        let document_type = DocumentType::default();
+
+        let where_cbor = common::value_to_cbor(query_value, None);
+        DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &document_type)
+            .expect_err("the query should not be created");
+    }
+
+    #[test]
+    fn test_valid_query_groupable_meeting_clauses() {
+        let query_value = json!({
+            "where": [
+                ["firstName", "<=", "Gilligan"],
+                ["firstName", ">", "Gilligan"],
+            ],
+            "limit": 100,
+            "orderBy": [
+                ["firstName", "asc"],
+                ["lastName", "asc"],
+            ],
+        });
+
+        let contract = Contract::default();
+        let document_type = DocumentType::default();
+
+        let where_cbor = common::value_to_cbor(query_value, None);
+        DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &document_type)
+            .expect("the query should be created");
+    }
+
+    #[test]
+    fn test_valid_query_query_field_at_max_length() {
+        let long_string = "t".repeat(255);
+        let query_value = json!({
+            "where": [
+                ["firstName", "<", long_string],
+            ],
+            "limit": 100,
+            "orderBy": [
+                ["firstName", "asc"],
+                ["lastName", "asc"],
+            ],
+        });
+        let contract = Contract::default();
+        let document_type = DocumentType::default();
+
+        let where_cbor = common::value_to_cbor(query_value, None);
+        DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &document_type)
+            .expect("query should be fine for a 255 byte long string");
+    }
+
+    #[test]
+    fn test_invalid_query_field_too_long() {
+        let (drive, contract) = setup_family_contract();
+
+        let document_type = contract
+            .document_type_for_name("person")
+            .expect("expected to get a document type");
+
+        let too_long_string = "t".repeat(256);
+        let query_value = json!({
+            "where": [
+                ["firstName", "<", too_long_string],
+            ],
+            "limit": 100,
+            "orderBy": [
+                ["firstName", "asc"],
+                ["lastName", "asc"],
+            ],
+        });
+
+        let where_cbor = common::value_to_cbor(query_value, None);
+        let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &document_type)
+            .expect("fields of queries length must be under 256 bytes long");
+        query
+            .execute_no_proof(&drive, None)
+            .expect_err("fields of queries length must be under 256 bytes long");
+    }
+
+    // TODO: Eventually we want to error with weird Null values
+    // #[test]
+    // fn test_invalid_query_scalar_field_with_null_value() {
+    //     let (drive, contract) = setup_family_contract();
+    //
+    //     let document_type = contract
+    //         .document_type_for_name("person")
+    //         .expect("expected to get a document type");
+    //
+    //     let query_value = json!({
+    //         "where": [
+    //             ["age", "<", Null],
+    //         ],
+    //         "limit": 100,
+    //         "orderBy": [
+    //             ["age", "asc"],
+    //         ],
+    //     });
+    //
+    //     let where_cbor = common::value_to_cbor(query_value, None);
+    //     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &document_type)
+    //         .expect("The query itself should be valid for a null type");
+    //     query
+    //         .execute_no_proof(&drive, None)
+    //         .expect_err("a Null value doesn't make sense for an integer");
+    // }
+
+    // TODO: Eventually we want to error with weird Null values
+    //
+    // #[test]
+    // fn test_invalid_query_timestamp_field_with_null_value() {
+    //     let (drive, contract) = setup_family_birthday_contract();
+    //
+    //     let document_type = contract
+    //         .document_type_for_name("person")
+    //         .expect("expected to get a document type");
+    //
+    //     let query_value = json!({
+    //         "where": [
+    //             ["birthday", "<", Null],
+    //         ],
+    //         "limit": 100,
+    //         "orderBy": [
+    //             ["birthday", "asc"],
+    //         ],
+    //     });
+    //
+    //     let where_cbor = common::value_to_cbor(query_value, None);
+    //     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &document_type)
+    //         .expect("The query itself should be valid for a null type");
+    //     query
+    //         .execute_no_proof(&drive, None)
+    //         .expect_err("the value can not be less than Null");
+    // }
+
+    #[test]
+    fn test_valid_query_timestamp_field_with_null_value() {
+        let (drive, contract) = setup_family_birthday_contract();
+
+        let document_type = contract
+            .document_type_for_name("person")
+            .expect("expected to get a document type");
+
+        let query_value = json!({
+            "where": [
+                ["birthday", ">=", Null],
+            ],
+            "limit": 100,
+            "orderBy": [
+                ["birthday", "asc"],
+            ],
+        });
+
+        let where_cbor = common::value_to_cbor(query_value, None);
+        let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &document_type)
+            .expect("The query itself should be valid for a null type");
+        query
+            .execute_no_proof(&drive, None)
+            .expect("a Null value doesn't make sense for a float");
+    }
+
+    #[test]
+    fn test_invalid_query_in_with_empty_array() {
+        let (drive, contract) = setup_family_contract();
+
+        let document_type = contract
+            .document_type_for_name("person")
+            .expect("expected to get a document type");
+
+        let query_value = json!({
+            "where": [
+                ["firstName", "in", []],
+            ],
+            "limit": 100,
+            "orderBy": [
+                ["firstName", "asc"],
+            ],
+        });
+
+        let where_cbor = common::value_to_cbor(query_value, None);
+        let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &document_type)
+            .expect("query should be valid for empty array");
+
+        query
+            .execute_no_proof(&drive, None)
+            .expect_err("query should not be able to execute for empty array");
+    }
+
+    #[test]
+    fn test_invalid_query_in_too_many_elements() {
+        let (drive, contract) = setup_family_contract();
+
+        let document_type = contract
+            .document_type_for_name("person")
+            .expect("expected to get a document type");
+
+        let mut array: Vec<String> = Vec::with_capacity(101);
+        for _ in 0..array.capacity() {
+            array.push(String::from("a"));
+        }
+        let query_value = json!({
+            "where": [
+                ["firstName", "in", array],
+            ],
+            "limit": 100,
+            "orderBy": [
+                ["firstName", "asc"],
+            ],
+        });
+
+        let where_cbor = common::value_to_cbor(query_value, None);
+        let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &document_type)
+            .expect("query is valid for too many elements");
+
+        query
+            .execute_no_proof(&drive, None)
+            .expect_err("query should not be able to execute with too many elements");
+    }
+
+    #[test]
+    fn test_invalid_query_in_unique_elements() {
+        let (drive, contract) = setup_family_contract();
+
+        let document_type = contract
+            .document_type_for_name("person")
+            .expect("expected to get a document type");
+
+        let query_value = json!({
+            "where": [
+                ["firstName", "in", ["a", "a"]],
+            ],
+            "limit": 100,
+            "orderBy": [
+                ["firstName", "asc"],
+            ],
+        });
+
+        let where_cbor = common::value_to_cbor(query_value, None);
+
+        // The is actually valid, however executing it is not
+        // This is in order to optimize query execution
+
+        let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &document_type)
+            .expect("the query should be created");
+
+        query
+            .execute_no_proof(&drive, None)
+            .expect_err("there should be no duplicates values for In query");
+    }
+
+    #[test]
+    fn test_invalid_query_starts_with_empty_string() {
+        let query_value = json!({
+            "where": [
+                ["firstName", "startsWith", ""],
+            ],
+            "limit": 100,
+            "orderBy": [
+                ["firstName", "asc"],
+            ],
+        });
+
+        let contract = Contract::default();
+        let document_type = DocumentType::default();
+
+        let where_cbor = common::value_to_cbor(query_value, None);
+        DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &document_type)
+            .expect_err("starts with can not start with an empty string");
+    }
+
+    #[test]
+    fn test_invalid_query_limit_too_high() {
+        let query_value = json!({
+            "where": [
+                ["firstName", "startsWith", "a"],
+            ],
+            "limit": 101,
+            "orderBy": [
+                ["firstName", "asc"],
+            ],
+        });
+
+        let contract = Contract::default();
+        let document_type = DocumentType::default();
+
+        let where_cbor = common::value_to_cbor(query_value, None);
+        DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &document_type)
+            .expect_err("starts with can not start with an empty string");
+    }
+
+    #[test]
+    fn test_invalid_query_limit_too_low() {
+        let query_value = json!({
+            "where": [
+                ["firstName", "startsWith", "a"],
+            ],
+            "limit": -1,
+            "orderBy": [
+                ["firstName", "asc"],
+            ],
+        });
+
+        let contract = Contract::default();
+        let document_type = DocumentType::default();
+
+        let where_cbor = common::value_to_cbor(query_value, None);
+        DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &document_type)
+            .expect_err("starts with can not start with an empty string");
+    }
+
+    #[test]
+    fn test_invalid_query_limit_zero() {
+        let query_value = json!({
+            "where": [
+                ["firstName", "startsWith", "a"],
+            ],
+            "limit": 0,
+            "orderBy": [
+                ["firstName", "asc"],
+            ],
+        });
+
+        let contract = Contract::default();
+        let document_type = DocumentType::default();
+
+        let where_cbor = common::value_to_cbor(query_value, None);
+        DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &document_type)
+            .expect_err("starts with can not start with an empty string");
     }
 }
