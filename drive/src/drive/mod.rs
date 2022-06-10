@@ -2,6 +2,7 @@ pub mod contract;
 pub mod defaults;
 pub mod identity;
 pub mod object_size_info;
+mod grove_operations;
 
 use crate::contract::flags::StorageFlags;
 use crate::contract::{Contract, Document, DocumentType};
@@ -228,205 +229,6 @@ impl Drive {
         Ok(())
     }
 
-    fn batch_insert_empty_tree<'a, 'c, P>(
-        &'a self,
-        path: P,
-        key_info: KeyInfo<'c>,
-        storage_flags: &StorageFlags,
-        insert_operations: &mut Vec<InsertOperation>,
-    ) -> Result<(), Error>
-    where
-        P: IntoIterator<Item = &'c [u8]>,
-        <P as IntoIterator>::IntoIter: ExactSizeIterator + DoubleEndedIterator + Clone,
-    {
-        match key_info {
-            KeyRef(key) => {
-                let mut path_items: Vec<Vec<u8>> = path.into_iter().map(Vec::from).collect();
-                insert_operations.push(InsertOperation::for_empty_tree(path_items, key.to_vec(), storage_flags));
-                Ok(())
-            }
-            KeySize(key_max_length) => {
-                insert_operations.push(InsertOperation::for_worst_case_key_value_size(key_max_length, 0));
-                Ok(())
-            }
-            Key(_) => Err(Error::Drive(DriveError::GroveDBInsertion(
-                "only a key ref can be inserted into groveDB",
-            ))),
-        }
-    }
-
-    fn grove_has_raw<'p, P>(
-        &self,
-        path: P,
-        key: &'p [u8],
-        transaction: TransactionArg,
-    ) -> Result<bool, Error>
-        where
-            P: IntoIterator<Item = &'p [u8]>,
-            <P as IntoIterator>::IntoIter: ExactSizeIterator + DoubleEndedIterator + Clone,
-    {
-        let query_result = self.grove.has_raw(path, key, transaction);
-        match query_result {
-            Err(GroveError::PathKeyNotFound(_)) | Err(GroveError::PathNotFound(_)) => {
-                Ok(false)
-            }
-            _ => {
-                Ok(query_result?)
-            }
-        }
-    }
-
-    fn batch_insert_empty_tree_if_not_exists<'a, 'c, const N: usize>(
-        &'a self,
-        path_key_info: PathKeyInfo<'c, N>,
-        storage_flags: &StorageFlags,
-        transaction: TransactionArg,
-        query_operations: &mut Vec<QueryOperation>,
-        insert_operations: &mut Vec<InsertOperation>,
-    ) -> Result<bool, Error> {
-        match path_key_info {
-            PathKeyRef((path, key)) => {
-                let path_iter: Vec<&[u8]> = path.iter().map(|x| x.as_slice()).collect();
-                let has_raw = self.grove_has_raw(path_iter.clone(), key, transaction)?;
-                query_operations.push(QueryOperation::for_key_check_in_path(key.len(), path_iter));
-                if has_raw == false {
-                    insert_operations.push(InsertOperation::for_empty_tree(path, key.to_vec(), storage_flags));
-                }
-                Ok(!has_raw)
-            }
-            PathKeySize((path_length, key_length)) => {
-                insert_operations.push(InsertOperation::for_worst_case_key_value_size(key_length, 0));
-
-                query_operations.push(QueryOperation::for_key_check_with_path_length(
-                    key_length,
-                    path_length,
-                ));
-                Ok(true)
-            }
-            PathKey((path, key)) => {
-                let path_iter: Vec<&[u8]> = path.iter().map(|x| x.as_slice()).collect();
-                let has_raw = self.grove_has_raw(path_iter.clone(), key.as_slice(), transaction)?;
-                query_operations.push(QueryOperation::for_key_check_in_path(key.len(), path_iter));
-                if has_raw == false {
-                    insert_operations.push(InsertOperation::for_empty_tree(path, key.to_vec(), storage_flags));
-                }
-                Ok(!has_raw)
-            }
-            PathFixedSizeKey((path, key)) => {
-                let has_raw = self.grove_has_raw(path.clone(), key.as_slice(), transaction)?;
-                if has_raw == false {
-                    let mut path_items: Vec<Vec<u8>> = path.into_iter().map(Vec::from).collect();
-                    insert_operations.push(InsertOperation::for_empty_tree(path_items, key.to_vec(), storage_flags));
-                }
-                query_operations.push(QueryOperation::for_key_check_in_path(key.len(), path));
-                Ok(!has_raw)
-            }
-            PathFixedSizeKeyRef((path, key)) => {
-                let has_raw = self.grove_has_raw(path.clone(), key, transaction)?;
-                if has_raw == false {
-                    let mut path_items: Vec<Vec<u8>> = path.into_iter().map(Vec::from).collect();
-                    insert_operations.push(InsertOperation::for_empty_tree(path_items, key.to_vec(), storage_flags));
-                }
-                query_operations.push(QueryOperation::for_key_check_in_path(key.len(), path));
-                Ok(!has_raw)
-            }
-        }
-    }
-
-    fn batch_insert<const N: usize>(
-        &self,
-        path_key_element_info: PathKeyElementInfo<N>,
-        insert_operations: &mut Vec<InsertOperation>,
-    ) -> Result<(), Error> {
-        match path_key_element_info {
-            PathKeyElement((path, key, element)) => {
-                insert_operations.push(InsertOperation::for_path_key_element(path, key.to_vec(), element));
-                Ok(())
-            }
-            PathKeyElementSize((_path_max_length, key_max_length, element_max_size)) => {
-                insert_operations.push(InsertOperation::for_worst_case_key_value_size(
-                    key_max_length,
-                    element_max_size,
-                ));
-                Ok(())
-            }
-            PathFixedSizeKeyElement((path, key, element)) => {
-                let mut path_items: Vec<Vec<u8>> = path.into_iter().map(Vec::from).collect();
-                insert_operations.push(InsertOperation::for_path_key_element(path_items, key.to_vec(), element));
-                Ok(())
-            }
-        }
-    }
-
-    fn batch_insert_if_not_exists<'a, 'c, const N: usize>(
-        &'a self,
-        path_key_element_info: PathKeyElementInfo<'c, N>,
-        transaction: TransactionArg,
-        query_operations: &mut Vec<QueryOperation>,
-        insert_operations: &mut Vec<InsertOperation>,
-    ) -> Result<bool, Error> {
-        match path_key_element_info {
-            PathKeyElement((path, key, element)) => {
-                let path_iter: Vec<&[u8]> = path.iter().map(|x| x.as_slice()).collect();
-                let has_raw = self.grove_has_raw(path_iter.clone(), key, transaction)?;
-                query_operations.push(QueryOperation::for_key_check_in_path(key.len(), path_iter));
-                if has_raw == false {
-                    insert_operations.push(InsertOperation::for_path_key_element(path, key.to_vec(), element));
-                }
-                Ok(!has_raw)
-            }
-            PathKeyElementSize((path_size, key_max_length, element_max_size)) => {
-                let insert_operation =
-                    InsertOperation::for_worst_case_key_value_size(key_max_length, element_max_size);
-                let query_operation =
-                    QueryOperation::for_key_check_with_path_length(key_max_length, path_size);
-                insert_operations.push(insert_operation);
-                query_operations.push(query_operation);
-                Ok(true)
-            }
-            PathFixedSizeKeyElement((path, key, element)) => {
-                let has_raw = self.grove_has_raw(path, key, transaction)?;
-                if has_raw == false {
-                    let mut path_items: Vec<Vec<u8>> = path.into_iter().map(Vec::from).collect();
-                    insert_operations.push(InsertOperation::for_path_key_element(path_items, key.to_vec(), element));
-                }
-                query_operations.push(QueryOperation::for_key_check_in_path(key.len(), path));
-                Ok(!has_raw)
-            }
-        }
-    }
-
-    pub(crate) fn grove_get<'a, 'c, P>(
-        &'a self,
-        path: P,
-        key_value_info: KeyValueInfo<'c>,
-        transaction: TransactionArg,
-        query_operations: &mut Vec<QueryOperation>,
-    ) -> Result<Option<Element>, Error>
-    where
-        P: IntoIterator<Item = &'c [u8]>,
-        <P as IntoIterator>::IntoIter: ExactSizeIterator + DoubleEndedIterator + Clone,
-    {
-        let path_iter = path.into_iter();
-        match key_value_info {
-            KeyRefRequest(key) => {
-                let item = self.grove.get(path_iter.clone(), key, transaction)?;
-                query_operations.push(QueryOperation::for_value_retrieval_in_path(
-                    key.len(),
-                    path_iter,
-                    item.serialized_byte_size(),
-                ));
-                Ok(Some(item))
-            }
-            KeyValueMaxSize((key_size, value_size)) => {
-                query_operations.push(QueryOperation::for_value_retrieval_in_path(
-                    key_size, path_iter, value_size,
-                ));
-                Ok(None)
-            }
-        }
-    }
-
     // If a document isn't sent to this function then we are just calling to know the query and
     // insert operations
     fn add_document_to_primary_storage(
@@ -446,7 +248,7 @@ impl Drive {
         if document_type.documents_keep_history {
             let (path_key_info, storage_flags) =
                 if let DocumentAndSerialization((document, _, storage_flags)) =
-                    document_and_contract_info.document_info
+                document_and_contract_info.document_info
                 {
                     (
                         PathFixedSizeKeyRef((primary_key_path, document.id.as_slice())),
@@ -503,7 +305,7 @@ impl Drive {
 
             let path_key_element_info =
                 if let DocumentAndSerialization((document, _, storage_flags)) =
-                    document_and_contract_info.document_info
+                document_and_contract_info.document_info
                 {
                     // we should also insert a reference at 0 to the current value
                     // todo: we could construct this only once
