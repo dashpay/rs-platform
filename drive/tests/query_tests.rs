@@ -2604,6 +2604,20 @@ fn test_dpns_insertion_no_aliases() {
         .expect("should perform query");
 
     assert_eq!(result.0.len(), 15);
+
+    let (proof_root_hash, proof_results) = drive
+        .query_documents_from_contract_as_grove_proof_only_get_elements(
+            &contract,
+            domain_document_type,
+            query_cbor.as_slice(),
+            None,
+        )
+        .expect("query should be executed");
+    assert_eq!(
+        drive.grove.root_hash(None).expect("should get root hash"),
+        Some(proof_root_hash)
+    );
+    assert_eq!(result.0, proof_results);
 }
 
 #[test]
@@ -2635,6 +2649,20 @@ fn test_dpns_insertion_with_aliases() {
         .expect("should perform query");
 
     assert_eq!(result.0.len(), 24);
+
+    let (proof_root_hash, proof_results) = drive
+        .query_documents_from_contract_as_grove_proof_only_get_elements(
+            &contract,
+            domain_document_type,
+            query_cbor.as_slice(),
+            None,
+        )
+        .expect("query should be executed");
+    assert_eq!(
+        drive.grove.root_hash(None).expect("should get root hash"),
+        Some(proof_root_hash)
+    );
+    assert_eq!(result.0, proof_results);
 }
 
 #[test]
