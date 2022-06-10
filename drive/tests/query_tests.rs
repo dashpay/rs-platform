@@ -3348,7 +3348,9 @@ fn test_dpns_query_start_after_with_null_id_desc() {
         .collect();
 
     // TODO: Add test back
-    let (proof_root_hash, proof_results) = query.execute_with_proof_only_get_elements(&drive, None).expect("we should be able to a proof");
+    let (proof_root_hash, proof_results) = query
+        .execute_with_proof_only_get_elements(&drive, None)
+        .expect("we should be able to a proof");
     dbg!(results.len());
 
     assert_eq!(results, proof_results);
