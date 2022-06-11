@@ -749,7 +749,7 @@ impl Drive {
             }
         }
         println!("{:#?}", insert_operations);
-        self.grove.apply_batch(InsertOperation::grovedb_operations(insert_operations), transaction)?;
+        self.grove.apply_batch(InsertOperation::grovedb_operations(insert_operations), true, transaction)?;
         Ok(())
     }
 
@@ -1151,7 +1151,7 @@ impl Drive {
                 }
             }
         }
-        self.grove.apply_batch(InsertOperation::grovedb_operations(insert_operations), transaction)?;
+        self.grove.apply_batch(InsertOperation::grovedb_operations(insert_operations), true, transaction)?;
         Ok(())
     }
 
@@ -2140,6 +2140,93 @@ mod tests {
             .expect("expected to execute query");
 
         assert_eq!(results.len(), 0);
+    }
+
+    #[test]
+    fn test_add_and_remove_family_one_document_no_transaction() {
+        let tmp_dir = TempDir::new().unwrap();
+        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+
+        drive
+            .create_root_tree(None)
+            .expect("expected to create root tree successfully");
+
+        let contract = setup_contract(
+            &drive,
+            "tests/supporting_files/contract/family/family-contract-reduced.json",
+            None,
+            None,
+        );
+
+        let person_document_cbor = json_document_to_cbor(
+            "tests/supporting_files/contract/family/person0.json",
+            Some(1),
+        );
+
+        let random_owner_id = rand::thread_rng().gen::<[u8; 32]>();
+
+        let document = Document::from_cbor(&person_document_cbor, None, Some(&random_owner_id))
+            .expect("expected to deserialize the document");
+
+        let document_type = contract
+            .document_type_for_name("person")
+            .expect("expected to get a document type");
+
+        let storage_flags = StorageFlags { epoch: 0 };
+
+        drive
+            .add_document_for_contract(
+                DocumentAndContractInfo {
+                    document_info: DocumentAndSerialization((
+                        &document,
+                        &person_document_cbor,
+                        &storage_flags,
+                    )),
+                    contract: &contract,
+                    document_type,
+                    owner_id: None,
+                },
+                false,
+                0f64,
+                true,
+                None,
+            )
+            .expect("expected to insert a document successfully");
+
+        let sql_string =
+            "select * from person where firstName = 'Samuel' order by firstName asc limit 100";
+        let query = DriveQuery::from_sql_expr(sql_string, &contract).expect("should build query");
+
+        let (results_no_transaction, _, _) = query
+            .execute_no_proof(&drive, None)
+            .expect("expected to execute query");
+
+        assert_eq!(results_no_transaction.len(), 1);
+
+        let (results_on_transaction, _, _) = query
+            .execute_no_proof(&drive, None)
+            .expect("expected to execute query");
+
+        assert_eq!(results_on_transaction.len(), 1);
+        let document_id = bs58::decode("AYjYxDqLy2hvGQADqE6FAkBnQEpJSzNd3CRw1tpS6vZ7")
+            .into_vec()
+            .expect("this should decode");
+
+        drive
+            .delete_document_for_contract(
+                &document_id,
+                &contract,
+                "person",
+                Some(&random_owner_id),
+                None,
+            )
+            .expect("expected to be able to delete the document");
+
+        let (results_on_transaction, _, _) = query
+            .execute_no_proof(&drive, None)
+            .expect("expected to execute query");
+
+        assert_eq!(results_on_transaction.len(), 0);
     }
 
     #[test]

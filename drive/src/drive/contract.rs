@@ -185,7 +185,7 @@ impl Drive {
         }
         println!("contract inserts {:#?}", insert_operations);
         if apply {
-            self.grove.apply_batch(InsertOperation::grovedb_operations(insert_operations), transaction)?;
+            self.grove.apply_batch(InsertOperation::grovedb_operations(insert_operations), true, transaction)?;
         }
         Ok(())
     }
@@ -325,7 +325,7 @@ impl Drive {
         }
 
         if apply {
-            self.grove.apply_batch(InsertOperation::grovedb_operations(insert_operations), transaction)?;
+            self.grove.apply_batch(InsertOperation::grovedb_operations(insert_operations), true, transaction)?;
         }
 
         Ok(())
