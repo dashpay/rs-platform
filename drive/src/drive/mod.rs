@@ -3,18 +3,17 @@ pub mod defaults;
 pub mod identity;
 pub mod object_size_info;
 mod grove_operations;
+mod config;
 
 use crate::contract::flags::StorageFlags;
 use crate::contract::{Contract, Document, DocumentType};
 use crate::drive::defaults::STORAGE_FLAGS_SIZE;
-use crate::drive::object_size_info::KeyInfo::KeySize;
-use crate::drive::object_size_info::PathKeyInfo::{PathFixedSizeKey, PathKey, PathKeyRef};
 use crate::error::drive::DriveError;
 use crate::error::query::QueryError;
 use crate::error::Error;
 use crate::fee::calculate_fee;
 use crate::fee::op::{DeleteOperation, InsertOperation, QueryOperation};
-use crate::query::{DriveQuery, GroveError};
+use crate::query::{DriveQuery};
 use defaults::{CONTRACT_DOCUMENTS_PATH_HEIGHT, DEFAULT_HASH_SIZE};
 use grovedb::{Element, GroveDb, Transaction, TransactionArg};
 use moka::sync::Cache;
@@ -31,11 +30,9 @@ use object_size_info::{
     PathKeyInfo,
 };
 use std::cell::RefCell;
-use std::collections::BTreeSet;
-use std::ops::DerefMut;
 use std::path::Path;
 use std::sync::Arc;
-use crate::drive::object_size_info::KeyValueInfo::KeyValueMaxSize;
+use crate::drive::config::DriveConfig;
 
 pub struct EpochInfo {
     current_epoch: u16,
@@ -43,6 +40,7 @@ pub struct EpochInfo {
 
 pub struct Drive {
     pub grove: GroveDb,
+    pub config: DriveConfig,
     pub epoch_info: RefCell<EpochInfo>,
     pub cached_contracts: RefCell<Cache<[u8; 32], Arc<Contract>>>, //HashMap<[u8; 32], Rc<Contract>>>,
 }
@@ -165,6 +163,7 @@ impl Drive {
         match GroveDb::open(path) {
             Ok(grove) => Ok(Drive {
                 grove,
+                config: DriveConfig::default(),
                 cached_contracts: RefCell::new(Cache::new(200)),
                 epoch_info: RefCell::new(EpochInfo { current_epoch: 0 }),
             }),
@@ -749,7 +748,7 @@ impl Drive {
             }
         }
         println!("{:#?}", insert_operations);
-        self.grove.apply_batch(InsertOperation::grovedb_operations(insert_operations), true, transaction)?;
+        self.grove_apply_batch(InsertOperation::grovedb_operations(insert_operations), true, transaction)?;
         Ok(())
     }
 
@@ -1151,7 +1150,7 @@ impl Drive {
                 }
             }
         }
-        self.grove.apply_batch(InsertOperation::grovedb_operations(insert_operations), true, transaction)?;
+        self.grove_apply_batch(InsertOperation::grovedb_operations(insert_operations), true, transaction)?;
         Ok(())
     }
 

@@ -3,7 +3,7 @@ use enum_map::{enum_map, Enum, EnumMap};
 use grovedb::{Element, GroveDb, PathQuery};
 use grovedb::batch::GroveDbOp;
 use crate::contract::flags::StorageFlags;
-use crate::fee::op::InsertOperation::{GroveInsertOperation, WorstCaseInsertOperation};
+use crate::fee::op::InsertOperation::{GroveInsertOperation, CostCalculationInsertOperation};
 
 pub(crate) const STORAGE_CREDIT_PER_BYTE: u64 = 5000;
 pub(crate) const STORAGE_PROCESSING_CREDIT_PER_BYTE: u64 = 10;
@@ -178,6 +178,7 @@ impl QueryOperation {
 
 #[derive(Debug)]
 pub struct SizeOfInsertOperation {
+    pub path_size: u32,
     pub key_size: u16,
     pub value_size: u32,
 }
@@ -185,7 +186,7 @@ pub struct SizeOfInsertOperation {
 #[derive(Debug)]
 pub enum InsertOperation {
     GroveInsertOperation(GroveDbOp),
-    WorstCaseInsertOperation(SizeOfInsertOperation),
+    CostCalculationInsertOperation(SizeOfInsertOperation),
 }
 
 impl InsertOperation {
@@ -205,11 +206,11 @@ impl InsertOperation {
         GroveInsertOperation(GroveDbOp::insert(path, key, element))
     }
 
-    pub fn for_worst_case_key_value_size(key_size: usize, value_size: usize) -> Self {
-        let node_value_size = Element::calculate_node_byte_size(value_size, key_size);
-        WorstCaseInsertOperation(SizeOfInsertOperation {
-            key_size: key_size as u16,
-            value_size: node_value_size as u32,
+    pub fn for_path_key_value_size(path_size: u32, key_size: u16, value_size: u32) -> Self {
+       CostCalculationInsertOperation(SizeOfInsertOperation {
+            path_size,
+            key_size,
+            value_size,
         })
     }
 
@@ -218,8 +219,9 @@ impl InsertOperation {
             GroveInsertOperation(grovedb_op) => {
                 0
             }
-            WorstCaseInsertOperation(worst_case_insert_operation) => {
-                worst_case_insert_operation.value_size + worst_case_insert_operation.key_size as u32
+            CostCalculationInsertOperation(worst_case_insert_operation) => {
+                let node_value_size = Element::calculate_node_byte_size(worst_case_insert_operation.value_size as usize, worst_case_insert_operation.key_size as usize);
+                node_value_size as u32
             }
         }
     }

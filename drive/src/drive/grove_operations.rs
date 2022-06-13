@@ -1,4 +1,5 @@
 use grovedb::{Element, TransactionArg};
+use grovedb::batch::{GroveDbOp, Op};
 use crate::contract::flags::StorageFlags;
 use crate::drive::Drive;
 use crate::drive::object_size_info::{KeyInfo, KeyValueInfo, PathKeyElementInfo, PathKeyInfo};
@@ -12,283 +13,295 @@ use crate::fee::op::{InsertOperation, QueryOperation};
 use crate::query::GroveError;
 
 impl Drive {
-    // fn grove_insert_empty_tree<'a, 'c, P>(
-    //     &'a self,
-    //     path: P,
-    //     key_info: KeyInfo<'c>,
-    //     storage_flags: &StorageFlags,
-    //     transaction: TransactionArg,
-    //     apply: bool,
-    //     insert_operations: &mut Vec<InsertOperation>,
-    // ) -> Result<(), Error>
-    //     where
-    //         P: IntoIterator<Item = &'c [u8]>,
-    //         <P as IntoIterator>::IntoIter: ExactSizeIterator + DoubleEndedIterator + Clone,
-    // {
-    //     match key_info {
-    //         KeyRef(key) => {
-    //             let path_items: Vec<Vec<u8>> = path.into_iter().map(Vec::from).collect();
-    //             insert_operations.push(InsertOperation::for_empty_tree(path_items, key.to_vec(), storage_flags));
-    //             if apply {
-    //                 self.grove
-    //                     .insert(
-    //                         path,
-    //                         key,
-    //                         Element::empty_tree_with_flags(storage_flags.to_element_flags()),
-    //                         transaction,
-    //                     )
-    //                     .map_err(Error::GroveDB)?
-    //             }
-    //             Ok(())
-    //         }
-    //         KeySize(key_max_length) => {
-    //             insert_operations.push(InsertOperation::for_worst_case_key_value_size(key_max_length, 0));
-    //             Ok(())
-    //         }
-    //         Key(_) => Err(Error::Drive(DriveError::GroveDBInsertion(
-    //             "only a key ref can be inserted into groveDB",
-    //         ))),
-    //     }
-    // }
-    //
-    // fn grove_insert_empty_tree_if_not_exists<'a, 'c, const N: usize>(
-    //     &'a self,
-    //     path_key_info: PathKeyInfo<'c, N>,
-    //     storage_flags: &StorageFlags,
-    //     transaction: TransactionArg,
-    //     apply: bool,
-    //     query_operations: &mut Vec<QueryOperation>,
-    //     insert_operations: &mut Vec<InsertOperation>,
-    // ) -> Result<bool, Error> {
-    //     match path_key_info {
-    //         PathKeyRef((path, key)) => {
-    //             let path = path.iter().map(|x| x.as_slice());
-    //             let inserted = if apply {
-    //                 self.grove.insert_if_not_exists(
-    //                     path.clone(),
-    //                     key,
-    //                     Element::empty_tree_with_flags(storage_flags.to_element_flags()),
-    //                     transaction,
-    //                 )?
-    //             };
-    //             if inserted {
-    //                 insert_operations.push(InsertOperation::for_empty_tree(key.len()));
-    //             }
-    //             query_operations.push(QueryOperation::for_key_check_in_path(key.len(), path));
-    //             Ok(inserted)
-    //         }
-    //         PathKeySize((path_length, key_length)) => {
-    //             insert_operations.push(InsertOperation::for_worst_case_key_value_size(key_length, 0));
-    //             query_operations.push(QueryOperation::for_key_check_with_path_length(
-    //                 key_length,
-    //                 path_length,
-    //             ));
-    //             Ok(true)
-    //         }
-    //         PathKey((path, key)) => {
-    //             let path = path.iter().map(|x| x.as_slice());
-    //             let inserted = if apply {
-    //                 self.grove.insert_if_not_exists(
-    //                     path.clone(),
-    //                     key.as_slice(),
-    //                     Element::empty_tree_with_flags(storage_flags.to_element_flags()),
-    //                     transaction,
-    //                 )?
-    //             } else {
-    //                 let mut path_items: Vec<Vec<u8>> = path.clone().map(Vec::from).collect();
-    //                 path_items.push(key.clone());
-    //                 let exists = self
-    //                     .transient_batch_inserts
-    //                     .borrow_mut()
-    //                     .contains(&path_items)
-    //                     || self.transient_inserts.borrow_mut().contains(&path_items);
-    //                 if !exists {
-    //                     self.transient_batch_inserts.borrow_mut().insert(path_items);
-    //                 }
-    //                 !exists
-    //             };
-    //             if inserted {
-    //                 insert_operations.push(InsertOperation::for_empty_tree(key.len()));
-    //             }
-    //             query_operations.push(QueryOperation::for_key_check_in_path(key.len(), path));
-    //             Ok(inserted)
-    //         }
-    //         PathFixedSizeKey((path, key)) => {
-    //             let path = path.into_iter();
-    //             let inserted = if apply {
-    //                 self.grove.insert_if_not_exists(
-    //                     path.clone(),
-    //                     key.as_slice(),
-    //                     Element::empty_tree_with_flags(storage_flags.to_element_flags()),
-    //                     transaction,
-    //                 )?
-    //             } else {
-    //                 let mut path_items: Vec<Vec<u8>> = path.clone().map(Vec::from).collect();
-    //                 path_items.push(key.clone());
-    //                 let exists = self
-    //                     .transient_batch_inserts
-    //                     .borrow_mut()
-    //                     .contains(&path_items)
-    //                     || self.transient_inserts.borrow_mut().contains(&path_items);
-    //                 if !exists {
-    //                     self.transient_batch_inserts.borrow_mut().insert(path_items);
-    //                 }
-    //                 !exists
-    //             };
-    //             if inserted {
-    //                 insert_operations.push(InsertOperation::for_empty_tree(key.len()));
-    //             }
-    //             query_operations.push(QueryOperation::for_key_check_in_path(key.len(), path));
-    //             Ok(inserted)
-    //         }
-    //         PathFixedSizeKeyRef((path, key)) => {
-    //             let path = path.into_iter();
-    //             let inserted = if apply {
-    //                 self.grove.insert_if_not_exists(
-    //                     path.clone(),
-    //                     key,
-    //                     Element::empty_tree_with_flags(storage_flags.to_element_flags()),
-    //                     transaction,
-    //                 )?
-    //             } else {
-    //                 let mut path_items: Vec<Vec<u8>> = path.clone().map(Vec::from).collect();
-    //                 path_items.push(Vec::from(key));
-    //                 let exists = self
-    //                     .transient_batch_inserts
-    //                     .borrow_mut()
-    //                     .contains(&path_items)
-    //                     || self
-    //                     .transient_batch_inserts
-    //                     .borrow_mut()
-    //                     .contains(&path_items);
-    //                 if !exists {
-    //                     self.transient_batch_inserts.borrow_mut().insert(path_items);
-    //                 }
-    //                 !exists
-    //             };
-    //             if inserted {
-    //                 insert_operations.push(InsertOperation::for_empty_tree(key.len()));
-    //             }
-    //             query_operations.push(QueryOperation::for_key_check_in_path(key.len(), path));
-    //             Ok(inserted)
-    //         }
-    //     }
-    // }
-    //
-    // fn grove_insert<'a, 'c, const N: usize>(
-    //     &'a self,
-    //     path_key_element_info: PathKeyElementInfo<'c, N>,
-    //     transaction: TransactionArg,
-    //     apply: bool,
-    //     insert_operations: &mut Vec<InsertOperation>,
-    // ) -> Result<(), Error> {
-    //     match path_key_element_info {
-    //         PathKeyElement((path, key, element)) => {
-    //             let path = path.iter().map(|x| x.as_slice());
-    //             insert_operations.push(InsertOperation::for_key_value(key.len(), &element));
-    //             if apply {
-    //                 self.grove
-    //                     .insert(path, key, element, transaction)
-    //                     .map_err(Error::GroveDB)
-    //             } else {
-    //                 Ok(())
-    //             }
-    //         }
-    //         PathKeyElementSize((_path_max_length, key_max_length, element_max_size)) => {
-    //             insert_operations.push(InsertOperation::for_key_value_size(
-    //                 key_max_length,
-    //                 element_max_size,
-    //             ));
-    //             Ok(())
-    //         }
-    //         PathFixedSizeKeyElement((path, key, element)) => {
-    //             insert_operations.push(InsertOperation::for_key_value(key.len(), &element));
-    //             if apply {
-    //                 self.grove
-    //                     .insert(path, key, element, transaction)
-    //                     .map_err(Error::GroveDB)
-    //             } else {
-    //                 Ok(())
-    //             }
-    //         }
-    //     }
-    // }
-    //
-    // fn grove_insert_if_not_exists<'a, 'c, const N: usize>(
-    //     &'a self,
-    //     path_key_element_info: PathKeyElementInfo<'c, N>,
-    //     transaction: TransactionArg,
-    //     apply: bool,
-    //     query_operations: &mut Vec<QueryOperation>,
-    //     insert_operations: &mut Vec<InsertOperation>,
-    // ) -> Result<bool, Error> {
-    //     match path_key_element_info {
-    //         PathKeyElement((path, key, element)) => {
-    //             let path_iter = path.iter().map(|x| x.as_slice());
-    //             let insert_operation = InsertOperation::for_key_value(key.len(), &element);
-    //             let query_operation =
-    //                 QueryOperation::for_key_check_in_path(key.len(), path_iter.clone());
-    //             let inserted = if apply {
-    //                 self.grove
-    //                     .insert_if_not_exists(path_iter, key, element, transaction)?
-    //             } else {
-    //                 let mut path_items: Vec<Vec<u8>> = path.into_iter().map(Vec::from).collect();
-    //                 path_items.push(Vec::from(key));
-    //                 let exists = self
-    //                     .transient_batch_inserts
-    //                     .borrow_mut()
-    //                     .contains(&path_items)
-    //                     || self.transient_inserts.borrow_mut().contains(&path_items);
-    //                 if !exists {
-    //                     self.transient_batch_inserts.borrow_mut().insert(path_items);
-    //                 }
-    //                 !exists
-    //             };
-    //             if inserted {
-    //                 insert_operations.push(insert_operation);
-    //             }
-    //             query_operations.push(query_operation);
-    //             Ok(inserted)
-    //         }
-    //         PathKeyElementSize((path_size, key_max_length, element_max_size)) => {
-    //             let insert_operation =
-    //                 InsertOperation::for_key_value_size(key_max_length, element_max_size);
-    //             let query_operation =
-    //                 QueryOperation::for_key_check_with_path_length(key_max_length, path_size);
-    //             insert_operations.push(insert_operation);
-    //             query_operations.push(query_operation);
-    //             Ok(true)
-    //         }
-    //         PathFixedSizeKeyElement((path, key, element)) => {
-    //             let path_iter = path.into_iter();
-    //             let insert_operation = InsertOperation::for_key_value(key.len(), &element);
-    //             let query_operation =
-    //                 QueryOperation::for_key_check_in_path(key.len(), path_iter.clone());
-    //             let inserted = if apply {
-    //                 self.grove
-    //                     .insert_if_not_exists(path_iter, key, element, transaction)?
-    //             } else {
-    //                 let mut path_items: Vec<Vec<u8>> = path.into_iter().map(Vec::from).collect();
-    //                 path_items.push(Vec::from(key));
-    //                 let exists = self
-    //                     .transient_batch_inserts
-    //                     .borrow_mut()
-    //                     .contains(&path_items)
-    //                     || self.transient_inserts.borrow_mut().contains(&path_items);
-    //                 if !exists {
-    //                     self.transient_batch_inserts.borrow_mut().insert(path_items);
-    //                 }
-    //                 !exists
-    //             };
-    //
-    //             if inserted {
-    //                 insert_operations.push(insert_operation);
-    //             }
-    //             query_operations.push(query_operation);
-    //             Ok(inserted)
-    //         }
-    //     }
-    // }
+    pub(crate) fn grove_insert_empty_tree<'a, 'c, P>(
+        &'a self,
+        path: P,
+        key_info: KeyInfo<'c>,
+        storage_flags: &StorageFlags,
+        transaction: TransactionArg,
+        apply: bool,
+        insert_operations: Option<&mut Vec<InsertOperation>>,
+    ) -> Result<(), Error>
+        where
+            P: IntoIterator<Item = &'c [u8]>,
+            <P as IntoIterator>::IntoIter: ExactSizeIterator + DoubleEndedIterator + Clone,
+    {
+        match key_info {
+            KeyRef(key) => {
+                let (path_items, path): (Vec<Vec<u8>>, Vec<&[u8]>) = path.into_iter().map(|x| (Vec::from(x), x)).unzip();
+                if let Some(insert_operations) = insert_operations {
+                    insert_operations.push(InsertOperation::for_empty_tree(path_items, key.to_vec(), storage_flags));
+                }
+                if apply {
+                    self.grove
+                        .insert(
+                            path,
+                            key,
+                            Element::empty_tree_with_flags(storage_flags.to_element_flags()),
+                            transaction,
+                        )
+                        .map_err(Error::GroveDB)?
+                }
+                Ok(())
+            }
+            KeySize(key_max_length) => {
+                if let Some(insert_operations) = insert_operations {
+                    let path_size: u32 = path.into_iter().map(|p| p.len() as u32).sum();
+                    insert_operations.push(InsertOperation::for_path_key_value_size(path_size, key_max_length as u16, 0));
+                }
+                Ok(())
+            }
+            Key(_) => Err(Error::Drive(DriveError::GroveDBInsertion(
+                "only a key ref can be inserted into groveDB",
+            ))),
+        }
+    }
+
+    pub(crate) fn grove_insert_empty_tree_if_not_exists<'a, 'c, const N: usize>(
+        &'a self,
+        path_key_info: PathKeyInfo<'c, N>,
+        storage_flags: &StorageFlags,
+        transaction: TransactionArg,
+        apply: bool,
+        query_operations: Option<&mut Vec<QueryOperation>>,
+        insert_operations: Option<&mut Vec<InsertOperation>>,
+    ) -> Result<bool, Error> {
+        match path_key_info {
+            PathKeyRef((path, key)) => {
+                let path_clone = path.clone();
+                let path_iter: Vec<&[u8]> = path_clone.iter().map(|x| x.as_slice()).collect();
+                let inserted = if apply {
+                    self.grove.insert_if_not_exists(
+                        path_iter.clone(),
+                        key,
+                        Element::empty_tree_with_flags(storage_flags.to_element_flags()),
+                        transaction,
+                    )?
+                } else {
+                    true
+                };
+                if inserted {
+                    if let Some(insert_operations) = insert_operations {
+                        insert_operations.push(InsertOperation::for_empty_tree(path, key.to_vec(), storage_flags));
+                    }
+                }
+                if let Some(query_operations) = query_operations {
+                    query_operations.push(QueryOperation::for_key_check_in_path(key.len(), path_iter));
+                }
+                Ok(inserted)
+            }
+            PathKeySize((path_length, key_length)) => {
+                if let Some(insert_operations) = insert_operations {
+                    insert_operations.push(InsertOperation::for_path_key_value_size(path_length as u32, key_length as u16, 0));
+                }
+                if let Some(query_operations) = query_operations {
+                    query_operations.push(QueryOperation::for_key_check_with_path_length(
+                        key_length,
+                        path_length,
+                    ));
+                }
+                Ok(true)
+            }
+            PathKey((path, key)) => {
+                let path_clone = path.clone();
+                let path_iter: Vec<&[u8]> = path_clone.iter().map(|x| x.as_slice()).collect();
+                let inserted = if apply {
+                    self.grove.insert_if_not_exists(
+                        path_iter.clone(),
+                        key.as_slice(),
+                        Element::empty_tree_with_flags(storage_flags.to_element_flags()),
+                        transaction,
+                    )?
+                } else {
+                    true
+                };
+                if inserted {
+                    if let Some(insert_operations) = insert_operations {
+                        insert_operations.push(InsertOperation::for_empty_tree(path, key.to_vec(), storage_flags));
+                    }
+                }
+                if let Some(query_operations) = query_operations {
+                    query_operations.push(QueryOperation::for_key_check_in_path(key.len(), path_iter));
+                }
+                Ok(inserted)
+            }
+            PathFixedSizeKey((path, key)) => {
+                let inserted = if apply {
+                    self.grove.insert_if_not_exists(
+                        path.clone(),
+                        key.as_slice(),
+                        Element::empty_tree_with_flags(storage_flags.to_element_flags()),
+                        transaction,
+                    )?
+                } else {
+                    true
+                };
+                if inserted {
+                    if let Some(insert_operations) = insert_operations {
+                        let path_clone = path.clone();
+                        let path_items: Vec<Vec<u8>> = path_clone.into_iter().map(Vec::from).collect();
+                        insert_operations.push(InsertOperation::for_empty_tree(path_items, key.to_vec(), storage_flags));
+                    }
+                }
+                if let Some(query_operations) = query_operations {
+                    query_operations.push(QueryOperation::for_key_check_in_path(key.len(), path));
+                }
+                Ok(inserted)
+            }
+            PathFixedSizeKeyRef((path, key)) => {
+                let inserted = if apply {
+                    self.grove.insert_if_not_exists(
+                        path.clone(),
+                        key,
+                        Element::empty_tree_with_flags(storage_flags.to_element_flags()),
+                        transaction,
+                    )?
+                } else {
+                    true
+                };
+                if inserted {
+                    if let Some(insert_operations) = insert_operations {
+                        let path_clone = path.clone();
+                        let path_items: Vec<Vec<u8>> = path_clone.into_iter().map(Vec::from).collect();
+                        insert_operations.push(InsertOperation::for_empty_tree(path_items, key.to_vec(), storage_flags));
+                    }
+                }
+                if let Some(query_operations) = query_operations {
+                    query_operations.push(QueryOperation::for_key_check_in_path(key.len(), path));
+                }
+                Ok(inserted)
+            }
+        }
+    }
+
+    pub(crate) fn grove_insert<'a, 'c, const N: usize>(
+        &'a self,
+        path_key_element_info: PathKeyElementInfo<'c, N>,
+        transaction: TransactionArg,
+        apply: bool,
+        insert_operations: Option<&mut Vec<InsertOperation>>,
+    ) -> Result<(), Error> {
+        match path_key_element_info {
+            PathKeyElement((path, key, element)) => {
+                let path_iter: Vec<&[u8]> = path.iter().map(|x| x.as_slice()).collect();
+                if let Some(insert_operations) = insert_operations {
+                    let path_size = path.iter().map(|x| x.len() as u32).sum();
+                    let key_len = key.len();
+                    insert_operations.push(InsertOperation::for_path_key_value_size(path_size, key_len as u16, element.node_byte_size(key_len) as u32));
+                }
+                if apply {
+                    self.grove
+                        .insert(path_iter, key, element, transaction)
+                        .map_err(Error::GroveDB)
+                } else {
+                    Ok(())
+                }
+            }
+            PathKeyElementSize((path_max_length, key_max_length, element_max_size)) => {
+                if let Some(insert_operations) = insert_operations {
+                    insert_operations.push(InsertOperation::for_path_key_value_size(
+                        path_max_length as u32,
+                        key_max_length as u16,
+                        element_max_size as u32,
+                    ));
+                }
+                Ok(())
+            }
+            PathFixedSizeKeyElement((path, key, element)) => {
+                if let Some(insert_operations) = insert_operations {
+                    let path_size = path.into_iter().map(|a| a.len() as u32).sum();
+                    let key_len = key.len();
+                    insert_operations.push(InsertOperation::for_path_key_value_size(path_size, key_len as u16, element.node_byte_size(key_len) as u32));
+                }
+                if apply {
+                    self.grove
+                        .insert(path, key, element, transaction)
+                        .map_err(Error::GroveDB)
+                } else {
+                    Ok(())
+                }
+            }
+        }
+    }
+
+    pub(crate) fn grove_insert_if_not_exists<'a, 'c, const N: usize>(
+        &'a self,
+        path_key_element_info: PathKeyElementInfo<'c, N>,
+        transaction: TransactionArg,
+        apply: bool,
+        query_operations: Option<&mut Vec<QueryOperation>>,
+        insert_operations: Option<&mut Vec<InsertOperation>>,
+    ) -> Result<bool, Error> {
+        match path_key_element_info {
+            PathKeyElement((path, key, element)) => {
+                let (path_iter, path_lengths) : (Vec<&[u8]>, Vec<u32>) = path.iter().map(|x| (x.as_slice(), x.len() as u32)).unzip();
+                let element_node_byte_size = if insert_operations.is_some() {
+                    element.node_byte_size(key.len()) as u32
+                } else {
+                    0 //doesn't matter
+                };
+                let inserted = if apply {
+                    self.grove
+                        .insert_if_not_exists(path_iter.clone(), key, element, transaction)?
+                } else {
+                    true
+                };
+                if inserted {
+                    if let Some(insert_operations) = insert_operations {
+                        let insert_operation = InsertOperation::for_path_key_value_size(path_lengths.iter().sum(), key.len() as u16, element_node_byte_size);
+                        insert_operations.push(insert_operation);
+                    }
+                }
+                if let Some (query_operations) = query_operations {
+                    let query_operation =
+                        QueryOperation::for_key_check_in_path(key.len(), path_iter);
+                    query_operations.push(query_operation);
+                }
+                Ok(inserted)
+            }
+            PathKeyElementSize((path_size, key_max_length, element_max_size)) => {
+                let insert_operation =
+                    InsertOperation::for_path_key_value_size(path_size as u32, key_max_length as u16, element_max_size as u32);
+                let query_operation =
+                QueryOperation::for_key_check_with_path_length(key_max_length, path_size);
+                if let Some(insert_operations) = insert_operations {
+                    insert_operations.push(insert_operation);
+                }
+                if let Some(query_operations) = query_operations {
+                    query_operations.push(query_operation);
+                }
+                Ok(true)
+            }
+            PathFixedSizeKeyElement((path, key, element)) => {
+                let path_iter = path.into_iter();
+                let element_node_byte_size = if insert_operations.is_some() {
+                    element.node_byte_size(key.len()) as u32
+                } else {
+                    0 //doesn't matter
+                };
+                let inserted = if apply {
+                    self.grove
+                        .insert_if_not_exists(path_iter.clone(), key, element, transaction)?
+                } else {
+                    true
+                };
+                if inserted {
+                    if let Some(insert_operations) = insert_operations {
+                        let path_size = path_iter.clone().map(|a| a.len() as u32).sum();
+                        let key_len = key.len();
+                        let insert_operation = InsertOperation::for_path_key_value_size(path_size, key_len as u16, element_node_byte_size);
+                        insert_operations.push(insert_operation);
+                    }
+                }
+                if let Some(query_operations) = query_operations {
+                    let query_operation =
+                        QueryOperation::for_key_check_in_path(key.len(), path_iter.clone());
+                    query_operations.push(query_operation);
+                }
+                Ok(inserted)
+            }
+        }
+    }
 
     pub(crate) fn batch_insert_empty_tree<'a, 'c, P>(
         &'a self,
@@ -308,7 +321,8 @@ impl Drive {
                 Ok(())
             }
             KeySize(key_max_length) => {
-                insert_operations.push(InsertOperation::for_worst_case_key_value_size(key_max_length, 0));
+                let path_size = path.into_iter().map(|x| x.len() as u32).sum();
+                insert_operations.push(InsertOperation::for_path_key_value_size(path_size, key_max_length as u16, 0));
                 Ok(())
             }
             Key(_) => Err(Error::Drive(DriveError::GroveDBInsertion(
@@ -317,7 +331,7 @@ impl Drive {
         }
     }
 
-    fn grove_has_raw<'p, P>(
+    pub(crate) fn grove_has_raw<'p, P>(
         &self,
         path: P,
         key: &'p [u8],
@@ -357,7 +371,7 @@ impl Drive {
                 Ok(!has_raw)
             }
             PathKeySize((path_length, key_length)) => {
-                insert_operations.push(InsertOperation::for_worst_case_key_value_size(key_length, 0));
+                insert_operations.push(InsertOperation::for_path_key_value_size(path_length as u32, key_length as u16, 0));
 
                 query_operations.push(QueryOperation::for_key_check_with_path_length(
                     key_length,
@@ -405,10 +419,11 @@ impl Drive {
                 insert_operations.push(InsertOperation::for_path_key_element(path, key.to_vec(), element));
                 Ok(())
             }
-            PathKeyElementSize((_path_max_length, key_max_length, element_max_size)) => {
-                insert_operations.push(InsertOperation::for_worst_case_key_value_size(
-                    key_max_length,
-                    element_max_size,
+            PathKeyElementSize((path_max_length, key_max_length, element_max_size)) => {
+                insert_operations.push(InsertOperation::for_path_key_value_size(
+                    path_max_length as u32,
+                    key_max_length as u16,
+                    element_max_size as u32,
                 ));
                 Ok(())
             }
@@ -439,7 +454,7 @@ impl Drive {
             }
             PathKeyElementSize((path_size, key_max_length, element_max_size)) => {
                 let insert_operation =
-                    InsertOperation::for_worst_case_key_value_size(key_max_length, element_max_size);
+                    InsertOperation::for_path_key_value_size(path_size as u32, key_max_length as u16, element_max_size as u32);
                 let query_operation =
                     QueryOperation::for_key_check_with_path_length(key_max_length, path_size);
                 insert_operations.push(insert_operation);
@@ -489,4 +504,28 @@ impl Drive {
         }
     }
 
+
+    pub fn grove_apply_batch(
+        &self,
+        ops: Vec<GroveDbOp>,
+        validate: bool,
+        transaction: TransactionArg,
+    ) -> Result<(), Error> {
+        if self.config.batching_enabled {
+            self.grove.apply_batch(ops, validate, transaction).map_err(Error::GroveDB)
+        } else {
+            for op in ops.into_iter() {
+                match op.op {
+                    Op::Insert { element } => {
+                        self.grove_insert(PathKeyElementInfo::<0>::PathKeyElement((op.path.clone(), op.key.as_slice(), element)), transaction, true, None)?;
+                    }
+                    Op::Delete => {
+                        let path_iter: Vec<&[u8]> = op.path.iter().map(|x| x.as_slice()).collect();
+                        self.grove.delete(path_iter, op.key.as_slice(), transaction).map_err(Error::GroveDB)?;
+                    }
+                }
+            }
+            Ok(())
+        }
+    }
 }
