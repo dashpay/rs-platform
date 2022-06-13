@@ -11,6 +11,7 @@ use crate::error::drive::DriveError;
 use crate::error::query::QueryError;
 use crate::error::structure::StructureError;
 use crate::error::Error;
+use crate::error::Error::GroveDB;
 use crate::fee::calculate_fee;
 use crate::fee::op::QueryOperation;
 use ciborium::value::Value;
@@ -1137,25 +1138,21 @@ impl<'a> DriveQuery<'a> {
             .grove
             .get_proved_path_query(&path_query, transaction)
             .map_err(Error::GroveDB)?;
-        let (root_hash, key_value_elements) =
+        let (root_hash, mut key_value_elements) =
             GroveDb::execute_proof(proof.as_slice(), &path_query).map_err(Error::GroveDB)?;
 
-        let values = key_value_elements
-            .into_iter()
-            .map(|(key, value)| {
-                let element = Element::deserialize(&value).unwrap();
-                // TODO: remove panics
-                match element {
-                    Element::Item(val, _) => val,
-                    Element::Tree(_, _) => {
-                        panic!("path query should only point to items: got trees")
-                    }
-                    Element::Reference(..) => {
-                        panic!("path query should only point to items: got reference")
-                    }
+        let mut values = vec![];
+        for (_, value) in key_value_elements.iter_mut() {
+            let element = Element::deserialize(&value).unwrap();
+            match element {
+                Element::Item(val, _) => values.push(val),
+                Element::Tree(..) | Element::Reference(..) => {
+                    return Err(Error::GroveDB(GroveError::InvalidQuery(
+                        "path query should only point to items: got trees",
+                    )));
                 }
-            })
-            .collect::<Vec<Vec<u8>>>();
+            }
+        }
 
         Ok((root_hash, values))
     }
