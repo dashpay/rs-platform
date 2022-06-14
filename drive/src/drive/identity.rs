@@ -24,9 +24,7 @@ impl Drive {
             )),
             &mut insert_operations,
         )?;
-        if apply {
-
-        }
+        if apply {}
         calculate_fee(None, None, Some(insert_operations), None)
     }
 

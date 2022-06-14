@@ -7,7 +7,7 @@ pub struct DriveConfig {
 impl DriveConfig {
     pub fn default() -> Self {
         DriveConfig {
-            batching_enabled : DEFAULT_GROVE_BATCHING_ENABLED
+            batching_enabled: DEFAULT_GROVE_BATCHING_ENABLED,
         }
     }
 }

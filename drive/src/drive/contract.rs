@@ -165,12 +165,7 @@ impl Drive {
 
             // primary key tree
             let key_info = if apply { KeyRef(&[0]) } else { KeySize(1) };
-            self.batch_insert_empty_tree(
-                type_path,
-                key_info,
-                &storage_flags,
-                insert_operations,
-            )?;
+            self.batch_insert_empty_tree(type_path, key_info, &storage_flags, insert_operations)?;
 
             // for each type we should insert the indices that are top level
             for index in document_type.top_level_indices()? {
@@ -184,7 +179,11 @@ impl Drive {
             }
         }
         if apply {
-            self.grove_apply_batch(DriveOperation::grovedb_operations(insert_operations), true, transaction)?;
+            self.grove_apply_batch(
+                DriveOperation::grovedb_operations(insert_operations),
+                true,
+                transaction,
+            )?;
         }
         Ok(())
     }
@@ -324,7 +323,11 @@ impl Drive {
         }
 
         if apply {
-            self.grove_apply_batch(DriveOperation::grovedb_operations(insert_operations), true, transaction)?;
+            self.grove_apply_batch(
+                DriveOperation::grovedb_operations(insert_operations),
+                true,
+                transaction,
+            )?;
         }
 
         Ok(())

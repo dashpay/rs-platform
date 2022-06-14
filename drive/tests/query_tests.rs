@@ -1,3 +1,4 @@
+use grovedb::GroveDb;
 use rand::seq::SliceRandom;
 use rand::{Rng, SeedableRng};
 use rs_drive::common;
@@ -17,7 +18,6 @@ use std::fs::File;
 use std::io::{self, BufRead};
 use std::option::Option::None;
 use std::sync::Arc;
-use grovedb::GroveDb;
 use tempfile::TempDir;
 
 #[derive(Serialize, Deserialize)]

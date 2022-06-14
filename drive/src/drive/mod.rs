@@ -1,19 +1,20 @@
+mod config;
 pub mod contract;
 pub mod defaults;
 pub mod flags;
+mod grove_operations;
 pub mod identity;
 pub mod object_size_info;
-mod grove_operations;
-mod config;
 
 use crate::contract::{Contract, Document, DocumentType};
+use crate::drive::config::DriveConfig;
 use crate::drive::defaults::STORAGE_FLAGS_SIZE;
 use crate::error::drive::DriveError;
 use crate::error::query::QueryError;
 use crate::error::Error;
 use crate::fee::calculate_fee;
 use crate::fee::op::{DeleteOperation, DriveOperation, QueryOperation};
-use crate::query::{DriveQuery};
+use crate::query::DriveQuery;
 use defaults::{CONTRACT_DOCUMENTS_PATH_HEIGHT, DEFAULT_HASH_SIZE};
 use flags::StorageFlags;
 use grovedb::{Element, GroveDb, Transaction, TransactionArg};
@@ -33,7 +34,6 @@ use object_size_info::{
 use std::cell::RefCell;
 use std::path::Path;
 use std::sync::Arc;
-use crate::drive::config::DriveConfig;
 
 pub struct EpochInfo {
     current_epoch: u16,
@@ -248,7 +248,7 @@ impl Drive {
         if document_type.documents_keep_history {
             let (path_key_info, storage_flags) =
                 if let DocumentAndSerialization((document, _, storage_flags)) =
-                document_and_contract_info.document_info
+                    document_and_contract_info.document_info
                 {
                     (
                         PathFixedSizeKeyRef((primary_key_path, document.id.as_slice())),
@@ -749,7 +749,11 @@ impl Drive {
             }
         }
         if apply {
-            self.grove_apply_batch(DriveOperation::grovedb_operations(insert_operations), true, transaction)?;
+            self.grove_apply_batch(
+                DriveOperation::grovedb_operations(insert_operations),
+                true,
+                transaction,
+            )?;
         }
         Ok(())
     }
@@ -1156,7 +1160,11 @@ impl Drive {
             }
         }
         if apply {
-            self.grove_apply_batch(DriveOperation::grovedb_operations(insert_operations), true, transaction)?;
+            self.grove_apply_batch(
+                DriveOperation::grovedb_operations(insert_operations),
+                true,
+                transaction,
+            )?;
         }
         Ok(())
     }
