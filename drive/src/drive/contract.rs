@@ -471,7 +471,7 @@ impl Drive {
                 &mut insert_operations,
             )?;
         }
-        let fees = calculate_fee(None, Some(query_operations), Some(insert_operations), None)?;
+        let fees = calculate_fee(None, Some(query_operations), Some(insert_operations))?;
         Ok(fees)
     }
 }

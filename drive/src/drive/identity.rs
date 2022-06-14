@@ -25,7 +25,7 @@ impl Drive {
             &mut insert_operations,
         )?;
         if apply {}
-        calculate_fee(None, None, Some(insert_operations), None)
+        calculate_fee(None, None, Some(insert_operations))
     }
 
     pub fn insert_identity_cbor(

@@ -1170,7 +1170,7 @@ impl<'a> DriveQuery<'a> {
             Err(GroveError::PathKeyNotFound(_)) | Err(GroveError::PathNotFound(_)) => {
                 let path_query_operations = QueryOperation::for_empty_path_query(&path_query);
                 query_operations.push(path_query_operations);
-                let (_, processing_fee) = calculate_fee(None, Some(query_operations), None, None)?;
+                let (_, processing_fee) = calculate_fee(None, Some(query_operations), None)?;
                 Ok((Vec::new(), 0, processing_fee))
             }
             _ => {
@@ -1178,8 +1178,7 @@ impl<'a> DriveQuery<'a> {
                 {
                     let path_query_operations = QueryOperation::for_path_query(&path_query, &data);
                     query_operations.push(path_query_operations);
-                    let (_, processing_fee) =
-                        calculate_fee(None, Some(query_operations), None, None)?;
+                    let (_, processing_fee) = calculate_fee(None, Some(query_operations), None)?;
                     Ok((data, skipped, processing_fee))
                 }
             }

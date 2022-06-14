@@ -238,7 +238,7 @@ impl Drive {
         insert_without_check: bool,
         transaction: TransactionArg,
         query_operations: &mut Vec<QueryOperation>,
-        insert_operations: &mut Vec<DriveOperation>,
+        drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<(), Error> {
         //let mut base_operations : EnumMap<Op, u64> = EnumMap::default();
         let contract = document_and_contract_info.contract;
@@ -270,7 +270,7 @@ impl Drive {
                 &storage_flags,
                 transaction,
                 query_operations,
-                insert_operations,
+                drive_operations,
             )?;
             let encoded_time = crate::contract::types::encode_float(block_time)?;
             let path_key_element_info = match document_and_contract_info.document_info {
@@ -301,7 +301,7 @@ impl Drive {
                     ))
                 }
             };
-            self.batch_insert(path_key_element_info, insert_operations)?;
+            self.batch_insert(path_key_element_info, drive_operations)?;
 
             let path_key_element_info =
                 if let DocumentAndSerialization((document, _, storage_flags)) =
@@ -343,7 +343,7 @@ impl Drive {
                     ))
                 };
 
-            self.batch_insert(path_key_element_info, insert_operations)?;
+            self.batch_insert(path_key_element_info, drive_operations)?;
         } else if insert_without_check {
             let path_key_element_info = match document_and_contract_info.document_info {
                 DocumentAndSerialization((document, document_cbor, storage_flags)) => {
@@ -357,7 +357,7 @@ impl Drive {
                     Element::required_item_space(max_size, STORAGE_FLAGS_SIZE),
                 )),
             };
-            self.batch_insert(path_key_element_info, insert_operations)?;
+            self.batch_insert(path_key_element_info, drive_operations)?;
         } else {
             let path_key_element_info = match document_and_contract_info.document_info {
                 DocumentAndSerialization((document, document_cbor, storage_flags)) => {
@@ -375,7 +375,7 @@ impl Drive {
                 path_key_element_info,
                 transaction,
                 query_operations,
-                insert_operations,
+                drive_operations,
             )?;
             if !inserted {
                 return Err(Error::Drive(DriveError::CorruptedDocumentAlreadyExists(
@@ -471,7 +471,7 @@ impl Drive {
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
         let mut query_operations: Vec<QueryOperation> = vec![];
-        let mut insert_operations: Vec<DriveOperation> = vec![];
+        let mut drive_operations: Vec<DriveOperation> = vec![];
         self.add_document_for_contract_operations(
             document_and_contract_info,
             override_document,
@@ -479,9 +479,9 @@ impl Drive {
             apply,
             transaction,
             &mut query_operations,
-            &mut insert_operations,
+            &mut drive_operations,
         )?;
-        let fees = calculate_fee(None, Some(query_operations), Some(insert_operations), None)?;
+        let fees = calculate_fee(None, Some(query_operations), Some(drive_operations))?;
         Ok(fees)
     }
 
@@ -493,7 +493,7 @@ impl Drive {
         apply: bool,
         transaction: TransactionArg,
         query_operations: &mut Vec<QueryOperation>,
-        insert_operations: &mut Vec<DriveOperation>,
+        drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<(), Error> {
         // second we need to construct the path for documents on the contract
         // the path is
@@ -528,7 +528,7 @@ impl Drive {
                 apply,
                 transaction,
                 query_operations,
-                insert_operations,
+                drive_operations,
             )?;
             return Ok(());
         } else {
@@ -539,7 +539,7 @@ impl Drive {
                 override_document,
                 transaction,
                 query_operations,
-                insert_operations,
+                drive_operations,
             )?;
         }
 
@@ -581,7 +581,7 @@ impl Drive {
                 &storage_flags,
                 transaction,
                 query_operations,
-                insert_operations,
+                drive_operations,
             )?;
 
             let mut any_fields_null = document_top_field.is_empty();
@@ -625,7 +625,7 @@ impl Drive {
                     &storage_flags,
                     transaction,
                     query_operations,
-                    insert_operations,
+                    drive_operations,
                 )?;
 
                 index_path_info.push(index_property_key)?;
@@ -643,7 +643,7 @@ impl Drive {
                     &storage_flags,
                     transaction,
                     query_operations,
-                    insert_operations,
+                    drive_operations,
                 )?;
 
                 any_fields_null |= document_index_field.is_empty();
@@ -684,7 +684,7 @@ impl Drive {
                     &storage_flags,
                     transaction,
                     query_operations,
-                    insert_operations,
+                    drive_operations,
                 )?;
 
                 index_path_info.push(Key(vec![0]))?;
@@ -711,7 +711,7 @@ impl Drive {
                 )?;
 
                 // here we should return an error if the element already exists
-                self.batch_insert(path_key_element_info, insert_operations)?;
+                self.batch_insert(path_key_element_info, drive_operations)?;
             } else {
                 let key_element_info = match &document_and_contract_info.document_info {
                     DocumentAndSerialization((document, _, storage_flags)) => {
@@ -739,7 +739,7 @@ impl Drive {
                     path_key_element_info,
                     transaction,
                     query_operations,
-                    insert_operations,
+                    drive_operations,
                 )?;
                 if !inserted {
                     return Err(Error::Drive(DriveError::CorruptedContractIndexes(
@@ -750,7 +750,7 @@ impl Drive {
         }
         if apply {
             self.grove_apply_batch(
-                DriveOperation::grovedb_operations(insert_operations),
+                DriveOperation::grovedb_operations(drive_operations),
                 true,
                 transaction,
             )?;
@@ -820,7 +820,7 @@ impl Drive {
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
         let mut query_operations: Vec<QueryOperation> = vec![];
-        let mut insert_operations: Vec<DriveOperation> = vec![];
+        let mut drive_operations: Vec<DriveOperation> = vec![];
 
         let document_type = contract.document_type_for_name(document_type_name)?;
 
@@ -843,9 +843,9 @@ impl Drive {
             apply,
             transaction,
             &mut query_operations,
-            &mut insert_operations,
+            &mut drive_operations,
         )?;
-        let fees = calculate_fee(None, Some(query_operations), Some(insert_operations), None)?;
+        let fees = calculate_fee(None, Some(query_operations), Some(drive_operations))?;
         Ok(fees)
     }
 
@@ -856,7 +856,7 @@ impl Drive {
         apply: bool,
         transaction: TransactionArg,
         query_operations: &mut Vec<QueryOperation>,
-        insert_operations: &mut Vec<DriveOperation>,
+        drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<(), Error> {
         if !document_and_contract_info.document_type.documents_mutable {
             return Err(Error::Drive(DriveError::UpdatingReadOnlyImmutableDocument(
@@ -876,7 +876,7 @@ impl Drive {
                 apply,
                 transaction,
                 query_operations,
-                insert_operations,
+                drive_operations,
             )?;
             return Ok(());
         }
@@ -944,7 +944,7 @@ impl Drive {
                 true,
                 transaction,
                 query_operations,
-                insert_operations,
+                drive_operations,
             )?;
 
             let old_document = if let Element::Item(old_document_cbor, _) = old_document_element {
@@ -1005,7 +1005,7 @@ impl Drive {
                         storage_flags,
                         transaction,
                         query_operations,
-                        insert_operations,
+                        drive_operations,
                     )?;
                 }
 
@@ -1053,7 +1053,7 @@ impl Drive {
                             storage_flags,
                             transaction,
                             query_operations,
-                            insert_operations,
+                            drive_operations,
                         )?;
                     }
 
@@ -1073,7 +1073,7 @@ impl Drive {
                             storage_flags,
                             transaction,
                             query_operations,
-                            insert_operations,
+                            drive_operations,
                         )?;
                     }
 
@@ -1103,7 +1103,7 @@ impl Drive {
                             Some(CONTRACT_DOCUMENTS_PATH_HEIGHT),
                             transaction,
                             query_operations,
-                            insert_operations,
+                            drive_operations,
                         )?;
                     } else {
                         let old_index_path_slices: Vec<&[u8]> =
@@ -1116,7 +1116,7 @@ impl Drive {
                             Some(CONTRACT_DOCUMENTS_PATH_HEIGHT),
                             transaction,
                             query_operations,
-                            insert_operations,
+                            drive_operations,
                         )?;
                     }
 
@@ -1129,7 +1129,7 @@ impl Drive {
                             storage_flags,
                             transaction,
                             query_operations,
-                            insert_operations,
+                            drive_operations,
                         )?;
                         index_path.push(vec![0]);
 
@@ -1140,7 +1140,7 @@ impl Drive {
                                 document.id.as_slice(),
                                 document_reference.clone(),
                             )),
-                            insert_operations,
+                            drive_operations,
                         )?;
                     } else {
                         // here we should return an error if the element already exists
@@ -1148,7 +1148,7 @@ impl Drive {
                             PathKeyElement::<0>((index_path, &[0], document_reference.clone())),
                             transaction,
                             query_operations,
-                            insert_operations,
+                            drive_operations,
                         )?;
                         if !inserted {
                             return Err(Error::Drive(DriveError::CorruptedContractIndexes(
@@ -1161,7 +1161,7 @@ impl Drive {
         }
         if apply {
             self.grove_apply_batch(
-                DriveOperation::grovedb_operations(insert_operations),
+                DriveOperation::grovedb_operations(drive_operations),
                 true,
                 transaction,
             )?;
@@ -1175,20 +1175,22 @@ impl Drive {
         contract: &Contract,
         document_type_name: &str,
         owner_id: Option<&[u8]>,
+        apply: bool,
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
         let mut query_operations: Vec<QueryOperation> = vec![];
-        let mut delete_operations: Vec<DeleteOperation> = vec![];
+        let mut drive_operations: Vec<DriveOperation> = vec![];
         self.delete_document_for_contract_operations(
             document_id,
             contract,
             document_type_name,
             owner_id,
+            apply,
             transaction,
             &mut query_operations,
-            &mut delete_operations,
+            &mut drive_operations,
         )?;
-        let fees = calculate_fee(None, Some(query_operations), None, Some(delete_operations))?;
+        let fees = calculate_fee(None, Some(query_operations), Some(drive_operations))?;
         Ok(fees)
     }
 
@@ -1198,6 +1200,7 @@ impl Drive {
         contract_cbor: &[u8],
         document_type_name: &str,
         owner_id: Option<&[u8]>,
+        apply: bool,
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
         let contract = Contract::from_cbor(contract_cbor, None)?;
@@ -1206,6 +1209,7 @@ impl Drive {
             &contract,
             document_type_name,
             owner_id,
+            apply,
             transaction,
         )
     }
@@ -1216,9 +1220,10 @@ impl Drive {
         contract: &Contract,
         document_type_name: &str,
         owner_id: Option<&[u8]>,
+        apply: bool,
         transaction: TransactionArg,
         query_operations: &mut Vec<QueryOperation>,
-        delete_operations: &mut Vec<DeleteOperation>,
+        drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<(), Error> {
         let document_type = contract.document_type_for_name(document_type_name)?;
 
@@ -1258,10 +1263,12 @@ impl Drive {
         let document = Document::from_cbor(document_bytes.as_slice(), None, owner_id)?;
 
         // third we need to delete the document for it's primary key
-        self.grove.delete(
+        self.batch_delete(
             contract_documents_primary_key_path,
             document_id,
+            true, // not a tree, irrelevant
             transaction,
+            drive_operations,
         )?;
 
         let contract_document_type_path =
@@ -1330,24 +1337,35 @@ impl Drive {
                     index_path.iter().map(|x| x.as_slice()).collect();
 
                 // here we should return an error if the element already exists
-                self.grove.delete_up_tree_while_empty(
+                self.batch_delete_up_tree_while_empty(
                     index_path_slices,
                     document_id,
                     Some(CONTRACT_DOCUMENTS_PATH_HEIGHT),
                     transaction,
+                    query_operations,
+                    drive_operations,
                 )?;
             } else {
                 let index_path_slices: Vec<&[u8]> =
                     index_path.iter().map(|x| x.as_slice()).collect();
 
                 // here we should return an error if the element already exists
-                self.grove.delete_up_tree_while_empty(
+                self.batch_delete_up_tree_while_empty(
                     index_path_slices,
                     &[0],
                     Some(CONTRACT_DOCUMENTS_PATH_HEIGHT),
                     transaction,
+                    query_operations,
+                    drive_operations,
                 )?;
             }
+        }
+        if apply {
+            self.grove_apply_batch(
+                DriveOperation::grovedb_operations(drive_operations),
+                true,
+                transaction,
+            )?;
         }
         Ok(())
     }
@@ -1726,9 +1744,9 @@ mod tests {
             .document_type_for_name("contactRequest")
             .expect("expected to get document type successfully");
         let mut fee_query_operations: Vec<QueryOperation> = vec![];
-        let mut fee_insert_operations: Vec<DriveOperation> = vec![];
+        let mut fee_drive_operations: Vec<DriveOperation> = vec![];
         let mut actual_query_operations: Vec<QueryOperation> = vec![];
-        let mut actual_insert_operations: Vec<DriveOperation> = vec![];
+        let mut actual_drive_operations: Vec<DriveOperation> = vec![];
 
         let root_hash = drive
             .grove
@@ -1749,7 +1767,7 @@ mod tests {
                 false,
                 Some(&db_transaction),
                 &mut fee_query_operations,
-                &mut fee_insert_operations,
+                &mut fee_drive_operations,
             )
             .expect("expected to get back fee for document insertion successfully");
 
@@ -1774,11 +1792,11 @@ mod tests {
                 true,
                 Some(&db_transaction),
                 &mut actual_query_operations,
-                &mut actual_insert_operations,
+                &mut actual_drive_operations,
             )
             .expect("expected to get back fee for document insertion successfully");
 
-        assert_eq!(actual_insert_operations.len(), fee_insert_operations.len());
+        assert_eq!(actual_drive_operations.len(), fee_drive_operations.len());
         assert_eq!(actual_query_operations.len(), fee_query_operations.len());
     }
 
@@ -1933,6 +1951,7 @@ mod tests {
                 &dashpay_cbor,
                 "profile",
                 Some(&random_owner_id),
+                true,
                 None,
             )
             .expect("expected to be able to delete the document");
@@ -1985,6 +2004,7 @@ mod tests {
                 &contract,
                 "profile",
                 Some(&random_owner_id),
+                true,
                 Some(&db_transaction),
             )
             .expect("expected to be able to delete the document");
@@ -2144,6 +2164,7 @@ mod tests {
                 &contract,
                 "niceDocument",
                 Some(&documents.get(0).unwrap().owner_id),
+                true,
                 Some(&db_transaction),
             )
             .expect("expected to be able to delete the document");
@@ -2244,6 +2265,7 @@ mod tests {
                 &contract,
                 "person",
                 Some(&random_owner_id),
+                true,
                 None,
             )
             .expect("expected to be able to delete the document");
@@ -2340,6 +2362,7 @@ mod tests {
                 &contract,
                 "person",
                 Some(&random_owner_id),
+                true,
                 Some(&db_transaction),
             )
             .expect("expected to be able to delete the document");
@@ -2473,6 +2496,7 @@ mod tests {
                 &contract,
                 "person",
                 Some(&random_owner_id),
+                true,
                 Some(&db_transaction),
             )
             .expect("expected to be able to delete the document");
@@ -2504,6 +2528,7 @@ mod tests {
                 &contract,
                 "person",
                 Some(&random_owner_id),
+                true,
                 Some(&db_transaction),
             )
             .expect("expected to be able to delete the document");
@@ -2639,6 +2664,7 @@ mod tests {
                 &contract,
                 "person",
                 Some(&random_owner_id),
+                true,
                 Some(&db_transaction),
             )
             .expect("expected to be able to delete the document");
@@ -2691,6 +2717,7 @@ mod tests {
                 &contract,
                 "person",
                 Some(&random_owner_id),
+                true,
                 Some(&db_transaction),
             )
             .expect("expected to be able to delete the document");
@@ -2705,6 +2732,7 @@ mod tests {
                 &contract,
                 "person",
                 Some(&random_owner_id),
+                true,
                 Some(&db_transaction),
             )
             .expect("expected to be able to delete the document");
@@ -3156,6 +3184,7 @@ mod tests {
                 &contract,
                 "profile",
                 None,
+                true,
                 Some(&db_transaction),
             )
             .expect("expected to delete document");
@@ -3378,6 +3407,7 @@ mod tests {
                 &contract,
                 "indexedDocument",
                 None,
+                true,
                 None,
             )
             .expect("should delete document");
