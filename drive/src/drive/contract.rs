@@ -10,7 +10,7 @@ use crate::drive::{contract_documents_path, defaults, Drive, RootTree};
 use crate::error::drive::DriveError;
 use crate::error::Error;
 use crate::fee::calculate_fee;
-use crate::fee::op::{InsertOperation, QueryOperation};
+use crate::fee::op::{DriveOperation, QueryOperation};
 use grovedb::{Element, TransactionArg};
 use std::sync::Arc;
 
@@ -48,7 +48,7 @@ impl Drive {
         contract: &Contract,
         block_time: f64,
         apply: bool,
-        insert_operations: &mut Vec<InsertOperation>,
+        insert_operations: &mut Vec<DriveOperation>,
     ) -> Result<(), Error> {
         let contract_root_path = contract_root_path(&contract.id);
         if contract.keeps_history {
@@ -114,7 +114,7 @@ impl Drive {
         block_time: f64,
         apply: bool,
         transaction: TransactionArg,
-        insert_operations: &mut Vec<InsertOperation>,
+        insert_operations: &mut Vec<DriveOperation>,
     ) -> Result<(), Error> {
         let storage_flags = StorageFlags::from_element_flags(contract_element.get_flags().clone())?;
 
@@ -183,9 +183,8 @@ impl Drive {
                 )?;
             }
         }
-        println!("contract inserts {:#?}", insert_operations);
         if apply {
-            self.grove.apply_batch(InsertOperation::grovedb_operations(insert_operations), true, transaction)?;
+            self.grove_apply_batch(DriveOperation::grovedb_operations(insert_operations), true, transaction)?;
         }
         Ok(())
     }
@@ -199,7 +198,7 @@ impl Drive {
         apply: bool,
         transaction: TransactionArg,
         query_operations: &mut Vec<QueryOperation>,
-        insert_operations: &mut Vec<InsertOperation>,
+        insert_operations: &mut Vec<DriveOperation>,
     ) -> Result<(), Error> {
         if original_contract.readonly {
             return Err(Error::Drive(DriveError::UpdatingReadOnlyImmutableContract(
@@ -325,7 +324,7 @@ impl Drive {
         }
 
         if apply {
-            self.grove.apply_batch(InsertOperation::grovedb_operations(insert_operations), true, transaction)?;
+            self.grove_apply_batch(DriveOperation::grovedb_operations(insert_operations), true, transaction)?;
         }
 
         Ok(())
@@ -416,7 +415,7 @@ impl Drive {
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
         let mut query_operations: Vec<QueryOperation> = vec![];
-        let mut insert_operations: Vec<InsertOperation> = vec![];
+        let mut insert_operations: Vec<DriveOperation> = vec![];
 
         // overlying structure
         let mut already_exists = false;

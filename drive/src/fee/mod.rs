@@ -1,6 +1,6 @@
 use crate::error::fee::FeeError;
 use crate::error::Error;
-use crate::fee::op::{BaseOp, DeleteOperation, InsertOperation, QueryOperation};
+use crate::fee::op::{BaseOp, DeleteOperation, DriveOperation, QueryOperation};
 use enum_map::EnumMap;
 
 pub mod op;
@@ -8,7 +8,7 @@ pub mod op;
 pub fn calculate_fee(
     base_operations: Option<EnumMap<BaseOp, u64>>,
     query_operations: Option<Vec<QueryOperation>>,
-    insert_operations: Option<Vec<InsertOperation>>,
+    insert_operations: Option<Vec<DriveOperation>>,
     delete_operations: Option<Vec<DeleteOperation>>,
 ) -> Result<(i64, u64), Error> {
     let mut storage_cost = 0i64;

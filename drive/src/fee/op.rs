@@ -3,7 +3,7 @@ use enum_map::{enum_map, Enum, EnumMap};
 use grovedb::{Element, GroveDb, PathQuery};
 use grovedb::batch::GroveDbOp;
 use crate::contract::flags::StorageFlags;
-use crate::fee::op::InsertOperation::{GroveInsertOperation, CostCalculationInsertOperation};
+use crate::fee::op::DriveOperation::{GroveOperation, CostCalculationInsertOperation};
 
 pub(crate) const STORAGE_CREDIT_PER_BYTE: u64 = 5000;
 pub(crate) const STORAGE_PROCESSING_CREDIT_PER_BYTE: u64 = 10;
@@ -184,26 +184,25 @@ pub struct SizeOfInsertOperation {
 }
 
 #[derive(Debug)]
-pub enum InsertOperation {
-    GroveInsertOperation(GroveDbOp),
+pub enum DriveOperation {
+    GroveOperation(GroveDbOp),
     CostCalculationInsertOperation(SizeOfInsertOperation),
 }
 
-impl InsertOperation {
-
-    pub fn grovedb_operations(insert_operations: &Vec<InsertOperation>) -> Vec<GroveDbOp> {
+impl DriveOperation {
+    pub fn grovedb_operations(insert_operations: &Vec<DriveOperation>) -> Vec<GroveDbOp> {
         insert_operations.iter().filter_map(|op| match op {
-            GroveInsertOperation(grovedb_op) => { Some(grovedb_op.clone())}
+            GroveOperation(grovedb_op) => { Some(grovedb_op.clone())}
             _ => { None}
         }).collect()
     }
 
     pub fn for_empty_tree(path: Vec<Vec<u8>>, key: Vec<u8>, storage_flags: &StorageFlags) -> Self {
         let tree = Element::empty_tree_with_flags(storage_flags.to_element_flags());
-        InsertOperation::for_path_key_element(path, key, tree)
+        DriveOperation::for_path_key_element(path, key, tree)
     }
     pub fn for_path_key_element(path: Vec<Vec<u8>>, key: Vec<u8>, element: Element) -> Self {
-        GroveInsertOperation(GroveDbOp::insert(path, key, element))
+        GroveOperation(GroveDbOp::insert(path, key, element))
     }
 
     pub fn for_path_key_value_size(path_size: u32, key_size: u16, value_size: u32) -> Self {
@@ -216,7 +215,7 @@ impl InsertOperation {
 
     pub fn data_size(&self) -> u32 {
         match self {
-            GroveInsertOperation(grovedb_op) => {
+            GroveOperation(grovedb_op) => {
                 0
             }
             CostCalculationInsertOperation(worst_case_insert_operation) => {

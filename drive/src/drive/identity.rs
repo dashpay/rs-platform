@@ -3,7 +3,7 @@ use crate::drive::object_size_info::PathKeyElementInfo::PathFixedSizeKeyElement;
 use crate::drive::{Drive, RootTree};
 use crate::error::Error;
 use crate::fee::calculate_fee;
-use crate::fee::op::InsertOperation;
+use crate::fee::op::DriveOperation;
 use crate::identity::Identity;
 use grovedb::{Element, TransactionArg};
 
@@ -15,7 +15,7 @@ impl Drive {
         apply: bool,
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
-        let mut insert_operations: Vec<InsertOperation> = vec![];
+        let mut insert_operations: Vec<DriveOperation> = vec![];
         self.batch_insert(
             PathFixedSizeKeyElement((
                 [Into::<&[u8; 1]>::into(RootTree::Identities).as_slice()],
