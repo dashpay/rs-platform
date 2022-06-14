@@ -1,5 +1,4 @@
 mod defaults;
-pub mod flags;
 pub mod types;
 
 use crate::common::{
@@ -17,7 +16,6 @@ use crate::error::structure::StructureError;
 use crate::error::Error;
 use byteorder::{BigEndian, WriteBytesExt};
 use ciborium::value::{Value as CborValue, Value};
-use flags::StorageFlags;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
@@ -148,7 +146,7 @@ impl Index {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct IndexProperty {
     pub name: String,
     pub ascending: bool,
@@ -617,7 +615,7 @@ impl DocumentType {
             )),
             "$createdAt" => Some(DocumentFieldType::Date),
             "$updatedAt" => Some(DocumentFieldType::Date),
-            &_ => self.properties.get(property).map(|p| p.clone()),
+            &_ => self.properties.get(property).cloned(),
         }
     }
 

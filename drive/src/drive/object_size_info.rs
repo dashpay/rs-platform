@@ -1,6 +1,6 @@
-use crate::contract::flags::StorageFlags;
 use crate::contract::{Contract, Document, DocumentType};
 use crate::drive::defaults::DEFAULT_HASH_SIZE;
+use crate::drive::flags::StorageFlags;
 use crate::error::contract::ContractError;
 use crate::error::drive::DriveError;
 use crate::error::Error;

@@ -2,7 +2,7 @@ use crate::drive::defaults::EMPTY_TREE_STORAGE_SIZE;
 use enum_map::{enum_map, Enum, EnumMap};
 use grovedb::{Element, GroveDb, PathQuery};
 use grovedb::batch::GroveDbOp;
-use crate::contract::flags::StorageFlags;
+use crate::drive::flags::StorageFlags;
 use crate::fee::op::DriveOperation::{GroveOperation, CostCalculationInsertOperation};
 
 pub(crate) const STORAGE_CREDIT_PER_BYTE: u64 = 5000;

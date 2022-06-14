@@ -1,4 +1,4 @@
-use crate::contract::flags::StorageFlags;
+use crate::drive::flags::StorageFlags;
 use crate::drive::object_size_info::PathKeyElementInfo::PathFixedSizeKeyElement;
 use crate::drive::{Drive, RootTree};
 use crate::error::Error;
@@ -60,7 +60,7 @@ impl Drive {
 
 #[cfg(test)]
 mod tests {
-    use crate::contract::flags::StorageFlags;
+    use crate::drive::flags::StorageFlags;
     use crate::drive::Drive;
     use crate::identity::Identity;
     use grovedb::Element;

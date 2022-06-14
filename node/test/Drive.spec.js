@@ -1,6 +1,7 @@
 const fs = require('fs');
 
-const { expect } = require('chai');
+const { expect, use } = require('chai');
+use(require('dirty-chai'));
 
 const Document = require('@dashevo/dpp/lib/document/Document');
 

@@ -1,7 +1,7 @@
 use grovedb::{Element, TransactionArg};
 use grovedb::batch::{GroveDbOp, Op};
-use crate::contract::flags::StorageFlags;
 use crate::drive::Drive;
+use crate::drive::flags::StorageFlags;
 use crate::drive::object_size_info::{KeyInfo, KeyValueInfo, PathKeyElementInfo, PathKeyInfo};
 use crate::drive::object_size_info::KeyInfo::{Key, KeyRef, KeySize};
 use crate::drive::object_size_info::KeyValueInfo::{KeyRefRequest, KeyValueMaxSize};

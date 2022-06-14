@@ -1,5 +1,5 @@
-use crate::contract::flags::StorageFlags;
 use crate::contract::Contract;
+use crate::drive::flags::StorageFlags;
 use crate::drive::object_size_info::KeyInfo::{KeyRef, KeySize};
 use crate::drive::object_size_info::KeyValueInfo::KeyRefRequest;
 use crate::drive::object_size_info::PathKeyElementInfo::{
@@ -80,7 +80,7 @@ impl Drive {
                 PathFixedSizeKeyElement((
                     contract_keeping_history_storage_path,
                     &[0],
-                    Element::Reference(contract_storage_path, element_flags.clone()),
+                    Element::Reference(contract_storage_path, element_flags),
                 ))
             } else {
                 PathKeyElementSize((
@@ -392,11 +392,11 @@ impl Drive {
         let stored_element = self
             .grove
             .get(contract_root_path(&contract_id), &[0], transaction)?;
-        if let Element::Item(stored_contract_bytes, elementFlag) = stored_element {
+        if let Element::Item(stored_contract_bytes, element_flag) = stored_element {
             let contract = Arc::new(Contract::from_cbor(&stored_contract_bytes, None)?);
             let cached_contracts = self.cached_contracts.borrow();
             cached_contracts.insert(contract_id, Arc::clone(&contract));
-            let flags = StorageFlags::from_element_flags(elementFlag)?;
+            let flags = StorageFlags::from_element_flags(element_flag)?;
             Ok((Some(Arc::clone(&contract)), flags))
         } else {
             Err(Error::Drive(DriveError::CorruptedContractPath(
@@ -476,8 +476,8 @@ impl Drive {
 #[cfg(test)]
 mod tests {
     use crate::common::json_document_to_cbor;
-    use crate::contract::flags::StorageFlags;
     use crate::contract::Contract;
+    use crate::drive::flags::StorageFlags;
     use crate::drive::object_size_info::{DocumentAndContractInfo, DocumentInfo};
     use crate::drive::Drive;
     use rand::Rng;

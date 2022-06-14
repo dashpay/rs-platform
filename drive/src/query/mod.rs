@@ -28,7 +28,7 @@ use sqlparser::ast::Value::Number;
 use sqlparser::ast::{OrderByExpr, Select, Statement};
 use sqlparser::dialect::GenericDialect;
 use sqlparser::parser::Parser;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use std::ops::BitXor;
 
 #[derive(Clone, Debug, PartialEq, Default)]
@@ -1129,17 +1129,32 @@ impl<'a> DriveQuery<'a> {
         self,
         drive: &Drive,
         transaction: TransactionArg,
-    ) -> Result<Vec<Vec<u8>>, Error> {
+    ) -> Result<([u8; 32], Vec<Vec<u8>>), Error> {
         let mut query_operations: Vec<QueryOperation> = vec![];
         let path_query =
             self.construct_path_query_operations(drive, transaction, &mut query_operations)?;
+
         let proof = drive
             .grove
             .get_proved_path_query(&path_query, transaction)
             .map_err(Error::GroveDB)?;
-        let (_, key_value_elements) = GroveDb::execute_proof(proof.as_slice(), &path_query).map_err(Error::GroveDB)?;
+        let (root_hash, mut key_value_elements) =
+            GroveDb::execute_proof(proof.as_slice(), &path_query).map_err(Error::GroveDB)?;
 
-        Ok(key_value_elements.into_iter().map(|(key, value) | value).collect())
+        let mut values = vec![];
+        for (_, value) in key_value_elements.iter_mut() {
+            let element = Element::deserialize(&value).unwrap();
+            match element {
+                Element::Item(val, _) => values.push(val),
+                Element::Tree(..) | Element::Reference(..) => {
+                    return Err(Error::GroveDB(GroveError::InvalidQuery(
+                        "path query should only point to items: got trees",
+                    )));
+                }
+            }
+        }
+
+        Ok((root_hash, values))
     }
 
     pub fn execute_no_proof(
@@ -1176,8 +1191,8 @@ impl<'a> DriveQuery<'a> {
 mod tests {
     use crate::common;
     use crate::common::json_document_to_cbor;
-    use crate::contract::flags::StorageFlags;
     use crate::contract::{Contract, DocumentType};
+    use crate::drive::flags::StorageFlags;
     use crate::drive::Drive;
     use crate::query::DriveQuery;
     use serde_json::json;

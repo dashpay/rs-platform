@@ -1,11 +1,11 @@
 pub mod contract;
 pub mod defaults;
+pub mod flags;
 pub mod identity;
 pub mod object_size_info;
 mod grove_operations;
 mod config;
 
-use crate::contract::flags::StorageFlags;
 use crate::contract::{Contract, Document, DocumentType};
 use crate::drive::defaults::STORAGE_FLAGS_SIZE;
 use crate::error::drive::DriveError;
@@ -15,6 +15,7 @@ use crate::fee::calculate_fee;
 use crate::fee::op::{DeleteOperation, DriveOperation, QueryOperation};
 use crate::query::{DriveQuery};
 use defaults::{CONTRACT_DOCUMENTS_PATH_HEIGHT, DEFAULT_HASH_SIZE};
+use flags::StorageFlags;
 use grovedb::{Element, GroveDb, Transaction, TransactionArg};
 use moka::sync::Cache;
 use object_size_info::DocumentInfo::{DocumentAndSerialization, DocumentSize};
@@ -304,7 +305,7 @@ impl Drive {
 
             let path_key_element_info =
                 if let DocumentAndSerialization((document, _, storage_flags)) =
-                document_and_contract_info.document_info
+                    document_and_contract_info.document_info
                 {
                     // we should also insert a reference at 0 to the current value
                     // todo: we could construct this only once
@@ -942,18 +943,17 @@ impl Drive {
                 insert_operations,
             )?;
 
-            let old_document =
-                if let Element::Item(old_document_cbor, old_element_flags) = old_document_element {
-                    Ok(Document::from_cbor(
-                        old_document_cbor.as_slice(),
-                        None,
-                        owner_id,
-                    )?)
-                } else {
-                    Err(Error::Drive(DriveError::CorruptedDocumentNotItem(
-                        "old document is not an item",
-                    )))
-                }?;
+            let old_document = if let Element::Item(old_document_cbor, _) = old_document_element {
+                Ok(Document::from_cbor(
+                    old_document_cbor.as_slice(),
+                    None,
+                    owner_id,
+                )?)
+            } else {
+                Err(Error::Drive(DriveError::CorruptedDocumentNotItem(
+                    "old document is not an item",
+                )))
+            }?;
 
             // fourth we need to store a reference to the document for each index
             for index in &document_type.indices {
@@ -1243,7 +1243,7 @@ impl Drive {
         }
 
         let document_bytes: Vec<u8> = match document_element.unwrap() {
-            Element::Item(data, storage_flags) => data,
+            Element::Item(data, _) => data,
             _ => todo!(), // TODO: how should this be handled, possibility that document might not be in storage
         };
 
@@ -1438,6 +1438,18 @@ impl Drive {
         query.execute_with_proof(self, transaction)
     }
 
+    pub fn query_documents_from_contract_as_grove_proof_only_get_elements(
+        &self,
+        contract: &Contract,
+        document_type: &DocumentType,
+        query_cbor: &[u8],
+        transaction: TransactionArg,
+    ) -> Result<([u8; 32], Vec<Vec<u8>>), Error> {
+        let query = DriveQuery::from_cbor(query_cbor, contract, document_type)?;
+
+        query.execute_with_proof_only_get_elements(self, transaction)
+    }
+
     pub fn worst_case_fee_for_document_type_with_name(
         &self,
         contract: &Contract,
@@ -1465,8 +1477,8 @@ mod tests {
         cbor_from_hex, json_document_to_cbor, setup_contract, setup_contract_from_hex,
         value_to_cbor,
     };
-    use crate::contract::flags::StorageFlags;
     use crate::contract::{Contract, Document};
+    use crate::drive::flags::StorageFlags;
     use crate::drive::object_size_info::DocumentInfo::DocumentAndSerialization;
     use crate::drive::object_size_info::{DocumentAndContractInfo, DocumentInfo};
     use crate::drive::{defaults, Drive};

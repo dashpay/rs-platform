@@ -1,8 +1,8 @@
 use rand::seq::SliceRandom;
 use rand::{Rng, SeedableRng};
 use rs_drive::common;
-use rs_drive::contract::flags::StorageFlags;
 use rs_drive::contract::{Contract, Document};
+use rs_drive::drive::flags::StorageFlags;
 use rs_drive::drive::object_size_info::DocumentAndContractInfo;
 use rs_drive::drive::object_size_info::DocumentInfo::DocumentAndSerialization;
 use rs_drive::drive::Drive;
@@ -166,8 +166,7 @@ fn test_query_historical() {
     assert_eq!(
         root_hash.expect("cannot get root hash").as_slice(),
         vec![
-            61, 186, 193, 171, 235, 220, 81, 55, 187, 86, 227, 222, 69, 202, 9, 12, 251, 109, 248,
-            217, 108, 148, 71, 54, 227, 170, 213, 120, 21, 24, 12, 110
+            128, 252, 179, 97, 131, 69, 233, 41, 120, 123, 206, 12, 233, 7, 10, 212, 4, 153, 54, 19, 139, 53, 136, 196, 146, 149, 86, 40, 126, 195, 204, 29
         ]
     );
 
@@ -1386,8 +1385,7 @@ fn test_query_historical() {
     assert_eq!(
         root_hash.expect("cannot get root hash").as_slice(),
         vec![
-            160, 99, 252, 166, 225, 36, 68, 39, 181, 54, 116, 180, 29, 1, 16, 24, 65, 248, 9, 21,
-            44, 228, 28, 146, 9, 45, 27, 233, 145, 87, 73, 220
+            220, 80, 43, 153, 39, 129, 179, 35, 207, 139, 92, 252, 122, 36, 16, 181, 87, 4, 102, 239, 162, 90, 163, 238, 119, 255, 106, 64, 104, 146, 172, 123
         ]
     );
 }

@@ -1,6 +1,7 @@
 const fs = require('fs');
 
-const { expect } = require('chai');
+const { expect, use } = require('chai');
+use(require('dirty-chai'));
 
 const Drive = require('../Drive');
 
@@ -67,7 +68,7 @@ describe('GroveDB', () => {
       itemKey,
     );
 
-    expect(result).to.exist;
+    expect(result).to.exist();
     expect(result.type).to.equals('item');
     expect(result.value).to.deep.equals(itemValue);
   });
