@@ -678,7 +678,7 @@ impl Drive {
                 .apply_batch(ops, validate, transaction)
                 .map_err(Error::GroveDB)
         } else {
-            println!("changes {} {:#?}", ops.len(), ops);
+            //println!("changes {} {:#?}", ops.len(), ops);
             for op in ops.into_iter() {
                 //println!("on {:#?}", op);
                 match op.op {

@@ -218,7 +218,7 @@ impl DriveOperation {
 
     pub fn data_size(&self) -> u32 {
         match self {
-            GroveOperation(grovedb_op) => 0,
+            GroveOperation(grovedb_op) => grovedb_op.key.len() as u32,
             CostCalculationInsertOperation(worst_case_insert_operation) => {
                 let node_value_size = Element::calculate_node_byte_size(
                     worst_case_insert_operation.value_size as usize,
