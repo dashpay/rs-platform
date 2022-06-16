@@ -24,11 +24,11 @@ impl<'f> FeePools<'f> {
             .map_err(Error::GroveDB)?;
 
         if let Element::Item(item, _) = element {
-            let genesis_time = i64::from_le_bytes(
-                item.as_slice()
-                    .try_into()
-                    .expect("invalid item length in bytes"),
-            );
+            let genesis_time = i64::from_le_bytes(item.as_slice().try_into().map_err(|_| {
+                Error::Fee(FeeError::CorruptedGenesisTimeInvalidItemLength(
+                    "genesis time item have an invalid length",
+                ))
+            })?);
 
             Ok(genesis_time)
         } else {

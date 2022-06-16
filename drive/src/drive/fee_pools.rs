@@ -7,11 +7,7 @@ use crate::fee::pools::fee_pools::FeePools;
 use chrono::Utc;
 
 impl Drive {
-    pub fn init_fee_pools(
-        &self,
-        genesis_time: i64,
-        transaction: TransactionArg,
-    ) -> Result<(), Error> {
+    pub fn init_fee_pools(&self, transaction: TransactionArg) -> Result<(), Error> {
         let fee_pool = FeePools::new(self);
 
         // initialize the pools with epochs

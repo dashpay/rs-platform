@@ -20,9 +20,13 @@ impl<'e> EpochPool<'e> {
             .map_err(Error::GroveDB)?;
 
         if let Element::Item(item, _) = element {
-            Ok(f64::from_le_bytes(
-                item.as_slice().try_into().expect("invalid item length"),
-            ))
+            Ok(f64::from_le_bytes(item.as_slice().try_into().map_err(
+                |_| {
+                    Error::Fee(FeeError::CorruptedStorageFeeInvalidItemLength(
+                        "epoch storage fee item have an invalid length",
+                    ))
+                },
+            )?))
         } else {
             Err(Error::Fee(FeeError::CorruptedStorageFeeNotItem(
                 "epoch storage fee must be an item",
@@ -42,9 +46,13 @@ impl<'e> EpochPool<'e> {
             .map_err(Error::GroveDB)?;
 
         if let Element::Item(item, _) = element {
-            Ok(f64::from_le_bytes(
-                item.as_slice().try_into().expect("invalid item length"),
-            ))
+            Ok(f64::from_le_bytes(item.as_slice().try_into().map_err(
+                |_| {
+                    Error::Fee(FeeError::CorruptedProcessingFeeInvalidItemLength(
+                        "epoch processing fee item have an invalid length",
+                    ))
+                },
+            )?))
         } else {
             Err(Error::Fee(FeeError::CorruptedProcessingFeeNotItem(
                 "epoch processing fee must be an item",
@@ -68,7 +76,11 @@ impl<'e> EpochPool<'e> {
             .map_err(Error::GroveDB)?;
 
         if let Element::Item(item, _) = element {
-            let fee = f64::from_le_bytes(item.as_slice().try_into().expect("invalid item length"));
+            let fee = f64::from_le_bytes(item.as_slice().try_into().map_err(|_| {
+                Error::Fee(FeeError::CorruptedProcessingFeeInvalidItemLength(
+                    "epoch processing fee item have an invalid length",
+                ))
+            })?);
 
             // in case fee is set updated it
             self.drive
@@ -105,11 +117,11 @@ impl<'e> EpochPool<'e> {
             .map_err(Error::GroveDB)?;
 
         if let Element::Item(item, _) = element {
-            let fee = f64::from_le_bytes(
-                item.as_slice()
-                    .try_into()
-                    .expect("expected item to be of length 8"),
-            );
+            let fee = f64::from_le_bytes(item.as_slice().try_into().map_err(|_| {
+                Error::Fee(FeeError::CorruptedStorageFeeInvalidItemLength(
+                    "epoch storage fee item have an invalid length",
+                ))
+            })?);
 
             // in case fee is set updated it
             self.drive

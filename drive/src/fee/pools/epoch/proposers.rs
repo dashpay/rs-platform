@@ -23,9 +23,13 @@ impl<'e> EpochPool<'e> {
             .map_err(Error::GroveDB)?;
 
         if let Element::Item(item, _) = element {
-            Ok(u64::from_le_bytes(
-                item.as_slice().try_into().expect("invalid item length"),
-            ))
+            Ok(u64::from_le_bytes(item.as_slice().try_into().map_err(
+                |_| {
+                    Error::Fee(FeeError::CorruptedFirstProposedBlockHeightItemLength(
+                        "epoch first proposed block height item have an invalid length",
+                    ))
+                },
+            )?))
         } else {
             Err(Error::Fee(
                 FeeError::CorruptedFirstProposedBlockHeightNotItem(
@@ -63,9 +67,13 @@ impl<'e> EpochPool<'e> {
             .map_err(Error::GroveDB)?;
 
         if let Element::Item(item, _) = element {
-            Ok(u64::from_le_bytes(
-                item.as_slice().try_into().expect("invalid item length"),
-            ))
+            Ok(u64::from_le_bytes(item.as_slice().try_into().map_err(
+                |_| {
+                    Error::Fee(FeeError::CorruptedProposerBlockCountItemLength(
+                        "epoch proposer block count item have an invalid length",
+                    ))
+                },
+            )?))
         } else {
             Err(Error::Fee(FeeError::CorruptedProposerBlockCountNotItem(
                 "epoch proposer block count must be an item",
@@ -127,18 +135,28 @@ impl<'e> EpochPool<'e> {
         let elements = self
             .drive
             .grove
-            .get_path_queries(&path_queries, transaction)
+            .get_path_queries_raw(&path_queries, transaction)
             .map_err(Error::GroveDB)?;
 
-        let result: Vec<(Vec<u8>, u64)> = elements
+        let result = elements
             .into_iter()
-            .map(|e| {
-                (
-                    vec![], // TODO: get an actuall tx_hash
-                    u64::from_le_bytes(e.try_into().expect("invalid item length")),
-                )
+            .map(|(pro_tx_hash, e)| {
+                if let Element::Item(item, _) = e {
+                    let block_count =
+                        u64::from_le_bytes(item.as_slice().try_into().map_err(|_| {
+                            Error::Fee(FeeError::CorruptedProposerBlockCountItemLength(
+                                "epoch proposer block count item have an invalid length",
+                            ))
+                        })?);
+
+                    Ok((pro_tx_hash, block_count))
+                } else {
+                    Err(Error::Fee(FeeError::CorruptedProposerBlockCountNotItem(
+                        "epoch proposer block count must be an item",
+                    )))
+                }
             })
-            .collect();
+            .collect::<Result<Vec<(Vec<u8>, u64)>, Error>>()?;
 
         Ok(result)
     }

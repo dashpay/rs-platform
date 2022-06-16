@@ -3,6 +3,7 @@ use serde_json::json;
 
 use crate::common::value_to_cbor;
 use crate::contract::Document;
+use crate::error::document::DocumentError;
 use crate::error::Error;
 use crate::fee::pools::fee_pools::FeePools;
 
@@ -86,30 +87,39 @@ impl<'f> FeePools<'f> {
 
             let documents: Vec<Document> = document_cbors
                 .iter()
-                .map(|cbor| {
-                    Document::from_cbor(cbor, None, None)
-                        .expect("should be able to deserialize cbor")
-                })
-                .collect();
+                .map(|cbor| Ok(Document::from_cbor(cbor, None, None)?))
+                .collect::<Result<Vec<Document>, Error>>()?;
 
             for document in documents {
                 let pay_to_id = document
                     .properties
                     .get("payToId")
-                    .expect("should be able to get payToId")
+                    .ok_or(Error::Document(DocumentError::MissingDocumentProperty(
+                        "payToId property is missing",
+                    )))?
                     .as_bytes()
-                    .expect("shoul be able to get as bytes");
+                    .ok_or(Error::Document(DocumentError::InvalidDocumentPropertyType(
+                        "payToId property type is not bytes",
+                    )))?;
 
                 let mut identity = self.drive.fetch_identity(pay_to_id, transaction)?;
 
                 let share_percentage_integer: u64 = document
                     .properties
                     .get("percentage")
-                    .expect("should be able to get percentage")
+                    .ok_or(Error::Document(DocumentError::MissingDocumentProperty(
+                        "percentage property is missing",
+                    )))?
                     .as_integer()
-                    .expect("should be an integer")
+                    .ok_or(Error::Document(DocumentError::InvalidDocumentPropertyType(
+                        "percentage property type is not integer",
+                    )))?
                     .try_into()
-                    .expect("should be able to convert to u64");
+                    .map_err(|_| {
+                        Error::Document(DocumentError::InvalidDocumentPropertyType(
+                            "percentage property cannot be converted to u64",
+                        ))
+                    })?;
 
                 let share_percentage: f64 = share_percentage_integer as f64 / 100.0;
 

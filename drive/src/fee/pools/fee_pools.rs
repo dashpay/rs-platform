@@ -61,7 +61,7 @@ impl<'f> FeePools<'f> {
         epoch_index: u16,
         transaction: TransactionArg,
     ) -> Result<EpochPool, Error> {
-        if epoch_index == 1 {
+        if epoch_index == 0 {
             return Ok(EpochPool::new(epoch_index, self.drive));
         }
 

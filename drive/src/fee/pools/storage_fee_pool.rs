@@ -23,10 +23,12 @@ impl<'f> FeePools<'f> {
             .map_err(Error::GroveDB)?;
 
         if let Element::Item(item, _) = element {
-            let value =
-                f64::from_le_bytes(item.as_slice().try_into().expect("invalid item length"));
+            let value = f64::from_le_bytes(item.as_slice().try_into().map_err(|_| {
+                Error::Fee(FeeError::CorruptedStorageFeePoolInvalidItemLength(
+                    "fee pools storage fee pool item have an invalid length",
+                ))
+            })?);
 
-            // in case credit is set update it
             self.drive
                 .grove
                 .insert(
@@ -57,8 +59,11 @@ impl<'f> FeePools<'f> {
             .map_err(Error::GroveDB)?;
 
         if let Element::Item(item, _) = element {
-            let credit =
-                f64::from_le_bytes(item.as_slice().try_into().expect("invalid item length"));
+            let credit = f64::from_le_bytes(item.as_slice().try_into().map_err(|_| {
+                Error::Fee(FeeError::CorruptedStorageFeePoolInvalidItemLength(
+                    "fee pools storage fee pool item have an invalid length",
+                ))
+            })?);
 
             Ok(credit)
         } else {
