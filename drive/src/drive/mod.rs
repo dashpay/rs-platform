@@ -1227,8 +1227,8 @@ impl Drive {
             &mut query_operations,
             &mut drive_operations,
         )?;
-        let fees = calculate_fee(None, Some(query_operations), Some(drive_operations))?;
-        Ok(fees)
+        //let fees = calculate_fee(None, Some(query_operations), Some(drive_operations))?;
+        Ok((0, 0))
     }
 
     pub fn delete_document_for_contract_cbor(
