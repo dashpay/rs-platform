@@ -1,6 +1,6 @@
 use grovedb::{Element, TransactionArg};
 
-use crate::error::drive::DriveError;
+use crate::error::fee::FeeError;
 use crate::error::Error;
 use crate::fee::pools::fee_pools::FeePools;
 
@@ -22,7 +22,7 @@ impl<'f> FeePools<'f> {
             )
             .map_err(Error::GroveDB)?;
 
-        if let Element::Item(item) = element {
+        if let Element::Item(item, _) = element {
             let value =
                 f64::from_le_bytes(item.as_slice().try_into().expect("invalid item length"));
 
@@ -32,14 +32,14 @@ impl<'f> FeePools<'f> {
                 .insert(
                     FeePools::get_path(),
                     constants::KEY_STORAGE_FEE_POOL.as_bytes(),
-                    Element::Item((value + storage_fee).to_le_bytes().to_vec()),
+                    Element::Item((value + storage_fee).to_le_bytes().to_vec(), None),
                     transaction,
                 )
                 .map_err(Error::GroveDB)?;
 
             Ok(())
         } else {
-            Err(Error::Drive(DriveError::CorruptedEpochElement(
+            Err(Error::Fee(FeeError::CorruptedStorageFeePoolNotItem(
                 "fee pools storage fee pool must be an item",
             )))
         }
@@ -56,13 +56,13 @@ impl<'f> FeePools<'f> {
             )
             .map_err(Error::GroveDB)?;
 
-        if let Element::Item(item) = element {
+        if let Element::Item(item, _) = element {
             let credit =
                 f64::from_le_bytes(item.as_slice().try_into().expect("invalid item length"));
 
             Ok(credit)
         } else {
-            Err(Error::Drive(DriveError::CorruptedEpochElement(
+            Err(Error::Fee(FeeError::CorruptedStorageFeePoolNotItem(
                 "fee pools storage fee pool must be an item",
             )))
         }

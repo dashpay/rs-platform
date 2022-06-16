@@ -1,6 +1,6 @@
 use grovedb::{Element, TransactionArg};
 
-use crate::error::drive::DriveError;
+use crate::error::fee::FeeError;
 use crate::error::Error;
 use crate::fee::pools::fee_pools::FeePools;
 
@@ -23,7 +23,7 @@ impl<'f> FeePools<'f> {
             )
             .map_err(Error::GroveDB)?;
 
-        if let Element::Item(item) = element {
+        if let Element::Item(item, _) = element {
             let genesis_time = i64::from_le_bytes(
                 item.as_slice()
                     .try_into()
@@ -32,8 +32,8 @@ impl<'f> FeePools<'f> {
 
             Ok(genesis_time)
         } else {
-            Err(Error::Drive(DriveError::CorruptedEpochElement(
-                "fee pool genesis_time must be an item",
+            Err(Error::Fee(FeeError::CorruptedGenesisTimeNotItem(
+                "fee pool genesis time must be an item",
             )))
         }
     }
@@ -48,7 +48,7 @@ impl<'f> FeePools<'f> {
             .insert(
                 FeePools::get_path(),
                 constants::KEY_GENESIS_TIME.as_bytes(),
-                Element::Item(genesis_time.to_le_bytes().to_vec()),
+                Element::Item(genesis_time.to_le_bytes().to_vec(), None),
                 transaction,
             )
             .map_err(Error::GroveDB)?;
@@ -88,18 +88,12 @@ impl<'f> FeePools<'f> {
         let next_thousandth_epoch = EpochPool::new(epoch_index + 1000, self.drive);
         next_thousandth_epoch.init(transaction)?;
 
-        // init first_proposer_block_height for an epoch `i`
+        // init first_proposer_block_height and processing_fee for an epoch
         let epoch = EpochPool::new(epoch_index, self.drive);
         epoch.update_first_proposed_block_height(first_proposer_block_height, transaction)?;
-
-        // init processing_fee and proposers for an epoch `i + 1`
-        let next_epoch = EpochPool::new(epoch_index + 1, self.drive);
-        next_epoch.update_processing_fee(0f64, transaction)?;
-        // next_epoch.update_proposers(vec![], transaction)?; TODO: init proposers tree
+        epoch.update_processing_fee(0f64, transaction)?;
 
         // distribute the storage fees
-        self.distribute_storage_distribution_pool(epoch_index, transaction)?;
-
-        Ok(())
+        self.distribute_storage_distribution_pool(epoch_index, transaction)
     }
 }

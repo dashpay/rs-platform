@@ -1,7 +1,7 @@
 use grovedb::{Element, TransactionArg};
 
 use crate::{
-    error::{drive::DriveError, Error},
+    error::{fee::FeeError, Error},
     fee::pools::epoch::epoch_pool::EpochPool,
 };
 
@@ -19,12 +19,12 @@ impl<'e> EpochPool<'e> {
             )
             .map_err(Error::GroveDB)?;
 
-        if let Element::Item(item) = element {
+        if let Element::Item(item, _) = element {
             Ok(f64::from_le_bytes(
                 item.as_slice().try_into().expect("invalid item length"),
             ))
         } else {
-            Err(Error::Drive(DriveError::CorruptedEpochElement(
+            Err(Error::Fee(FeeError::CorruptedStorageFeeNotItem(
                 "epoch storage fee must be an item",
             )))
         }
@@ -41,12 +41,12 @@ impl<'e> EpochPool<'e> {
             )
             .map_err(Error::GroveDB)?;
 
-        if let Element::Item(item) = element {
+        if let Element::Item(item, _) = element {
             Ok(f64::from_le_bytes(
                 item.as_slice().try_into().expect("invalid item length"),
             ))
         } else {
-            Err(Error::Drive(DriveError::CorruptedEpochElement(
+            Err(Error::Fee(FeeError::CorruptedProcessingFeeNotItem(
                 "epoch processing fee must be an item",
             )))
         }
@@ -67,7 +67,7 @@ impl<'e> EpochPool<'e> {
             )
             .map_err(Error::GroveDB)?;
 
-        if let Element::Item(item) = element {
+        if let Element::Item(item, _) = element {
             let fee = f64::from_le_bytes(item.as_slice().try_into().expect("invalid item length"));
 
             // in case fee is set updated it
@@ -76,15 +76,15 @@ impl<'e> EpochPool<'e> {
                 .insert(
                     self.get_path(),
                     constants::KEY_PROCESSING_FEE.as_bytes(),
-                    Element::Item((fee + processing_fee).to_le_bytes().to_vec()),
+                    Element::Item((fee + processing_fee).to_le_bytes().to_vec(), None),
                     transaction,
                 )
                 .map_err(Error::GroveDB)?;
 
             Ok(())
         } else {
-            Err(Error::Drive(DriveError::CorruptedEpochElement(
-                "epoch processing_fee must be an item",
+            Err(Error::Fee(FeeError::CorruptedProcessingFeeNotItem(
+                "epoch processing fee must be an item",
             )))
         }
     }
@@ -104,7 +104,7 @@ impl<'e> EpochPool<'e> {
             )
             .map_err(Error::GroveDB)?;
 
-        if let Element::Item(item) = element {
+        if let Element::Item(item, _) = element {
             let fee = f64::from_le_bytes(
                 item.as_slice()
                     .try_into()
@@ -117,15 +117,15 @@ impl<'e> EpochPool<'e> {
                 .insert(
                     self.get_path(),
                     constants::KEY_STORAGE_FEE.as_bytes(),
-                    Element::Item((fee + storage_fee).to_le_bytes().to_vec()),
+                    Element::Item((fee + storage_fee).to_le_bytes().to_vec(), None),
                     transaction,
                 )
                 .map_err(Error::GroveDB)?;
 
             Ok(())
         } else {
-            Err(Error::Drive(DriveError::CorruptedEpochElement(
-                "epoch storage_fee must be an item",
+            Err(Error::Fee(FeeError::CorruptedStorageFeeNotItem(
+                "epoch storage fee must be an item",
             )))
         }
     }

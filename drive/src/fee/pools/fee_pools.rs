@@ -41,7 +41,7 @@ impl<'f> FeePools<'f> {
             .insert(
                 FeePools::get_path(),
                 constants::KEY_STORAGE_FEE_POOL.as_bytes(),
-                Element::Item(0f64.to_le_bytes().to_vec()),
+                Element::Item(0f64.to_le_bytes().to_vec(), None),
                 transaction,
             )
             .map_err(Error::GroveDB)?;

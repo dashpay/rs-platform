@@ -66,6 +66,8 @@ impl<'f> FeePools<'f> {
 
         let proposers = epoch_pool.get_proposers(proposers_limit, transaction)?;
 
+        let proposers_len = proposers.len();
+
         for (proposer_tx_hash, proposed_block_count) in proposers {
             let query_json = json!({
                 "where": [
@@ -121,13 +123,14 @@ impl<'f> FeePools<'f> {
                 self.drive.insert_identity_cbor(
                     Some(pay_to_id),
                     identity.to_cbor(),
+                    true,
                     transaction,
                 )?;
             }
         }
 
         // if less then a limit processed - drop the pool
-        if proposers.len() < proposers_limit.into() {
+        if proposers_len < proposers_limit.into() {
             epoch_pool.delete(transaction)?;
         }
 

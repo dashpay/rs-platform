@@ -8,7 +8,7 @@ use super::constants;
 
 pub struct EpochPool<'e> {
     pub index: u16,
-    key: [u8; 2],
+    pub key: [u8; 2],
     pub drive: &'e Drive,
 }
 
@@ -39,7 +39,7 @@ impl<'e> EpochPool<'e> {
             .insert(
                 self.get_path(),
                 constants::KEY_STORAGE_FEE.as_bytes(),
-                Element::Item(0f64.to_le_bytes().to_vec()),
+                Element::Item(0f64.to_le_bytes().to_vec(), None),
                 transaction,
             )
             .map_err(Error::GroveDB)

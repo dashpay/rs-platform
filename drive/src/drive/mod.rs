@@ -1844,12 +1844,12 @@ impl Drive {
             )
             .map_err(Error::GroveDB)?;
 
-        if let Element::Item(identity_cbor) = element {
+        if let Element::Item(identity_cbor, _) = element {
             let identity = Identity::from_cbor(identity_cbor.as_slice())?;
 
             Ok(identity)
         } else {
-            Err(Error::Drive(DriveError::CorruptedEpochElement(
+            Err(Error::Drive(DriveError::CorruptedIdentityNotItem(
                 "identity must be an item",
             )))
         }

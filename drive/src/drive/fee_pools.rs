@@ -15,9 +15,7 @@ impl Drive {
         let fee_pool = FeePools::new(self);
 
         // initialize the pools with epochs
-        fee_pool.init(transaction)?;
-
-        Ok(())
+        fee_pool.init(transaction)
     }
 
     pub fn process_block(
@@ -52,8 +50,6 @@ impl Drive {
             transaction,
         )?;
 
-        fee_pools.distribute_fees_to_proposers(epoch_index, transaction)?;
-
-        Ok(())
+        fee_pools.distribute_fees_to_proposers(epoch_index, transaction)
     }
 }

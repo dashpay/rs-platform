@@ -1,7 +1,7 @@
 use grovedb::{Element, PathQuery, Query, SizedQuery, TransactionArg};
 
 use crate::{
-    error::{drive::DriveError, Error},
+    error::{drive::DriveError, fee::FeeError, Error},
     fee::pools::epoch::epoch_pool::EpochPool,
 };
 
@@ -22,14 +22,16 @@ impl<'e> EpochPool<'e> {
             )
             .map_err(Error::GroveDB)?;
 
-        if let Element::Item(item) = element {
+        if let Element::Item(item, _) = element {
             Ok(u64::from_le_bytes(
                 item.as_slice().try_into().expect("invalid item length"),
             ))
         } else {
-            Err(Error::Drive(DriveError::CorruptedEpochElement(
-                "epoch first proposed block height must be an item",
-            )))
+            Err(Error::Fee(
+                FeeError::CorruptedFirstProposedBlockHeightNotItem(
+                    "epoch first proposed block height must be an item",
+                ),
+            ))
         }
     }
 
@@ -43,7 +45,7 @@ impl<'e> EpochPool<'e> {
             .insert(
                 self.get_path(),
                 constants::KEY_FIRST_PROPOSER_BLOCK_HEIGHT.as_bytes(),
-                Element::Item(first_proposer_block_height.to_le_bytes().to_vec()),
+                Element::Item(first_proposer_block_height.to_le_bytes().to_vec(), None),
                 transaction,
             )
             .map_err(Error::GroveDB)
@@ -60,12 +62,12 @@ impl<'e> EpochPool<'e> {
             .get(self.get_proposers_path(), proposer_tx_hash, transaction)
             .map_err(Error::GroveDB)?;
 
-        if let Element::Item(item) = element {
+        if let Element::Item(item, _) = element {
             Ok(u64::from_le_bytes(
                 item.as_slice().try_into().expect("invalid item length"),
             ))
         } else {
-            Err(Error::Drive(DriveError::CorruptedEpochElement(
+            Err(Error::Fee(FeeError::CorruptedProposerBlockCountNotItem(
                 "epoch proposer block count must be an item",
             )))
         }
@@ -82,7 +84,7 @@ impl<'e> EpochPool<'e> {
             .insert(
                 self.get_path(),
                 proposer_tx_hash,
-                Element::Item(block_count.to_le_bytes().to_vec()),
+                Element::Item(block_count.to_le_bytes().to_vec(), None),
                 transaction,
             )
             .map_err(Error::GroveDB)
