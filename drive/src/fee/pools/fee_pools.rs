@@ -74,3 +74,62 @@ impl<'f> FeePools<'f> {
         self.get_oldest_epoch_pool(epoch_index - 1, transaction)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use tempfile::TempDir;
+
+    use crate::drive::Drive;
+
+    use super::FeePools;
+
+    #[test]
+    fn test_fee_pools_init() {
+        let tmp_dir = TempDir::new().unwrap();
+        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+
+        drive
+            .create_root_tree(None)
+            .expect("expected to create root tree successfully");
+
+        let transaction = drive.grove.start_transaction();
+
+        let fee_pools = FeePools::new(&drive);
+
+        fee_pools
+            .init(Some(&transaction))
+            .expect("fee pools to init");
+
+        let storage_fee_pool = fee_pools
+            .get_storage_fee_pool(Some(&transaction))
+            .expect("to get storage fee pool");
+
+        assert_eq!(storage_fee_pool, 0f64);
+    }
+
+    #[test]
+    fn test_fee_pools_get_oldest_epoch() {
+        let tmp_dir = TempDir::new().unwrap();
+        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+
+        drive
+            .create_root_tree(None)
+            .expect("expected to create root tree successfully");
+
+        let transaction = drive.grove.start_transaction();
+
+        let fee_pools = FeePools::new(&drive);
+
+        fee_pools
+            .init(Some(&transaction))
+            .expect("fee pools to init");
+
+        let oldest_epoch = fee_pools
+            .get_oldest_epoch_pool(1000, Some(&transaction))
+            .expect("to get oldest epoch pool");
+
+        assert_eq!(oldest_epoch.index, 1000);
+
+        // TODO: find a way to test other epoch index
+    }
+}

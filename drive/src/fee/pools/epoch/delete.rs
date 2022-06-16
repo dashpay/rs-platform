@@ -12,3 +12,11 @@ impl<'e> EpochPool<'e> {
             .map_err(Error::GroveDB)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_epoch_pool_delete() {
+        todo!()
+    }
+}

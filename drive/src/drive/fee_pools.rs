@@ -49,3 +49,11 @@ impl Drive {
         fee_pools.distribute_fees_to_proposers(epoch_index, transaction)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_drive_process_block() {
+        todo!()
+    }
+}

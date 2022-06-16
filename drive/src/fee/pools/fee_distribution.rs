@@ -45,7 +45,6 @@ impl<'f> FeePools<'f> {
         self.update_storage_fee_pool(fee_pool_value, transaction)
     }
 
-    // TODO: throw proper errors instead of expects
     pub fn distribute_fees_to_proposers(
         &self,
         epoch_index: u16,
@@ -174,5 +173,23 @@ impl<'f> FeePools<'f> {
             proposed_block_count + 1,
             transaction,
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_fee_pools_distribute_storage_distribution_pool() {
+        todo!()
+    }
+
+    #[test]
+    fn test_fee_pools_distribute_fees_to_proposers() {
+        todo!()
+    }
+
+    #[test]
+    fn test_fee_pools_distribute_st_fees() {
+        todo!()
     }
 }

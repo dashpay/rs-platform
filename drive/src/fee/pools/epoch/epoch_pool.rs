@@ -57,3 +57,42 @@ impl<'e> EpochPool<'e> {
         ]
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use tempfile::TempDir;
+
+    use crate::{drive::Drive, fee::pools::fee_pools::FeePools};
+
+    use super::EpochPool;
+
+    #[test]
+    fn test_epoch_pool_init() {
+        let tmp_dir = TempDir::new().unwrap();
+        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+
+        drive
+            .create_root_tree(None)
+            .expect("expected to create root tree successfully");
+
+        let transaction = drive.grove.start_transaction();
+
+        let fee_pools = FeePools::new(&drive);
+
+        fee_pools
+            .init(Some(&transaction))
+            .expect("fee pools to init");
+
+        let epoch = EpochPool::new(1042, &drive);
+
+        epoch
+            .init(Some(&transaction))
+            .expect("to init an epoch pool");
+
+        let storage_fee = epoch
+            .get_storage_fee(Some(&transaction))
+            .expect("to get storage fee");
+
+        assert_eq!(storage_fee, 0f64);
+    }
+}

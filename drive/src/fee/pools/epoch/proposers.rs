@@ -161,3 +161,21 @@ impl<'e> EpochPool<'e> {
         Ok(result)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_epoch_pool_update_and_get_first_proposed_block_height() {
+        todo!()
+    }
+
+    #[test]
+    fn test_epoch_pool_update_and_get_proposer_block_count() {
+        todo!()
+    }
+
+    #[test]
+    fn test_epoch_pool_get_proposers() {
+        todo!()
+    }
+}

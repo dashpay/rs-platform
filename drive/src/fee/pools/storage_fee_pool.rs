@@ -73,3 +73,40 @@ impl<'f> FeePools<'f> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use tempfile::TempDir;
+
+    use crate::{drive::Drive, fee::pools::fee_pools::FeePools};
+
+    #[test]
+    fn test_fee_pools_update_and_get_storage_fee_pool() {
+        let tmp_dir = TempDir::new().unwrap();
+        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+
+        drive
+            .create_root_tree(None)
+            .expect("expected to create root tree successfully");
+
+        let transaction = drive.grove.start_transaction();
+
+        let fee_pools = FeePools::new(&drive);
+
+        fee_pools
+            .init(Some(&transaction))
+            .expect("fee pools to init");
+
+        let storage_fee: f64 = 0.42;
+
+        fee_pools
+            .update_storage_fee_pool(storage_fee, Some(&transaction))
+            .expect("to update storage fee pool");
+
+        let stored_storage_fee = fee_pools
+            .get_storage_fee_pool(Some(&transaction))
+            .expect("to get storage fee pool");
+
+        assert_eq!(storage_fee, stored_storage_fee);
+    }
+}
