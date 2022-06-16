@@ -674,12 +674,11 @@ impl DriveWrapper {
                     let callback = js_callback.into_inner(&mut task_context);
                     let this = task_context.undefined();
                     let callback_arguments: Vec<Handle<JsValue>> = match result {
-                        Ok(value) => {
-                            let js_array: Handle<JsArray> = task_context.empty_array();
-                            let js_buffer = JsBuffer::external(&mut task_context, value);
-                            js_array.set(&mut task_context, 0, js_buffer)?;
+                        Ok(proof) => {
+                            let js_buffer = JsBuffer::external(&mut task_context, proof);
+                            let js_value = js_buffer.as_value(&mut task_context);
 
-                            vec![task_context.null().upcast(), js_array.upcast()]
+                            vec![task_context.null().upcast(), js_value.upcast()]
                         }
 
                         // Convert the error to a JavaScript exception on failure
@@ -1382,6 +1381,12 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
         "driveQueryDocuments",
         DriveWrapper::js_create_and_execute_query,
     )?;
+
+    cx.export_function(
+        "driveProveQueryDocuments",
+        DriveWrapper::js_create_and_execute_query_as_grove_proof,
+    )?;
+
     cx.export_function("groveDbInsert", DriveWrapper::js_grove_db_insert)?;
     cx.export_function(
         "groveDbInsertIfNotExists",

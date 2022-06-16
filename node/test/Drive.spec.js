@@ -344,6 +344,28 @@ describe('Drive', () => {
     });
   });
 
+  describe('#proveQueryDocuments', () => {
+    beforeEach(async () => {
+      await drive.createRootTree();
+
+      await drive.applyContract(dataContract, blockTime);
+    });
+
+    it('should query existing documents', async () => {
+      // Create documents
+      await Promise.all(
+        documents.map((document) => drive.createDocument(document, blockTime)),
+      );
+
+      const proofs = await drive.proveQueryDocuments(dataContract, 'indexedDocument', {
+        where: [['lastName', '==', 'Kennedy']],
+      });
+
+      expect(proofs).to.be.an.instanceOf(Buffer);
+      expect(proofs.length).to.be.greaterThan(0);
+    });
+  });
+
   describe('#insertIdentity', () => {
     beforeEach(async () => {
       await drive.createRootTree();
