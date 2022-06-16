@@ -595,7 +595,7 @@ mod tests {
                 },
                 false,
                 0f64,
-                false,
+                true,
                 None,
             )
             .expect("expected to insert a document successfully");
@@ -632,7 +632,7 @@ mod tests {
                 },
                 false,
                 0f64,
-                false,
+                true,
                 None,
             )
             .expect("expected to insert a document successfully");

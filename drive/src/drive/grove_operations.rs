@@ -4,10 +4,15 @@ use crate::drive::object_size_info::KeyValueInfo::{KeyRefRequest, KeyValueMaxSiz
 use crate::drive::object_size_info::PathKeyElementInfo::{
     PathFixedSizeKeyElement, PathKeyElement, PathKeyElementSize,
 };
+use crate::drive::object_size_info::PathKeyForDeletionElementInfo::{
+    PathFixedSizeKeyForDeletion, PathKeyElementSizeForDeletion, PathKeyForDeletion,
+};
 use crate::drive::object_size_info::PathKeyInfo::{
     PathFixedSizeKey, PathFixedSizeKeyRef, PathKey, PathKeyRef, PathKeySize,
 };
-use crate::drive::object_size_info::{KeyInfo, KeyValueInfo, PathKeyElementInfo, PathKeyInfo};
+use crate::drive::object_size_info::{
+    KeyInfo, KeyValueInfo, PathKeyElementInfo, PathKeyForDeletionElementInfo, PathKeyInfo,
+};
 use crate::drive::Drive;
 use crate::error::drive::DriveError;
 use crate::error::Error;
@@ -571,6 +576,59 @@ impl Drive {
                 Ok(!has_raw)
             }
         }
+    }
+
+    pub fn grove_delete<'a, const N: usize>(
+        &'a self,
+        path_key_element_info: PathKeyForDeletionElementInfo<N>,
+        transaction: TransactionArg,
+    ) -> Result<(), Error> {
+        match path_key_element_info {
+            PathFixedSizeKeyForDeletion((path, key)) => {
+                self.grove
+                    .delete(path, key, transaction)
+                    .map_err(Error::GroveDB)?;
+            }
+
+            PathKeyForDeletion((path, key)) => {
+                let path: Vec<&[u8]> = path.iter().map(|i| i.as_slice()).collect();
+
+                self.grove
+                    .delete(path, key, transaction)
+                    .map_err(Error::GroveDB)?;
+            }
+
+            PathKeyElementSizeForDeletion((_, _, _)) => {}
+        }
+
+        Ok(())
+    }
+
+    pub fn grove_delete_up_tree_while_empty<'a, const N: usize>(
+        &'a self,
+        path_key_element_info: PathKeyForDeletionElementInfo<N>,
+        stop_path_height: Option<u16>,
+        transaction: TransactionArg,
+    ) -> Result<(), Error> {
+        match path_key_element_info {
+            PathFixedSizeKeyForDeletion((path, key)) => {
+                self.grove
+                    .delete_up_tree_while_empty(path, key, stop_path_height, transaction)
+                    .map_err(Error::GroveDB)?;
+            }
+
+            PathKeyForDeletion((path, key)) => {
+                let path: Vec<&[u8]> = path.iter().map(|i| i.as_slice()).collect();
+
+                self.grove
+                    .delete_up_tree_while_empty(path, key, stop_path_height, transaction)
+                    .map_err(Error::GroveDB)?;
+            }
+
+            PathKeyElementSizeForDeletion((_, _, _)) => {}
+        }
+
+        Ok(())
     }
 
     pub(crate) fn batch_delete<'a, 'c, P>(
