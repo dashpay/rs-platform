@@ -145,8 +145,6 @@ impl Drive {
     ) -> Result<(Vec<u8>, u64), Error> {
         let mut drive_operations: Vec<DriveOperation> = vec![];
 
-        let query = DriveQuery::from_cbor(query_cbor, contract, document_type)?;
-
         let items = self.query_documents_from_contract_as_grove_proof_internal(
             contract,
             document_type,
