@@ -1,8 +1,7 @@
-use crate::drive::defaults::EMPTY_TREE_STORAGE_SIZE;
 use crate::drive::flags::StorageFlags;
 use crate::fee::op::DriveOperation::{
-    CalculatedCostOperation, CostCalculationDeleteOperation, CostCalculationInsertOperation,
-    CostCalculationQueryOperation, GroveOperation,
+    CalculatedCostOperation, ContractFetch, CostCalculationDeleteOperation,
+    CostCalculationInsertOperation, CostCalculationQueryOperation, GroveOperation,
 };
 use costs::OperationCost;
 use enum_map::{enum_map, Enum, EnumMap};
