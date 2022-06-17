@@ -1,9 +1,12 @@
 use crate::drive::defaults::EMPTY_TREE_STORAGE_SIZE;
 use crate::drive::flags::StorageFlags;
-use crate::fee::op::DriveOperation::{CostCalculationInsertOperation, GroveOperation};
+use crate::fee::op::DriveOperation::{
+    CalculatedCostOperation, CostCalculationDeleteOperation, CostCalculationInsertOperation,
+    CostCalculationQueryOperation, GroveOperation,
+};
+use costs::OperationCost;
 use enum_map::{enum_map, Enum, EnumMap};
-use grovedb::batch::GroveDbOp;
-use grovedb::{Element, GroveDb, PathQuery};
+use grovedb::{batch::GroveDbOp, Element, GroveDb, PathQuery};
 
 pub(crate) const STORAGE_CREDIT_PER_BYTE: u64 = 5000;
 pub(crate) const STORAGE_PROCESSING_CREDIT_PER_BYTE: u64 = 10;
@@ -76,13 +79,14 @@ impl FunctionOp {
     pub fn cost(&self, word_count: u32) {}
 }
 
-pub struct QueryOperation {
+#[derive(Debug)]
+pub struct SizesOfQueryOperation {
     pub key_size: u32,
     pub path_size: u32,
     pub value_size: u32,
 }
 
-impl QueryOperation {
+impl SizesOfQueryOperation {
     pub fn for_key_check_in_path<'a: 'b, 'b, 'c, P>(key_len: usize, path: P) -> Self
     where
         P: IntoIterator<Item = &'c [u8]>,
@@ -92,7 +96,7 @@ impl QueryOperation {
             .into_iter()
             .map(|inner: &[u8]| inner.len() as u32)
             .sum();
-        QueryOperation {
+        SizesOfQueryOperation {
             key_size: key_len as u32,
             path_size,
             value_size: 0,
@@ -100,7 +104,7 @@ impl QueryOperation {
     }
 
     pub fn for_key_check_with_path_length(key_len: usize, path_len: usize) -> Self {
-        QueryOperation {
+        SizesOfQueryOperation {
             key_size: key_len as u32,
             path_size: path_len as u32,
             value_size: 0,
@@ -120,7 +124,7 @@ impl QueryOperation {
             .into_iter()
             .map(|inner: &[u8]| inner.len() as u32)
             .sum();
-        QueryOperation {
+        SizesOfQueryOperation {
             key_size: key_len as u32,
             path_size,
             value_size: value_len as u32,
@@ -132,7 +136,7 @@ impl QueryOperation {
         path_len: usize,
         value_len: usize,
     ) -> Self {
-        QueryOperation {
+        SizesOfQueryOperation {
             key_size: key_len as u32,
             path_size: path_len as u32,
             value_size: value_len as u32,
@@ -140,7 +144,7 @@ impl QueryOperation {
     }
 
     pub fn for_path_query(path_query: &PathQuery, returned_values: &[Vec<u8>]) -> Self {
-        QueryOperation {
+        SizesOfQueryOperation {
             key_size: path_query
                 .query
                 .query
@@ -154,7 +158,7 @@ impl QueryOperation {
     }
 
     pub fn for_empty_path_query(path_query: &PathQuery) -> Self {
-        QueryOperation {
+        SizesOfQueryOperation {
             key_size: path_query
                 .query
                 .query
@@ -177,16 +181,72 @@ impl QueryOperation {
 }
 
 #[derive(Debug)]
-pub struct SizeOfInsertOperation {
+pub struct SizesOfInsertOperation {
     pub path_size: u32,
     pub key_size: u16,
     pub value_size: u32,
 }
 
 #[derive(Debug)]
+pub struct SizesOfDeleteOperation {
+    pub path_size: u32,
+    pub key_size: u16,
+    pub value_size: u32,
+    pub multiplier: u8,
+}
+
+impl SizesOfDeleteOperation {
+    pub fn for_empty_tree(path_size: u32, key_size: u16, multiplier: u8) -> Self {
+        SizesOfDeleteOperation {
+            path_size,
+            key_size,
+            value_size: 0,
+            multiplier,
+        }
+    }
+    pub fn for_key_value(path_size: u32, key_size: u16, element: &Element, multiplier: u8) -> Self {
+        let value_size = match element {
+            Element::Item(item, _) => item.len(),
+            Element::Reference(path, _) => path.iter().map(|inner| inner.len()).sum(),
+            Element::Tree(..) => 32,
+        } as u32;
+        SizesOfDeleteOperation::for_key_value_size(path_size, key_size, value_size, multiplier)
+    }
+
+    pub fn for_key_value_size(
+        path_size: u32,
+        key_size: u16,
+        value_size: u32,
+        multiplier: u8,
+    ) -> Self {
+        SizesOfDeleteOperation {
+            path_size,
+            key_size,
+            value_size,
+            multiplier,
+        }
+    }
+
+    pub fn data_size(&self) -> u32 {
+        self.value_size + self.key_size as u32
+    }
+
+    pub fn ephemeral_cost(&self) -> u64 {
+        self.data_size() as u64 * STORAGE_PROCESSING_CREDIT_PER_BYTE
+    }
+
+    pub fn storage_cost(&self) -> i64 {
+        -(self.data_size() as i64 * STORAGE_CREDIT_PER_BYTE as i64)
+    }
+}
+
+#[derive(Debug)]
 pub enum DriveOperation {
     GroveOperation(GroveDbOp),
-    CostCalculationInsertOperation(SizeOfInsertOperation),
+    CalculatedCostOperation(OperationCost),
+    CostCalculationInsertOperation(SizesOfInsertOperation),
+    CostCalculationDeleteOperation(SizesOfDeleteOperation),
+    CostCalculationQueryOperation(SizesOfQueryOperation),
 }
 
 impl DriveOperation {
@@ -208,8 +268,38 @@ impl DriveOperation {
         GroveOperation(GroveDbOp::insert(path, key, element))
     }
 
-    pub fn for_path_key_value_size(path_size: u32, key_size: u16, value_size: u32) -> Self {
-        CostCalculationInsertOperation(SizeOfInsertOperation {
+    pub fn for_insert_path_key_value_size(path_size: u32, key_size: u16, value_size: u32) -> Self {
+        CostCalculationInsertOperation(SizesOfInsertOperation {
+            path_size,
+            key_size,
+            value_size,
+        })
+    }
+
+    pub fn for_delete_path_key_value_size(
+        path: Vec<Vec<u8>>,
+        key_size: u16,
+        value_size: u32,
+        multiplier: u8,
+    ) -> Self {
+        let path_sizes: Vec<u16> = path.into_iter().map(|x| x.len() as u16).collect();
+        Self::for_delete_path_key_value_max_sizes(path_sizes, key_size, value_size, multiplier)
+    }
+
+    pub fn for_delete_path_key_value_max_sizes(
+        path: Vec<u16>,
+        key_size: u16,
+        value_size: u32,
+        multiplier: u8,
+    ) -> Self {
+        let path_size: u32 = path.into_iter().map(|x| x as u32).sum();
+        CostCalculationDeleteOperation(SizesOfDeleteOperation::for_key_value_size(
+            path_size, key_size, value_size, multiplier,
+        ))
+    }
+
+    pub fn for_query_path_key_value_size(path_size: u32, key_size: u32, value_size: u32) -> Self {
+        CostCalculationQueryOperation(SizesOfQueryOperation {
             path_size,
             key_size,
             value_size,
@@ -226,6 +316,13 @@ impl DriveOperation {
                 );
                 node_value_size as u32
             }
+            CostCalculationQueryOperation(worst_case_query_operation) => {
+                worst_case_query_operation.data_size()
+            }
+            CostCalculationDeleteOperation(worst_case_delete_operation) => {
+                worst_case_delete_operation.data_size()
+            }
+            CalculatedCostOperation(operation_cost) => operation_cost.storage_written_bytes as u32,
         }
     }
 
@@ -235,45 +332,5 @@ impl DriveOperation {
 
     pub fn storage_cost(&self) -> i64 {
         self.data_size() as i64 * STORAGE_CREDIT_PER_BYTE as i64
-    }
-}
-
-pub struct DeleteOperation {
-    pub key_size: u16,
-    pub value_size: u32,
-    pub multiplier: u64,
-}
-
-impl DeleteOperation {
-    pub fn for_empty_tree(key_size: usize, multiplier: u64) -> Self {
-        DeleteOperation {
-            key_size: key_size as u16,
-            value_size: 0,
-            multiplier,
-        }
-    }
-    pub fn for_key_value(key_size: usize, element: &Element, multiplier: u64) -> Self {
-        let value_size = match element {
-            Element::Item(item, _) => item.len(),
-            Element::Reference(path, _) => path.iter().map(|inner| inner.len()).sum(),
-            Element::Tree(..) => 32,
-        };
-        DeleteOperation {
-            key_size: key_size as u16,
-            value_size: value_size as u32,
-            multiplier,
-        }
-    }
-
-    pub fn data_size(&self) -> u32 {
-        self.value_size + self.key_size as u32
-    }
-
-    pub fn ephemeral_cost(&self) -> u64 {
-        self.data_size() as u64 * STORAGE_PROCESSING_CREDIT_PER_BYTE
-    }
-
-    pub fn storage_cost(&self) -> i64 {
-        -(self.data_size() as i64 * STORAGE_CREDIT_PER_BYTE as i64)
     }
 }

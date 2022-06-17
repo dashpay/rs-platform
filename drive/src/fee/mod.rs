@@ -1,13 +1,12 @@
 use crate::error::fee::FeeError;
 use crate::error::Error;
-use crate::fee::op::{BaseOp, DeleteOperation, DriveOperation, QueryOperation};
+use crate::fee::op::{BaseOp, DriveOperation, SizesOfDeleteOperation, SizesOfQueryOperation};
 use enum_map::EnumMap;
 
 pub mod op;
 
 pub fn calculate_fee(
     base_operations: Option<EnumMap<BaseOp, u64>>,
-    query_operations: Option<Vec<QueryOperation>>,
     drive_operations: Option<Vec<DriveOperation>>,
 ) -> Result<(i64, u64), Error> {
     let mut storage_cost = 0i64;
@@ -21,14 +20,6 @@ pub fn calculate_fee(
                     None => return Err(Error::Fee(FeeError::Overflow("overflow error"))),
                     Some(value) => cpu_cost = value,
                 },
-            }
-        }
-    }
-    if let Some(query_operations) = query_operations {
-        for query_operation in query_operations {
-            match cpu_cost.checked_add(query_operation.ephemeral_cost()) {
-                None => return Err(Error::Fee(FeeError::Overflow("overflow error"))),
-                Some(value) => cpu_cost = value,
             }
         }
     }
