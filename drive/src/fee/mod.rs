@@ -10,15 +10,15 @@ pub fn calculate_fee(
     drive_operations: Option<Vec<DriveOperation>>,
 ) -> Result<(i64, u64), Error> {
     let mut storage_cost = 0i64;
-    let mut cpu_cost = 0u64;
+    let mut processing_cost = 0u64;
     if let Some(base_operations) = base_operations {
         for (base_op, count) in base_operations.iter() {
             match base_op.cost().checked_mul(*count) {
                 // Todo: This should be made into an overflow error
                 None => return Err(Error::Fee(FeeError::Overflow("overflow error"))),
-                Some(cost) => match cpu_cost.checked_add(cost) {
+                Some(cost) => match processing_cost.checked_add(cost) {
                     None => return Err(Error::Fee(FeeError::Overflow("overflow error"))),
-                    Some(value) => cpu_cost = value,
+                    Some(value) => processing_cost = value,
                 },
             }
         }
@@ -26,9 +26,9 @@ pub fn calculate_fee(
 
     if let Some(drive_operations) = drive_operations {
         for drive_operation in drive_operations {
-            match cpu_cost.checked_add(drive_operation.ephemeral_cost()) {
+            match processing_cost.checked_add(drive_operation.ephemeral_cost()) {
                 None => return Err(Error::Fee(FeeError::Overflow("overflow error"))),
-                Some(value) => cpu_cost = value,
+                Some(value) => processing_cost = value,
             }
 
             match storage_cost.checked_add(drive_operation.storage_cost()) {
@@ -38,5 +38,5 @@ pub fn calculate_fee(
         }
     }
 
-    Ok((storage_cost, cpu_cost))
+    Ok((storage_cost, processing_cost))
 }
