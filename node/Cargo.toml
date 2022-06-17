@@ -1,6 +1,6 @@
 [package]
 name = "node"
-version = "0.23.0-dev.4"
+version = "0.23.0-dev.5"
 description = "GroveDB node.js bindings"
 edition = "2021"
 license = "MIT"
@@ -14,9 +14,9 @@ rs-drive = { path = "../drive" }
 
 [dependencies.grovedb]
 git = "https://github.com/dashevo/grovedb"
-branch = "develop"
+branch = "feat/BatchDeleteUpTreeWhileEmpty"
 
 [dependencies.neon]
-version = "0.9"
+version = "0.10.1"
 default-features = false
 features = ["napi-6", "event-queue-api", "try-catch-api"]
