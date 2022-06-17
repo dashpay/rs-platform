@@ -22,12 +22,14 @@ fn test_root_hash(drive: &Drive, db_transaction: &Transaction) {
             Into::<&[u8; 1]>::into(RootTree::Identities),
             Element::empty_tree(),
             Some(db_transaction),
-        ).unwrap()
+        )
+        .unwrap()
         .expect("should insert tree");
 
     let app_hash = drive
         .grove
-        .root_hash(Some(db_transaction)).unwrap()
+        .root_hash(Some(db_transaction))
+        .unwrap()
         .ok()
         .flatten()
         .expect("should return app hash");
@@ -55,12 +57,14 @@ fn test_root_hash(drive: &Drive, db_transaction: &Transaction) {
             Into::<&[u8; 1]>::into(RootTree::PublicKeyHashesToIdentities),
             Element::empty_tree(),
             Some(db_transaction),
-        ).unwrap()
+        )
+        .unwrap()
         .expect("should insert tree");
 
     let app_hash = drive
         .grove
-        .root_hash(Some(db_transaction)).unwrap()
+        .root_hash(Some(db_transaction))
+        .unwrap()
         .ok()
         .flatten()
         .expect("should return app hash");
@@ -88,12 +92,14 @@ fn test_root_hash(drive: &Drive, db_transaction: &Transaction) {
             Into::<&[u8; 1]>::into(RootTree::ContractDocuments),
             Element::empty_tree(),
             Some(db_transaction),
-        ).unwrap()
+        )
+        .unwrap()
         .expect("should insert tree");
 
     let app_hash = drive
         .grove
-        .root_hash(Some(db_transaction)).unwrap()
+        .root_hash(Some(db_transaction))
+        .unwrap()
         .ok()
         .flatten()
         .expect("should return app hash");
@@ -121,12 +127,14 @@ fn test_root_hash(drive: &Drive, db_transaction: &Transaction) {
             Into::<&[u8; 1]>::into(RootTree::Misc),
             Element::empty_tree(),
             Some(db_transaction),
-        ).unwrap()
+        )
+        .unwrap()
         .expect("should insert tree");
 
     let app_hash = drive
         .grove
-        .root_hash(Some(db_transaction)).unwrap()
+        .root_hash(Some(db_transaction))
+        .unwrap()
         .ok()
         .flatten()
         .expect("should return app hash");
@@ -156,12 +164,14 @@ fn test_root_hash(drive: &Drive, db_transaction: &Transaction) {
             &[0],
             Element::empty_tree(),
             Some(db_transaction),
-        ).unwrap()
+        )
+        .unwrap()
         .expect("should insert tree");
 
     let app_hash = drive
         .grove
-        .root_hash(Some(db_transaction)).unwrap()
+        .root_hash(Some(db_transaction))
+        .unwrap()
         .ok()
         .flatten()
         .expect("should return app hash");
@@ -193,7 +203,8 @@ fn test_root_hash(drive: &Drive, db_transaction: &Transaction) {
 
     let app_hash = drive
         .grove
-        .root_hash(Some(db_transaction)).unwrap()
+        .root_hash(Some(db_transaction))
+        .unwrap()
         .ok()
         .flatten()
         .expect("should return app hash");
@@ -230,12 +241,14 @@ fn test_root_hash(drive: &Drive, db_transaction: &Transaction) {
                 .unwrap(),
             ),
             Some(db_transaction),
-        ).unwrap()
+        )
+        .unwrap()
         .expect("should insert");
 
     let app_hash = drive
         .grove
-        .root_hash(Some(db_transaction)).unwrap()
+        .root_hash(Some(db_transaction))
+        .unwrap()
         .ok()
         .flatten()
         .expect("should return app hash");
@@ -259,7 +272,8 @@ fn test_root_hash(drive: &Drive, db_transaction: &Transaction) {
 
     let app_hash = drive
         .grove
-        .root_hash(Some(db_transaction)).unwrap()
+        .root_hash(Some(db_transaction))
+        .unwrap()
         .ok()
         .flatten()
         .expect("should return app hash");
