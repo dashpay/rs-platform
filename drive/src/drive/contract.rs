@@ -10,7 +10,9 @@ use crate::drive::{contract_documents_path, defaults, Drive, RootTree};
 use crate::error::drive::DriveError;
 use crate::error::Error;
 use crate::fee::calculate_fee;
-use crate::fee::op::DriveOperation::{CalculatedCostOperation, ContractFetch, CostCalculationQueryOperation};
+use crate::fee::op::DriveOperation::{
+    CalculatedCostOperation, ContractFetch, CostCalculationQueryOperation,
+};
 use crate::fee::op::{DriveOperation, SizesOfQueryOperation};
 use costs::CostContext;
 use grovedb::{Element, TransactionArg};
