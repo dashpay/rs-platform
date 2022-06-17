@@ -10,7 +10,7 @@ use crate::drive::{contract_documents_path, defaults, Drive, RootTree};
 use crate::error::drive::DriveError;
 use crate::error::Error;
 use crate::fee::calculate_fee;
-use crate::fee::op::DriveOperation::CalculatedCostOperation;
+use crate::fee::op::DriveOperation::{CalculatedCostOperation, ContractFetch, CostCalculationQueryOperation};
 use crate::fee::op::{DriveOperation, SizesOfQueryOperation};
 use costs::CostContext;
 use grovedb::{Element, TransactionArg};
@@ -354,10 +354,12 @@ impl Drive {
         transaction: TransactionArg,
         drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<Option<Arc<Contract>>, Error> {
+        // We always charge for a contract fetch in order to remove non determinism issues
+        drive_operations.push(ContractFetch);
         let cached_contracts = self.cached_contracts.borrow();
         match cached_contracts.get(&contract_id) {
             None => self
-                .fetch_contract(contract_id, transaction, drive_operations)
+                .fetch_contract(contract_id, transaction)
                 .map(|(c, _)| c),
             Some(contract) => {
                 let contract_ref = Arc::clone(&contract);
@@ -384,12 +386,10 @@ impl Drive {
         &self,
         contract_id: [u8; 32],
         transaction: TransactionArg,
-        drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<(Option<Arc<Contract>>, StorageFlags), Error> {
         let CostContext { value, cost } =
             self.grove
                 .get(contract_root_path(&contract_id), &[0], transaction);
-        drive_operations.push(CalculatedCostOperation(cost));
         let stored_element = value.map_err(Error::GroveDB)?;
         if let Element::Item(stored_contract_bytes, element_flag) = stored_element {
             let contract = Arc::new(Contract::from_cbor(&stored_contract_bytes, None)?);

@@ -247,6 +247,7 @@ pub enum DriveOperation {
     CostCalculationInsertOperation(SizesOfInsertOperation),
     CostCalculationDeleteOperation(SizesOfDeleteOperation),
     CostCalculationQueryOperation(SizesOfQueryOperation),
+    ContractFetch,
 }
 
 impl DriveOperation {
@@ -323,6 +324,7 @@ impl DriveOperation {
                 worst_case_delete_operation.data_size()
             }
             CalculatedCostOperation(operation_cost) => operation_cost.storage_written_bytes as u32,
+            ContractFetch => { 0 }
         }
     }
 
