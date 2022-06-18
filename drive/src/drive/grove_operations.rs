@@ -244,6 +244,7 @@ impl Drive {
         match path_key_element_info {
             PathKeyElement((path, key, element)) => {
                 if apply {
+                    // println!("element {:#?}", element);
                     let path_iter: Vec<&[u8]> = path.iter().map(|x| x.as_slice()).collect();
                     let cost_context = self.grove.insert(path_iter, key, element, transaction);
                     push_drive_operation_result_optional(cost_context, drive_operations)
@@ -763,7 +764,7 @@ impl Drive {
         drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<(), Error> {
         if self.config.batching_enabled {
-            let cost_context = self.grove.apply_batch(ops, validate, transaction);
+            let cost_context = self.grove.apply_sorted_pre_validated_batch(ops, transaction);
             push_drive_operation_result(cost_context, drive_operations)
         } else {
             //println!("changes {} {:#?}", ops.len(), ops);

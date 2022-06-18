@@ -247,6 +247,7 @@ impl Drive {
         drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<(), Error> {
         if apply {
+            // println!("batch {:#?}", batch_operations);
             self.grove_apply_batch(
                 DriveOperation::grovedb_operations(&batch_operations),
                 true,
@@ -1547,6 +1548,48 @@ mod tests {
 
     #[test]
     fn test_add_dashpay_fee_for_documents() {
+        let tmp_dir = TempDir::new().unwrap();
+        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+
+        let db_transaction = drive.grove.start_transaction();
+
+        drive
+            .create_root_tree(Some(&db_transaction))
+            .expect("expected to create root tree successfully");
+
+        let contract = setup_contract(
+            &drive,
+            "tests/supporting_files/contract/dashpay/dashpay-contract-all-mutable.json",
+            None,
+            Some(&db_transaction),
+        );
+
+        let dashpay_cr_document_cbor = json_document_to_cbor(
+            "tests/supporting_files/contract/dashpay/contact-request0.json",
+            Some(1),
+        );
+
+        let random_owner_id = rand::thread_rng().gen::<[u8; 32]>();
+
+        let (actual_storage_fee, actual_processing_fee) = drive
+            .add_document_cbor_for_contract(
+                &dashpay_cr_document_cbor,
+                &contract,
+                "contactRequest",
+                Some(&random_owner_id),
+                false,
+                0f64,
+                true,
+                Some(&db_transaction),
+            )
+            .expect("expected to insert a document successfully");
+
+        assert_eq!(1, actual_storage_fee);
+        assert_eq!(1, actual_processing_fee);
+    }
+
+    #[test]
+    fn test_max_cost_dashpay_fee_for_documents() {
         let tmp_dir = TempDir::new().unwrap();
         let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
 

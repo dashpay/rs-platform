@@ -1,4 +1,4 @@
-pub const DEFAULT_GROVE_BATCHING_ENABLED: bool = false;
+pub const DEFAULT_GROVE_BATCHING_ENABLED: bool = true;
 
 pub struct DriveConfig {
     pub batching_enabled: bool,

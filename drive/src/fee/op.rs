@@ -7,7 +7,7 @@ use costs::OperationCost;
 use enum_map::{enum_map, Enum, EnumMap};
 use grovedb::{batch::GroveDbOp, Element, GroveDb, PathQuery};
 
-pub(crate) const STORAGE_CREDIT_PER_BYTE: u64 = 5000;
+pub(crate) const STORAGE_CREDIT_PER_BYTE: u64 = 45000;
 pub(crate) const STORAGE_PROCESSING_CREDIT_PER_BYTE: u64 = 10;
 pub(crate) const QUERY_CREDIT_PER_BYTE: u64 = 10;
 

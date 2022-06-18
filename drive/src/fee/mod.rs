@@ -25,6 +25,7 @@ pub fn calculate_fee(
     }
 
     if let Some(drive_operations) = drive_operations {
+        // println!("{:#?}", drive_operations);
         for drive_operation in drive_operations {
             match processing_cost.checked_add(drive_operation.ephemeral_cost()) {
                 None => return Err(Error::Fee(FeeError::Overflow("overflow error"))),

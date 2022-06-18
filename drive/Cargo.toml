@@ -27,12 +27,12 @@ nohash-hasher = "0.2.0"
 
 [dependencies.grovedb]
 git = "https://github.com/dashevo/grovedb"
-branch = "feat/BatchDeleteUpTreeWhileEmpty"
+branch = "fix/batches"
 
 [dependencies.storage]
 git = "https://github.com/dashevo/grovedb"
-branch = "feat/BatchDeleteUpTreeWhileEmpty"
+branch = "fix/batches"
 
 [dependencies.costs]
 git = "https://github.com/dashevo/grovedb"
-branch = "feat/BatchDeleteUpTreeWhileEmpty"
+branch = "fix/batches"
