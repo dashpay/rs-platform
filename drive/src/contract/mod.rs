@@ -695,6 +695,10 @@ impl DocumentType {
         vec
     }
 
+    pub fn document_from_bytes(&self, bytes: &[u8]) -> Result<Document, Error> {
+        Document::from_bytes(bytes, self)
+    }
+
     pub fn random_document(&self, seed: Option<u64>) -> Document {
         let mut rng = match seed {
             None => StdRng::from_entropy(),

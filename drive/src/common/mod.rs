@@ -92,6 +92,19 @@ pub fn cbor_map_to_btree_map(cbor_map: &[(Value, Value)]) -> BTreeMap<String, &V
         .collect::<BTreeMap<String, &Value>>()
 }
 
+pub fn cbor_owned_map_to_btree_map(cbor_map: Vec<(Value, Value)>) -> BTreeMap<String, Value> {
+    cbor_map
+        .into_iter()
+        .filter_map(|(key, value)| {
+            if let Value::Text(key) = key {
+                Some((key, value))
+            } else {
+                None
+            }
+        })
+        .collect::<BTreeMap<String, Value>>()
+}
+
 pub fn cbor_inner_array_value<'a>(
     document_type: &'a [(Value, Value)],
     key: &'a str,

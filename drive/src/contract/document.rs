@@ -1,18 +1,16 @@
 use crate::common::{bytes_for_system_value_from_tree_map, get_key_from_cbor_map};
 use crate::contract::{Contract, DocumentType};
-use crate::drive::defaults::{DEFAULT_HASH_SIZE, PROTOCOL_VERSION};
+use crate::drive::defaults::PROTOCOL_VERSION;
 use crate::drive::Drive;
 use crate::error::contract::ContractError;
 use crate::error::drive::DriveError;
 use crate::error::structure::StructureError;
 use crate::error::Error;
-use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
-use bytes::{Buf, BufMut, BytesMut};
+use byteorder::{BigEndian, WriteBytesExt};
 use ciborium::value::Value;
-use integer_encoding::{VarInt, VarIntReader};
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, HashMap};
-use std::io::{BufReader, Cursor, Read};
+use std::collections::BTreeMap;
+use std::io::{BufReader, Read};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct Document {
@@ -37,6 +35,33 @@ impl Document {
             .iter()
             .map(|(field_name, field)| {
                 if let Some(value) = self.properties.get(field_name) {
+                    let value = field
+                        .document_type
+                        .encode_value_ref_with_size(value, field.required)?;
+                    buffer.extend(value.as_slice());
+                    Ok(())
+                } else if field.required {
+                    Err(Error::Contract(ContractError::MissingRequiredKey(
+                        "a required field is not present",
+                    )))
+                } else {
+                    // We don't have something that wasn't required
+                    buffer.push(0);
+                    Ok(())
+                }
+            })
+            .collect::<Result<(), Error>>()?;
+        Ok(buffer)
+    }
+
+    pub fn serialize_consume(mut self, document_type: &DocumentType) -> Result<Vec<u8>, Error> {
+        let mut buffer: Vec<u8> = self.id.as_slice().to_vec();
+        buffer.extend(self.owner_id.as_slice());
+        document_type
+            .properties
+            .iter()
+            .map(|(field_name, field)| {
+                if let Some(value) = self.properties.remove(field_name) {
                     let value = field
                         .document_type
                         .encode_value_with_size(value, field.required)?;
@@ -318,8 +343,6 @@ impl Document {
 mod tests {
     use crate::common::json_document_to_cbor;
     use crate::contract::{Contract, Document};
-    use crate::drive::Drive;
-    use std::collections::HashMap;
 
     #[test]
     fn test_drive_serialization() {
@@ -336,10 +359,14 @@ mod tests {
 
         let document_cbor = document.to_cbor();
 
-        let document_serialized = document
+        let serialized_document = document
             .serialize(document_type)
             .expect("expected to serialize");
 
-        assert!(document_serialized.len() < document_cbor.len());
+        let deserialized_document = document_type
+            .document_from_bytes(serialized_document.as_slice())
+            .expect("expected to deserialize a document");
+        assert_eq!(document, deserialized_document);
+        assert!(serialized_document.len() < document_cbor.len());
     }
 }

@@ -25,7 +25,6 @@ enum-map = "2.0.3"
 thiserror = "1.0.30"
 moka = "0.8.1"
 nohash-hasher = "0.2.0"
-bytes = "1.1.0"
 
 [dependencies.grovedb]
 git = "https://github.com/dashevo/grovedb"
@@ -38,3 +37,10 @@ branch = "fix/batches"
 [dependencies.costs]
 git = "https://github.com/dashevo/grovedb"
 branch = "fix/batches"
+
+[dev-dependencies]
+criterion = "0.3.5"
+
+[[bench]]
+name = "benchmarks"
+harness = false

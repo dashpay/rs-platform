@@ -1,4 +1,4 @@
-use crate::common::{cbor_inner_array_value, cbor_map_to_btree_map};
+use crate::common::{cbor_inner_array_value, cbor_map_to_btree_map, cbor_owned_map_to_btree_map};
 use crate::error::contract::ContractError;
 use crate::error::drive::DriveError;
 use crate::error::Error;
@@ -231,8 +231,8 @@ impl DocumentFieldType {
         if bytes == 0 {
             Ok(None)
         } else {
-            let mut value: Vec<u8> = Vec::with_capacity(bytes);
-            buf.read_exact(value.as_mut_slice()).map_err(|_| {
+            let mut value: Vec<u8> = vec![0u8; bytes];
+            buf.read_exact(&mut value).map_err(|_| {
                 Error::Drive(DriveError::CorruptedSerialization(
                     "error reading from serialized document",
                 ))
@@ -289,12 +289,12 @@ impl DocumentFieldType {
                         return Ok(None);
                     }
                 }
-                let date = buf.read_f64::<BigEndian>().map_err(|_| {
+                let integer = buf.read_i64::<BigEndian>().map_err(|_| {
                     Error::Drive(DriveError::CorruptedSerialization(
                         "error reading from serialized document",
                     ))
                 })?;
-                Ok(Some(Value::Float(date)))
+                Ok(Some(Value::Integer(Integer::from(integer))))
             }
             DocumentFieldType::Boolean => {
                 let value = buf.read_u8().map_err(|_| {
@@ -310,16 +310,7 @@ impl DocumentFieldType {
             }
             DocumentFieldType::ByteArray(_, _) => {
                 let bytes = Self::read_varint_value(buf)?;
-                if let Some(bytes) = bytes {
-                    let string = String::from_utf8(bytes).map_err(|_| {
-                        Error::Drive(DriveError::CorruptedSerialization(
-                            "error reading from serialized document",
-                        ))
-                    })?;
-                    Ok(Some(Value::Text(string)))
-                } else {
-                    Ok(None)
-                }
+                Ok(bytes.map(Value::Bytes))
             }
 
             DocumentFieldType::Object(inner_fields) => {
@@ -358,7 +349,175 @@ impl DocumentFieldType {
         };
     }
 
-    pub fn encode_value_with_size(&self, value: &Value, required: bool) -> Result<Vec<u8>, Error> {
+    pub fn encode_value_with_size(&self, value: Value, required: bool) -> Result<Vec<u8>, Error> {
+        if value.is_null() {
+            return Ok(vec![]);
+        }
+        return match self {
+            DocumentFieldType::String(_, _) => {
+                if let Value::Text(value) = value {
+                    let vec = value.into_bytes();
+                    let mut r_vec = vec.len().encode_var_vec();
+                    r_vec.extend(vec);
+                    Ok(r_vec)
+                } else {
+                    Err(get_field_type_matching_error())
+                }
+            }
+            DocumentFieldType::Date => {
+                let value_as_f64 = match value {
+                    Value::Integer(value_as_integer) => {
+                        let value_as_i128: i128 = value_as_integer.try_into().map_err(|_| {
+                            Error::Contract(ContractError::ValueWrongType("expected integer value"))
+                        })?;
+                        let value_as_f64: f64 = value_as_i128 as f64;
+                        Ok(value_as_f64)
+                    }
+                    Value::Float(value_as_float) => Ok(value_as_float),
+                    _ => Err(get_field_type_matching_error()),
+                }?;
+                let mut value_bytes = value_as_f64.to_be_bytes().to_vec();
+                if required {
+                    Ok(value_bytes)
+                } else {
+                    // if the value wasn't required we need to add a byte to prove it existed
+                    let mut r_vec = vec![255u8];
+                    r_vec.extend(value_bytes);
+                    Ok(r_vec)
+                }
+            }
+            DocumentFieldType::Integer => {
+                let value_as_integer = value
+                    .as_integer()
+                    .ok_or_else(get_field_type_matching_error)?;
+
+                let value_as_i64: i64 = value_as_integer.try_into().map_err(|_| {
+                    Error::Contract(ContractError::ValueWrongType("expected integer value"))
+                })?;
+                let mut value_bytes = value_as_i64.to_be_bytes().to_vec();
+                if required {
+                    Ok(value_bytes)
+                } else {
+                    // if the value wasn't required we need to add a byte to prove it existed
+                    let mut r_vec = vec![255u8];
+                    r_vec.extend(value_bytes);
+                    Ok(r_vec)
+                }
+            }
+            DocumentFieldType::Number => {
+                let value_as_f64 = if value.is_integer() {
+                    let value_as_integer = value
+                        .as_integer()
+                        .ok_or_else(get_field_type_matching_error)?;
+
+                    let value_as_i64: i64 = value_as_integer.try_into().map_err(|_| {
+                        Error::Contract(ContractError::ValueWrongType("expected number value"))
+                    })?;
+
+                    value_as_i64 as f64
+                } else {
+                    value.as_float().ok_or_else(get_field_type_matching_error)?
+                };
+                let mut value_bytes = value_as_f64.to_be_bytes().to_vec();
+                if required {
+                    Ok(value_bytes)
+                } else {
+                    // if the value wasn't required we need to add a byte to prove it existed
+                    let mut r_vec = vec![255u8];
+                    r_vec.extend(value_bytes);
+                    Ok(r_vec)
+                }
+            }
+            DocumentFieldType::ByteArray(_, _) => {
+                let mut bytes = match value {
+                    Value::Bytes(bytes) => Ok(bytes),
+                    Value::Text(text) => {
+                        let value_as_bytes = base64::decode(text).map_err(|_| {
+                            Error::Contract(ContractError::ValueDecodingError(
+                                "bytearray: invalid base64 value",
+                            ))
+                        })?;
+                        Ok(value_as_bytes)
+                    }
+                    Value::Array(array) => array
+                        .into_iter()
+                        .map(|byte| match byte {
+                            Value::Integer(int) => {
+                                let value_as_u8: u8 = int.try_into().map_err(|_| {
+                                    Error::Contract(ContractError::ValueWrongType(
+                                        "expected u8 value",
+                                    ))
+                                })?;
+                                Ok(value_as_u8)
+                            }
+                            _ => Err(Error::Contract(ContractError::ValueWrongType(
+                                "not an array of integers",
+                            ))),
+                        })
+                        .collect::<Result<Vec<u8>, Error>>(),
+                    _ => Err(get_field_type_matching_error()),
+                }?;
+
+                let mut r_vec = bytes.len().encode_var_vec();
+                r_vec.append(&mut bytes);
+                Ok(r_vec)
+            }
+            DocumentFieldType::Boolean => {
+                let value_as_boolean = value.as_bool().ok_or_else(get_field_type_matching_error)?;
+                // 0 means does not exist
+                if value_as_boolean {
+                    Ok(vec![1]) // 1 is true
+                } else {
+                    Ok(vec![2]) // 2 is false
+                }
+            }
+            DocumentFieldType::Object(inner_fields) => {
+                if let Value::Map(map) = value {
+                    let mut value_map = cbor_owned_map_to_btree_map(map);
+                    let mut r_vec = vec![];
+                    inner_fields
+                        .into_iter()
+                        .map(|(key, field)| {
+                            if let Some(value) = value_map.remove(key) {
+                                let mut value = field
+                                    .document_type
+                                    .encode_value_with_size(value, field.required)?;
+                                r_vec.append(&mut value);
+                                Ok(())
+                            } else if field.required {
+                                Err(Error::Contract(ContractError::MissingRequiredKey(
+                                    "a required field is not present",
+                                )))
+                            } else {
+                                // We don't have something that wasn't required
+                                r_vec.push(0);
+                                Ok(())
+                            }
+                        })
+                        .collect::<Result<(), Error>>()?;
+                    Ok(r_vec)
+                } else {
+                    Err(get_field_type_matching_error())
+                }
+            }
+            DocumentFieldType::Array(array_field_type) => {
+                Err(Error::Drive(DriveError::Unsupported(
+                    "serialization of arrays not yet supported",
+                )))
+                // cbor_inner_array_value(value.as_array().ok_or_else(get_field_type_matching_error))
+                // let array = value.as_array().ok_or_else(get_field_type_matching_error)?;
+            }
+            DocumentFieldType::VariableTypeArray(_) => Err(Error::Drive(DriveError::Unsupported(
+                "serialization of arrays not yet supported",
+            ))),
+        };
+    }
+
+    pub fn encode_value_ref_with_size(
+        &self,
+        value: &Value,
+        required: bool,
+    ) -> Result<Vec<u8>, Error> {
         if value.is_null() {
             return Ok(vec![]);
         }
@@ -366,14 +525,9 @@ impl DocumentFieldType {
             DocumentFieldType::String(_, _) => {
                 let value_as_text = value.as_text().ok_or_else(get_field_type_matching_error)?;
                 let vec = value_as_text.as_bytes().to_vec();
-                if vec.is_empty() {
-                    // we don't want to collide with the definition of an empty string
-                    Ok(vec![0])
-                } else {
-                    let mut r_vec = vec.len().encode_var_vec();
-                    r_vec.extend(vec);
-                    Ok(r_vec)
-                }
+                let mut r_vec = vec.len().encode_var_vec();
+                r_vec.extend(vec);
+                Ok(r_vec)
             }
             DocumentFieldType::Date => {
                 let value_as_f64 = match *value {
@@ -493,7 +647,7 @@ impl DocumentFieldType {
                         if let Some(value) = value_map.get(key) {
                             let value = field
                                 .document_type
-                                .encode_value_with_size(value, field.required)?;
+                                .encode_value_ref_with_size(value, field.required)?;
                             r_vec.extend(value.as_slice());
                             Ok(())
                         } else if field.required {
