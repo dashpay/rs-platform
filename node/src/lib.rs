@@ -336,7 +336,7 @@ impl DriveWrapper {
 
         drive
             .send_to_drive_thread(move |drive: &Drive, transaction, channel| {
-                let result = drive.add_document_for_contract_cbor(
+                let result = drive.add_serialized_document_for_serialized_contract(
                     &document_cbor,
                     &contract_cbor,
                     &document_type_name,

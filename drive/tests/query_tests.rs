@@ -3,7 +3,7 @@ use rand::seq::SliceRandom;
 use rand::{Rng, SeedableRng};
 use rs_drive::common;
 use rs_drive::common::{cbor_inner_bytes_value, setup_contract};
-use rs_drive::contract::{Contract, Document};
+use rs_drive::contract::{document::Document, Contract};
 use rs_drive::drive::flags::StorageFlags;
 use rs_drive::drive::object_size_info::DocumentAndContractInfo;
 use rs_drive::drive::object_size_info::DocumentInfo::DocumentAndSerialization;

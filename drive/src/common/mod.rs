@@ -5,7 +5,7 @@ use crate::error::Error;
 use byteorder::{BigEndian, WriteBytesExt};
 use ciborium::value::Value;
 use grovedb::TransactionArg;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs::File;
 use std::io;
 use std::io::{BufRead, BufReader};
@@ -101,6 +101,29 @@ pub fn cbor_inner_array_value<'a>(
         return Some(key_value);
     }
     None
+}
+
+pub fn cbor_inner_array_of_strings<'a>(
+    document_type: &'a [(Value, Value)],
+    key: &'a str,
+) -> Option<BTreeSet<String>> {
+    let key_value = get_key_from_cbor_map(document_type, key)?;
+    if let Value::Array(key_value) = key_value {
+        Some(
+            key_value
+                .iter()
+                .filter_map(|v| {
+                    if let Value::Text(text) = v {
+                        Some(text.clone())
+                    } else {
+                        None
+                    }
+                })
+                .collect(),
+        )
+    } else {
+        None
+    }
 }
 
 pub fn cbor_inner_map_value<'a>(

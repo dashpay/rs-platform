@@ -764,7 +764,9 @@ impl Drive {
         drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<(), Error> {
         if self.config.batching_enabled {
-            let cost_context = self.grove.apply_sorted_pre_validated_batch(ops, transaction);
+            let cost_context = self
+                .grove
+                .apply_sorted_pre_validated_batch(ops, transaction);
             push_drive_operation_result(cost_context, drive_operations)
         } else {
             //println!("changes {} {:#?}", ops.len(), ops);

@@ -1,13 +1,31 @@
+use crate::common::{cbor_inner_array_value, cbor_map_to_btree_map};
 use crate::error::contract::ContractError;
+use crate::error::drive::DriveError;
 use crate::error::Error;
 use byteorder::{BigEndian, WriteBytesExt};
 use ciborium::value::{Integer, Value};
+use integer_encoding::VarInt;
 use rand::distributions::{Alphanumeric, Standard};
 use rand::rngs::StdRng;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fmt;
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+pub struct DocumentField {
+    pub document_type: DocumentFieldType,
+    pub required: bool,
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+pub enum ArrayFieldType {
+    Integer,
+    Number,
+    String(Option<usize>, Option<usize>),
+    ByteArray(Option<usize>, Option<usize>),
+    Date,
+}
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum DocumentFieldType {
@@ -17,8 +35,9 @@ pub enum DocumentFieldType {
     ByteArray(Option<usize>, Option<usize>),
     Boolean,
     Date,
-    Object(BTreeMap<String, DocumentFieldType>),
-    Array,
+    Object(BTreeMap<String, DocumentField>),
+    Array(ArrayFieldType),
+    VariableTypeArray(Vec<ArrayFieldType>),
 }
 
 impl DocumentFieldType {
@@ -38,9 +57,10 @@ impl DocumentFieldType {
             DocumentFieldType::Date => Some(8),
             DocumentFieldType::Object(sub_fields) => sub_fields
                 .iter()
-                .map(|(_, sub_field)| sub_field.min_size())
+                .map(|(_, sub_field)| sub_field.document_type.min_size())
                 .sum(),
-            DocumentFieldType::Array => None,
+            DocumentFieldType::Array(_) => None,
+            DocumentFieldType::VariableTypeArray(_) => None,
         }
     }
 
@@ -60,9 +80,10 @@ impl DocumentFieldType {
             DocumentFieldType::Date => Some(8),
             DocumentFieldType::Object(sub_fields) => sub_fields
                 .iter()
-                .map(|(_, sub_field)| sub_field.min_byte_size())
+                .map(|(_, sub_field)| sub_field.document_type.min_byte_size())
                 .sum(),
-            DocumentFieldType::Array => None,
+            DocumentFieldType::Array(_) => None,
+            DocumentFieldType::VariableTypeArray(_) => None,
         }
     }
 
@@ -82,9 +103,10 @@ impl DocumentFieldType {
             DocumentFieldType::Date => Some(8),
             DocumentFieldType::Object(sub_fields) => sub_fields
                 .iter()
-                .map(|(_, sub_field)| sub_field.max_byte_size())
+                .map(|(_, sub_field)| sub_field.document_type.max_byte_size())
                 .sum(),
-            DocumentFieldType::Array => None,
+            DocumentFieldType::Array(_) => None,
+            DocumentFieldType::VariableTypeArray(_) => None,
         }
     }
 
@@ -104,9 +126,10 @@ impl DocumentFieldType {
             DocumentFieldType::Date => Some(8),
             DocumentFieldType::Object(sub_fields) => sub_fields
                 .iter()
-                .map(|(_, sub_field)| sub_field.max_size())
+                .map(|(_, sub_field)| sub_field.document_type.max_size())
                 .sum(),
-            DocumentFieldType::Array => None,
+            DocumentFieldType::Array(_) => None,
+            DocumentFieldType::VariableTypeArray(_) => None,
         }
     }
 
@@ -144,12 +167,16 @@ impl DocumentFieldType {
                 let value_vec = sub_fields
                     .iter()
                     .map(|(string, field_type)| {
-                        (Value::Text(string.clone()), field_type.random_value(rng))
+                        (
+                            Value::Text(string.clone()),
+                            field_type.document_type.random_value(rng),
+                        )
                     })
                     .collect();
                 Value::Map(value_vec)
             }
-            DocumentFieldType::Array => Value::Null,
+            DocumentFieldType::Array(_) => Value::Null,
+            DocumentFieldType::VariableTypeArray(_) => Value::Null,
         }
     }
 
@@ -183,18 +210,153 @@ impl DocumentFieldType {
                     .map(|(string, field_type)| {
                         (
                             Value::Text(string.clone()),
-                            field_type.random_filled_value(rng),
+                            field_type.document_type.random_filled_value(rng),
                         )
                     })
                     .collect();
                 Value::Map(value_vec)
             }
-            DocumentFieldType::Array => Value::Null,
+            DocumentFieldType::Array(_) => Value::Null,
+            DocumentFieldType::VariableTypeArray(_) => Value::Null,
         }
     }
 
+    pub fn encode_value_with_size(&self, value: &Value) -> Result<Vec<u8>, Error> {
+        if value.is_null() {
+            return Ok(vec![]);
+        }
+        return match self {
+            DocumentFieldType::String(_, _) => {
+                let value_as_text = value.as_text().ok_or_else(get_field_type_matching_error)?;
+                let vec = value_as_text.as_bytes().to_vec();
+                if vec.is_empty() {
+                    // we don't want to collide with the definition of an empty string
+                    Ok(vec![0])
+                } else {
+                    let mut r_vec = vec.len().encode_var_vec();
+                    r_vec.extend(vec);
+                    Ok(r_vec)
+                }
+            }
+            DocumentFieldType::Date => match *value {
+                Value::Integer(value_as_integer) => {
+                    let value_as_i128: i128 = value_as_integer.try_into().map_err(|_| {
+                        Error::Contract(ContractError::ValueWrongType("expected integer value"))
+                    })?;
+                    let value_as_f64: f64 = value_as_i128 as f64;
+                    Ok(value_as_f64.to_be_bytes().to_vec())
+                }
+                Value::Float(value_as_float) => Ok(value_as_float.to_be_bytes().to_vec()),
+                _ => Err(get_field_type_matching_error()),
+            },
+            DocumentFieldType::Integer => {
+                let value_as_integer = value
+                    .as_integer()
+                    .ok_or_else(get_field_type_matching_error)?;
+
+                let value_as_i64: i64 = value_as_integer.try_into().map_err(|_| {
+                    Error::Contract(ContractError::ValueWrongType("expected integer value"))
+                })?;
+                Ok(value_as_i64.to_be_bytes().to_vec())
+            }
+            DocumentFieldType::Number => {
+                let value_as_f64 = if value.is_integer() {
+                    let value_as_integer = value
+                        .as_integer()
+                        .ok_or_else(get_field_type_matching_error)?;
+
+                    let value_as_i64: i64 = value_as_integer.try_into().map_err(|_| {
+                        Error::Contract(ContractError::ValueWrongType("expected number value"))
+                    })?;
+
+                    value_as_i64 as f64
+                } else {
+                    value.as_float().ok_or_else(get_field_type_matching_error)?
+                };
+                Ok(value_as_f64.to_be_bytes().to_vec())
+            }
+            DocumentFieldType::ByteArray(_, _) => {
+                let mut bytes = match value {
+                    Value::Bytes(bytes) => Ok(bytes.clone()),
+                    Value::Text(text) => {
+                        let value_as_bytes = base64::decode(text).map_err(|_| {
+                            Error::Contract(ContractError::ValueDecodingError(
+                                "bytearray: invalid base64 value",
+                            ))
+                        })?;
+                        Ok(value_as_bytes)
+                    }
+                    Value::Array(array) => array
+                        .iter()
+                        .map(|byte| match byte {
+                            Value::Integer(int) => {
+                                let value_as_u8: u8 = (*int).try_into().map_err(|_| {
+                                    Error::Contract(ContractError::ValueWrongType(
+                                        "expected u8 value",
+                                    ))
+                                })?;
+                                Ok(value_as_u8)
+                            }
+                            _ => Err(Error::Contract(ContractError::ValueWrongType(
+                                "not an array of integers",
+                            ))),
+                        })
+                        .collect::<Result<Vec<u8>, Error>>(),
+                    _ => Err(get_field_type_matching_error()),
+                }?;
+
+                let mut r_vec = bytes.len().encode_var_vec();
+                r_vec.append(&mut bytes);
+                Ok(r_vec)
+            }
+            DocumentFieldType::Boolean => {
+                let value_as_boolean = value.as_bool().ok_or_else(get_field_type_matching_error)?;
+                if value_as_boolean {
+                    Ok(vec![1])
+                } else {
+                    Ok(vec![0])
+                }
+            }
+            DocumentFieldType::Object(inner_fields) => {
+                let value_map = cbor_map_to_btree_map(
+                    value.as_map().ok_or_else(get_field_type_matching_error)?,
+                );
+                let mut r_vec = vec![];
+                inner_fields
+                    .iter()
+                    .map(|(key, field)| {
+                        if let Some(value) = value_map.get(key) {
+                            let value = field.document_type.encode_value_with_size(value)?;
+                            r_vec.extend(value.as_slice());
+                            Ok(())
+                        } else if field.required {
+                            Err(Error::Contract(ContractError::MissingRequiredKey(
+                                "a required field is not present",
+                            )))
+                        } else {
+                            // We don't have something that wasn't required
+                            r_vec.push(0);
+                            Ok(())
+                        }
+                    })
+                    .collect::<Result<(), Error>>()?;
+                Ok(r_vec)
+            }
+            DocumentFieldType::Array(array_field_type) => {
+                Err(Error::Drive(DriveError::Unsupported(
+                    "serialization of arrays not yet supported",
+                )))
+                // cbor_inner_array_value(value.as_array().ok_or_else(get_field_type_matching_error))
+                // let array = value.as_array().ok_or_else(get_field_type_matching_error)?;
+            }
+            DocumentFieldType::VariableTypeArray(_) => Err(Error::Drive(DriveError::Unsupported(
+                "serialization of arrays not yet supported",
+            ))),
+        };
+    }
+
     // Given a field type and a value this function chooses and executes the right encoding method
-    pub fn encode_value(&self, value: &Value) -> Result<Vec<u8>, Error> {
+    pub fn encode_value_for_tree_keys(&self, value: &Value) -> Result<Vec<u8>, Error> {
         if value.is_null() {
             return Ok(vec![]);
         }
@@ -288,11 +450,11 @@ impl DocumentFieldType {
                     "we should never try encoding an object",
                 ),
             )),
-            DocumentFieldType::Array => Err(Error::Contract(
-                ContractError::EncodingDataStructureNotSupported(
+            DocumentFieldType::Array(_) | DocumentFieldType::VariableTypeArray(_) => Err(
+                Error::Contract(ContractError::EncodingDataStructureNotSupported(
                     "we should never try encoding an array",
-                ),
-            )),
+                )),
+            ),
         };
     }
 
@@ -364,11 +526,11 @@ impl DocumentFieldType {
                     "we should never try encoding an object",
                 ),
             )),
-            DocumentFieldType::Array => Err(Error::Contract(
-                ContractError::EncodingDataStructureNotSupported(
+            DocumentFieldType::Array(_) | DocumentFieldType::VariableTypeArray(_) => Err(
+                Error::Contract(ContractError::EncodingDataStructureNotSupported(
                     "we should never try encoding an array",
-                ),
-            )),
+                )),
+            ),
         };
     }
 }
@@ -409,14 +571,25 @@ impl fmt::Display for DocumentFieldType {
             DocumentFieldType::Object(sub_fields) => {
                 let object_rep = sub_fields
                     .iter()
-                    .map(|(string, document_field_type)| {
-                        format!("{} : {}", string, document_field_type)
+                    .map(|(string, document_field)| {
+                        format!(
+                            "{} : {}{}",
+                            string,
+                            if document_field.required {
+                                "required : "
+                            } else {
+                                ""
+                            },
+                            document_field.document_type
+                        )
                     })
                     .collect::<Vec<String>>()
                     .join(" | ");
                 format!("object: {{ {} }}", object_rep)
             }
-            DocumentFieldType::Array => "array".to_string(),
+            DocumentFieldType::Array(_) | DocumentFieldType::VariableTypeArray(_) => {
+                "array".to_string()
+            }
         };
         write!(f, "{}", text.as_str())
     }
@@ -551,13 +724,13 @@ mod tests {
         let integer3 = Value::Integer(Integer::from(i64::MAX));
 
         let encoded_integer1 = &DocumentFieldType::Integer
-            .encode_value(&integer1)
+            .encode_value_for_tree_keys(&integer1)
             .expect(encode_err_msg);
         let encoded_integer2 = &DocumentFieldType::Integer
-            .encode_value(&integer2)
+            .encode_value_for_tree_keys(&integer2)
             .expect(encode_err_msg);
         let encoded_integer3 = &DocumentFieldType::Integer
-            .encode_value(&integer3)
+            .encode_value_for_tree_keys(&integer3)
             .expect(encode_err_msg);
 
         assert!(encoded_integer1 < encoded_integer2);
@@ -569,13 +742,13 @@ mod tests {
         let integer3 = Value::Integer(Integer::from(i64::MIN));
 
         let encoded_integer1 = &DocumentFieldType::Integer
-            .encode_value(&integer1)
+            .encode_value_for_tree_keys(&integer1)
             .expect(encode_err_msg);
         let encoded_integer2 = &DocumentFieldType::Integer
-            .encode_value(&integer2)
+            .encode_value_for_tree_keys(&integer2)
             .expect(encode_err_msg);
         let encoded_integer3 = &DocumentFieldType::Integer
-            .encode_value(&integer3)
+            .encode_value_for_tree_keys(&integer3)
             .expect(encode_err_msg);
 
         assert!(encoded_integer1 > encoded_integer2);
@@ -587,13 +760,13 @@ mod tests {
         let integer3 = Value::Integer(Integer::from(1));
 
         let encoded_integer1 = &DocumentFieldType::Integer
-            .encode_value(&integer1)
+            .encode_value_for_tree_keys(&integer1)
             .expect(encode_err_msg);
         let encoded_integer2 = &DocumentFieldType::Integer
-            .encode_value(&integer2)
+            .encode_value_for_tree_keys(&integer2)
             .expect(encode_err_msg);
         let encoded_integer3 = &DocumentFieldType::Integer
-            .encode_value(&integer3)
+            .encode_value_for_tree_keys(&integer3)
             .expect(encode_err_msg);
 
         assert!(encoded_integer2 > encoded_integer1);
@@ -621,28 +794,28 @@ mod tests {
         let float5 = Value::Float(f64::INFINITY);
 
         let encoded_number1 = &DocumentFieldType::Number
-            .encode_value(&float1)
+            .encode_value_for_tree_keys(&float1)
             .expect(encode_err_msg);
         let encoded_number2 = &DocumentFieldType::Number
-            .encode_value(&float2)
+            .encode_value_for_tree_keys(&float2)
             .expect(encode_err_msg);
         let encoded_number3 = &DocumentFieldType::Number
-            .encode_value(&float3)
+            .encode_value_for_tree_keys(&float3)
             .expect(encode_err_msg);
         let encoded_number4 = &DocumentFieldType::Number
-            .encode_value(&float4)
+            .encode_value_for_tree_keys(&float4)
             .expect(encode_err_msg);
         let encoded_number5 = &DocumentFieldType::Number
-            .encode_value(&float5)
+            .encode_value_for_tree_keys(&float5)
             .expect(encode_err_msg);
         let encoded_number6 = &DocumentFieldType::Number
-            .encode_value(&integer1)
+            .encode_value_for_tree_keys(&integer1)
             .expect(encode_err_msg);
         let encoded_number7 = &DocumentFieldType::Number
-            .encode_value(&integer2)
+            .encode_value_for_tree_keys(&integer2)
             .expect(encode_err_msg);
         let encoded_number8 = &DocumentFieldType::Number
-            .encode_value(&integer3)
+            .encode_value_for_tree_keys(&integer3)
             .expect(encode_err_msg);
 
         assert!(encoded_number1 < encoded_number2);
@@ -662,19 +835,19 @@ mod tests {
         let float5 = Value::Float(f64::NEG_INFINITY);
 
         let encoded_float1 = &DocumentFieldType::Number
-            .encode_value(&float1)
+            .encode_value_for_tree_keys(&float1)
             .expect(encode_err_msg);
         let encoded_float2 = &DocumentFieldType::Number
-            .encode_value(&float2)
+            .encode_value_for_tree_keys(&float2)
             .expect(encode_err_msg);
         let encoded_float3 = &DocumentFieldType::Number
-            .encode_value(&float3)
+            .encode_value_for_tree_keys(&float3)
             .expect(encode_err_msg);
         let encoded_float4 = &DocumentFieldType::Number
-            .encode_value(&float4)
+            .encode_value_for_tree_keys(&float4)
             .expect(encode_err_msg);
         let encoded_float5 = &DocumentFieldType::Number
-            .encode_value(&float5)
+            .encode_value_for_tree_keys(&float5)
             .expect(encode_err_msg);
 
         assert!(encoded_float1 > encoded_float2);
@@ -690,13 +863,13 @@ mod tests {
         let smallest_positive_float = Value::Float(0.0 + f64::EPSILON);
 
         let encoded_float1 = &DocumentFieldType::Number
-            .encode_value(&largest_negative_float)
+            .encode_value_for_tree_keys(&largest_negative_float)
             .expect(encode_err_msg);
         let encoded_float2 = &DocumentFieldType::Number
-            .encode_value(&float2)
+            .encode_value_for_tree_keys(&float2)
             .expect(encode_err_msg);
         let encoded_float3 = &DocumentFieldType::Number
-            .encode_value(&smallest_positive_float)
+            .encode_value_for_tree_keys(&smallest_positive_float)
             .expect(encode_err_msg);
 
         assert!(encoded_float1 < encoded_float2);
@@ -713,7 +886,7 @@ mod tests {
         let object_value = Value::Map(vec![(smallest_positive_float, integer1)]);
 
         let encoded_object =
-            &DocumentFieldType::Object(BTreeMap::new()).encode_value(&object_value);
+            &DocumentFieldType::Object(BTreeMap::new()).encode_value_for_tree_keys(&object_value);
 
         assert!(encoded_object.is_err());
     }

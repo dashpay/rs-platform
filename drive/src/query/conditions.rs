@@ -1,4 +1,4 @@
-use crate::contract::{Document, DocumentType};
+use crate::contract::{document::Document, DocumentType};
 use crate::error::query::QueryError;
 use crate::error::Error;
 use ciborium::value::{Integer, Value};

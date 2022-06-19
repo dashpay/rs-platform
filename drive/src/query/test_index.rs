@@ -56,6 +56,7 @@ mod tests {
                 },
             ],
             properties: Default::default(),
+            required_fields: Default::default(),
             documents_keep_history: false,
             documents_mutable: false,
         }

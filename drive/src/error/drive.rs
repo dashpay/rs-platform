@@ -4,6 +4,9 @@ pub enum DriveError {
     #[error("corrupted code execution error: {0}")]
     CorruptedCodeExecution(&'static str),
 
+    #[error("unsupported error: {0}")]
+    Unsupported(&'static str),
+
     #[error("grovedb insertion error: {0}")]
     GroveDBInsertion(&'static str),
 
