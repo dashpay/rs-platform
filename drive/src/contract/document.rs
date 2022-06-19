@@ -1,15 +1,18 @@
 use crate::common::{bytes_for_system_value_from_tree_map, get_key_from_cbor_map};
 use crate::contract::{Contract, DocumentType};
-use crate::drive::defaults::PROTOCOL_VERSION;
+use crate::drive::defaults::{DEFAULT_HASH_SIZE, PROTOCOL_VERSION};
 use crate::drive::Drive;
 use crate::error::contract::ContractError;
+use crate::error::drive::DriveError;
 use crate::error::structure::StructureError;
 use crate::error::Error;
-use byteorder::{BigEndian, WriteBytesExt};
+use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
+use bytes::{Buf, BufMut, BytesMut};
 use ciborium::value::Value;
-use integer_encoding::VarInt;
+use integer_encoding::{VarInt, VarIntReader};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
+use std::io::{BufReader, Cursor, Read};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct Document {
@@ -34,7 +37,9 @@ impl Document {
             .iter()
             .map(|(field_name, field)| {
                 if let Some(value) = self.properties.get(field_name) {
-                    let value = field.document_type.encode_value_with_size(value)?;
+                    let value = field
+                        .document_type
+                        .encode_value_with_size(value, field.required)?;
                     buffer.extend(value.as_slice());
                     Ok(())
                 } else if field.required {
@@ -51,14 +56,55 @@ impl Document {
         Ok(buffer)
     }
 
-    // pub fn from_bytes(
-    //     serialized_document: &[u8],
-    //     document_id: Option<&[u8]>,
-    //     owner_id: Option<&[u8]>,
-    //     contract: &Contract,
-    // ) -> Result<Self, Error> {
-    //
-    // }
+    pub fn from_bytes(
+        mut serialized_document: &[u8],
+        document_type: &DocumentType,
+    ) -> Result<Self, Error> {
+        let mut buf = BufReader::new(serialized_document);
+        if serialized_document.len() < 64 {
+            return Err(Error::Drive(DriveError::CorruptedSerialization(
+                "serialized document is too small, must have id and owner id",
+            )));
+        }
+        let mut id = [0; 32];
+        buf.read_exact(&mut id).map_err(|_| {
+            Error::Drive(DriveError::CorruptedSerialization(
+                "error reading from serialized document",
+            ))
+        })?;
+
+        let mut owner_id = [0; 32];
+        buf.read_exact(&mut owner_id).map_err(|_| {
+            Error::Drive(DriveError::CorruptedSerialization(
+                "error reading from serialized document",
+            ))
+        })?;
+
+        let properties = document_type
+            .properties
+            .iter()
+            .filter_map(|(key, field)| {
+                let read_value = field.document_type.read_from(&mut buf, field.required);
+                match read_value {
+                    Ok(read_value) => {
+                        if let Some(read_value) = read_value {
+                            Some(Ok((key.clone(), read_value)))
+                        } else {
+                            None
+                        }
+                    }
+                    Err(e) => Some(Err(e)),
+                }
+            })
+            .collect::<Result<BTreeMap<String, Value>, Error>>()?;
+        let id = <[u8; 32]>::try_from(id).unwrap();
+        let owner_id = <[u8; 32]>::try_from(owner_id).unwrap();
+        Ok(Document {
+            id,
+            properties,
+            owner_id,
+        })
+    }
 
     pub fn from_cbor(
         document_cbor: &[u8],

@@ -44,4 +44,7 @@ pub enum DriveError {
 
     #[error("corrupted element flags error: {0}")]
     CorruptedElementFlags(&'static str),
+
+    #[error("corrupted serialization error: {0}")]
+    CorruptedSerialization(&'static str),
 }

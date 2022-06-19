@@ -2,15 +2,16 @@ use crate::common::{cbor_inner_array_value, cbor_map_to_btree_map};
 use crate::error::contract::ContractError;
 use crate::error::drive::DriveError;
 use crate::error::Error;
-use byteorder::{BigEndian, WriteBytesExt};
+use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use ciborium::value::{Integer, Value};
-use integer_encoding::VarInt;
+use integer_encoding::{VarInt, VarIntReader};
 use rand::distributions::{Alphanumeric, Standard};
 use rand::rngs::StdRng;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fmt;
+use std::io::{BufReader, Read};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct DocumentField {
@@ -221,7 +222,143 @@ impl DocumentFieldType {
         }
     }
 
-    pub fn encode_value_with_size(&self, value: &Value) -> Result<Vec<u8>, Error> {
+    fn read_varint_value(buf: &mut BufReader<&[u8]>) -> Result<Option<Vec<u8>>, Error> {
+        let bytes: usize = buf.read_varint().map_err(|_| {
+            Error::Drive(DriveError::CorruptedSerialization(
+                "error reading from serialized document",
+            ))
+        })?;
+        if bytes == 0 {
+            Ok(None)
+        } else {
+            let mut value: Vec<u8> = Vec::with_capacity(bytes);
+            buf.read_exact(value.as_mut_slice()).map_err(|_| {
+                Error::Drive(DriveError::CorruptedSerialization(
+                    "error reading from serialized document",
+                ))
+            })?;
+            Ok(Some(value))
+        }
+    }
+
+    pub fn read_from(
+        &self,
+        buf: &mut BufReader<&[u8]>,
+        required: bool,
+    ) -> Result<Option<Value>, Error> {
+        return match self {
+            DocumentFieldType::String(_, _) => {
+                let bytes = Self::read_varint_value(buf)?;
+                if let Some(bytes) = bytes {
+                    let string = String::from_utf8(bytes).map_err(|_| {
+                        Error::Drive(DriveError::CorruptedSerialization(
+                            "error reading from serialized document",
+                        ))
+                    })?;
+                    Ok(Some(Value::Text(string)))
+                } else {
+                    Ok(None)
+                }
+            }
+            DocumentFieldType::Date | DocumentFieldType::Number => {
+                if required == false {
+                    let marker = buf.read_u8().map_err(|_| {
+                        Error::Drive(DriveError::CorruptedSerialization(
+                            "error reading from serialized document",
+                        ))
+                    })?;
+                    if marker == 0 {
+                        return Ok(None);
+                    }
+                }
+                let date = buf.read_f64::<BigEndian>().map_err(|_| {
+                    Error::Drive(DriveError::CorruptedSerialization(
+                        "error reading from serialized document",
+                    ))
+                })?;
+                Ok(Some(Value::Float(date)))
+            }
+            DocumentFieldType::Integer => {
+                if required == false {
+                    let marker = buf.read_u8().map_err(|_| {
+                        Error::Drive(DriveError::CorruptedSerialization(
+                            "error reading from serialized document",
+                        ))
+                    })?;
+                    if marker == 0 {
+                        return Ok(None);
+                    }
+                }
+                let date = buf.read_f64::<BigEndian>().map_err(|_| {
+                    Error::Drive(DriveError::CorruptedSerialization(
+                        "error reading from serialized document",
+                    ))
+                })?;
+                Ok(Some(Value::Float(date)))
+            }
+            DocumentFieldType::Boolean => {
+                let value = buf.read_u8().map_err(|_| {
+                    Error::Drive(DriveError::CorruptedSerialization(
+                        "error reading from serialized document",
+                    ))
+                })?;
+                match value {
+                    0 => Ok(None),
+                    1 => Ok(Some(Value::Bool(true))),
+                    _ => Ok(Some(Value::Bool(false))),
+                }
+            }
+            DocumentFieldType::ByteArray(_, _) => {
+                let bytes = Self::read_varint_value(buf)?;
+                if let Some(bytes) = bytes {
+                    let string = String::from_utf8(bytes).map_err(|_| {
+                        Error::Drive(DriveError::CorruptedSerialization(
+                            "error reading from serialized document",
+                        ))
+                    })?;
+                    Ok(Some(Value::Text(string)))
+                } else {
+                    Ok(None)
+                }
+            }
+
+            DocumentFieldType::Object(inner_fields) => {
+                let values = inner_fields
+                    .iter()
+                    .filter_map(|(key, field)| {
+                        let read_value = field.document_type.read_from(buf, field.required);
+                        match read_value {
+                            Ok(read_value) => {
+                                if let Some(read_value) = read_value {
+                                    Some(Ok((Value::Text(key.clone()), read_value)))
+                                } else {
+                                    None
+                                }
+                            }
+                            Err(e) => Some(Err(e)),
+                        }
+                    })
+                    .collect::<Result<Vec<(Value, Value)>, Error>>()?;
+                if values.is_empty() {
+                    Ok(None)
+                } else {
+                    Ok(Some(Value::Map(values)))
+                }
+            }
+            DocumentFieldType::Array(array_field_type) => {
+                Err(Error::Drive(DriveError::Unsupported(
+                    "serialization of arrays not yet supported",
+                )))
+                // cbor_inner_array_value(value.as_array().ok_or_else(get_field_type_matching_error))
+                // let array = value.as_array().ok_or_else(get_field_type_matching_error)?;
+            }
+            DocumentFieldType::VariableTypeArray(_) => Err(Error::Drive(DriveError::Unsupported(
+                "serialization of arrays not yet supported",
+            ))),
+        };
+    }
+
+    pub fn encode_value_with_size(&self, value: &Value, required: bool) -> Result<Vec<u8>, Error> {
         if value.is_null() {
             return Ok(vec![]);
         }
@@ -238,17 +375,28 @@ impl DocumentFieldType {
                     Ok(r_vec)
                 }
             }
-            DocumentFieldType::Date => match *value {
-                Value::Integer(value_as_integer) => {
-                    let value_as_i128: i128 = value_as_integer.try_into().map_err(|_| {
-                        Error::Contract(ContractError::ValueWrongType("expected integer value"))
-                    })?;
-                    let value_as_f64: f64 = value_as_i128 as f64;
-                    Ok(value_as_f64.to_be_bytes().to_vec())
+            DocumentFieldType::Date => {
+                let value_as_f64 = match *value {
+                    Value::Integer(value_as_integer) => {
+                        let value_as_i128: i128 = value_as_integer.try_into().map_err(|_| {
+                            Error::Contract(ContractError::ValueWrongType("expected integer value"))
+                        })?;
+                        let value_as_f64: f64 = value_as_i128 as f64;
+                        Ok(value_as_f64)
+                    }
+                    Value::Float(value_as_float) => Ok(value_as_float),
+                    _ => Err(get_field_type_matching_error()),
+                }?;
+                let mut value_bytes = value_as_f64.to_be_bytes().to_vec();
+                if required {
+                    Ok(value_bytes)
+                } else {
+                    // if the value wasn't required we need to add a byte to prove it existed
+                    let mut r_vec = vec![255u8];
+                    r_vec.extend(value_bytes);
+                    Ok(r_vec)
                 }
-                Value::Float(value_as_float) => Ok(value_as_float.to_be_bytes().to_vec()),
-                _ => Err(get_field_type_matching_error()),
-            },
+            }
             DocumentFieldType::Integer => {
                 let value_as_integer = value
                     .as_integer()
@@ -257,7 +405,15 @@ impl DocumentFieldType {
                 let value_as_i64: i64 = value_as_integer.try_into().map_err(|_| {
                     Error::Contract(ContractError::ValueWrongType("expected integer value"))
                 })?;
-                Ok(value_as_i64.to_be_bytes().to_vec())
+                let mut value_bytes = value_as_i64.to_be_bytes().to_vec();
+                if required {
+                    Ok(value_bytes)
+                } else {
+                    // if the value wasn't required we need to add a byte to prove it existed
+                    let mut r_vec = vec![255u8];
+                    r_vec.extend(value_bytes);
+                    Ok(r_vec)
+                }
             }
             DocumentFieldType::Number => {
                 let value_as_f64 = if value.is_integer() {
@@ -273,7 +429,15 @@ impl DocumentFieldType {
                 } else {
                     value.as_float().ok_or_else(get_field_type_matching_error)?
                 };
-                Ok(value_as_f64.to_be_bytes().to_vec())
+                let mut value_bytes = value_as_f64.to_be_bytes().to_vec();
+                if required {
+                    Ok(value_bytes)
+                } else {
+                    // if the value wasn't required we need to add a byte to prove it existed
+                    let mut r_vec = vec![255u8];
+                    r_vec.extend(value_bytes);
+                    Ok(r_vec)
+                }
             }
             DocumentFieldType::ByteArray(_, _) => {
                 let mut bytes = match value {
@@ -311,10 +475,11 @@ impl DocumentFieldType {
             }
             DocumentFieldType::Boolean => {
                 let value_as_boolean = value.as_bool().ok_or_else(get_field_type_matching_error)?;
+                // 0 means does not exist
                 if value_as_boolean {
-                    Ok(vec![1])
+                    Ok(vec![1]) // 1 is true
                 } else {
-                    Ok(vec![0])
+                    Ok(vec![2]) // 2 is false
                 }
             }
             DocumentFieldType::Object(inner_fields) => {
@@ -326,7 +491,9 @@ impl DocumentFieldType {
                     .iter()
                     .map(|(key, field)| {
                         if let Some(value) = value_map.get(key) {
-                            let value = field.document_type.encode_value_with_size(value)?;
+                            let value = field
+                                .document_type
+                                .encode_value_with_size(value, field.required)?;
                             r_vec.extend(value.as_slice());
                             Ok(())
                         } else if field.required {
