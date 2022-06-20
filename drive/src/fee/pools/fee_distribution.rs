@@ -59,8 +59,8 @@ impl<'f> FeePools<'f> {
         let accumulated_fees = epoch_pool.get_combined_fee(transaction)?;
 
         let next_epoch_pool = EpochPool::new(epoch_pool.index + 1, self.drive);
-        let epoch_block_count = next_epoch_pool.get_first_proposed_block_height(transaction)?
-            - epoch_pool.get_first_proposed_block_height(transaction)?;
+        let epoch_block_count = next_epoch_pool.get_first_proposer_block_height(transaction)?
+            - epoch_pool.get_first_proposer_block_height(transaction)?;
 
         let proposers = epoch_pool.get_proposers(proposers_limit, transaction)?;
 

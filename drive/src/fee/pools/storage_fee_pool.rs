@@ -52,9 +52,14 @@ impl<'f> FeePools<'f> {
 
 #[cfg(test)]
 mod tests {
+    use grovedb::Element;
     use tempfile::TempDir;
 
-    use crate::{drive::Drive, fee::pools::fee_pools::FeePools};
+    use crate::{
+        drive::Drive,
+        error::{self, fee::FeeError},
+        fee::pools::{constants, fee_pools::FeePools},
+    };
 
     #[test]
     fn test_fee_pools_update_and_get_storage_fee_pool() {
@@ -67,13 +72,35 @@ mod tests {
 
         let transaction = drive.grove.start_transaction();
 
+        let storage_fee: f64 = 0.42;
+
         let fee_pools = FeePools::new(&drive);
+
+        match fee_pools.get_storage_fee_pool(Some(&transaction)) {
+            Ok(_) => assert!(
+                false,
+                "should not be able to get genesis time on uninit fee pools"
+            ),
+            Err(e) => match e {
+                error::Error::GroveDB(grovedb::Error::PathNotFound(_)) => assert!(true),
+                _ => assert!(false, "invalid error type"),
+            },
+        }
+
+        match fee_pools.update_storage_fee_pool(storage_fee, Some(&transaction)) {
+            Ok(_) => assert!(
+                false,
+                "should not be able to update genesis time on uninit fee pools"
+            ),
+            Err(e) => match e {
+                error::Error::GroveDB(grovedb::Error::InvalidPath(_)) => assert!(true),
+                _ => assert!(false, "invalid error type"),
+            },
+        }
 
         fee_pools
             .init(Some(&transaction))
             .expect("fee pools to init");
-
-        let storage_fee: f64 = 0.42;
 
         fee_pools
             .update_storage_fee_pool(storage_fee, Some(&transaction))
@@ -84,5 +111,25 @@ mod tests {
             .expect("to get storage fee pool");
 
         assert_eq!(storage_fee, stored_storage_fee);
+
+        drive
+            .grove
+            .insert(
+                FeePools::get_path(),
+                constants::KEY_STORAGE_FEE_POOL.as_bytes(),
+                Element::Item(u128::MAX.to_le_bytes().to_vec(), None),
+                Some(&transaction),
+            )
+            .expect("to insert invalid data");
+
+        match fee_pools.get_storage_fee_pool(Some(&transaction)) {
+            Ok(_) => assert!(false, "should not be able to decode stored value"),
+            Err(e) => match e {
+                error::Error::Fee(FeeError::CorruptedStorageFeePoolInvalidItemLength(_)) => {
+                    assert!(true)
+                }
+                _ => assert!(false, "ivalid error type"),
+            },
+        }
     }
 }

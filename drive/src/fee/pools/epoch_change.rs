@@ -101,12 +101,13 @@ impl<'f> FeePools<'f> {
 
 #[cfg(test)]
 mod tests {
+    use grovedb::Element;
     use tempfile::TempDir;
 
     use crate::{
         drive::Drive,
-        error,
-        fee::pools::{epoch::epoch_pool::EpochPool, fee_pools::FeePools},
+        error::{self, fee::FeeError},
+        fee::pools::{constants, epoch::epoch_pool::EpochPool, fee_pools::FeePools},
     };
 
     #[test]
@@ -122,11 +123,33 @@ mod tests {
 
         let mut fee_pools = FeePools::new(&drive);
 
+        let genesis_time: i64 = 1655396517902;
+
+        match fee_pools.get_genesis_time(Some(&transaction)) {
+            Ok(_) => assert!(
+                false,
+                "should not be able to get genesis time on uninit fee pools"
+            ),
+            Err(e) => match e {
+                error::Error::GroveDB(grovedb::Error::PathNotFound(_)) => assert!(true),
+                _ => assert!(false, "invalid error type"),
+            },
+        }
+
+        match fee_pools.update_genesis_time(genesis_time, Some(&transaction)) {
+            Ok(_) => assert!(
+                false,
+                "should not be able to update genesis time on uninit fee pools"
+            ),
+            Err(e) => match e {
+                error::Error::GroveDB(grovedb::Error::InvalidPath(_)) => assert!(true),
+                _ => assert!(false, "invalid error type"),
+            },
+        }
+
         fee_pools
             .init(Some(&transaction))
             .expect("fee pools to init");
-
-        let genesis_time: i64 = 1655396517902;
 
         fee_pools
             .update_genesis_time(genesis_time, Some(&transaction))
@@ -138,7 +161,27 @@ mod tests {
 
         assert_eq!(genesis_time, stored_genesis_time);
 
-        // TODO: check db has not been called if genesis time was updated
+        fee_pools.genesis_time = None;
+
+        drive
+            .grove
+            .insert(
+                FeePools::get_path(),
+                constants::KEY_GENESIS_TIME.as_bytes(),
+                Element::Item(u128::MAX.to_le_bytes().to_vec(), None),
+                Some(&transaction),
+            )
+            .expect("to insert invalid data");
+
+        match fee_pools.get_genesis_time(Some(&transaction)) {
+            Ok(_) => assert!(false, "should not be able to decode stored value"),
+            Err(e) => match e {
+                error::Error::Fee(FeeError::CorruptedGenesisTimeInvalidItemLength(_)) => {
+                    assert!(true)
+                }
+                _ => assert!(false, "ivalid error type"),
+            },
+        }
     }
 
     #[test]
@@ -229,7 +272,7 @@ mod tests {
         assert_eq!(processing_fee, 0.0);
 
         let first_proposer_block_count = epoch
-            .get_first_proposed_block_height(Some(&transaction))
+            .get_first_proposer_block_height(Some(&transaction))
             .expect("to get first proposer block count");
 
         assert_eq!(first_proposer_block_count, 42);

@@ -19,6 +19,7 @@ mod tests {
 
     use crate::{
         drive::Drive,
+        error,
         fee::pools::{epoch::epoch_pool::EpochPool, fee_pools::FeePools},
     };
 
@@ -38,6 +39,16 @@ mod tests {
         fee_pools
             .init(Some(&transaction))
             .expect("fee pools to init");
+
+        let uninit_epoch_pool = EpochPool::new(7000, &drive);
+
+        match uninit_epoch_pool.delete(Some(&transaction)) {
+            Ok(_) => assert!(false, "should not be able to delete uninit pool"),
+            Err(e) => match e {
+                error::Error::GroveDB(grovedb::Error::PathKeyNotFound(_)) => assert!(true),
+                _ => assert!(false, "error type is wrong"),
+            },
+        }
 
         let epoch = EpochPool::new(42, &drive);
 

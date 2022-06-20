@@ -62,7 +62,7 @@ impl<'e> EpochPool<'e> {
 mod tests {
     use tempfile::TempDir;
 
-    use crate::{drive::Drive, fee::pools::fee_pools::FeePools};
+    use crate::{drive::Drive, error, fee::pools::fee_pools::FeePools};
 
     use super::EpochPool;
 
@@ -76,6 +76,16 @@ mod tests {
             .expect("expected to create root tree successfully");
 
         let transaction = drive.grove.start_transaction();
+
+        let epoch = EpochPool::new(1042, &drive);
+
+        match epoch.init(Some(&transaction)) {
+            Ok(_) => assert!(false, "should not be able to init epoch without FeePools"),
+            Err(e) => match e {
+                error::Error::GroveDB(grovedb::Error::InvalidPath(_)) => assert!(true),
+                _ => assert!(false, "ivalid error type"),
+            },
+        }
 
         let fee_pools = FeePools::new(&drive);
 

@@ -8,7 +8,7 @@ use crate::{
 use super::constants;
 
 impl<'e> EpochPool<'e> {
-    pub fn get_first_proposed_block_height(
+    pub fn get_first_proposer_block_height(
         &self,
         transaction: TransactionArg,
     ) -> Result<u64, Error> {
@@ -26,14 +26,14 @@ impl<'e> EpochPool<'e> {
             Ok(u64::from_le_bytes(item.as_slice().try_into().map_err(
                 |_| {
                     Error::Fee(FeeError::CorruptedFirstProposedBlockHeightItemLength(
-                        "epoch first proposed block height item have an invalid length",
+                        "epoch first proposer block height item have an invalid length",
                     ))
                 },
             )?))
         } else {
             Err(Error::Fee(
                 FeeError::CorruptedFirstProposedBlockHeightNotItem(
-                    "epoch first proposed block height must be an item",
+                    "epoch first proposer block height must be an item",
                 ),
             ))
         }
@@ -176,11 +176,16 @@ impl<'e> EpochPool<'e> {
 
 #[cfg(test)]
 mod tests {
+    use grovedb::Element;
     use tempfile::TempDir;
 
     use crate::{
         drive::Drive,
-        fee::pools::{epoch::epoch_pool::EpochPool, fee_pools::FeePools},
+        error::{self, fee::FeeError},
+        fee::pools::{
+            epoch::{constants, epoch_pool::EpochPool},
+            fee_pools::FeePools,
+        },
     };
 
     #[test]
@@ -200,6 +205,30 @@ mod tests {
             .init(Some(&transaction))
             .expect("fee pools to init");
 
+        let epoch = EpochPool::new(7000, &drive);
+
+        match epoch.get_first_proposer_block_height(Some(&transaction)) {
+            Ok(_) => assert!(
+                false,
+                "should not be able to get first proposer block height on uninit epoch pool"
+            ),
+            Err(e) => match e {
+                error::Error::GroveDB(grovedb::Error::PathNotFound(_)) => assert!(true),
+                _ => assert!(false, "invalid error type"),
+            },
+        }
+
+        match epoch.update_first_proposer_block_height(1, Some(&transaction)) {
+            Ok(_) => assert!(
+                false,
+                "should not be able to update first proposer block count on uninit epoch pool"
+            ),
+            Err(e) => match e {
+                error::Error::GroveDB(grovedb::Error::InvalidPath(_)) => assert!(true),
+                _ => assert!(false, "invalid error type"),
+            },
+        }
+
         let epoch = EpochPool::new(42, &drive);
 
         let first_proposer_block_height = 42;
@@ -209,13 +238,33 @@ mod tests {
             .expect("to update first proposer block height");
 
         let stored_first_proposer_block_height = epoch
-            .get_first_proposed_block_height(Some(&transaction))
+            .get_first_proposer_block_height(Some(&transaction))
             .expect("to get first proposer block count");
 
         assert_eq!(
             stored_first_proposer_block_height,
             first_proposer_block_height
         );
+
+        drive
+            .grove
+            .insert(
+                epoch.get_path(),
+                constants::KEY_FIRST_PROPOSER_BLOCK_HEIGHT.as_bytes(),
+                Element::Item(u128::MAX.to_le_bytes().to_vec(), None),
+                Some(&transaction),
+            )
+            .expect("to insert invalid data");
+
+        match epoch.get_first_proposer_block_height(Some(&transaction)) {
+            Ok(_) => assert!(false, "should not be able to decode stored value"),
+            Err(e) => match e {
+                error::Error::Fee(FeeError::CorruptedFirstProposedBlockHeightItemLength(_)) => {
+                    assert!(true)
+                }
+                _ => assert!(false, "ivalid error type"),
+            },
+        }
     }
 
     #[test]
@@ -235,6 +284,36 @@ mod tests {
             .init(Some(&transaction))
             .expect("fee pools to init");
 
+        let pro_tx_hash: [u8; 32] =
+            hex::decode("0101010101010101010101010101010101010101010101010101010101010101")
+                .expect("to decode pro tx hash")
+                .try_into()
+                .expect("to convert vector to array of 32 bytes");
+
+        let epoch = EpochPool::new(7000, &drive);
+
+        match epoch.get_proposer_block_count(&pro_tx_hash, Some(&transaction)) {
+            Ok(_) => assert!(
+                false,
+                "should not be able to get proposer block count on uninit epoch pool"
+            ),
+            Err(e) => match e {
+                error::Error::GroveDB(grovedb::Error::PathNotFound(_)) => assert!(true),
+                _ => assert!(false, "invalid error type"),
+            },
+        }
+
+        match epoch.update_proposer_block_count(&pro_tx_hash, 1, Some(&transaction)) {
+            Ok(_) => assert!(
+                false,
+                "should not be able to update proposer block count on uninit epoch pool"
+            ),
+            Err(e) => match e {
+                error::Error::GroveDB(grovedb::Error::InvalidPath(_)) => assert!(true),
+                _ => assert!(false, "invalid error type"),
+            },
+        }
+
         let epoch = EpochPool::new(42, &drive);
 
         let is_proposers_tree_empty = epoch
@@ -247,12 +326,6 @@ mod tests {
             .init_proposers_tree(Some(&transaction))
             .expect("to init proposers tree");
 
-        let pro_tx_hash: [u8; 32] =
-            hex::decode("0101010101010101010101010101010101010101010101010101010101010101")
-                .expect("to decode pro tx hash")
-                .try_into()
-                .expect("to convert vector to array of 32 bytes");
-
         let block_count = 42;
 
         epoch
@@ -264,6 +337,26 @@ mod tests {
             .expect("to get proposer block count");
 
         assert_eq!(stored_block_count, block_count);
+
+        drive
+            .grove
+            .insert(
+                epoch.get_proposers_path(),
+                &pro_tx_hash,
+                Element::Item(u128::MAX.to_le_bytes().to_vec(), None),
+                Some(&transaction),
+            )
+            .expect("to insert invalid data");
+
+        match epoch.get_proposer_block_count(&pro_tx_hash, Some(&transaction)) {
+            Ok(_) => assert!(false, "should not be able to decode stored value"),
+            Err(e) => match e {
+                error::Error::Fee(FeeError::CorruptedProposerBlockCountItemLength(_)) => {
+                    assert!(true)
+                }
+                _ => assert!(false, "ivalid error type"),
+            },
+        }
     }
 
     #[test]
