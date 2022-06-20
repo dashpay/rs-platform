@@ -65,45 +65,15 @@ impl<'e> EpochPool<'e> {
         processing_fee: f64,
         transaction: TransactionArg,
     ) -> Result<(), Error> {
-        let element = self
-            .drive
+        self.drive
             .grove
-            .get(
+            .insert(
                 self.get_path(),
                 constants::KEY_PROCESSING_FEE.as_bytes(),
+                Element::Item(processing_fee.to_le_bytes().to_vec(), None),
                 transaction,
             )
-            .or_else(|e| match e {
-                grovedb::Error::PathKeyNotFound(_) => {
-                    Ok(Element::Item(0f64.to_le_bytes().to_vec(), None))
-                }
-                _ => Err(Error::GroveDB(e)),
-            })?;
-
-        if let Element::Item(item, _) = element {
-            let fee = f64::from_le_bytes(item.as_slice().try_into().map_err(|_| {
-                Error::Fee(FeeError::CorruptedProcessingFeeInvalidItemLength(
-                    "epoch processing fee item have an invalid length",
-                ))
-            })?);
-
-            // in case fee is set updated it
-            self.drive
-                .grove
-                .insert(
-                    self.get_path(),
-                    constants::KEY_PROCESSING_FEE.as_bytes(),
-                    Element::Item((fee + processing_fee).to_le_bytes().to_vec(), None),
-                    transaction,
-                )
-                .map_err(Error::GroveDB)?;
-
-            Ok(())
-        } else {
-            Err(Error::Fee(FeeError::CorruptedProcessingFeeNotItem(
-                "epoch processing fee must be an item",
-            )))
-        }
+            .map_err(Error::GroveDB)
     }
 
     pub fn update_storage_fee(
@@ -111,40 +81,15 @@ impl<'e> EpochPool<'e> {
         storage_fee: f64,
         transaction: TransactionArg,
     ) -> Result<(), Error> {
-        let element = self
-            .drive
+        self.drive
             .grove
-            .get(
+            .insert(
                 self.get_path(),
                 constants::KEY_STORAGE_FEE.as_bytes(),
+                Element::Item(storage_fee.to_le_bytes().to_vec(), None),
                 transaction,
             )
-            .map_err(Error::GroveDB)?;
-
-        if let Element::Item(item, _) = element {
-            let fee = f64::from_le_bytes(item.as_slice().try_into().map_err(|_| {
-                Error::Fee(FeeError::CorruptedStorageFeeInvalidItemLength(
-                    "epoch storage fee item have an invalid length",
-                ))
-            })?);
-
-            // in case fee is set updated it
-            self.drive
-                .grove
-                .insert(
-                    self.get_path(),
-                    constants::KEY_STORAGE_FEE.as_bytes(),
-                    Element::Item((fee + storage_fee).to_le_bytes().to_vec(), None),
-                    transaction,
-                )
-                .map_err(Error::GroveDB)?;
-
-            Ok(())
-        } else {
-            Err(Error::Fee(FeeError::CorruptedStorageFeeNotItem(
-                "epoch storage fee must be an item",
-            )))
-        }
+            .map_err(Error::GroveDB)
     }
 
     pub fn get_combined_fee(&self, transaction: TransactionArg) -> Result<f64, Error> {

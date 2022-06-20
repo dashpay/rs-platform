@@ -12,39 +12,15 @@ impl<'f> FeePools<'f> {
         storage_fee: f64,
         transaction: TransactionArg,
     ) -> Result<(), Error> {
-        let element = self
-            .drive
+        self.drive
             .grove
-            .get(
+            .insert(
                 FeePools::get_path(),
                 constants::KEY_STORAGE_FEE_POOL.as_bytes(),
+                Element::Item(storage_fee.to_le_bytes().to_vec(), None),
                 transaction,
             )
-            .map_err(Error::GroveDB)?;
-
-        if let Element::Item(item, _) = element {
-            let value = f64::from_le_bytes(item.as_slice().try_into().map_err(|_| {
-                Error::Fee(FeeError::CorruptedStorageFeePoolInvalidItemLength(
-                    "fee pools storage fee pool item have an invalid length",
-                ))
-            })?);
-
-            self.drive
-                .grove
-                .insert(
-                    FeePools::get_path(),
-                    constants::KEY_STORAGE_FEE_POOL.as_bytes(),
-                    Element::Item((value + storage_fee).to_le_bytes().to_vec(), None),
-                    transaction,
-                )
-                .map_err(Error::GroveDB)?;
-
-            Ok(())
-        } else {
-            Err(Error::Fee(FeeError::CorruptedStorageFeePoolNotItem(
-                "fee pools storage fee pool must be an item",
-            )))
-        }
+            .map_err(Error::GroveDB)
     }
 
     pub fn get_storage_fee_pool(&self, transaction: TransactionArg) -> Result<f64, Error> {
@@ -59,13 +35,13 @@ impl<'f> FeePools<'f> {
             .map_err(Error::GroveDB)?;
 
         if let Element::Item(item, _) = element {
-            let credit = f64::from_le_bytes(item.as_slice().try_into().map_err(|_| {
+            let fee = f64::from_le_bytes(item.as_slice().try_into().map_err(|_| {
                 Error::Fee(FeeError::CorruptedStorageFeePoolInvalidItemLength(
                     "fee pools storage fee pool item have an invalid length",
                 ))
             })?);
 
-            Ok(credit)
+            Ok(fee)
         } else {
             Err(Error::Fee(FeeError::CorruptedStorageFeePoolNotItem(
                 "fee pools storage fee pool must be an item",

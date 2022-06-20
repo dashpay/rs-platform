@@ -90,8 +90,9 @@ impl<'f> FeePools<'f> {
 
         // init first_proposer_block_height and processing_fee for an epoch
         let epoch = EpochPool::new(epoch_index, self.drive);
-        epoch.update_first_proposed_block_height(first_proposer_block_height, transaction)?;
+        epoch.update_first_proposer_block_height(first_proposer_block_height, transaction)?;
         epoch.update_processing_fee(0f64, transaction)?;
+        epoch.init_proposers_tree(transaction)?;
 
         // distribute the storage fees
         self.distribute_storage_distribution_pool(epoch_index, transaction)
@@ -102,7 +103,11 @@ impl<'f> FeePools<'f> {
 mod tests {
     use tempfile::TempDir;
 
-    use crate::{drive::Drive, fee::pools::fee_pools::FeePools};
+    use crate::{
+        drive::Drive,
+        error,
+        fee::pools::{epoch::epoch_pool::EpochPool, fee_pools::FeePools},
+    };
 
     #[test]
     fn test_fee_pools_update_and_get_genesis_time() {
@@ -180,6 +185,53 @@ mod tests {
 
     #[test]
     fn test_fee_pools_process_epoch_change() {
-        todo!();
+        let tmp_dir = TempDir::new().unwrap();
+        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+
+        drive
+            .create_root_tree(None)
+            .expect("expected to create root tree successfully");
+
+        let transaction = drive.grove.start_transaction();
+
+        let fee_pools = FeePools::new(&drive);
+
+        fee_pools
+            .init(Some(&transaction))
+            .expect("fee pools to init");
+
+        fee_pools
+            .update_storage_fee_pool(42.0, Some(&transaction))
+            .expect("to update storage fee pool");
+
+        let first_proposer_block_height = 42;
+
+        fee_pools
+            .process_epoch_change(0, first_proposer_block_height, Some(&transaction))
+            .expect("to process epoch change");
+
+        let next_thousandth_epoch = EpochPool::new(1000, &drive);
+
+        match next_thousandth_epoch.get_processing_fee(Some(&transaction)) {
+            Ok(_) => assert!(false, "should not be able to get processing fee"),
+            Err(e) => match e {
+                error::Error::GroveDB(grovedb::Error::PathKeyNotFound(_)) => assert!(true),
+                _ => assert!(false, "wrong error type"),
+            },
+        }
+
+        let epoch = EpochPool::new(0, &drive);
+
+        let processing_fee = epoch
+            .get_processing_fee(Some(&transaction))
+            .expect("to get processing fee");
+
+        assert_eq!(processing_fee, 0.0);
+
+        let first_proposer_block_count = epoch
+            .get_first_proposed_block_height(Some(&transaction))
+            .expect("to get first proposer block count");
+
+        assert_eq!(first_proposer_block_count, 42);
     }
 }

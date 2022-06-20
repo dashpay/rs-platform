@@ -125,11 +125,29 @@ mod tests {
             .expect("fee pools to init");
 
         let oldest_epoch = fee_pools
-            .get_oldest_epoch_pool(1000, Some(&transaction))
+            .get_oldest_epoch_pool(999, Some(&transaction))
             .expect("to get oldest epoch pool");
 
-        assert_eq!(oldest_epoch.index, 1000);
+        assert_eq!(oldest_epoch.index, 999);
 
-        // TODO: find a way to test other epoch index
+        let proposer_pro_tx_hash: [u8; 32] =
+            hex::decode("0101010101010101010101010101010101010101010101010101010101010101")
+                .expect("to decode pro tx hash")
+                .try_into()
+                .expect("to convert vector to array of 32 bytes");
+
+        oldest_epoch
+            .init_proposers_tree(Some(&transaction))
+            .expect("to init proposers tree");
+
+        oldest_epoch
+            .update_proposer_block_count(&proposer_pro_tx_hash, 1, Some(&transaction))
+            .expect("to update proposer block count");
+
+        let oldest_epoch = fee_pools
+            .get_oldest_epoch_pool(999, Some(&transaction))
+            .expect("to get oldest epoch pool");
+
+        assert_eq!(oldest_epoch.index, 998);
     }
 }

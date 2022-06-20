@@ -4,16 +4,14 @@ use serde_json::json;
 use crate::common::value_to_cbor;
 use crate::contract::Document;
 use crate::error::document::DocumentError;
-use crate::error::Error;
+use crate::error::{self, Error};
 use crate::fee::pools::fee_pools::FeePools;
 
 use super::constants;
 use super::epoch::epoch_pool::EpochPool;
 
-fn get_fee_distribution_percent(epoch_index: u16) -> f64 {
-    let thousands_iteration = (epoch_index as f64 / 1000.0).trunc() as u16;
-
-    let reset_epoch_index = epoch_index - (thousands_iteration * 1000);
+fn get_fee_distribution_percent(epoch_index: u16, start_index: u16) -> f64 {
+    let reset_epoch_index = epoch_index - start_index;
 
     let epoch_year = (reset_epoch_index as f64 / 20.0).trunc() as usize;
 
@@ -31,7 +29,7 @@ impl<'f> FeePools<'f> {
         for index in epoch_index..epoch_index + 1000 {
             let epoch_pool = EpochPool::new(index, self.drive);
 
-            let distribution_percent = get_fee_distribution_percent(index);
+            let distribution_percent = get_fee_distribution_percent(index, epoch_index);
 
             let fee_share = fee_pool_value * distribution_percent;
 
@@ -165,8 +163,12 @@ impl<'f> FeePools<'f> {
         self.update_storage_fee_pool(storage_fee_pool + storage_fees, transaction)?;
 
         // update proposer's block count
-        let proposed_block_count =
-            epoch_pool.get_proposer_block_count(&proposer_pro_tx_hash, transaction)?;
+        let proposed_block_count = epoch_pool
+            .get_proposer_block_count(&proposer_pro_tx_hash, transaction)
+            .or_else(|e| match e {
+                error::Error::GroveDB(grovedb::Error::PathKeyNotFound(_)) => Ok(0u64),
+                _ => Err(e),
+            })?;
 
         epoch_pool.update_proposer_block_count(
             &proposer_pro_tx_hash,
@@ -178,9 +180,71 @@ impl<'f> FeePools<'f> {
 
 #[cfg(test)]
 mod tests {
+    use tempfile::TempDir;
+
+    use crate::{
+        drive::Drive,
+        fee::pools::{epoch::epoch_pool::EpochPool, fee_pools::FeePools},
+    };
+
     #[test]
     fn test_fee_pools_distribute_storage_distribution_pool() {
-        todo!()
+        let tmp_dir = TempDir::new().unwrap();
+        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+
+        drive
+            .create_root_tree(None)
+            .expect("expected to create root tree successfully");
+
+        let transaction = drive.grove.start_transaction();
+
+        let fee_pools = FeePools::new(&drive);
+
+        fee_pools
+            .init(Some(&transaction))
+            .expect("fee pools to init");
+
+        let storage_pool = 1000.0;
+        let epoch_index = 42;
+
+        // init additional epoch pools as it will be done in epoch_change
+        for i in 1000..=1000 + epoch_index {
+            let epoch = EpochPool::new(i, &drive);
+            epoch
+                .init(Some(&transaction))
+                .expect("to init additional epoch pool");
+        }
+
+        fee_pools
+            .update_storage_fee_pool(storage_pool, Some(&transaction))
+            .expect("to update storage fee pool");
+
+        fee_pools
+            .distribute_storage_distribution_pool(epoch_index, Some(&transaction))
+            .expect("to distribute storage fee pool");
+
+        let leftover_storage_fee_pool = fee_pools
+            .get_storage_fee_pool(Some(&transaction))
+            .expect("to get storage fee pool");
+
+        assert_eq!(leftover_storage_fee_pool, 1.5260017107721069e-6);
+
+        // selectively check 1st and last item
+        let first_epoch = EpochPool::new(epoch_index, &drive);
+
+        let first_epoch_storage_fee = first_epoch
+            .get_storage_fee(Some(&transaction))
+            .expect("to get storage fee");
+
+        assert_eq!(first_epoch_storage_fee, 50.0);
+
+        let last_epoch = EpochPool::new(epoch_index + 999, &drive);
+
+        let last_epoch_storage_fee = last_epoch
+            .get_storage_fee(Some(&transaction))
+            .expect("to get storage fee");
+
+        assert_eq!(last_epoch_storage_fee, 1.909889563258572e-9);
     }
 
     #[test]
@@ -190,6 +254,71 @@ mod tests {
 
     #[test]
     fn test_fee_pools_distribute_st_fees() {
-        todo!()
+        let tmp_dir = TempDir::new().unwrap();
+        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+
+        drive
+            .create_root_tree(None)
+            .expect("expected to create root tree successfully");
+
+        let transaction = drive.grove.start_transaction();
+
+        let fee_pools = FeePools::new(&drive);
+
+        fee_pools
+            .init(Some(&transaction))
+            .expect("fee pools to init");
+
+        let epoch_index = 0;
+
+        let epoch_pool = EpochPool::new(epoch_index, &drive);
+
+        // emulating epoch_change
+        epoch_pool
+            .update_processing_fee(0f64, Some(&transaction))
+            .expect("to update processing fee");
+
+        epoch_pool
+            .update_storage_fee(0f64, Some(&transaction))
+            .expect("to update storage fee");
+
+        epoch_pool
+            .init_proposers_tree(Some(&transaction))
+            .expect("to init proposers tree");
+
+        let processing_fees = 0.42;
+        let storage_fees = 0.16;
+
+        let proposer_pro_tx_hash: [u8; 32] =
+            hex::decode("0101010101010101010101010101010101010101010101010101010101010101")
+                .expect("to decode pro tx hash")
+                .try_into()
+                .expect("to convert vector to array of 32 bytes");
+
+        fee_pools
+            .distribute_st_fees(
+                epoch_index,
+                processing_fees,
+                storage_fees,
+                proposer_pro_tx_hash,
+                Some(&transaction),
+            )
+            .expect("to distribute st fees");
+
+        let stored_processing_fees = epoch_pool
+            .get_processing_fee(Some(&transaction))
+            .expect("to get processing fees");
+
+        let stored_storage_fee_pool = fee_pools
+            .get_storage_fee_pool(Some(&transaction))
+            .expect("to get storage fee pool");
+
+        let stored_block_count = epoch_pool
+            .get_proposer_block_count(&proposer_pro_tx_hash, Some(&transaction))
+            .expect("to get proposer block count");
+
+        assert_eq!(stored_processing_fees, processing_fees);
+        assert_eq!(stored_storage_fee_pool, storage_fees);
+        assert_eq!(stored_block_count, 1);
     }
 }
