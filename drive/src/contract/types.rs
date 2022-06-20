@@ -382,7 +382,7 @@ impl DocumentFieldType {
                 } else {
                     // if the value wasn't required we need to add a byte to prove it existed
                     let mut r_vec = vec![255u8];
-                    r_vec.extend(value_bytes);
+                    r_vec.append(&mut value_bytes);
                     Ok(r_vec)
                 }
             }
@@ -400,7 +400,7 @@ impl DocumentFieldType {
                 } else {
                     // if the value wasn't required we need to add a byte to prove it existed
                     let mut r_vec = vec![255u8];
-                    r_vec.extend(value_bytes);
+                    r_vec.append(&mut value_bytes);
                     Ok(r_vec)
                 }
             }
@@ -424,7 +424,7 @@ impl DocumentFieldType {
                 } else {
                     // if the value wasn't required we need to add a byte to prove it existed
                     let mut r_vec = vec![255u8];
-                    r_vec.extend(value_bytes);
+                    r_vec.append(&mut value_bytes);
                     Ok(r_vec)
                 }
             }

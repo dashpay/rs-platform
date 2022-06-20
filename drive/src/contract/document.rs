@@ -55,8 +55,9 @@ impl Document {
     }
 
     pub fn serialize_consume(mut self, document_type: &DocumentType) -> Result<Vec<u8>, Error> {
-        let mut buffer: Vec<u8> = self.id.as_slice().to_vec();
-        buffer.extend(self.owner_id.as_slice());
+        let mut buffer: Vec<u8> = Vec::try_from(self.id).unwrap();
+        let mut owner_id = Vec::try_from(self.owner_id).unwrap();
+        buffer.append(&mut owner_id);
         document_type
             .properties
             .iter()
@@ -368,5 +369,11 @@ mod tests {
             .expect("expected to deserialize a document");
         assert_eq!(document, deserialized_document);
         assert!(serialized_document.len() < document_cbor.len());
+        for _i in 0..10000 {
+            let document = document_type.random_document(Some(3333));
+            let serialized_document = document
+                .serialize_consume(document_type)
+                .expect("expected to serialize");
+        }
     }
 }
