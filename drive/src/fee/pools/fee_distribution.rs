@@ -371,6 +371,17 @@ mod tests {
         fee_pools
             .distribute_fees_to_proposers(0, 10, Some(&transaction))
             .expect("to distribute fees to proporsers");
+
+        match drive
+            .grove
+            .get(FeePools::get_path(), &epoch.key, Some(&transaction))
+        {
+            Ok(_) => assert!(false, "should not be able to get deleted epoch pool"),
+            Err(e) => match e {
+                grovedb::Error::PathKeyNotFound(_) => assert!(true),
+                _ => assert!(false, "invalid error type"),
+            },
+        }
     }
 
     #[test]
