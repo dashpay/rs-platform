@@ -4,6 +4,7 @@ const { expect, use } = require('chai');
 use(require('dirty-chai'));
 
 const Drive = require('../Drive');
+const {init} = require("mocha/lib/cli/commands");
 
 const TEST_DATA_PATH = './test_data';
 
@@ -191,6 +192,7 @@ describe('GroveDB', () => {
         itemTreePath,
         itemKey,
         { type: 'item', epoch: 0, value: itemValue },
+        false,
         true,
       );
 
@@ -228,6 +230,7 @@ describe('GroveDB', () => {
         itemTreePath,
         itemKey,
         { type: 'item', epoch: 0, value: itemValue },
+        false,
         true,
       );
 
@@ -265,6 +268,7 @@ describe('GroveDB', () => {
         itemTreePath,
         itemKey,
         { type: 'item', epoch: 0, value: itemValue },
+        false,
         true,
       );
 
@@ -322,6 +326,7 @@ describe('GroveDB', () => {
         itemTreePath,
         itemKey,
         { type: 'item', epoch: 0, value: itemValue },
+        false,
         true,
       );
 
@@ -437,6 +442,43 @@ describe('GroveDB', () => {
       } catch (e) {
         expect(e.message).to.be.equal('Tree buffer is expected to be 32 bytes long, but got 1');
       }
+    });
+
+    it('should return costs', async () => {
+      const result = await groveDb.insert(
+        [],
+        Buffer.from('test_tree'),
+        { type: 'tree', epoch: 0, value: Buffer.alloc(32) },
+      );
+
+      expect(result).to.have.lengthOf(2);
+      expect(result[0]).to.be.greaterThan(0);
+      expect(result[1]).to.be.greaterThan(0);
+    });
+
+    it('should not insert any data with dry run', async () => {
+      const initialRootHash = await groveDb.getRootHash();
+
+      const path = [Buffer.from('test_tree')];
+      const key = Buffer.from('test_item');
+
+      await groveDb.insert(
+        [],
+        path[0],
+        { type: 'tree', epoch: 0, value: Buffer.alloc(32) },
+        true,
+      );
+
+      await groveDb.insert(
+        path,
+        key,
+        { type: 'item', epoch: 0, value: Buffer.alloc(32).fill(1) },
+        true,
+      );
+
+      const finalRootHash = await groveDb.getRootHash();
+
+      expect(finalRootHash).to.be.deep.equal(initialRootHash);
     });
   });
 
@@ -1142,6 +1184,7 @@ describe('GroveDB', () => {
         itemTreePath,
         Buffer.from('transactional_test_key'),
         { type: 'item', epoch: 0, value: itemValue },
+        false,
         true,
       );
 

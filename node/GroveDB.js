@@ -66,11 +66,12 @@ class GroveDB {
    * @param {Buffer[]} path
    * @param {Buffer} key
    * @param {Element} value
+   * @param {boolean} [dryRun=false]
    * @param {boolean} [useTransaction=false]
    * @returns {Promise<*>}
    */
-  async insert(path, key, value, useTransaction = false) {
-    return groveDbInsertAsync.call(this.db, path, key, value, useTransaction);
+  async insert(path, key, value, dryRun = false, useTransaction = false) {
+    return groveDbInsertAsync.call(this.db, path, key, value, !dryRun, useTransaction);
   }
 
   /**

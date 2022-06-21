@@ -4,6 +4,7 @@ use std::{option::Option::None, path::Path, sync::mpsc, thread};
 
 use grovedb::{Transaction, TransactionArg};
 use neon::prelude::*;
+use neon::types::buffer::TypedArray;
 use neon::types::JsDate;
 use rs_drive::drive::Drive;
 
@@ -878,12 +879,14 @@ impl DriveWrapper {
         let js_path = cx.argument::<JsArray>(0)?;
         let js_key = cx.argument::<JsBuffer>(1)?;
         let js_element = cx.argument::<JsObject>(2)?;
-        let js_using_transaction = cx.argument::<JsBoolean>(3)?;
-        let js_callback = cx.argument::<JsFunction>(4)?.root(&mut cx);
+        let js_apply = cx.argument::<JsBoolean>(3)?;
+        let js_using_transaction = cx.argument::<JsBoolean>(4)?;
+        let js_callback = cx.argument::<JsFunction>(5)?.root(&mut cx);
 
         let path = converter::js_array_of_buffers_to_vec(js_path, &mut cx)?;
-        let key = converter::js_buffer_to_vec_u8(js_key, &mut cx);
         let element = converter::js_object_to_element(js_element, &mut cx)?;
+        let key = converter::js_buffer_to_vec_u8(js_key, &mut cx);
+        let apply = js_apply.value(&mut cx);
         let using_transaction = js_using_transaction.value(&mut cx);
 
         // Get the `this` value as a `JsBox<Database>`
@@ -903,26 +906,38 @@ impl DriveWrapper {
                     Ok(())
                 });
             } else {
-                let grove_db = &drive.grove;
-                let path_slice = path.iter().map(|fragment| fragment.as_slice());
-                let result = grove_db
-                    .insert(
-                        path_slice,
-                        &key,
-                        element,
-                        using_transaction.then(|| transaction).flatten(),
-                    )
-                    .value;
+                let result = drive.grove_insert_with_fees(
+                    path,
+                    &key,
+                    element,
+                    apply,
+                    using_transaction.then(|| transaction).flatten(),
+                );
 
                 channel.send(move |mut task_context| {
                     let callback = js_callback.into_inner(&mut task_context);
                     let this = task_context.undefined();
                     let callback_arguments: Vec<Handle<JsValue>> = match result {
-                        Ok(_) => vec![task_context.null().upcast()],
+                        Ok((storage_cost, processing_cost)) => {
+                            let js_array: Handle<JsArray> = task_context.empty_array();
+
+                            let js_storage_cost =
+                                task_context.number(storage_cost as f64).upcast::<JsValue>();
+
+                            let js_processing_cost = task_context
+                                .number(processing_cost as f64)
+                                .upcast::<JsValue>();
+
+                            js_array.set(&mut task_context, 0, js_storage_cost)?;
+                            js_array.set(&mut task_context, 1, js_processing_cost)?;
+
+                            vec![task_context.null().upcast(), js_array.upcast()]
+                        }
                         Err(err) => vec![task_context.error(err.to_string())?.upcast()],
                     };
 
                     callback.call(&mut task_context, this, callback_arguments)?;
+
                     Ok(())
                 });
             }

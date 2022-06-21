@@ -1387,6 +1387,28 @@ impl Drive {
             None,
         )
     }
+
+    pub fn grove_insert_with_fees(
+        &self,
+        path: Vec<Vec<u8>>,
+        key: &[u8],
+        element: Element,
+        apply: bool,
+        transaction: TransactionArg,
+    ) -> Result<(i64, u64), Error> {
+        let mut drive_operations: Vec<DriveOperation> = vec![];
+
+        self.grove_insert(
+            PathKeyElement::<0>((path, key, element)),
+            transaction,
+            apply,
+            Some(&mut drive_operations),
+        )?;
+
+        let fees = calculate_fee(None, Some(drive_operations))?;
+
+        Ok(fees)
+    }
 }
 
 #[cfg(test)]
