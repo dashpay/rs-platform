@@ -73,7 +73,11 @@ impl<'f> FeePools<'f> {
         let epoch_index = (block_time - genesis_time) as f64 / constants::EPOCH_CHANGE_TIME as f64;
         let epoch_index_floored = epoch_index.floor();
 
-        let is_epoch_change = epoch_index_floored > prev_epoch_index_floored;
+        let is_epoch_change = if epoch_index_floored as u16 == 0 {
+            true
+        } else {
+            epoch_index_floored > prev_epoch_index_floored
+        };
 
         Ok((epoch_index_floored as u16, is_epoch_change))
     }
@@ -214,7 +218,7 @@ mod tests {
             .expect("to get current epoch index");
 
         assert_eq!(epoch_index, 0);
-        assert_eq!(is_epoch_change, false);
+        assert_eq!(is_epoch_change, true);
 
         let block_time: i64 = 1657125244561;
 

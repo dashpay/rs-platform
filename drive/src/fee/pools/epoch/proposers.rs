@@ -137,10 +137,10 @@ impl<'e> EpochPool<'e> {
             .map(|slice| slice.to_vec())
             .collect();
 
-        let path_query = PathQuery::new(
-            path_as_vec,
-            SizedQuery::new(Query::new(), Some(limit), None),
-        );
+        let mut query = Query::new();
+        query.insert_all();
+
+        let path_query = PathQuery::new(path_as_vec, SizedQuery::new(query, Some(limit), None));
 
         let path_queries = [&path_query];
 
