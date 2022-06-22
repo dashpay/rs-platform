@@ -239,7 +239,7 @@ impl<'a, const N: usize> PathKeyElementInfo<'a, N> {
                 KeyElementInfo::KeyElement((key, element)) => Ok(PathKeyElementSize((
                     path_size,
                     key.len(),
-                    element.node_byte_size(key),
+                    element.node_byte_size(key.len()),
                 ))),
                 KeyElementInfo::KeyElementSize((key_len, element_size)) => {
                     Ok(PathKeyElementSize((path_size, key_len, element_size)))

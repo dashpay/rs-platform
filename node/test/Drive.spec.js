@@ -363,4 +363,38 @@ describe('Drive', () => {
       expect(await drive.getGroveDB().getRootHash()).to.not.deep.equals(initialRootHash);
     });
   });
+
+  describe('#initFeePools', () => {
+    beforeEach(async () => {
+      await drive.createRootTree();
+    });
+
+    it('should successfully init fee pools', async () => {
+      await drive.initFeePools();
+    });
+  });
+
+  describe('#feePoolsProcessBlock', () => {
+    beforeEach(async () => {
+      await drive.createRootTree();
+    });
+
+    it('should successfully process a block', async () => {
+      const blockHeight = 0;
+      const blockTime = (new Date()).getTime();
+      const previousBlockTime = (new Date()).getTime();
+      const proposerTxHash = Buffer.alloc(32, 1);
+      const processingFees = 0.42;
+      const storageFees = 42.0;
+
+      await drive.feePoolsProcessBlock(
+        blockHeight,
+        blockTime,
+        previousBlockTime,
+        proposerTxHash,
+        processingFees,
+        storageFees,
+      );
+    });
+  });
 });

@@ -16,6 +16,8 @@ const {
   driveDeleteDocument,
   driveQueryDocuments,
   driveInsertIdentity,
+  driveInitFeePools,
+  driveFeePoolsProcessBlock,
 } = require('neon-load-or-build')({
   dir: pathJoin(__dirname, '..'),
 });
@@ -35,6 +37,8 @@ const driveUpdateDocumentAsync = appendStack(promisify(driveUpdateDocument));
 const driveDeleteDocumentAsync = appendStack(promisify(driveDeleteDocument));
 const driveQueryDocumentsAsync = appendStack(promisify(driveQueryDocuments));
 const driveInsertIdentityAsync = appendStack(promisify(driveInsertIdentity));
+const driveInitFeePoolsAsync = appendStack(promisify(driveInitFeePools));
+const driveFeePoolsProcessBlockAsync = appendStack(promisify(driveFeePoolsProcessBlock));
 
 // Wrapper class for the boxed `Drive` for idiomatic JavaScript usage
 class Drive {
@@ -209,6 +213,44 @@ class Drive {
       identity.toBuffer(),
       !dryRun,
       useTransaction,
+    );
+  }
+
+  /**
+   * Initialize fee pools
+   *
+   * @returns {Promise<void>}
+   */
+  async initFeePools() {
+    return driveInitFeePoolsAsync.call(this.drive);
+  }
+
+  /**
+   * @param {number} blockHeight
+   * @param {number} blockTime
+   * @param {number} previousBlockTime
+   * @param {Buffer} proposerTxHash
+   * @param {number} processingFees
+   * @param {number} storageFees
+   *
+   * @returns {Promise<void>}
+   */
+  async feePoolsProcessBlock(
+    blockHeight,
+    blockTime,
+    previousBlockTime,
+    proposerTxHash,
+    processingFees,
+    storageFees,
+  ) {
+    return driveFeePoolsProcessBlockAsync.call(
+      this.drive,
+      blockHeight,
+      blockTime,
+      previousBlockTime,
+      proposerTxHash,
+      processingFees,
+      storageFees,
     );
   }
 }

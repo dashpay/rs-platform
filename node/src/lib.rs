@@ -1357,6 +1357,99 @@ impl DriveWrapper {
         // The result is returned through the callback, not through direct return
         Ok(cx.undefined())
     }
+
+    fn js_fee_pools_init(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+        let js_callback = cx.argument::<JsFunction>(0)?.root(&mut cx);
+
+        let db = cx
+            .this()
+            .downcast_or_throw::<JsBox<DriveWrapper>, _>(&mut cx)?;
+
+        db.send_to_drive_thread(move |drive: &Drive, transaction, channel| {
+            let result = drive.init_fee_pools(transaction);
+
+            channel.send(move |mut task_context| {
+                let callback = js_callback.into_inner(&mut task_context);
+                let this = task_context.undefined();
+
+                let callback_arguments: Vec<Handle<JsValue>> = match result {
+                    Ok(()) => {
+                        vec![task_context.null().upcast()]
+                    }
+
+                    // Convert the error to a JavaScript exception on failure
+                    Err(err) => vec![task_context.error(err.to_string())?.upcast()],
+                };
+
+                callback.call(&mut task_context, this, callback_arguments)?;
+
+                Ok(())
+            });
+        })
+        .or_else(|err| cx.throw_error(err.to_string()))?;
+
+        // The result is returned through the callback, not through direct return
+        Ok(cx.undefined())
+    }
+
+    fn js_fee_pools_process_block(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+        let js_block_height = cx.argument::<JsNumber>(0)?;
+        let js_block_time = cx.argument::<JsNumber>(1)?;
+        let js_previous_block_time = cx.argument::<JsNumber>(2)?;
+        let js_proposer_tx_hash = cx.argument::<JsBuffer>(3)?;
+        let js_processing_fees = cx.argument::<JsNumber>(4)?;
+        let js_storage_fees = cx.argument::<JsNumber>(5)?;
+
+        let block_height = js_block_height.value(&mut cx) as u64;
+        let block_time = js_block_time.value(&mut cx) as i64;
+        let previous_block_time = js_previous_block_time.value(&mut cx) as i64;
+        let proposer_pro_tx_hash: [u8; 32] =
+            converter::js_buffer_to_vec_u8(js_proposer_tx_hash, &mut cx)
+                .try_into()
+                .or_else(|_| cx.throw_error("proposer_pro_tx_hash has invalid length"))?;
+        let processing_fees = js_processing_fees.value(&mut cx);
+        let storage_fees = js_storage_fees.value(&mut cx);
+
+        let js_callback = cx.argument::<JsFunction>(6)?.root(&mut cx);
+
+        let db = cx
+            .this()
+            .downcast_or_throw::<JsBox<DriveWrapper>, _>(&mut cx)?;
+
+        db.send_to_drive_thread(move |drive: &Drive, transaction, channel| {
+            let result = drive.process_block(
+                block_height,
+                block_time,
+                previous_block_time,
+                proposer_pro_tx_hash,
+                processing_fees,
+                storage_fees,
+                transaction,
+            );
+
+            channel.send(move |mut task_context| {
+                let callback = js_callback.into_inner(&mut task_context);
+                let this = task_context.undefined();
+
+                let callback_arguments: Vec<Handle<JsValue>> = match result {
+                    Ok(()) => {
+                        vec![task_context.null().upcast()]
+                    }
+
+                    // Convert the error to a JavaScript exception on failure
+                    Err(err) => vec![task_context.error(err.to_string())?.upcast()],
+                };
+
+                callback.call(&mut task_context, this, callback_arguments)?;
+
+                Ok(())
+            });
+        })
+        .or_else(|err| cx.throw_error(err.to_string()))?;
+
+        // The result is returned through the callback, not through direct return
+        Ok(cx.undefined())
+    }
 }
 
 #[neon::main]
@@ -1416,6 +1509,12 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("groveDbQuery", DriveWrapper::js_grove_db_query)?;
     cx.export_function("groveDbProveQuery", DriveWrapper::js_grove_db_prove_query)?;
     cx.export_function("groveDbRootHash", DriveWrapper::js_grove_db_root_hash)?;
+
+    cx.export_function("driveInitFeePools", DriveWrapper::js_fee_pools_init)?;
+    cx.export_function(
+        "driveFeePoolsProcessBlock",
+        DriveWrapper::js_fee_pools_process_block,
+    )?;
 
     Ok(())
 }

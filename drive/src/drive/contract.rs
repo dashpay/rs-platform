@@ -61,7 +61,7 @@ impl Drive {
                 &storage_flags,
                 insert_operations,
             )?;
-            let encoded_time = crate::contract::types::encode_float(block_time)?;
+            let encoded_time = crate::common::encode::encode_float(block_time)?;
             let contract_keeping_history_storage_path =
                 contract_keeping_history_storage_path(&contract.id);
             self.batch_insert(
