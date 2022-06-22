@@ -21,7 +21,7 @@ impl<'e> EpochPool<'e> {
         }
     }
 
-    pub fn init(&self, transaction: TransactionArg) -> Result<(), Error> {
+    pub fn init(&self, multiplier: u64, transaction: TransactionArg) -> Result<(), Error> {
         // init epoch tree
         self.drive
             .grove
@@ -44,9 +44,16 @@ impl<'e> EpochPool<'e> {
             )
             .map_err(Error::GroveDB)?;
 
-        todo!("Store u64 multiplier");
-
-        Ok(())
+        // init storage fee item to 0
+        self.drive
+            .grove
+            .insert(
+                self.get_path(),
+                constants::KEY_MULTIPLIER.as_bytes(),
+                Element::Item(multiplier.to_le_bytes().to_vec(), None),
+                transaction,
+            )
+            .map_err(Error::GroveDB)
     }
 
     pub fn get_path(&self) -> [&[u8]; 2] {
@@ -83,7 +90,7 @@ mod tests {
 
         let epoch = EpochPool::new(1042, &drive);
 
-        match epoch.init(Some(&transaction)) {
+        match epoch.init(42, Some(&transaction)) {
             Ok(_) => assert!(false, "should not be able to init epoch without FeePools"),
             Err(e) => match e {
                 error::Error::GroveDB(grovedb::Error::InvalidPath(_)) => assert!(true),
@@ -94,13 +101,15 @@ mod tests {
         let fee_pools = FeePools::new(&drive);
 
         fee_pools
-            .init(Some(&transaction))
+            .init(1, Some(&transaction))
             .expect("fee pools to init");
 
         let epoch = EpochPool::new(1042, &drive);
 
+        let multiplier = 42;
+
         epoch
-            .init(Some(&transaction))
+            .init(multiplier, Some(&transaction))
             .expect("to init an epoch pool");
 
         let storage_fee = epoch
@@ -108,5 +117,11 @@ mod tests {
             .expect("to get storage fee");
 
         assert_eq!(storage_fee, 0f64);
+
+        let stored_multiplier = epoch
+            .get_multiplier(Some(&transaction))
+            .expect("to get multiplier");
+
+        assert_eq!(stored_multiplier, multiplier);
     }
 }

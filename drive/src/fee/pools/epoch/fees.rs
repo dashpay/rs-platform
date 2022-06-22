@@ -60,6 +60,32 @@ impl<'e> EpochPool<'e> {
         }
     }
 
+    pub fn get_multiplier(&self, transaction: TransactionArg) -> Result<u64, Error> {
+        let element = self
+            .drive
+            .grove
+            .get(
+                self.get_path(),
+                constants::KEY_MULTIPLIER.as_bytes(),
+                transaction,
+            )
+            .map_err(Error::GroveDB)?;
+
+        if let Element::Item(item, _) = element {
+            Ok(u64::from_le_bytes(item.as_slice().try_into().map_err(
+                |_| {
+                    Error::Fee(FeeError::CorruptedMultiplierInvalidItemLength(
+                        "epoch multiplier item have an invalid length",
+                    ))
+                },
+            )?))
+        } else {
+            Err(Error::Fee(FeeError::CorruptedMultiplierNotItem(
+                "epoch multiplier must be an item",
+            )))
+        }
+    }
+
     pub fn update_processing_fee(
         &self,
         processing_fee: f64,
@@ -129,7 +155,7 @@ mod tests {
         let fee_pools = FeePools::new(&drive);
 
         fee_pools
-            .init(Some(&transaction))
+            .init(1, Some(&transaction))
             .expect("fee pools to init");
 
         let epoch = EpochPool::new(7000, &drive);
@@ -211,7 +237,7 @@ mod tests {
         let fee_pools = FeePools::new(&drive);
 
         fee_pools
-            .init(Some(&transaction))
+            .init(1, Some(&transaction))
             .expect("fee pools to init");
 
         let epoch = EpochPool::new(7000, &drive);
@@ -285,7 +311,7 @@ mod tests {
         let fee_pools = FeePools::new(&drive);
 
         fee_pools
-            .init(Some(&transaction))
+            .init(1, Some(&transaction))
             .expect("fee pools to init");
 
         let processing_fee: f64 = 0.42;
@@ -306,5 +332,64 @@ mod tests {
             .expect("to get combined fee");
 
         assert_eq!(combined_fee, processing_fee + storage_fee);
+    }
+
+    #[test]
+    fn test_get_multiplier() {
+        let tmp_dir = TempDir::new().unwrap();
+        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+
+        drive
+            .create_root_tree(None)
+            .expect("expected to create root tree successfully");
+
+        let transaction = drive.grove.start_transaction();
+
+        let fee_pools = FeePools::new(&drive);
+
+        fee_pools
+            .init(1, Some(&transaction))
+            .expect("fee pools to init");
+
+        let epoch = EpochPool::new(7000, &drive);
+
+        match epoch.get_multiplier(Some(&transaction)) {
+            Ok(_) => assert!(
+                false,
+                "should not be able to get multiplier on uninit epoch pool"
+            ),
+            Err(e) => match e {
+                error::Error::GroveDB(grovedb::Error::InvalidPath(_)) => assert!(true),
+                _ => assert!(false, "invalid error type"),
+            },
+        }
+
+        let epoch = EpochPool::new(0, &drive);
+
+        let stored_multiplier = epoch
+            .get_multiplier(Some(&transaction))
+            .expect("to get multiplier");
+
+        assert_eq!(stored_multiplier, 1);
+
+        drive
+            .grove
+            .insert(
+                epoch.get_path(),
+                constants::KEY_MULTIPLIER.as_bytes(),
+                Element::Item(u128::MAX.to_le_bytes().to_vec(), None),
+                Some(&transaction),
+            )
+            .expect("to insert invalid data");
+
+        match epoch.get_multiplier(Some(&transaction)) {
+            Ok(_) => assert!(false, "should not be able to decode stored value"),
+            Err(e) => match e {
+                error::Error::Fee(FeeError::CorruptedMultiplierInvalidItemLength(_)) => {
+                    assert!(true)
+                }
+                _ => assert!(false, "ivalid error type"),
+            },
+        }
     }
 }

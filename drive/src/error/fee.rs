@@ -27,4 +27,8 @@ pub enum FeeError {
     CorruptedStorageFeePoolNotItem(&'static str),
     #[error("corrupted storage fee pool invalid item length error: {0}")]
     CorruptedStorageFeePoolInvalidItemLength(&'static str),
+    #[error("corrupted multiplier not an item error: {0}")]
+    CorruptedMultiplierNotItem(&'static str),
+    #[error("corrupted multiplier invalid item length error: {0}")]
+    CorruptedMultiplierInvalidItemLength(&'static str),
 }

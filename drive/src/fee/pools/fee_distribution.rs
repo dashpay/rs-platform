@@ -273,7 +273,7 @@ mod tests {
         let fee_pools = FeePools::new(&drive);
 
         fee_pools
-            .init(Some(&transaction))
+            .init(1, Some(&transaction))
             .expect("fee pools to init");
 
         let oldest_epoch = fee_pools
@@ -330,12 +330,12 @@ mod tests {
         let fee_pools = FeePools::new(&drive);
 
         fee_pools
-            .init(Some(&transaction))
+            .init(1, Some(&transaction))
             .expect("fee pools to init");
 
         // set initial data for test
         fee_pools
-            .process_epoch_change(0, 1, Some(&transaction))
+            .process_epoch_change(0, 1, 1, Some(&transaction))
             .expect("to process epoch change");
 
         let epoch = EpochPool::new(0, &drive);
@@ -378,7 +378,7 @@ mod tests {
         let fee_pools = FeePools::new(&drive);
 
         fee_pools
-            .init(Some(&transaction))
+            .init(1, Some(&transaction))
             .expect("fee pools to init");
 
         let epoch_index = 0;

@@ -24,7 +24,7 @@ impl<'f> FeePools<'f> {
         [Into::<&[u8; 1]>::into(RootTree::Pools)]
     }
 
-    pub fn init(&self, transaction: TransactionArg) -> Result<(), Error> {
+    pub fn init(&self, multiplier: u64, transaction: TransactionArg) -> Result<(), Error> {
         // init fee pool subtree
         self.drive
             .grove
@@ -51,7 +51,7 @@ impl<'f> FeePools<'f> {
         // with 20 epochs per year that's 1000 epochs
         for i in 0..1000 {
             let epoch = EpochPool::new(i, self.drive);
-            epoch.init(transaction)?;
+            epoch.init(multiplier, transaction)?;
         }
 
         Ok(())
@@ -135,11 +135,12 @@ impl<'f> FeePools<'f> {
         &self,
         epoch_index: u16,
         first_proposer_block_height: u64,
+        multiplier: u64,
         transaction: TransactionArg,
     ) -> Result<(), Error> {
         // create and init next thousandth epoch
         let next_thousandth_epoch = EpochPool::new(epoch_index + 1000, self.drive);
-        next_thousandth_epoch.init(transaction)?;
+        next_thousandth_epoch.init(multiplier, transaction)?;
 
         // init first_proposer_block_height and processing_fee for an epoch
         let epoch = EpochPool::new(epoch_index, self.drive);
@@ -179,7 +180,7 @@ mod tests {
         let fee_pools = FeePools::new(&drive);
 
         fee_pools
-            .init(Some(&transaction))
+            .init(1, Some(&transaction))
             .expect("fee pools to init");
 
         let storage_fee_pool = fee_pools
@@ -229,7 +230,7 @@ mod tests {
         }
 
         fee_pools
-            .init(Some(&transaction))
+            .init(1, Some(&transaction))
             .expect("fee pools to init");
 
         fee_pools
@@ -279,7 +280,7 @@ mod tests {
         let mut fee_pools = FeePools::new(&drive);
 
         fee_pools
-            .init(Some(&transaction))
+            .init(1, Some(&transaction))
             .expect("fee pools to init");
 
         let genesis_time: i64 = 1655396517902;
@@ -321,13 +322,13 @@ mod tests {
         let fee_pools = FeePools::new(&drive);
 
         fee_pools
-            .init(Some(&transaction))
+            .init(1, Some(&transaction))
             .expect("fee pools to init");
 
         let first_proposer_block_height = 1;
 
         fee_pools
-            .process_epoch_change(0, first_proposer_block_height, Some(&transaction))
+            .process_epoch_change(0, first_proposer_block_height, 1, Some(&transaction))
             .expect("to process epoch change");
 
         // Verify next thousandth epoch
