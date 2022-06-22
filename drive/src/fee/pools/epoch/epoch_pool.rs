@@ -42,7 +42,11 @@ impl<'e> EpochPool<'e> {
                 Element::Item(0f64.to_le_bytes().to_vec(), None),
                 transaction,
             )
-            .map_err(Error::GroveDB)
+            .map_err(Error::GroveDB)?;
+
+        todo!("Store u64 multiplier");
+
+        Ok(())
     }
 
     pub fn get_path(&self) -> [&[u8]; 2] {

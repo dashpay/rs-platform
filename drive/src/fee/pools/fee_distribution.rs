@@ -7,40 +7,28 @@ use crate::error::document::DocumentError;
 use crate::error::{self, Error};
 use crate::fee::pools::fee_pools::FeePools;
 
-use super::constants;
-use super::epoch::epoch_pool::EpochPool;
-
-fn get_fee_distribution_percent(epoch_index: u16, start_index: u16) -> f64 {
-    let reset_epoch_index = epoch_index - start_index;
-
-    let epoch_year = (reset_epoch_index as f64 / 20.0).trunc() as usize;
-
-    constants::FEE_DISTRIBUTION_TABLE[epoch_year]
-}
+use crate::fee::pools::constants;
+use crate::fee::pools::epoch::epoch_pool::EpochPool;
 
 impl<'f> FeePools<'f> {
-    pub fn distribute_storage_distribution_pool(
+    pub fn get_oldest_epoch_pool(
         &self,
         epoch_index: u16,
         transaction: TransactionArg,
-    ) -> Result<(), Error> {
-        let mut fee_pool_value = self.get_storage_fee_pool(transaction)?;
-
-        for index in epoch_index..epoch_index + 1000 {
-            let epoch_pool = EpochPool::new(index, self.drive);
-
-            let distribution_percent = get_fee_distribution_percent(index, epoch_index);
-
-            let fee_share = fee_pool_value * distribution_percent;
-
-            let storage_fee = epoch_pool.get_storage_fee(transaction)?;
-
-            epoch_pool.update_storage_fee(storage_fee + fee_share, transaction)?;
-
-            fee_pool_value -= fee_share;
+    ) -> Result<EpochPool, Error> {
+        if epoch_index == 0 {
+            todo!("must be an error - all epochs paid");
+            return Ok(EpochPool::new(epoch_index, self.drive));
         }
 
-        self.update_storage_fee_pool(fee_pool_value, transaction)
+        let epoch = EpochPool::new(epoch_index, self.drive);
+
+        if epoch.is_proposers_tree_empty(transaction)? {
+            todo!("it must be previous");
+            return Ok(epoch);
+        }
+
+        self.get_oldest_epoch_pool(epoch_index - 1, transaction)
     }
 
     pub fn distribute_fees_to_proposers(
@@ -144,6 +132,7 @@ impl<'f> FeePools<'f> {
 
         // if less then a limit processed - drop the pool
         if proposers_len < proposers_limit.into() {
+            todo!("Delete only proposers tree");
             epoch_pool.delete(transaction)?;
         }
 
@@ -271,7 +260,7 @@ mod tests {
     }
 
     #[test]
-    fn test_fee_pools_distribute_storage_distribution_pool() {
+    fn test_fee_pools_get_oldest_epoch() {
         let tmp_dir = TempDir::new().unwrap();
         let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
 
@@ -287,51 +276,40 @@ mod tests {
             .init(Some(&transaction))
             .expect("fee pools to init");
 
-        let storage_pool = 1000.0;
-        let epoch_index = 42;
+        let oldest_epoch = fee_pools
+            .get_oldest_epoch_pool(999, Some(&transaction))
+            .expect("to get oldest epoch pool");
 
-        // init additional epoch pools as it will be done in epoch_change
-        for i in 1000..=1000 + epoch_index {
-            let epoch = EpochPool::new(i, &drive);
-            epoch
-                .init(Some(&transaction))
-                .expect("to init additional epoch pool");
-        }
+        assert_eq!(oldest_epoch.index, 999);
 
-        fee_pools
-            .update_storage_fee_pool(storage_pool, Some(&transaction))
-            .expect("to update storage fee pool");
+        let proposer_pro_tx_hash: [u8; 32] =
+            hex::decode("0101010101010101010101010101010101010101010101010101010101010101")
+                .expect("to decode pro tx hash")
+                .try_into()
+                .expect("to convert vector to array of 32 bytes");
 
-        fee_pools
-            .distribute_storage_distribution_pool(epoch_index, Some(&transaction))
-            .expect("to distribute storage fee pool");
+        oldest_epoch
+            .init_proposers_tree(Some(&transaction))
+            .expect("to init proposers tree");
 
-        let leftover_storage_fee_pool = fee_pools
-            .get_storage_fee_pool(Some(&transaction))
-            .expect("to get storage fee pool");
+        oldest_epoch
+            .update_proposer_block_count(&proposer_pro_tx_hash, 1, Some(&transaction))
+            .expect("to update proposer block count");
 
-        assert_eq!(leftover_storage_fee_pool, 1.5260017107721069e-6);
+        let oldest_epoch = fee_pools
+            .get_oldest_epoch_pool(999, Some(&transaction))
+            .expect("to get oldest epoch pool");
 
-        // selectively check 1st and last item
-        let first_epoch = EpochPool::new(epoch_index, &drive);
-
-        let first_epoch_storage_fee = first_epoch
-            .get_storage_fee(Some(&transaction))
-            .expect("to get storage fee");
-
-        assert_eq!(first_epoch_storage_fee, 50.0);
-
-        let last_epoch = EpochPool::new(epoch_index + 999, &drive);
-
-        let last_epoch_storage_fee = last_epoch
-            .get_storage_fee(Some(&transaction))
-            .expect("to get storage fee");
-
-        assert_eq!(last_epoch_storage_fee, 1.909889563258572e-9);
+        assert_eq!(oldest_epoch.index, 998);
     }
 
     #[test]
     fn test_fee_pools_distribute_fees_to_proposers() {
+        todo!()
+    }
+
+    #[test]
+    fn test_fee_pools_distribute_fees_to_proposers_remove_proposers_tree() {
         let tmp_dir = TempDir::new().unwrap();
         let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
 
@@ -382,6 +360,8 @@ mod tests {
                 _ => assert!(false, "invalid error type"),
             },
         }
+
+        todo!("Check updated balances");
     }
 
     #[test]

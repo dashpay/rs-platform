@@ -24,6 +24,7 @@ impl Drive {
         storage_fees: f64,
         transaction: TransactionArg,
     ) -> Result<(), Error> {
+        todo!("Initialize in Drive only once");
         let mut fee_pools = FeePools::new(self);
 
         if block_height == 1 {

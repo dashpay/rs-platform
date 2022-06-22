@@ -2,11 +2,46 @@ use grovedb::{Element, TransactionArg};
 
 use crate::error::fee::FeeError;
 use crate::error::Error;
+use crate::fee::pools::epoch::epoch_pool::EpochPool;
 use crate::fee::pools::fee_pools::FeePools;
 
 use super::constants;
 
+fn get_fee_distribution_percent(epoch_index: u16, start_index: u16) -> f64 {
+    let reset_epoch_index = epoch_index - start_index;
+
+    let epoch_year = (reset_epoch_index as f64 / 20.0).trunc() as usize;
+
+    constants::FEE_DISTRIBUTION_TABLE[epoch_year]
+}
+
 impl<'f> FeePools<'f> {
+    pub fn distribute_storage_fee_pool(
+        &self,
+        epoch_index: u16,
+        transaction: TransactionArg,
+    ) -> Result<(), Error> {
+        let mut fee_pool_value = self.get_storage_fee_pool(transaction)?;
+
+        // todo!("do nothing if empty, it's actually the case for epoch 0");
+
+        for index in epoch_index..epoch_index + 1000 {
+            let epoch_pool = EpochPool::new(index, self.drive);
+
+            let distribution_percent = get_fee_distribution_percent(index, epoch_index);
+
+            let fee_share = fee_pool_value * distribution_percent;
+
+            let storage_fee = epoch_pool.get_storage_fee(transaction)?;
+
+            epoch_pool.update_storage_fee(storage_fee + fee_share, transaction)?;
+
+            fee_pool_value -= fee_share;
+        }
+
+        self.update_storage_fee_pool(fee_pool_value, transaction)
+    }
+
     pub fn update_storage_fee_pool(
         &self,
         storage_fee: f64,
@@ -55,11 +90,75 @@ mod tests {
     use grovedb::Element;
     use tempfile::TempDir;
 
+    use crate::fee::pools::epoch::epoch_pool::EpochPool;
     use crate::{
         drive::Drive,
         error::{self, fee::FeeError},
         fee::pools::{constants, fee_pools::FeePools},
     };
+
+    #[test]
+    fn test_fee_pools_distribute_storage_distribution_pool() {
+        let tmp_dir = TempDir::new().unwrap();
+        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+
+        drive
+            .create_root_tree(None)
+            .expect("expected to create root tree successfully");
+
+        let transaction = drive.grove.start_transaction();
+
+        let fee_pools = FeePools::new(&drive);
+
+        fee_pools
+            .init(Some(&transaction))
+            .expect("fee pools to init");
+
+        let storage_pool = 1000.0;
+        let epoch_index = 42;
+
+        // init additional epoch pools as it will be done in epoch_change
+        for i in 1000..=1000 + epoch_index {
+            let epoch = EpochPool::new(i, &drive);
+            epoch
+                .init(Some(&transaction))
+                .expect("to init additional epoch pool");
+        }
+
+        fee_pools
+            .update_storage_fee_pool(storage_pool, Some(&transaction))
+            .expect("to update storage fee pool");
+
+        fee_pools
+            .distribute_storage_fee_pool(epoch_index, Some(&transaction))
+            .expect("to distribute storage fee pool");
+
+        // check leftover
+        let leftover_storage_fee_pool = fee_pools
+            .get_storage_fee_pool(Some(&transaction))
+            .expect("to get storage fee pool");
+
+        assert_eq!(leftover_storage_fee_pool, 1.5260017107721069e-6);
+
+        todo!("I guess it must be 0");
+
+        // selectively check 1st and last item
+        let first_epoch = EpochPool::new(epoch_index, &drive);
+
+        let first_epoch_storage_fee = first_epoch
+            .get_storage_fee(Some(&transaction))
+            .expect("to get storage fee");
+
+        assert_eq!(first_epoch_storage_fee, 50.0);
+
+        let last_epoch = EpochPool::new(epoch_index + 999, &drive);
+
+        let last_epoch_storage_fee = last_epoch
+            .get_storage_fee(Some(&transaction))
+            .expect("to get storage fee");
+
+        assert_eq!(last_epoch_storage_fee, 1.909889563258572e-9);
+    }
 
     #[test]
     fn test_fee_pools_update_and_get_storage_fee_pool() {

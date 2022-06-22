@@ -1,7 +1,7 @@
 use crate::common;
 use crate::common::bytes_for_system_value_from_tree_map;
-use crate::drive::Drive;
 use crate::drive::defaults::PROTOCOL_VERSION;
+use crate::drive::Drive;
 use crate::error::identity::IdentityError;
 use crate::error::structure::StructureError;
 use crate::error::Error;
@@ -204,9 +204,7 @@ impl Identity {
 
 #[cfg(test)]
 mod tests {
-    use crate::common::{
-        cbor_from_hex,
-    };
+    use crate::common::cbor_from_hex;
 
     use crate::identity::Identity;
 
@@ -215,8 +213,7 @@ mod tests {
         let identity_hex = String::from("01000000a46269645820e206bcbcf46f77b8d8a06e58254d814e90fb720afe62f062794cd02042aa18756762616c616e63650a687265766973696f6e006a7075626c69634b65797382a6626964006464617461582102eaf222e32d46b97f56f890bb22c3d65e279b18bda203f30bd2d3eed769a3476264747970650067707572706f73650068726561644f6e6c79f46d73656375726974794c6576656c00a6626964016464617461582103c00af793d83155f95502b33a17154110946dcf69ca0dd188bee3b6d10c0d4f8b64747970650067707572706f73650168726561644f6e6c79f46d73656375726974794c6576656c03");
         let identity_cbor = cbor_from_hex(identity_hex);
 
-        let identity = Identity::from_cbor(identity_cbor.as_slice())
-            .expect("identity to parse");
+        let identity = Identity::from_cbor(identity_cbor.as_slice()).expect("identity to parse");
 
         // TODO: deal with canonical encoding
         assert_eq!(identity.to_cbor(), identity_cbor);

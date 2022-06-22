@@ -200,7 +200,7 @@ impl Drive {
             let version_set_bytes: [u8; 4] = version_bytes
                 .try_into()
                 .expect("slice with incorrect length");
-            let version = u32::from_be_bytes(version_set_bytes);
+            let version = u32::from_le_bytes(version_set_bytes);
             Drive::check_protocol_version(version)
         }
     }
