@@ -25,7 +25,9 @@ impl FeePools {
     ) -> Result<(), Error> {
         let mut fee_pool_value = self.get_storage_fee_pool(drive, transaction)?;
 
-        // todo!("do nothing if empty, it's actually the case for epoch 0");
+        if fee_pool_value == 0.0 {
+            return Ok(());
+        }
 
         for index in epoch_index..epoch_index + 1000 {
             let epoch_pool = EpochPool::new(index, drive);

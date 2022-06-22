@@ -102,7 +102,7 @@ impl FeePools {
             )
             .map_err(Error::GroveDB)?;
 
-        // TODO: Should keep in fee pools to avoid extra reads
+        // Should keep in fee pools to avoid extra reads
         self.genesis_time = Some(genesis_time);
 
         Ok(())

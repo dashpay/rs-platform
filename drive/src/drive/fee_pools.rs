@@ -27,8 +27,6 @@ impl Drive {
             self.fee_pools
                 .borrow_mut()
                 .update_genesis_time(&self, genesis_time, transaction)?;
-
-            // TODO: must be inside `update_genesis_time`
         }
 
         let (epoch_index, is_epoch_change) = self
