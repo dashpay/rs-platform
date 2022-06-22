@@ -130,11 +130,7 @@ impl ArrayFieldType {
         };
     }
 
-
-    pub fn encode_value_ref_with_size(
-        &self,
-        value: &Value,
-    ) -> Result<Vec<u8>, Error> {
+    pub fn encode_value_ref_with_size(&self, value: &Value) -> Result<Vec<u8>, Error> {
         return match self {
             ArrayFieldType::String(_, _) => {
                 let value_as_text = value.as_text().ok_or_else(get_field_type_matching_error)?;
@@ -709,12 +705,15 @@ impl DocumentFieldType {
                 if let Value::Array(array) = value {
                     let mut r_vec = array.len().encode_var_vec();
 
-                    array.into_iter().map(|value| {
-                        let mut serialized_value = array_field_type.encode_value_with_size(value)?;
+                    array
+                        .into_iter()
+                        .map(|value| {
+                            let mut serialized_value =
+                                array_field_type.encode_value_with_size(value)?;
                             r_vec.append(&mut serialized_value);
                             Ok(())
-
-                    }).collect::<Result<(), Error>>()?;
+                        })
+                        .collect::<Result<(), Error>>()?;
                     Ok(r_vec)
                 } else {
                     Err(get_field_type_matching_error())
@@ -880,12 +879,15 @@ impl DocumentFieldType {
                 if let Value::Array(array) = value {
                     let mut r_vec = array.len().encode_var_vec();
 
-                    array.into_iter().map(|value| {
-                        let mut serialized_value = array_field_type.encode_value_ref_with_size(value)?;
-                        r_vec.append(&mut serialized_value);
-                        Ok(())
-
-                    }).collect::<Result<(), Error>>()?;
+                    array
+                        .into_iter()
+                        .map(|value| {
+                            let mut serialized_value =
+                                array_field_type.encode_value_ref_with_size(value)?;
+                            r_vec.append(&mut serialized_value);
+                            Ok(())
+                        })
+                        .collect::<Result<(), Error>>()?;
                     Ok(r_vec)
                 } else {
                     Err(get_field_type_matching_error())
