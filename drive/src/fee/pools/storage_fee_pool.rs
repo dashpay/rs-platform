@@ -121,7 +121,7 @@ mod tests {
         for i in 1000..=1000 + epoch_index {
             let epoch = EpochPool::new(i, &drive);
             epoch
-                .init(1, Some(&transaction))
+                .init_empty(1, Some(&transaction))
                 .expect("to init additional epoch pool");
         }
 
