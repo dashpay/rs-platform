@@ -51,7 +51,7 @@ impl<'f> FeePools<'f> {
         // with 20 epochs per year that's 1000 epochs
         for i in 0..1000 {
             let epoch = EpochPool::new(i, self.drive);
-            epoch.init(transaction)?;
+            epoch.init_empty(transaction)?;
         }
 
         Ok(())
@@ -139,13 +139,13 @@ impl<'f> FeePools<'f> {
     ) -> Result<(), Error> {
         // create and init next thousandth epoch
         let next_thousandth_epoch = EpochPool::new(epoch_index + 1000, self.drive);
-        next_thousandth_epoch.init(transaction)?;
+        next_thousandth_epoch.init_empty(transaction)?;
+
+        todo!("Store u64 multiplier");
 
         // init first_proposer_block_height and processing_fee for an epoch
         let epoch = EpochPool::new(epoch_index, self.drive);
-        epoch.update_first_proposer_block_height(first_proposer_block_height, transaction)?;
-        epoch.update_processing_fee(0f64, transaction)?;
-        epoch.init_proposers_tree(transaction)?;
+        epoch.init_current(first_proposer_block_height, transaction)?;
 
         // distribute the storage fees
         self.distribute_storage_fee_pool(epoch_index, transaction)

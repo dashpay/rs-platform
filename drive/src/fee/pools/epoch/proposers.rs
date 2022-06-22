@@ -64,6 +64,8 @@ impl<'e> EpochPool<'e> {
             .drive
             .grove
             .get(self.get_proposers_path(), proposer_tx_hash, transaction)
+            // TODO: Shouldn't we wrap all errors to Fee Pool errors?
+            //  in this case we know the source of error
             .map_err(Error::GroveDB)?;
 
         if let Element::Item(item, _) = element {

@@ -21,7 +21,7 @@ impl<'e> EpochPool<'e> {
         }
     }
 
-    pub fn init(&self, transaction: TransactionArg) -> Result<(), Error> {
+    pub fn init_empty(&self, transaction: TransactionArg) -> Result<(), Error> {
         // init epoch tree
         self.drive
             .grove
@@ -44,7 +44,17 @@ impl<'e> EpochPool<'e> {
             )
             .map_err(Error::GroveDB)?;
 
-        todo!("Store u64 multiplier");
+        Ok(())
+    }
+
+    pub fn init_current(
+        &self,
+        first_proposer_block_height: u64,
+        transaction: TransactionArg,
+    ) -> Result<(), Error> {
+        self.update_first_proposer_block_height(first_proposer_block_height, transaction)?;
+        self.update_processing_fee(0f64, transaction)?;
+        self.init_proposers_tree(transaction)?;
 
         Ok(())
     }
@@ -83,7 +93,7 @@ mod tests {
 
         let epoch = EpochPool::new(1042, &drive);
 
-        match epoch.init(Some(&transaction)) {
+        match epoch.init_empty(Some(&transaction)) {
             Ok(_) => assert!(false, "should not be able to init epoch without FeePools"),
             Err(e) => match e {
                 error::Error::GroveDB(grovedb::Error::InvalidPath(_)) => assert!(true),
@@ -100,7 +110,7 @@ mod tests {
         let epoch = EpochPool::new(1042, &drive);
 
         epoch
-            .init(Some(&transaction))
+            .init_empty(Some(&transaction))
             .expect("to init an epoch pool");
 
         let storage_fee = epoch

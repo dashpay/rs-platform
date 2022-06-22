@@ -39,7 +39,7 @@ impl Drive {
             fee_pools.process_epoch_change(epoch_index, block_height, transaction)?;
         }
 
-        fee_pools.distribute_st_fees(
+        fee_pools.distribute_fees_into_pools(
             epoch_index,
             processing_fees,
             storage_fees,
@@ -47,7 +47,7 @@ impl Drive {
             transaction,
         )?;
 
-        fee_pools.distribute_fees_to_proposers(epoch_index, block_height, transaction)
+        fee_pools.distribute_fees_from_pools_to_proposers(epoch_index, block_height, transaction)
     }
 }
 
