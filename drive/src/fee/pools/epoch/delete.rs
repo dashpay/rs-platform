@@ -37,7 +37,7 @@ mod tests {
         let fee_pools = FeePools::new();
 
         fee_pools
-            .init(&drive, 1, Some(&transaction))
+            .init(&drive, Some(&transaction))
             .expect("fee pools to init");
 
         let uninit_epoch_pool = EpochPool::new(7000, &drive);

@@ -20,12 +20,7 @@ impl FeePools {
         [Into::<&[u8; 1]>::into(RootTree::Pools)]
     }
 
-    pub fn init(
-        &self,
-        drive: &Drive,
-        multiplier: u64,
-        transaction: TransactionArg,
-    ) -> Result<(), Error> {
+    pub fn init(&self, drive: &Drive, transaction: TransactionArg) -> Result<(), Error> {
         // init fee pool subtree
         drive
             .grove
@@ -52,7 +47,7 @@ impl FeePools {
         // with 20 epochs per year that's 1000 epochs
         for i in 0..1000 {
             let epoch = EpochPool::new(i, drive);
-            epoch.init_empty(multiplier, transaction)?;
+            epoch.init_empty(transaction)?;
         }
 
         Ok(())
@@ -148,13 +143,11 @@ impl FeePools {
     ) -> Result<(), Error> {
         // create and init next thousandth epoch
         let next_thousandth_epoch = EpochPool::new(epoch_index + 1000, drive);
-        next_thousandth_epoch.init_empty(multiplier, transaction)?;
-
-        todo!("Store u64 multiplier");
+        next_thousandth_epoch.init_empty(transaction)?;
 
         // init first_proposer_block_height and processing_fee for an epoch
         let epoch = EpochPool::new(epoch_index, drive);
-        epoch.init_current(first_proposer_block_height, transaction)?;
+        epoch.init_current(multiplier, first_proposer_block_height, transaction)?;
 
         // distribute the storage fees
         self.distribute_storage_fee_pool(&drive, epoch_index, transaction)
@@ -188,7 +181,7 @@ mod tests {
         let fee_pools = FeePools::new();
 
         fee_pools
-            .init(&drive, 1, Some(&transaction))
+            .init(&drive, Some(&transaction))
             .expect("fee pools to init");
 
         let storage_fee_pool = fee_pools
@@ -238,7 +231,7 @@ mod tests {
         }
 
         fee_pools
-            .init(&drive, 1, Some(&transaction))
+            .init(&drive, Some(&transaction))
             .expect("fee pools to init");
 
         fee_pools
@@ -288,7 +281,7 @@ mod tests {
         let mut fee_pools = FeePools::new();
 
         fee_pools
-            .init(&drive, 1, Some(&transaction))
+            .init(&drive, Some(&transaction))
             .expect("fee pools to init");
 
         let genesis_time: i64 = 1655396517902;
@@ -330,7 +323,7 @@ mod tests {
         let fee_pools = FeePools::new();
 
         fee_pools
-            .init(&drive, 1, Some(&transaction))
+            .init(&drive, Some(&transaction))
             .expect("fee pools to init");
 
         let first_proposer_block_height = 1;

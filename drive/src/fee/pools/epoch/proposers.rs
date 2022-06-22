@@ -204,7 +204,7 @@ mod tests {
         let fee_pools = FeePools::new();
 
         fee_pools
-            .init(&drive, 1, Some(&transaction))
+            .init(&drive, Some(&transaction))
             .expect("fee pools to init");
 
         let epoch = EpochPool::new(7000, &drive);
@@ -283,7 +283,7 @@ mod tests {
         let fee_pools = FeePools::new();
 
         fee_pools
-            .init(&drive, 1, Some(&transaction))
+            .init(&drive, Some(&transaction))
             .expect("fee pools to init");
 
         let pro_tx_hash: [u8; 32] =
@@ -375,7 +375,7 @@ mod tests {
         let fee_pools = FeePools::new();
 
         fee_pools
-            .init(&drive, 1, Some(&transaction))
+            .init(&drive, Some(&transaction))
             .expect("fee pools to init");
 
         let epoch = EpochPool::new(42, &drive);

@@ -117,7 +117,7 @@ mod tests {
         let fee_pools = FeePools::new();
 
         fee_pools
-            .init(&drive, 1, Some(&transaction))
+            .init(&drive, Some(&transaction))
             .expect("fee pools to init");
 
         let storage_pool = 1000.0;
@@ -127,7 +127,7 @@ mod tests {
         for i in 1000..=1000 + epoch_index {
             let epoch = EpochPool::new(i, &drive);
             epoch
-                .init_empty(1, Some(&transaction))
+                .init_empty(Some(&transaction))
                 .expect("to init additional epoch pool");
         }
 
@@ -204,7 +204,7 @@ mod tests {
         }
 
         fee_pools
-            .init(&drive, 1, Some(&transaction))
+            .init(&drive, Some(&transaction))
             .expect("fee pools to init");
 
         fee_pools

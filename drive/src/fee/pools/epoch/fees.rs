@@ -155,7 +155,7 @@ mod tests {
         let fee_pools = FeePools::new();
 
         fee_pools
-            .init(&drive, 1, Some(&transaction))
+            .init(&drive, Some(&transaction))
             .expect("fee pools to init");
 
         let epoch = EpochPool::new(7000, &drive);
@@ -237,7 +237,7 @@ mod tests {
         let fee_pools = FeePools::new();
 
         fee_pools
-            .init(&drive, 1, Some(&transaction))
+            .init(&drive, Some(&transaction))
             .expect("fee pools to init");
 
         let epoch = EpochPool::new(7000, &drive);
@@ -311,7 +311,7 @@ mod tests {
         let fee_pools = FeePools::new();
 
         fee_pools
-            .init(&drive, 1, Some(&transaction))
+            .init(&drive, Some(&transaction))
             .expect("fee pools to init");
 
         let processing_fee: f64 = 0.42;
@@ -345,10 +345,10 @@ mod tests {
 
         let transaction = drive.grove.start_transaction();
 
-        let fee_pools = FeePools::new(&drive);
+        let fee_pools = FeePools::new();
 
         fee_pools
-            .init(1, Some(&transaction))
+            .init(&drive, Some(&transaction))
             .expect("fee pools to init");
 
         let epoch = EpochPool::new(7000, &drive);

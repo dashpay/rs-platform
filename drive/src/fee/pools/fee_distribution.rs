@@ -285,7 +285,7 @@ mod tests {
         let fee_pools = FeePools::new();
 
         fee_pools
-            .init(&drive, 1, Some(&transaction))
+            .init(&drive, Some(&transaction))
             .expect("fee pools to init");
 
         let oldest_epoch = fee_pools
@@ -363,7 +363,7 @@ mod tests {
             let fee_pools = FeePools::new();
 
             fee_pools
-                .init(&drive, 1, Some(&transaction))
+                .init(&drive, Some(&transaction))
                 .expect("fee pools to init");
 
             // set initial data for test
@@ -412,7 +412,7 @@ mod tests {
         let fee_pools = FeePools::new();
 
         fee_pools
-            .init(&drive, 1, Some(&transaction))
+            .init(&drive, Some(&transaction))
             .expect("fee pools to init");
 
         // TODO: Implement setup method and use everywhere.
@@ -425,7 +425,7 @@ mod tests {
         let epoch_pool = EpochPool::new(epoch_index, &drive);
 
         epoch_pool
-            .init_current(first_proposer_block_height, Some(&transaction))
+            .init_current(1, first_proposer_block_height, Some(&transaction))
             .expect("should init current pool");
 
         // Distribute fees
