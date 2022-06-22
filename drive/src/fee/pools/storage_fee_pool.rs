@@ -1,3 +1,4 @@
+use crate::drive::Drive;
 use grovedb::{Element, TransactionArg};
 
 use crate::error::fee::FeeError;
@@ -15,18 +16,19 @@ fn get_fee_distribution_percent(epoch_index: u16, start_index: u16) -> f64 {
     constants::FEE_DISTRIBUTION_TABLE[epoch_year]
 }
 
-impl<'f> FeePools<'f> {
+impl FeePools {
     pub fn distribute_storage_fee_pool(
         &self,
+        drive: &Drive,
         epoch_index: u16,
         transaction: TransactionArg,
     ) -> Result<(), Error> {
-        let mut fee_pool_value = self.get_storage_fee_pool(transaction)?;
+        let mut fee_pool_value = self.get_storage_fee_pool(drive, transaction)?;
 
         // todo!("do nothing if empty, it's actually the case for epoch 0");
 
         for index in epoch_index..epoch_index + 1000 {
-            let epoch_pool = EpochPool::new(index, self.drive);
+            let epoch_pool = EpochPool::new(index, drive);
 
             let distribution_percent = get_fee_distribution_percent(index, epoch_index);
 
@@ -39,15 +41,16 @@ impl<'f> FeePools<'f> {
             fee_pool_value -= fee_share;
         }
 
-        self.update_storage_fee_pool(fee_pool_value, transaction)
+        self.update_storage_fee_pool(drive, fee_pool_value, transaction)
     }
 
     pub fn update_storage_fee_pool(
         &self,
+        drive: &Drive,
         storage_fee: f64,
         transaction: TransactionArg,
     ) -> Result<(), Error> {
-        self.drive
+        drive
             .grove
             .insert(
                 FeePools::get_path(),
@@ -58,9 +61,12 @@ impl<'f> FeePools<'f> {
             .map_err(Error::GroveDB)
     }
 
-    pub fn get_storage_fee_pool(&self, transaction: TransactionArg) -> Result<f64, Error> {
-        let element = self
-            .drive
+    pub fn get_storage_fee_pool(
+        &self,
+        drive: &Drive,
+        transaction: TransactionArg,
+    ) -> Result<f64, Error> {
+        let element = drive
             .grove
             .get(
                 FeePools::get_path(),
@@ -108,10 +114,10 @@ mod tests {
 
         let transaction = drive.grove.start_transaction();
 
-        let fee_pools = FeePools::new(&drive);
+        let fee_pools = FeePools::new();
 
         fee_pools
-            .init(1, Some(&transaction))
+            .init(&drive, 1, Some(&transaction))
             .expect("fee pools to init");
 
         let storage_pool = 1000.0;
@@ -126,16 +132,16 @@ mod tests {
         }
 
         fee_pools
-            .update_storage_fee_pool(storage_pool, Some(&transaction))
+            .update_storage_fee_pool(&drive, storage_pool, Some(&transaction))
             .expect("to update storage fee pool");
 
         fee_pools
-            .distribute_storage_fee_pool(epoch_index, Some(&transaction))
+            .distribute_storage_fee_pool(&drive, epoch_index, Some(&transaction))
             .expect("to distribute storage fee pool");
 
         // check leftover
         let leftover_storage_fee_pool = fee_pools
-            .get_storage_fee_pool(Some(&transaction))
+            .get_storage_fee_pool(&drive, Some(&transaction))
             .expect("to get storage fee pool");
 
         assert_eq!(leftover_storage_fee_pool, 1.5260017107721069e-6);
@@ -173,9 +179,9 @@ mod tests {
 
         let storage_fee: f64 = 0.42;
 
-        let fee_pools = FeePools::new(&drive);
+        let fee_pools = FeePools::new();
 
-        match fee_pools.get_storage_fee_pool(Some(&transaction)) {
+        match fee_pools.get_storage_fee_pool(&drive, Some(&transaction)) {
             Ok(_) => assert!(
                 false,
                 "should not be able to get genesis time on uninit fee pools"
@@ -186,7 +192,7 @@ mod tests {
             },
         }
 
-        match fee_pools.update_storage_fee_pool(storage_fee, Some(&transaction)) {
+        match fee_pools.update_storage_fee_pool(&drive, storage_fee, Some(&transaction)) {
             Ok(_) => assert!(
                 false,
                 "should not be able to update genesis time on uninit fee pools"
@@ -198,15 +204,15 @@ mod tests {
         }
 
         fee_pools
-            .init(1, Some(&transaction))
+            .init(&drive, 1, Some(&transaction))
             .expect("fee pools to init");
 
         fee_pools
-            .update_storage_fee_pool(storage_fee, Some(&transaction))
+            .update_storage_fee_pool(&drive, storage_fee, Some(&transaction))
             .expect("to update storage fee pool");
 
         let stored_storage_fee = fee_pools
-            .get_storage_fee_pool(Some(&transaction))
+            .get_storage_fee_pool(&drive, Some(&transaction))
             .expect("to get storage fee pool");
 
         assert_eq!(storage_fee, stored_storage_fee);
@@ -221,7 +227,7 @@ mod tests {
             )
             .expect("to insert invalid data");
 
-        match fee_pools.get_storage_fee_pool(Some(&transaction)) {
+        match fee_pools.get_storage_fee_pool(&drive, Some(&transaction)) {
             Ok(_) => assert!(false, "should not be able to decode stored value"),
             Err(e) => match e {
                 error::Error::Fee(FeeError::CorruptedStorageFeePoolInvalidItemLength(_)) => {

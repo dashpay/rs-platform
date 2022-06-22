@@ -8,10 +8,8 @@ use chrono::Utc;
 
 impl Drive {
     pub fn init_fee_pools(&self, transaction: TransactionArg) -> Result<(), Error> {
-        let fee_pool = FeePools::new(self);
-
         // initialize the pools with epochs
-        fee_pool.init(transaction)
+        self.fee_pools.borrow().init(self, transaction)
     }
 
     pub fn process_block(
@@ -24,22 +22,31 @@ impl Drive {
         storage_fees: f64,
         transaction: TransactionArg,
     ) -> Result<(), Error> {
-        todo!("Initialize in Drive only once");
-        let mut fee_pools = FeePools::new(self);
-
         if block_height == 1 {
             let genesis_time = Utc::now().timestamp();
-            fee_pools.update_genesis_time(genesis_time, transaction)?;
+            self.fee_pools
+                .borrow_mut()
+                .update_genesis_time(&self, genesis_time, transaction)?;
+
+            // TODO: must be inside `update_genesis_time`
         }
 
-        let (epoch_index, is_epoch_change) =
-            fee_pools.get_current_epoch_index(block_time, previous_block_time, transaction)?;
+        let (epoch_index, is_epoch_change) = self
+            .fee_pools
+            .borrow()
+            .calculate_current_epoch_index(&self, block_time, previous_block_time, transaction)?;
 
         if is_epoch_change {
-            fee_pools.process_epoch_change(epoch_index, block_height, transaction)?;
+            self.fee_pools.borrow().process_epoch_change(
+                &self,
+                epoch_index,
+                block_height,
+                transaction,
+            )?;
         }
 
-        fee_pools.distribute_fees_into_pools(
+        self.fee_pools.borrow().distribute_fees_into_pools(
+            &self,
             epoch_index,
             processing_fees,
             storage_fees,
@@ -47,7 +54,9 @@ impl Drive {
             transaction,
         )?;
 
-        fee_pools.distribute_fees_from_pools_to_proposers(epoch_index, block_height, transaction)
+        self.fee_pools
+            .borrow()
+            .distribute_fees_from_pools_to_proposers(&self, epoch_index, block_height, transaction)
     }
 }
 
@@ -141,7 +150,7 @@ mod tests {
     #[test]
     fn test_drive_process_block() {
         let tmp_dir = TempDir::new().unwrap();
-        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+        let mut drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
 
         drive
             .create_root_tree(None)

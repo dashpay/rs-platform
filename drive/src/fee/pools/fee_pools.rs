@@ -7,26 +7,27 @@ use crate::error::Error;
 use super::constants;
 use super::epoch::epoch_pool::EpochPool;
 
-pub struct FeePools<'f> {
-    pub drive: &'f Drive,
+pub struct FeePools {
     pub genesis_time: Option<i64>,
 }
 
-impl<'f> FeePools<'f> {
-    pub fn new(drive: &Drive) -> FeePools {
-        FeePools {
-            drive,
-            genesis_time: None,
-        }
+impl FeePools {
+    pub fn new() -> FeePools {
+        FeePools { genesis_time: None }
     }
 
     pub fn get_path<'a>() -> [&'a [u8]; 1] {
         [Into::<&[u8; 1]>::into(RootTree::Pools)]
     }
 
-    pub fn init(&self, multiplier: u64, transaction: TransactionArg) -> Result<(), Error> {
+    pub fn init(
+        &self,
+        drive: &Drive,
+        multiplier: u64,
+        transaction: TransactionArg,
+    ) -> Result<(), Error> {
         // init fee pool subtree
-        self.drive
+        drive
             .grove
             .insert(
                 [],
@@ -37,7 +38,7 @@ impl<'f> FeePools<'f> {
             .map_err(Error::GroveDB)?;
 
         // Update storage credit pool
-        self.drive
+        drive
             .grove
             .insert(
                 FeePools::get_path(),
@@ -50,20 +51,23 @@ impl<'f> FeePools<'f> {
         // We need to insert 50 years worth of epochs,
         // with 20 epochs per year that's 1000 epochs
         for i in 0..1000 {
-            let epoch = EpochPool::new(i, self.drive);
+            let epoch = EpochPool::new(i, drive);
             epoch.init_empty(multiplier, transaction)?;
         }
 
         Ok(())
     }
 
-    pub fn get_genesis_time(&self, transaction: TransactionArg) -> Result<i64, Error> {
+    pub fn get_genesis_time(
+        &self,
+        drive: &Drive,
+        transaction: TransactionArg,
+    ) -> Result<i64, Error> {
         if let Some(genesis_time) = self.genesis_time {
             return Ok(genesis_time);
         }
 
-        let element = self
-            .drive
+        let element = drive
             .grove
             .get(
                 FeePools::get_path(),
@@ -89,10 +93,11 @@ impl<'f> FeePools<'f> {
 
     pub fn update_genesis_time(
         &mut self,
+        drive: &Drive,
         genesis_time: i64,
         transaction: TransactionArg,
     ) -> Result<(), Error> {
-        self.drive
+        drive
             .grove
             .insert(
                 FeePools::get_path(),
@@ -102,18 +107,20 @@ impl<'f> FeePools<'f> {
             )
             .map_err(Error::GroveDB)?;
 
+        // TODO: Should keep in fee pools to avoid extra reads
         self.genesis_time = Some(genesis_time);
 
         Ok(())
     }
 
-    pub fn get_current_epoch_index(
+    pub fn calculate_current_epoch_index(
         &self,
+        drive: &Drive,
         block_time: i64,
         previous_block_time: i64,
         transaction: TransactionArg,
     ) -> Result<(u16, bool), Error> {
-        let genesis_time = self.get_genesis_time(transaction)?;
+        let genesis_time = self.get_genesis_time(drive, transaction)?;
 
         let prev_epoch_index =
             (previous_block_time - genesis_time) as f64 / constants::EPOCH_CHANGE_TIME as f64;
@@ -133,23 +140,24 @@ impl<'f> FeePools<'f> {
 
     pub fn process_epoch_change(
         &self,
+        drive: &Drive,
         epoch_index: u16,
         first_proposer_block_height: u64,
         multiplier: u64,
         transaction: TransactionArg,
     ) -> Result<(), Error> {
         // create and init next thousandth epoch
-        let next_thousandth_epoch = EpochPool::new(epoch_index + 1000, self.drive);
+        let next_thousandth_epoch = EpochPool::new(epoch_index + 1000, drive);
         next_thousandth_epoch.init_empty(multiplier, transaction)?;
 
         todo!("Store u64 multiplier");
 
         // init first_proposer_block_height and processing_fee for an epoch
-        let epoch = EpochPool::new(epoch_index, self.drive);
+        let epoch = EpochPool::new(epoch_index, drive);
         epoch.init_current(first_proposer_block_height, transaction)?;
 
         // distribute the storage fees
-        self.distribute_storage_fee_pool(epoch_index, transaction)
+        self.distribute_storage_fee_pool(&drive, epoch_index, transaction)
     }
 }
 
@@ -177,14 +185,14 @@ mod tests {
 
         let transaction = drive.grove.start_transaction();
 
-        let fee_pools = FeePools::new(&drive);
+        let fee_pools = FeePools::new();
 
         fee_pools
-            .init(1, Some(&transaction))
+            .init(&drive, 1, Some(&transaction))
             .expect("fee pools to init");
 
         let storage_fee_pool = fee_pools
-            .get_storage_fee_pool(Some(&transaction))
+            .get_storage_fee_pool(&drive, Some(&transaction))
             .expect("to get storage fee pool");
 
         assert_eq!(storage_fee_pool, 0f64);
@@ -203,11 +211,11 @@ mod tests {
 
         let transaction = drive.grove.start_transaction();
 
-        let mut fee_pools = FeePools::new(&drive);
+        let mut fee_pools = FeePools::new();
 
         let genesis_time: i64 = 1655396517902;
 
-        match fee_pools.get_genesis_time(Some(&transaction)) {
+        match fee_pools.get_genesis_time(&drive, Some(&transaction)) {
             Ok(_) => assert!(
                 false,
                 "should not be able to get genesis time on uninit fee pools"
@@ -218,7 +226,7 @@ mod tests {
             },
         }
 
-        match fee_pools.update_genesis_time(genesis_time, Some(&transaction)) {
+        match fee_pools.update_genesis_time(&drive, genesis_time, Some(&transaction)) {
             Ok(_) => assert!(
                 false,
                 "should not be able to update genesis time on uninit fee pools"
@@ -230,15 +238,15 @@ mod tests {
         }
 
         fee_pools
-            .init(1, Some(&transaction))
+            .init(&drive, 1, Some(&transaction))
             .expect("fee pools to init");
 
         fee_pools
-            .update_genesis_time(genesis_time, Some(&transaction))
+            .update_genesis_time(&drive, genesis_time, Some(&transaction))
             .expect("to update genesis time");
 
         let stored_genesis_time = fee_pools
-            .get_genesis_time(Some(&transaction))
+            .get_genesis_time(&drive, Some(&transaction))
             .expect("to get genesis time");
 
         assert_eq!(genesis_time, stored_genesis_time);
@@ -255,7 +263,7 @@ mod tests {
             )
             .expect("to insert invalid data");
 
-        match fee_pools.get_genesis_time(Some(&transaction)) {
+        match fee_pools.get_genesis_time(&drive, Some(&transaction)) {
             Ok(_) => assert!(false, "should not be able to decode stored value"),
             Err(e) => match e {
                 error::Error::Fee(FeeError::CorruptedGenesisTimeInvalidItemLength(_)) => {
@@ -277,10 +285,10 @@ mod tests {
 
         let transaction = drive.grove.start_transaction();
 
-        let mut fee_pools = FeePools::new(&drive);
+        let mut fee_pools = FeePools::new();
 
         fee_pools
-            .init(1, Some(&transaction))
+            .init(&drive, 1, Some(&transaction))
             .expect("fee pools to init");
 
         let genesis_time: i64 = 1655396517902;
@@ -288,11 +296,11 @@ mod tests {
         let prev_block_time: i64 = 1655396517912;
 
         fee_pools
-            .update_genesis_time(genesis_time, Some(&transaction))
+            .update_genesis_time(&drive, genesis_time, Some(&transaction))
             .expect("to update genesis time");
 
         let (epoch_index, is_epoch_change) = fee_pools
-            .get_current_epoch_index(block_time, prev_block_time, Some(&transaction))
+            .calculate_current_epoch_index(&drive, block_time, prev_block_time, Some(&transaction))
             .expect("to get current epoch index");
 
         assert_eq!(epoch_index, 0);
@@ -301,7 +309,7 @@ mod tests {
         let block_time: i64 = 1657125244561;
 
         let (epoch_index, is_epoch_change) = fee_pools
-            .get_current_epoch_index(block_time, prev_block_time, Some(&transaction))
+            .calculate_current_epoch_index(&drive, block_time, prev_block_time, Some(&transaction))
             .expect("to get current epoch index");
 
         assert_eq!(epoch_index, 1);
@@ -319,16 +327,22 @@ mod tests {
 
         let transaction = drive.grove.start_transaction();
 
-        let fee_pools = FeePools::new(&drive);
+        let fee_pools = FeePools::new();
 
         fee_pools
-            .init(1, Some(&transaction))
+            .init(&drive, 1, Some(&transaction))
             .expect("fee pools to init");
 
         let first_proposer_block_height = 1;
 
         fee_pools
-            .process_epoch_change(0, first_proposer_block_height, 1, Some(&transaction))
+            .process_epoch_change(
+                &drive,
+                0,
+                first_proposer_block_height,
+                1,
+                Some(&transaction),
+            )
             .expect("to process epoch change");
 
         // Verify next thousandth epoch

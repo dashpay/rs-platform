@@ -3,6 +3,7 @@ use serde_json::json;
 
 use crate::common::value_to_cbor;
 use crate::contract::Document;
+use crate::drive::Drive;
 use crate::error::document::DocumentError;
 use crate::error::{self, Error};
 use crate::fee::pools::fee_pools::FeePools;
@@ -10,36 +11,39 @@ use crate::fee::pools::fee_pools::FeePools;
 use crate::fee::pools::constants;
 use crate::fee::pools::epoch::epoch_pool::EpochPool;
 
-impl<'f> FeePools<'f> {
+impl FeePools {
     pub fn get_oldest_unpaid_epoch_pool(
         &self,
+        drive: &Drive,
         epoch_index: u16,
         transaction: TransactionArg,
     ) -> Result<EpochPool, Error> {
         if epoch_index == 0 {
             todo!("must be an error - all epochs paid");
-            return Ok(EpochPool::new(epoch_index, self.drive));
+            return Ok(EpochPool::new(epoch_index, drive));
         }
 
-        let epoch = EpochPool::new(epoch_index, self.drive);
+        let epoch = EpochPool::new(epoch_index, drive);
 
         if epoch.is_proposers_tree_empty(transaction)? {
             todo!("it must be previous");
             return Ok(epoch);
         }
 
-        self.get_oldest_unpaid_epoch_pool(epoch_index - 1, transaction)
+        self.get_oldest_unpaid_epoch_pool(&drive, epoch_index - 1, transaction)
     }
 
     pub fn distribute_fees_from_pools_to_proposers(
         &self,
+        drive: &Drive,
         epoch_index: u16,
         block_height: u64,
         transaction: TransactionArg,
     ) -> Result<(), Error> {
         todo!("we need to do nothing if there is no epochs behind");
 
-        let unpaid_epoch_pool = self.get_oldest_unpaid_epoch_pool(epoch_index, transaction)?;
+        let unpaid_epoch_pool =
+            self.get_oldest_unpaid_epoch_pool(&drive, epoch_index, transaction)?;
 
         // Process more proposers at once if we have many unpaid epochs in past
         let proposers_limit: u16 = if unpaid_epoch_pool.index == epoch_index {
@@ -51,7 +55,7 @@ impl<'f> FeePools<'f> {
         let accumulated_fees = unpaid_epoch_pool.get_combined_fee(transaction)?;
 
         // TODO: Move to private function for readability
-        let next_epoch_pool = EpochPool::new(unpaid_epoch_pool.index + 1, self.drive);
+        let next_epoch_pool = EpochPool::new(unpaid_epoch_pool.index + 1, drive);
 
         let unpaid_epoch_block_count = if unpaid_epoch_pool.index == epoch_index {
             block_height - unpaid_epoch_pool.get_first_proposer_block_height(transaction)?
@@ -73,7 +77,7 @@ impl<'f> FeePools<'f> {
 
             let query_cbor = value_to_cbor(query_json, None);
 
-            let (document_cbors, _, _) = self.drive.query_documents(
+            let (document_cbors, _, _) = drive.query_documents(
                 &query_cbor,
                 constants::MN_REWARD_SHARES_CONTRACT_ID,
                 constants::MN_REWARD_SHARES_DOCUMENT_TYPE,
@@ -98,7 +102,7 @@ impl<'f> FeePools<'f> {
                     )))?;
 
                 // We ensure an identity existence in the data contract triggers in DPP
-                let mut identity = self.drive.fetch_identity(pay_to_id, transaction)?;
+                let mut identity = drive.fetch_identity(pay_to_id, transaction)?;
 
                 let share_percentage_integer: u64 = document
                     .properties
@@ -126,7 +130,7 @@ impl<'f> FeePools<'f> {
 
                 identity.balance += reward as u64;
 
-                self.drive.insert_identity_cbor(
+                drive.insert_identity_cbor(
                     Some(pay_to_id),
                     identity.to_cbor(),
                     true,
@@ -146,6 +150,7 @@ impl<'f> FeePools<'f> {
 
     pub fn distribute_fees_into_pools(
         &self,
+        drive: &Drive,
         epoch_index: u16,
         processing_fees: f64,
         storage_fees: f64,
@@ -154,15 +159,15 @@ impl<'f> FeePools<'f> {
     ) -> Result<(), Error> {
         todo!("accept epoch pool, check other places");
 
-        let epoch_pool = EpochPool::new(epoch_index, self.drive);
+        let epoch_pool = EpochPool::new(epoch_index, drive);
 
         // update epoch pool processing fees
         let epoch_processing_fees = epoch_pool.get_processing_fee(transaction)?;
         epoch_pool.update_processing_fee(epoch_processing_fees + processing_fees, transaction)?;
 
         // update storage fee pool
-        let storage_fee_pool = self.get_storage_fee_pool(transaction)?;
-        self.update_storage_fee_pool(storage_fee_pool + storage_fees, transaction)?;
+        let storage_fee_pool = self.get_storage_fee_pool(&drive, transaction)?;
+        self.update_storage_fee_pool(&drive, storage_fee_pool + storage_fees, transaction)?;
 
         // update proposer's block count
         let proposed_block_count = epoch_pool
@@ -277,14 +282,14 @@ mod tests {
 
         let transaction = drive.grove.start_transaction();
 
-        let fee_pools = FeePools::new(&drive);
+        let fee_pools = FeePools::new();
 
         fee_pools
-            .init(1, Some(&transaction))
+            .init(&drive, 1, Some(&transaction))
             .expect("fee pools to init");
 
         let oldest_epoch = fee_pools
-            .get_oldest_unpaid_epoch_pool(999, Some(&transaction))
+            .get_oldest_unpaid_epoch_pool(&drive, 999, Some(&transaction))
             .expect("to get oldest epoch pool");
 
         assert_eq!(oldest_epoch.index, 999);
@@ -304,7 +309,7 @@ mod tests {
             .expect("to update proposer block count");
 
         let oldest_epoch = fee_pools
-            .get_oldest_unpaid_epoch_pool(999, Some(&transaction))
+            .get_oldest_unpaid_epoch_pool(&drive, 999, Some(&transaction))
             .expect("to get oldest epoch pool");
 
         assert_eq!(oldest_epoch.index, 998);
@@ -355,15 +360,15 @@ mod tests {
 
             let transaction = drive.grove.start_transaction();
 
-            let fee_pools = FeePools::new(&drive);
+            let fee_pools = FeePools::new();
 
             fee_pools
-                .init(1, Some(&transaction))
+                .init(&drive, 1, Some(&transaction))
                 .expect("fee pools to init");
 
             // set initial data for test
             fee_pools
-                .process_epoch_change(0, 1, 1, Some(&transaction))
+                .process_epoch_change(&drive, 0, 1, 1, Some(&transaction))
                 .expect("to process epoch change");
 
             let epoch = EpochPool::new(0, &drive);
@@ -375,7 +380,7 @@ mod tests {
                 .expect("to update proposer block count");
 
             fee_pools
-                .distribute_fees_from_pools_to_proposers(0, 10, Some(&transaction))
+                .distribute_fees_from_pools_to_proposers(&drive, 0, 10, Some(&transaction))
                 .expect("to distribute fees to proporsers");
 
             match drive
@@ -404,10 +409,10 @@ mod tests {
 
         let transaction = drive.grove.start_transaction();
 
-        let fee_pools = FeePools::new(&drive);
+        let fee_pools = FeePools::new();
 
         fee_pools
-            .init(1, Some(&transaction))
+            .init(&drive, 1, Some(&transaction))
             .expect("fee pools to init");
 
         // TODO: Implement setup method and use everywhere.
@@ -436,6 +441,7 @@ mod tests {
 
         fee_pools
             .distribute_fees_into_pools(
+                &drive,
                 epoch_index,
                 processing_fees,
                 storage_fees,
@@ -449,7 +455,7 @@ mod tests {
             .expect("to get processing fees");
 
         let stored_storage_fee_pool = fee_pools
-            .get_storage_fee_pool(Some(&transaction))
+            .get_storage_fee_pool(&drive, Some(&transaction))
             .expect("to get storage fee pool");
 
         let stored_block_count = epoch_pool

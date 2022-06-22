@@ -15,6 +15,7 @@ use crate::error::query::QueryError;
 use crate::error::Error;
 use crate::fee::calculate_fee;
 use crate::fee::op::{DeleteOperation, DriveOperation, QueryOperation};
+use crate::fee::pools::fee_pools::FeePools;
 use crate::identity::Identity;
 use crate::query::DriveQuery;
 use defaults::{CONTRACT_DOCUMENTS_PATH_HEIGHT, DEFAULT_HASH_SIZE};
@@ -35,8 +36,10 @@ use object_size_info::{
 };
 use std::cell::RefCell;
 use std::path::Path;
+use std::rc::Rc;
 use std::sync::Arc;
 
+// TODO: Use FeePools instead
 pub struct EpochInfo {
     current_epoch: u16,
 }
@@ -45,6 +48,7 @@ pub struct Drive {
     pub grove: GroveDb,
     pub config: DriveConfig,
     pub epoch_info: RefCell<EpochInfo>,
+    pub fee_pools: RefCell<FeePools>,
     pub cached_contracts: RefCell<Cache<[u8; 32], Arc<Contract>>>, //HashMap<[u8; 32], Rc<Contract>>>,
 }
 
@@ -171,6 +175,7 @@ impl Drive {
                 config: DriveConfig::default(),
                 cached_contracts: RefCell::new(Cache::new(200)),
                 epoch_info: RefCell::new(EpochInfo { current_epoch: 0 }),
+                fee_pools: RefCell::new(FeePools::new()),
             }),
             Err(e) => Err(Error::GroveDB(e)),
         }
