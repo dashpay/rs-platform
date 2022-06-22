@@ -4,6 +4,7 @@ use crate::drive::Drive;
 use crate::error::Error;
 use crate::fee::pools::fee_pools::FeePools;
 
+use crate::fee::pools::epoch::epoch_pool::EpochPool;
 use chrono::Utc;
 
 impl Drive {
@@ -20,6 +21,7 @@ impl Drive {
         proposer_pro_tx_hash: [u8; 32],
         processing_fees: f64,
         storage_fees: f64,
+        fee_multiplier: u64,
         transaction: TransactionArg,
     ) -> Result<(), Error> {
         if block_height == 1 {
@@ -29,23 +31,26 @@ impl Drive {
                 .update_genesis_time(&self, genesis_time, transaction)?;
         }
 
-        let (epoch_index, is_epoch_change) = self
+        let (current_epoch_index, is_epoch_change) = self
             .fee_pools
             .borrow()
             .calculate_current_epoch_index(&self, block_time, previous_block_time, transaction)?;
 
+        let current_epoch_pool = EpochPool::new(current_epoch_index, self);
+
         if is_epoch_change {
             self.fee_pools.borrow().process_epoch_change(
                 &self,
-                epoch_index,
+                &current_epoch_pool,
                 block_height,
+                fee_multiplier,
                 transaction,
             )?;
         }
 
         self.fee_pools.borrow().distribute_fees_into_pools(
             &self,
-            epoch_index,
+            &current_epoch_pool,
             processing_fees,
             storage_fees,
             proposer_pro_tx_hash,
@@ -54,7 +59,12 @@ impl Drive {
 
         self.fee_pools
             .borrow()
-            .distribute_fees_from_pools_to_proposers(&self, epoch_index, block_height, transaction)
+            .distribute_fees_from_pools_to_proposers(
+                &self,
+                current_epoch_index,
+                block_height,
+                transaction,
+            )
     }
 }
 
@@ -181,6 +191,7 @@ mod tests {
                 proposer_pro_tx_hash,
                 processing_fees,
                 storage_fees,
+                1,
                 Some(&transaction),
             )
             .expect("to process block 1");

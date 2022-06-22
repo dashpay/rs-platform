@@ -151,33 +151,30 @@ impl FeePools {
     pub fn distribute_fees_into_pools(
         &self,
         drive: &Drive,
-        epoch_index: u16,
+        current_epoch_pool: &EpochPool,
         processing_fees: f64,
         storage_fees: f64,
         proposer_pro_tx_hash: [u8; 32],
         transaction: TransactionArg,
     ) -> Result<(), Error> {
-        todo!("accept epoch pool, check other places");
-
-        let epoch_pool = EpochPool::new(epoch_index, drive);
-
         // update epoch pool processing fees
-        let epoch_processing_fees = epoch_pool.get_processing_fee(transaction)?;
-        epoch_pool.update_processing_fee(epoch_processing_fees + processing_fees, transaction)?;
+        let epoch_processing_fees = current_epoch_pool.get_processing_fee(transaction)?;
+        current_epoch_pool
+            .update_processing_fee(epoch_processing_fees + processing_fees, transaction)?;
 
         // update storage fee pool
         let storage_fee_pool = self.get_storage_fee_pool(&drive, transaction)?;
         self.update_storage_fee_pool(&drive, storage_fee_pool + storage_fees, transaction)?;
 
         // update proposer's block count
-        let proposed_block_count = epoch_pool
+        let proposed_block_count = current_epoch_pool
             .get_proposer_block_count(&proposer_pro_tx_hash, transaction)
             .or_else(|e| match e {
                 error::Error::GroveDB(grovedb::Error::PathKeyNotFound(_)) => Ok(0u64),
                 _ => Err(e),
             })?;
 
-        epoch_pool.update_proposer_block_count(
+        current_epoch_pool.update_proposer_block_count(
             &proposer_pro_tx_hash,
             proposed_block_count + 1,
             transaction,
@@ -366,12 +363,12 @@ mod tests {
                 .init(&drive, Some(&transaction))
                 .expect("fee pools to init");
 
+            let epoch = EpochPool::new(0, &drive);
+
             // set initial data for test
             fee_pools
-                .process_epoch_change(&drive, 0, 1, 1, Some(&transaction))
+                .process_epoch_change(&drive, &epoch, 1, 1, Some(&transaction))
                 .expect("to process epoch change");
-
-            let epoch = EpochPool::new(0, &drive);
 
             let block_count = 42;
 
@@ -442,7 +439,7 @@ mod tests {
         fee_pools
             .distribute_fees_into_pools(
                 &drive,
-                epoch_index,
+                &epoch_pool,
                 processing_fees,
                 storage_fees,
                 proposer_pro_tx_hash,

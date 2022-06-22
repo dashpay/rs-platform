@@ -102,7 +102,6 @@ impl FeePools {
             )
             .map_err(Error::GroveDB)?;
 
-        // Should keep in fee pools to avoid extra reads
         self.genesis_time = Some(genesis_time);
 
         Ok(())
@@ -136,21 +135,20 @@ impl FeePools {
     pub fn process_epoch_change(
         &self,
         drive: &Drive,
-        epoch_index: u16,
+        current_epoch_pool: &EpochPool,
         first_proposer_block_height: u64,
         multiplier: u64,
         transaction: TransactionArg,
     ) -> Result<(), Error> {
         // create and init next thousandth epoch
-        let next_thousandth_epoch = EpochPool::new(epoch_index + 1000, drive);
+        let next_thousandth_epoch = EpochPool::new(current_epoch_pool.index + 1000, drive);
         next_thousandth_epoch.init_empty(transaction)?;
 
         // init first_proposer_block_height and processing_fee for an epoch
-        let epoch = EpochPool::new(epoch_index, drive);
-        epoch.init_current(multiplier, first_proposer_block_height, transaction)?;
+        current_epoch_pool.init_current(multiplier, first_proposer_block_height, transaction)?;
 
         // distribute the storage fees
-        self.distribute_storage_fee_pool(&drive, epoch_index, transaction)
+        self.distribute_storage_fee_pool(&drive, current_epoch_pool.index, transaction)
     }
 }
 
@@ -328,10 +326,12 @@ mod tests {
 
         let first_proposer_block_height = 1;
 
+        let epoch_pool = EpochPool::new(0, &drive);
+
         fee_pools
             .process_epoch_change(
                 &drive,
-                0,
+                &epoch_pool,
                 first_proposer_block_height,
                 1,
                 Some(&transaction),
@@ -353,15 +353,13 @@ mod tests {
         }
 
         // Make sure the current one was initialized
-        let epoch = EpochPool::new(0, &drive);
-
-        let processing_fee = epoch
+        let processing_fee = epoch_pool
             .get_processing_fee(Some(&transaction))
             .expect("to get processing fee");
 
         assert_eq!(processing_fee, 0.0);
 
-        let first_proposer_block_count = epoch
+        let first_proposer_block_count = epoch_pool
             .get_first_proposer_block_height(Some(&transaction))
             .expect("to get first proposer block count");
 
