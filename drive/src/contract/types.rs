@@ -25,7 +25,212 @@ pub enum ArrayFieldType {
     Number,
     String(Option<usize>, Option<usize>),
     ByteArray(Option<usize>, Option<usize>),
+    Boolean,
     Date,
+}
+
+impl ArrayFieldType {
+    pub fn encode_value_with_size(&self, value: Value) -> Result<Vec<u8>, Error> {
+        return match self {
+            ArrayFieldType::String(_, _) => {
+                if let Value::Text(value) = value {
+                    let vec = value.into_bytes();
+                    let mut r_vec = vec.len().encode_var_vec();
+                    r_vec.extend(vec);
+                    Ok(r_vec)
+                } else {
+                    Err(get_field_type_matching_error())
+                }
+            }
+            ArrayFieldType::Date => {
+                let value_as_f64 = match value {
+                    Value::Integer(value_as_integer) => {
+                        let value_as_i128: i128 = value_as_integer.try_into().map_err(|_| {
+                            Error::Contract(ContractError::ValueWrongType("expected integer value"))
+                        })?;
+                        let value_as_f64: f64 = value_as_i128 as f64;
+                        Ok(value_as_f64)
+                    }
+                    Value::Float(value_as_float) => Ok(value_as_float),
+                    _ => Err(get_field_type_matching_error()),
+                }?;
+                let mut value_bytes = value_as_f64.to_be_bytes().to_vec();
+                Ok(value_bytes)
+            }
+            ArrayFieldType::Integer => {
+                let value_as_integer = value
+                    .as_integer()
+                    .ok_or_else(get_field_type_matching_error)?;
+
+                let value_as_i64: i64 = value_as_integer.try_into().map_err(|_| {
+                    Error::Contract(ContractError::ValueWrongType("expected integer value"))
+                })?;
+                let mut value_bytes = value_as_i64.to_be_bytes().to_vec();
+                Ok(value_bytes)
+            }
+            ArrayFieldType::Number => {
+                let value_as_f64 = if value.is_integer() {
+                    let value_as_integer = value
+                        .as_integer()
+                        .ok_or_else(get_field_type_matching_error)?;
+
+                    let value_as_i64: i64 = value_as_integer.try_into().map_err(|_| {
+                        Error::Contract(ContractError::ValueWrongType("expected number value"))
+                    })?;
+
+                    value_as_i64 as f64
+                } else {
+                    value.as_float().ok_or_else(get_field_type_matching_error)?
+                };
+                let mut value_bytes = value_as_f64.to_be_bytes().to_vec();
+                Ok(value_bytes)
+            }
+            ArrayFieldType::ByteArray(_, _) => {
+                let mut bytes = match value {
+                    Value::Bytes(bytes) => Ok(bytes),
+                    Value::Text(text) => {
+                        let value_as_bytes = base64::decode(text).map_err(|_| {
+                            Error::Contract(ContractError::ValueDecodingError(
+                                "bytearray: invalid base64 value",
+                            ))
+                        })?;
+                        Ok(value_as_bytes)
+                    }
+                    Value::Array(array) => array
+                        .into_iter()
+                        .map(|byte| match byte {
+                            Value::Integer(int) => {
+                                let value_as_u8: u8 = int.try_into().map_err(|_| {
+                                    Error::Contract(ContractError::ValueWrongType(
+                                        "expected u8 value",
+                                    ))
+                                })?;
+                                Ok(value_as_u8)
+                            }
+                            _ => Err(Error::Contract(ContractError::ValueWrongType(
+                                "not an array of integers",
+                            ))),
+                        })
+                        .collect::<Result<Vec<u8>, Error>>(),
+                    _ => Err(get_field_type_matching_error()),
+                }?;
+
+                let mut r_vec = bytes.len().encode_var_vec();
+                r_vec.append(&mut bytes);
+                Ok(r_vec)
+            }
+            ArrayFieldType::Boolean => {
+                let value_as_boolean = value.as_bool().ok_or_else(get_field_type_matching_error)?;
+                if value_as_boolean {
+                    Ok(vec![1]) // 1 is true
+                } else {
+                    Ok(vec![0]) // 2 is false
+                }
+            }
+        };
+    }
+
+
+    pub fn encode_value_ref_with_size(
+        &self,
+        value: &Value,
+    ) -> Result<Vec<u8>, Error> {
+        return match self {
+            ArrayFieldType::String(_, _) => {
+                let value_as_text = value.as_text().ok_or_else(get_field_type_matching_error)?;
+                let vec = value_as_text.as_bytes().to_vec();
+                let mut r_vec = vec.len().encode_var_vec();
+                r_vec.extend(vec);
+                Ok(r_vec)
+            }
+            ArrayFieldType::Date => {
+                let value_as_f64 = match *value {
+                    Value::Integer(value_as_integer) => {
+                        let value_as_i128: i128 = value_as_integer.try_into().map_err(|_| {
+                            Error::Contract(ContractError::ValueWrongType("expected integer value"))
+                        })?;
+                        let value_as_f64: f64 = value_as_i128 as f64;
+                        Ok(value_as_f64)
+                    }
+                    Value::Float(value_as_float) => Ok(value_as_float),
+                    _ => Err(get_field_type_matching_error()),
+                }?;
+                let mut value_bytes = value_as_f64.to_be_bytes().to_vec();
+                Ok(value_bytes)
+            }
+            ArrayFieldType::Integer => {
+                let value_as_integer = value
+                    .as_integer()
+                    .ok_or_else(get_field_type_matching_error)?;
+
+                let value_as_i64: i64 = value_as_integer.try_into().map_err(|_| {
+                    Error::Contract(ContractError::ValueWrongType("expected integer value"))
+                })?;
+                let mut value_bytes = value_as_i64.to_be_bytes().to_vec();
+                Ok(value_bytes)
+            }
+            ArrayFieldType::Number => {
+                let value_as_f64 = if value.is_integer() {
+                    let value_as_integer = value
+                        .as_integer()
+                        .ok_or_else(get_field_type_matching_error)?;
+
+                    let value_as_i64: i64 = value_as_integer.try_into().map_err(|_| {
+                        Error::Contract(ContractError::ValueWrongType("expected number value"))
+                    })?;
+
+                    value_as_i64 as f64
+                } else {
+                    value.as_float().ok_or_else(get_field_type_matching_error)?
+                };
+                let mut value_bytes = value_as_f64.to_be_bytes().to_vec();
+                Ok(value_bytes)
+            }
+            ArrayFieldType::ByteArray(_, _) => {
+                let mut bytes = match value {
+                    Value::Bytes(bytes) => Ok(bytes.clone()),
+                    Value::Text(text) => {
+                        let value_as_bytes = base64::decode(text).map_err(|_| {
+                            Error::Contract(ContractError::ValueDecodingError(
+                                "bytearray: invalid base64 value",
+                            ))
+                        })?;
+                        Ok(value_as_bytes)
+                    }
+                    Value::Array(array) => array
+                        .iter()
+                        .map(|byte| match byte {
+                            Value::Integer(int) => {
+                                let value_as_u8: u8 = (*int).try_into().map_err(|_| {
+                                    Error::Contract(ContractError::ValueWrongType(
+                                        "expected u8 value",
+                                    ))
+                                })?;
+                                Ok(value_as_u8)
+                            }
+                            _ => Err(Error::Contract(ContractError::ValueWrongType(
+                                "not an array of integers",
+                            ))),
+                        })
+                        .collect::<Result<Vec<u8>, Error>>(),
+                    _ => Err(get_field_type_matching_error()),
+                }?;
+
+                let mut r_vec = bytes.len().encode_var_vec();
+                r_vec.append(&mut bytes);
+                Ok(r_vec)
+            }
+            ArrayFieldType::Boolean => {
+                let value_as_boolean = value.as_bool().ok_or_else(get_field_type_matching_error)?;
+                // 0 means does not exist
+                if value_as_boolean {
+                    Ok(vec![1]) // 1 is true
+                } else {
+                    Ok(vec![0]) // 2 is false
+                }
+            }
+        };
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
@@ -479,10 +684,10 @@ impl DocumentFieldType {
                         .into_iter()
                         .map(|(key, field)| {
                             if let Some(value) = value_map.remove(key) {
-                                let mut value = field
+                                let mut serialized_value = field
                                     .document_type
                                     .encode_value_with_size(value, field.required)?;
-                                r_vec.append(&mut value);
+                                r_vec.append(&mut serialized_value);
                                 Ok(())
                             } else if field.required {
                                 Err(Error::Contract(ContractError::MissingRequiredKey(
@@ -501,14 +706,22 @@ impl DocumentFieldType {
                 }
             }
             DocumentFieldType::Array(array_field_type) => {
-                Err(Error::Drive(DriveError::Unsupported(
-                    "serialization of arrays not yet supported",
-                )))
-                // cbor_inner_array_value(value.as_array().ok_or_else(get_field_type_matching_error))
-                // let array = value.as_array().ok_or_else(get_field_type_matching_error)?;
+                if let Value::Array(array) = value {
+                    let mut r_vec = array.len().encode_var_vec();
+
+                    array.into_iter().map(|value| {
+                        let mut serialized_value = array_field_type.encode_value_with_size(value)?;
+                            r_vec.append(&mut serialized_value);
+                            Ok(())
+
+                    }).collect::<Result<(), Error>>()?;
+                    Ok(r_vec)
+                } else {
+                    Err(get_field_type_matching_error())
+                }
             }
             DocumentFieldType::VariableTypeArray(_) => Err(Error::Drive(DriveError::Unsupported(
-                "serialization of arrays not yet supported",
+                "serialization of variable type arrays not yet supported",
             ))),
         };
     }
@@ -664,11 +877,19 @@ impl DocumentFieldType {
                 Ok(r_vec)
             }
             DocumentFieldType::Array(array_field_type) => {
-                Err(Error::Drive(DriveError::Unsupported(
-                    "serialization of arrays not yet supported",
-                )))
-                // cbor_inner_array_value(value.as_array().ok_or_else(get_field_type_matching_error))
-                // let array = value.as_array().ok_or_else(get_field_type_matching_error)?;
+                if let Value::Array(array) = value {
+                    let mut r_vec = array.len().encode_var_vec();
+
+                    array.into_iter().map(|value| {
+                        let mut serialized_value = array_field_type.encode_value_ref_with_size(value)?;
+                        r_vec.append(&mut serialized_value);
+                        Ok(())
+
+                    }).collect::<Result<(), Error>>()?;
+                    Ok(r_vec)
+                } else {
+                    Err(get_field_type_matching_error())
+                }
             }
             DocumentFieldType::VariableTypeArray(_) => Err(Error::Drive(DriveError::Unsupported(
                 "serialization of arrays not yet supported",
