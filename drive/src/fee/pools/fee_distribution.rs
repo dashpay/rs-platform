@@ -47,7 +47,7 @@ impl FeePools {
 
         let proposers = unpaid_epoch_pool.get_proposers(proposers_limit, transaction)?;
 
-        let proposers_len = proposers.len();
+        let proposers_len = proposers.len() as u16;
 
         for (proposer_tx_hash, proposed_block_count) in proposers {
             let query_json = json!({
@@ -123,8 +123,7 @@ impl FeePools {
         }
 
         // if less then a limit processed - drop the pool
-        if proposers_len < proposers_limit.into() {
-            todo!("Delete only proposers tree");
+        if proposers_len <= proposers_limit {
             unpaid_epoch_pool.cleanup(transaction)?;
         }
 
