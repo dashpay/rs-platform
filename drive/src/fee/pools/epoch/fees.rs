@@ -123,6 +123,19 @@ impl<'e> EpochPool<'e> {
         Ok(())
     }
 
+    pub fn delete_processing_fee(&self, transaction: TransactionArg) -> Result<(), Error> {
+        self.drive
+            .grove
+            .delete(
+                self.get_path(),
+                constants::KEY_PROCESSING_FEE.as_bytes(),
+                transaction,
+            )
+            .map_err(Error::GroveDB)?;
+
+        Ok(())
+    }
+
     pub fn update_storage_fee(
         &self,
         storage_fee: f64,
@@ -134,6 +147,19 @@ impl<'e> EpochPool<'e> {
                 self.get_path(),
                 constants::KEY_STORAGE_FEE.as_bytes(),
                 Element::Item(storage_fee.to_le_bytes().to_vec(), None),
+                transaction,
+            )
+            .map_err(Error::GroveDB)?;
+
+        Ok(())
+    }
+
+    pub fn delete_storage_fee(&self, transaction: TransactionArg) -> Result<(), Error> {
+        self.drive
+            .grove
+            .delete(
+                self.get_path(),
+                constants::KEY_STORAGE_FEE.as_bytes(),
                 transaction,
             )
             .map_err(Error::GroveDB)?;

@@ -65,19 +65,11 @@ impl<'e> EpochPool<'e> {
     }
 
     pub fn cleanup(&self, transaction: TransactionArg) -> Result<(), Error> {
-        self.drive
-            .grove
-            .delete(FeePools::get_path(), &self.key, transaction)
-            .map_err(Error::GroveDB)?;
+        self.delete_proposers(transaction)?;
 
-        self.drive
-            .grove
-            .delete(
-                self.get_path(),
-                constants::KEY_PROPOSERS.as_bytes(),
-                transaction,
-            )
-            .map_err(Error::GroveDB)?;
+        self.delete_storage_fee(transaction)?;
+
+        self.delete_processing_fee(transaction)?;
 
         Ok(())
     }

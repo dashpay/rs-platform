@@ -40,7 +40,7 @@ impl FeePools {
             (current_epoch_index - unpaid_epoch_pool.index) * 50
         };
 
-        let accumulated_fees = unpaid_epoch_pool.get_total_fees(transaction)?;
+        let total_fees = unpaid_epoch_pool.get_total_fees(transaction)?;
 
         let unpaid_epoch_block_count =
             Self::get_epoch_block_count(&drive, &unpaid_epoch_pool, transaction)?;
@@ -106,10 +106,9 @@ impl FeePools {
 
                 // TODO Aren't we loosing / burning some fee like this?
                 //  move leftover to the latest proposer?
-                let reward: f64 =
-                    ((accumulated_fees * proposed_block_count as f64 * share_percentage)
-                        / unpaid_epoch_block_count as f64)
-                        .floor();
+                let reward: f64 = ((total_fees * proposed_block_count as f64 * share_percentage)
+                    / unpaid_epoch_block_count as f64)
+                    .floor();
 
                 identity.balance += reward as u64;
 
@@ -130,9 +129,9 @@ impl FeePools {
         Ok(())
     }
 
-    fn get_oldest_unpaid_epoch_pool<'o>(
-        &'o self,
-        drive: &'o Drive,
+    fn get_oldest_unpaid_epoch_pool<'d>(
+        &'d self,
+        drive: &'d Drive,
         from_epoch_index: u16,
         transaction: TransactionArg,
     ) -> Result<Option<EpochPool>, Error> {
@@ -144,9 +143,9 @@ impl FeePools {
         )
     }
 
-    fn get_oldest_unpaid_epoch_pool_recursive<'o>(
-        &'o self,
-        drive: &'o Drive,
+    fn get_oldest_unpaid_epoch_pool_recursive<'d>(
+        &'d self,
+        drive: &'d Drive,
         from_epoch_index: u16,
         epoch_index: u16,
         transaction: TransactionArg,

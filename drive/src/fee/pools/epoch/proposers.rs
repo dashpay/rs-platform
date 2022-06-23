@@ -148,7 +148,9 @@ impl<'e> EpochPool<'e> {
                 Element::empty_tree(),
                 transaction,
             )
-            .map_err(Error::GroveDB)
+            .map_err(Error::GroveDB)?;
+
+        Ok(())
     }
 
     pub fn get_proposers(
@@ -196,6 +198,19 @@ impl<'e> EpochPool<'e> {
             .collect::<Result<Vec<(Vec<u8>, u64)>, Error>>()?;
 
         Ok(result)
+    }
+
+    pub fn delete_proposers(&self, transaction: TransactionArg) -> Result<(), Error> {
+        self.drive
+            .grove
+            .delete(
+                self.get_path(),
+                constants::KEY_PROPOSERS.as_bytes(),
+                transaction,
+            )
+            .map_err(Error::GroveDB)?;
+
+        Ok(())
     }
 }
 
