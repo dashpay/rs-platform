@@ -470,9 +470,6 @@ mod tests {
             .init(&drive, Some(&transaction))
             .expect("fee pools to init");
 
-        // TODO: Implement setup method and use everywhere.
-        //  let's create a tests module for pools with helpers like that
-
         let epoch_index = 0;
 
         let start_block_height = 1;
