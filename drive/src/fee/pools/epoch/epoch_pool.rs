@@ -1,6 +1,7 @@
 use grovedb::{Element, TransactionArg};
 
 use crate::drive::Drive;
+use crate::error::fee::FeeError;
 use crate::error::Error;
 use crate::fee::pools::fee_pools::FeePools;
 
@@ -34,15 +35,7 @@ impl<'e> EpochPool<'e> {
             .map_err(Error::GroveDB)?;
 
         // init storage fee item to 0
-        self.drive
-            .grove
-            .insert(
-                self.get_path(),
-                constants::KEY_STORAGE_FEE.as_bytes(),
-                Element::Item(0f64.to_le_bytes().to_vec(), None),
-                transaction,
-            )
-            .map_err(Error::GroveDB)?;
+        self.update_storage_fee(0i64, transaction)?;
 
         Ok(())
     }
@@ -50,10 +43,11 @@ impl<'e> EpochPool<'e> {
     pub fn init_current(
         &self,
         multiplier: u64,
-        first_proposer_block_height: u64,
+        start_block_height: u64,
+        start_time: i64,
         transaction: TransactionArg,
     ) -> Result<(), Error> {
-        self.update_first_proposer_block_height(first_proposer_block_height, transaction)?;
+        self.update_start_block_height(start_block_height, transaction)?;
 
         self.update_processing_fee(0u64, transaction)?;
 
@@ -61,7 +55,7 @@ impl<'e> EpochPool<'e> {
 
         self.update_fee_multiplier(multiplier, transaction)?;
 
-        // TODO: Store start time as well
+        self.update_start_time(start_time, transaction)?;
 
         Ok(())
     }
@@ -87,15 +81,180 @@ impl<'e> EpochPool<'e> {
             constants::KEY_PROPOSERS.as_bytes(),
         ]
     }
+
+    pub fn update_start_time(&self, time: i64, transaction: TransactionArg) -> Result<(), Error> {
+        self.drive
+            .grove
+            .insert(
+                self.get_path(),
+                constants::KEY_START_TIME.as_bytes(),
+                Element::Item(time.to_le_bytes().to_vec(), None),
+                transaction,
+            )
+            .map_err(Error::GroveDB)?;
+
+        Ok(())
+    }
+
+    pub fn get_start_time(&self, transaction: TransactionArg) -> Result<i64, Error> {
+        let element = self
+            .drive
+            .grove
+            .get(
+                self.get_path(),
+                constants::KEY_START_TIME.as_bytes(),
+                transaction,
+            )
+            .map_err(Error::GroveDB)?;
+
+        if let Element::Item(item, _) = element {
+            Ok(i64::from_le_bytes(item.as_slice().try_into().map_err(
+                |_| {
+                    Error::Fee(FeeError::CorruptedFirstProposedBlockHeightItemLength(
+                        "epoch start time item have an invalid length",
+                    ))
+                },
+            )?))
+        } else {
+            Err(Error::Fee(
+                FeeError::CorruptedFirstProposedBlockHeightNotItem(
+                    "epoch start time must be an item",
+                ),
+            ))
+        }
+    }
+
+    pub fn get_start_block_height(&self, transaction: TransactionArg) -> Result<u64, Error> {
+        let element = self
+            .drive
+            .grove
+            .get(
+                self.get_path(),
+                constants::KEY_START_BLOCK_HEIGHT.as_bytes(),
+                transaction,
+            )
+            .map_err(Error::GroveDB)?;
+
+        if let Element::Item(item, _) = element {
+            Ok(u64::from_le_bytes(item.as_slice().try_into().map_err(
+                |_| {
+                    Error::Fee(FeeError::CorruptedFirstProposedBlockHeightItemLength(
+                        "epoch start block height item have an invalid length",
+                    ))
+                },
+            )?))
+        } else {
+            Err(Error::Fee(
+                FeeError::CorruptedFirstProposedBlockHeightNotItem(
+                    "epoch start block height must be an item",
+                ),
+            ))
+        }
+    }
+
+    pub fn update_start_block_height(
+        &self,
+        start_block_height: u64,
+        transaction: TransactionArg,
+    ) -> Result<(), Error> {
+        self.drive
+            .grove
+            .insert(
+                self.get_path(),
+                constants::KEY_START_BLOCK_HEIGHT.as_bytes(),
+                Element::Item(start_block_height.to_le_bytes().to_vec(), None),
+                transaction,
+            )
+            .map_err(Error::GroveDB)
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use grovedb::Element;
     use tempfile::TempDir;
 
+    use crate::error::fee::FeeError;
+    use crate::fee::pools::epoch::constants;
     use crate::{drive::Drive, error, fee::pools::fee_pools::FeePools};
 
     use super::EpochPool;
+
+    #[test]
+    fn test_update_and_get_first_proposed_block_height() {
+        let tmp_dir = TempDir::new().unwrap();
+        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+
+        drive
+            .create_root_tree(None)
+            .expect("expected to create root tree successfully");
+
+        let transaction = drive.grove.start_transaction();
+
+        let fee_pools = FeePools::new();
+
+        fee_pools
+            .init(&drive, Some(&transaction))
+            .expect("fee pools to init");
+
+        let epoch = EpochPool::new(7000, &drive);
+
+        match epoch.get_start_block_height(Some(&transaction)) {
+            Ok(_) => assert!(
+                false,
+                "should not be able to get first proposer block height on uninit epoch pool"
+            ),
+            Err(e) => match e {
+                error::Error::GroveDB(grovedb::Error::PathNotFound(_)) => assert!(true),
+                _ => assert!(false, "invalid error type"),
+            },
+        }
+
+        match epoch.update_start_block_height(1, Some(&transaction)) {
+            Ok(_) => assert!(
+                false,
+                "should not be able to update first proposer block count on uninit epoch pool"
+            ),
+            Err(e) => match e {
+                error::Error::GroveDB(grovedb::Error::InvalidPath(_)) => assert!(true),
+                _ => assert!(false, "invalid error type"),
+            },
+        }
+
+        let epoch = EpochPool::new(42, &drive);
+
+        let start_block_height = 42;
+
+        epoch
+            .update_start_block_height(start_block_height, Some(&transaction))
+            .expect("to update first proposer block height");
+
+        let start_block_height = epoch
+            .get_start_block_height(Some(&transaction))
+            .expect("to get first proposer block count");
+
+        assert_eq!(start_block_height, start_block_height);
+
+        drive
+            .grove
+            .insert(
+                epoch.get_path(),
+                constants::KEY_START_BLOCK_HEIGHT.as_bytes(),
+                Element::Item(u128::MAX.to_le_bytes().to_vec(), None),
+                Some(&transaction),
+            )
+            .expect("to insert invalid data");
+
+        match epoch.get_start_block_height(Some(&transaction)) {
+            Ok(_) => assert!(false, "should not be able to decode stored value"),
+            Err(e) => match e {
+                error::Error::Fee(FeeError::CorruptedFirstProposedBlockHeightItemLength(_)) => {
+                    assert!(true)
+                }
+                _ => assert!(false, "ivalid error type"),
+            },
+        }
+    }
 
     #[test]
     fn test_init_empty() {

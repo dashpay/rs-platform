@@ -191,8 +191,8 @@ impl FeePools {
     ) -> Result<u64, Error> {
         let next_epoch_pool = EpochPool::new(epoch_pool.index + 1, drive);
 
-        let block_count = next_epoch_pool.get_first_proposer_block_height(transaction)?
-            - epoch_pool.get_first_proposer_block_height(transaction)?;
+        let block_count = next_epoch_pool.get_start_block_height(transaction)?
+            - epoch_pool.get_start_block_height(transaction)?;
 
         Ok(block_count)
     }
@@ -424,7 +424,7 @@ mod tests {
 
             // set initial data for test
             fee_pools
-                .shift_current_epoch_pool(&drive, &epoch, 1, 1, Some(&transaction))
+                .shift_current_epoch_pool(&drive, &epoch, 1, 1, 1, Some(&transaction))
                 .expect("to process epoch change");
 
             let block_count = 42;
@@ -474,12 +474,12 @@ mod tests {
 
         let epoch_index = 0;
 
-        let first_proposer_block_height = 1;
+        let start_block_height = 1;
 
         let epoch_pool = EpochPool::new(epoch_index, &drive);
 
         epoch_pool
-            .init_current(1, first_proposer_block_height, Some(&transaction))
+            .init_current(1, start_block_height, 1, Some(&transaction))
             .expect("should init current pool");
 
         // Distribute fees

@@ -142,7 +142,8 @@ impl FeePools {
         &self,
         drive: &Drive,
         current_epoch_pool: &EpochPool,
-        first_proposer_block_height: u64,
+        start_block_height: u64,
+        start_block_time: i64,
         multiplier: u64,
         transaction: TransactionArg,
     ) -> Result<(), Error> {
@@ -151,7 +152,12 @@ impl FeePools {
         next_thousandth_epoch.init_empty(transaction)?;
 
         // init first_proposer_block_height and processing_fee for an epoch
-        current_epoch_pool.init_current(multiplier, first_proposer_block_height, transaction)?;
+        current_epoch_pool.init_current(
+            multiplier,
+            start_block_height,
+            start_block_time,
+            transaction,
+        )?;
 
         Ok(())
     }
@@ -358,7 +364,7 @@ mod tests {
             .init(&drive, Some(&transaction))
             .expect("fee pools to init");
 
-        let first_proposer_block_height = 1;
+        let start_block_height = 1;
 
         let epoch_pool = EpochPool::new(0, &drive);
 
@@ -366,7 +372,8 @@ mod tests {
             .shift_current_epoch_pool(
                 &drive,
                 &epoch_pool,
-                first_proposer_block_height,
+                start_block_height,
+                1,
                 1,
                 Some(&transaction),
             )
@@ -393,11 +400,11 @@ mod tests {
 
         assert_eq!(processing_fee, 0);
 
-        let first_proposer_block_count = epoch_pool
-            .get_first_proposer_block_height(Some(&transaction))
+        let start_block_count = epoch_pool
+            .get_start_block_height(Some(&transaction))
             .expect("to get first proposer block count");
 
-        assert_eq!(first_proposer_block_count, first_proposer_block_height);
+        assert_eq!(start_block_count, start_block_height);
 
         todo!("check empty proposer tree exist");
     }
