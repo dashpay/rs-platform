@@ -66,7 +66,7 @@ pub const MN_REWARD_SHARES_DOCUMENT_TYPE: &'static str = "rewardShare";
 #[cfg(test)]
 mod tests {
     #[test]
-    fn test_distrubution_table_sum() {
+    fn test_distribution_table_sum() {
         assert_eq!(super::FEE_DISTRIBUTION_TABLE.iter().sum::<f64>(), 1.0);
     }
 }

@@ -18,8 +18,8 @@ impl Drive {
         block_time: i64,
         previous_block_time: i64,
         proposer_pro_tx_hash: [u8; 32],
-        processing_fees: f64,
-        storage_fees: f64, // TODO: It's not a float, it's i64
+        processing_fees: u64,
+        storage_fees: i64,
         fee_multiplier: u64,
         transaction: TransactionArg,
     ) -> Result<(), Error> {
@@ -54,7 +54,11 @@ impl Drive {
             )?;
 
             // distribute accumulated previous epoch storage fees
-            fee_pools.distribute_storage_fee_pool(&self, current_epoch_pool.index, transaction)?;
+            fee_pools.storage_fee_distribution_pool.distribute(
+                &self,
+                current_epoch_pool.index,
+                transaction,
+            )?;
         }
 
         fee_pools.distribute_fees_into_pools(
@@ -192,8 +196,8 @@ mod tests {
                 0, 0, 0, 0,
             ];
 
-            let processing_fees = 0.42;
-            let storage_fees = 22.1;
+            let processing_fees = 100;
+            let storage_fees = 2000;
 
             drive
                 .process_block(

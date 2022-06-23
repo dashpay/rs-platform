@@ -8,7 +8,7 @@ use crate::{
 use super::constants;
 
 impl<'e> EpochPool<'e> {
-    pub fn get_storage_fee(&self, transaction: TransactionArg) -> Result<f64, Error> {
+    pub fn get_storage_fee(&self, transaction: TransactionArg) -> Result<i64, Error> {
         let element = self
             .drive
             .grove
@@ -20,7 +20,7 @@ impl<'e> EpochPool<'e> {
             .map_err(Error::GroveDB)?;
 
         if let Element::Item(item, _) = element {
-            Ok(f64::from_le_bytes(item.as_slice().try_into().map_err(
+            Ok(i64::from_le_bytes(item.as_slice().try_into().map_err(
                 |_| {
                     Error::Fee(FeeError::CorruptedStorageFeeInvalidItemLength(
                         "epoch storage fee item have an invalid length",
@@ -34,7 +34,7 @@ impl<'e> EpochPool<'e> {
         }
     }
 
-    pub fn get_processing_fee(&self, transaction: TransactionArg) -> Result<f64, Error> {
+    pub fn get_processing_fee(&self, transaction: TransactionArg) -> Result<u64, Error> {
         let element = self
             .drive
             .grove
@@ -46,10 +46,10 @@ impl<'e> EpochPool<'e> {
             .map_err(Error::GroveDB)?;
 
         if let Element::Item(item, _) = element {
-            Ok(f64::from_le_bytes(item.as_slice().try_into().map_err(
+            Ok(u64::from_le_bytes(item.as_slice().try_into().map_err(
                 |_| {
                     Error::Fee(FeeError::CorruptedProcessingFeeInvalidItemLength(
-                        "epoch processing fee item have an invalid length",
+                        "epoch processing fee is not u64",
                     ))
                 },
             )?))
@@ -107,7 +107,7 @@ impl<'e> EpochPool<'e> {
 
     pub fn update_processing_fee(
         &self,
-        processing_fee: f64,
+        processing_fee: u64,
         transaction: TransactionArg,
     ) -> Result<(), Error> {
         self.drive
@@ -138,7 +138,7 @@ impl<'e> EpochPool<'e> {
 
     pub fn update_storage_fee(
         &self,
-        storage_fee: f64,
+        storage_fee: i64,
         transaction: TransactionArg,
     ) -> Result<(), Error> {
         self.drive
@@ -167,11 +167,10 @@ impl<'e> EpochPool<'e> {
         Ok(())
     }
 
-    pub fn get_total_fees(&self, transaction: TransactionArg) -> Result<f64, Error> {
-        // TODO: I guess it should be i64
+    pub fn get_total_fees(&self, transaction: TransactionArg) -> Result<i64, Error> {
         let storage_credit = self.get_storage_fee(transaction)?;
 
-        let processing_credit = self.get_processing_fee(transaction)?;
+        let processing_credit: i64 = self.get_processing_fee(transaction)? as i64;
 
         Ok(storage_credit + processing_credit)
     }
@@ -221,7 +220,7 @@ mod tests {
             },
         }
 
-        match epoch.update_storage_fee(0.42, Some(&transaction)) {
+        match epoch.update_storage_fee(42, Some(&transaction)) {
             Ok(_) => assert!(
                 false,
                 "should not be able to update storage fee on uninit epoch pool"
@@ -238,9 +237,9 @@ mod tests {
             .get_storage_fee(Some(&transaction))
             .expect("to get storage fee");
 
-        assert_eq!(stored_storage_fee, 0f64);
+        assert_eq!(stored_storage_fee, 0);
 
-        let storage_fee: f64 = 0.42;
+        let storage_fee: i64 = 42;
 
         epoch
             .update_storage_fee(storage_fee, Some(&transaction))
@@ -292,7 +291,7 @@ mod tests {
 
         let epoch = EpochPool::new(7000, &drive);
 
-        match epoch.update_processing_fee(0.42, Some(&transaction)) {
+        match epoch.update_processing_fee(42, Some(&transaction)) {
             Ok(_) => assert!(
                 false,
                 "should not be able to update processing fee on uninit epoch pool"
@@ -314,7 +313,7 @@ mod tests {
             assert!(false, "processing fee is not set yet");
         }
 
-        let processing_fee: f64 = 0.42;
+        let processing_fee: u64 = 42;
 
         epoch
             .update_processing_fee(processing_fee, Some(&transaction))
@@ -364,8 +363,8 @@ mod tests {
             .init(&drive, Some(&transaction))
             .expect("fee pools to init");
 
-        let processing_fee: f64 = 0.42;
-        let storage_fee: f64 = 0.05678;
+        let processing_fee: u64 = 42;
+        let storage_fee: i64 = 1000;
 
         let epoch = EpochPool::new(0, &drive);
 
@@ -381,7 +380,7 @@ mod tests {
             .get_total_fees(Some(&transaction))
             .expect("to get combined fee");
 
-        assert_eq!(combined_fee, processing_fee + storage_fee);
+        assert_eq!(combined_fee, processing_fee as i64 + storage_fee);
     }
 
     #[test]

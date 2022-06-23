@@ -106,9 +106,10 @@ impl FeePools {
 
                 // TODO Aren't we loosing / burning some fee like this?
                 //  move leftover to the latest proposer?
-                let reward: f64 = ((total_fees * proposed_block_count as f64 * share_percentage)
-                    / unpaid_epoch_block_count as f64)
-                    .floor();
+                let reward: f64 =
+                    ((total_fees as f64 * proposed_block_count as f64 * share_percentage)
+                        / unpaid_epoch_block_count as f64)
+                        .floor();
 
                 identity.balance += reward as u64;
 
@@ -121,9 +122,9 @@ impl FeePools {
             }
         }
 
-        // if less then a limit processed - drop the pool
-        if proposers_len <= proposers_limit {
-            unpaid_epoch_pool.cleanup(transaction)?;
+        // if less then a limit processed - clean up the pool (mark as paid)
+        if proposers_len < proposers_limit {
+            unpaid_epoch_pool.mark_as_paid(transaction)?;
         }
 
         Ok(())
@@ -187,18 +188,26 @@ impl FeePools {
         &self,
         drive: &Drive,
         current_epoch_pool: &EpochPool,
-        processing_fees: f64,
-        storage_fees: f64,
+        processing_fees: u64,
+        storage_fees: i64,
         transaction: TransactionArg,
     ) -> Result<(), Error> {
         // update epoch pool processing fees
         let epoch_processing_fees = current_epoch_pool.get_processing_fee(transaction)?;
+
         current_epoch_pool
             .update_processing_fee(epoch_processing_fees + processing_fees, transaction)?;
 
         // update storage fee pool
-        let storage_fee_pool = self.get_storage_fee_pool(&drive, transaction)?;
-        self.update_storage_fee_pool(&drive, storage_fee_pool + storage_fees, transaction)?;
+        let storage_fee_pool = self
+            .storage_fee_distribution_pool
+            .value(&drive, transaction)?;
+
+        self.storage_fee_distribution_pool.update(
+            &drive,
+            storage_fee_pool + storage_fees,
+            transaction,
+        )?;
 
         Ok(())
     }
@@ -462,8 +471,8 @@ mod tests {
 
         // Distribute fees
 
-        let processing_fees = 0.42;
-        let storage_fees = 0.16;
+        let processing_fees = 42;
+        let storage_fees = 1600;
 
         let proposer_pro_tx_hash: [u8; 32] =
             hex::decode("0101010101010101010101010101010101010101010101010101010101010101")
@@ -486,7 +495,8 @@ mod tests {
             .expect("to get processing fees");
 
         let stored_storage_fee_pool = fee_pools
-            .get_storage_fee_pool(&drive, Some(&transaction))
+            .storage_fee_distribution_pool
+            .value(&drive, Some(&transaction))
             .expect("to get storage fee pool");
 
         let stored_block_count = epoch_pool

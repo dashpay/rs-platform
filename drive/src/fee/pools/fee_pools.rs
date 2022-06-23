@@ -1,19 +1,25 @@
 use grovedb::{Element, TransactionArg};
+use std::cell::RefCell;
 
 use crate::drive::{Drive, RootTree};
 use crate::error::fee::FeeError;
 use crate::error::Error;
+use crate::fee::pools::storage_fee_distribution_pool::StorageFeeDistributionPool;
 
 use super::constants;
 use super::epoch::epoch_pool::EpochPool;
 
 pub struct FeePools {
     pub genesis_time: Option<i64>,
+    pub storage_fee_distribution_pool: StorageFeeDistributionPool,
 }
 
 impl FeePools {
     pub fn new() -> FeePools {
-        FeePools { genesis_time: None }
+        FeePools {
+            genesis_time: None,
+            storage_fee_distribution_pool: StorageFeeDistributionPool {},
+        }
     }
 
     pub fn get_path<'a>() -> [&'a [u8]; 1] {
@@ -182,10 +188,11 @@ mod tests {
             .expect("fee pools to init");
 
         let storage_fee_pool = fee_pools
-            .get_storage_fee_pool(&drive, Some(&transaction))
+            .storage_fee_distribution_pool
+            .value(&drive, Some(&transaction))
             .expect("to get storage fee pool");
 
-        assert_eq!(storage_fee_pool, 0f64);
+        assert_eq!(storage_fee_pool, 0);
 
         todo!("check that we have all 999 epoch pools")
     }
@@ -384,7 +391,7 @@ mod tests {
             .get_processing_fee(Some(&transaction))
             .expect("to get processing fee");
 
-        assert_eq!(processing_fee, 0.0);
+        assert_eq!(processing_fee, 0);
 
         let first_proposer_block_count = epoch_pool
             .get_first_proposer_block_height(Some(&transaction))

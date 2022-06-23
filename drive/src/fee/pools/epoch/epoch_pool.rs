@@ -55,16 +55,18 @@ impl<'e> EpochPool<'e> {
     ) -> Result<(), Error> {
         self.update_first_proposer_block_height(first_proposer_block_height, transaction)?;
 
-        self.update_processing_fee(0f64, transaction)?;
+        self.update_processing_fee(0u64, transaction)?;
 
         self.init_proposers(transaction)?;
 
         self.update_fee_multiplier(multiplier, transaction)?;
 
+        // TODO: Store start time as well
+
         Ok(())
     }
 
-    pub fn cleanup(&self, transaction: TransactionArg) -> Result<(), Error> {
+    pub fn mark_as_paid(&self, transaction: TransactionArg) -> Result<(), Error> {
         self.delete_proposers(transaction)?;
 
         self.delete_storage_fee(transaction)?;
@@ -134,7 +136,7 @@ mod tests {
             .get_storage_fee(Some(&transaction))
             .expect("to get storage fee");
 
-        assert_eq!(storage_fee, 0f64);
+        assert_eq!(storage_fee, 0);
 
         let stored_multiplier = epoch
             .get_fee_multiplier(Some(&transaction))
@@ -149,7 +151,7 @@ mod tests {
     }
 
     #[test]
-    fn test_cleanup() {
+    fn test_mark_as_paid() {
         let tmp_dir = TempDir::new().unwrap();
         let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
 
@@ -167,7 +169,7 @@ mod tests {
 
         let uninit_epoch_pool = EpochPool::new(7000, &drive);
 
-        match uninit_epoch_pool.cleanup(Some(&transaction)) {
+        match uninit_epoch_pool.mark_as_paid(Some(&transaction)) {
             Ok(_) => assert!(false, "should not be able to delete uninit pool"),
             Err(e) => match e {
                 error::Error::GroveDB(grovedb::Error::PathKeyNotFound(_)) => assert!(true),
@@ -178,7 +180,7 @@ mod tests {
         let epoch = EpochPool::new(42, &drive);
 
         epoch
-            .cleanup(Some(&transaction))
+            .mark_as_paid(Some(&transaction))
             .expect("to delete 42th epoch");
 
         match drive
