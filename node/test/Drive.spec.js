@@ -377,15 +377,20 @@ describe('Drive', () => {
   describe('#feePoolsProcessBlock', () => {
     beforeEach(async () => {
       await drive.createRootTree();
+
+      await drive.initFeePools();
+
+      // TODO: init contract, docs and identities
     });
 
     it('should successfully process a block', async () => {
       const blockHeight = 0;
-      const blockTime = (new Date()).getTime();
+      blockTime = (new Date()).getTime();
       const previousBlockTime = (new Date()).getTime();
       const proposerTxHash = Buffer.alloc(32, 1);
-      const processingFees = 0.42;
-      const storageFees = 42.0;
+      const processingFees = 42;
+      const storageFees = 43;
+      const feeMultiplier = 10;
 
       await drive.feePoolsProcessBlock(
         blockHeight,
@@ -394,6 +399,7 @@ describe('Drive', () => {
         proposerTxHash,
         processingFees,
         storageFees,
+        feeMultiplier,
       );
     });
   });

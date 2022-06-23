@@ -1399,6 +1399,7 @@ impl DriveWrapper {
         let js_proposer_tx_hash = cx.argument::<JsBuffer>(3)?;
         let js_processing_fees = cx.argument::<JsNumber>(4)?;
         let js_storage_fees = cx.argument::<JsNumber>(5)?;
+        let js_fee_multiplier = cx.argument::<JsNumber>(6)?;
 
         let block_height = js_block_height.value(&mut cx) as u64;
         let block_time = js_block_time.value(&mut cx) as i64;
@@ -1407,10 +1408,11 @@ impl DriveWrapper {
             converter::js_buffer_to_vec_u8(js_proposer_tx_hash, &mut cx)
                 .try_into()
                 .or_else(|_| cx.throw_error("proposer_pro_tx_hash has invalid length"))?;
-        let processing_fees = js_processing_fees.value(&mut cx);
-        let storage_fees = js_storage_fees.value(&mut cx);
+        let processing_fees = js_processing_fees.value(&mut cx) as u64;
+        let storage_fees = js_storage_fees.value(&mut cx) as i64;
+        let fee_multiplier = js_fee_multiplier.value(&mut cx) as u64;
 
-        let js_callback = cx.argument::<JsFunction>(6)?.root(&mut cx);
+        let js_callback = cx.argument::<JsFunction>(7)?.root(&mut cx);
 
         let db = cx
             .this()
@@ -1424,6 +1426,7 @@ impl DriveWrapper {
                 proposer_pro_tx_hash,
                 processing_fees,
                 storage_fees,
+                fee_multiplier,
                 transaction,
             );
 

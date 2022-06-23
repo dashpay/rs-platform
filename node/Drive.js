@@ -232,6 +232,7 @@ class Drive {
    * @param {Buffer} proposerTxHash
    * @param {number} processingFees
    * @param {number} storageFees
+   * @param {number} feeMultiplier
    *
    * @returns {Promise<void>}
    */
@@ -242,6 +243,7 @@ class Drive {
     proposerTxHash,
     processingFees,
     storageFees,
+    feeMultiplier,
   ) {
     return driveFeePoolsProcessBlockAsync.call(
       this.drive,
@@ -251,6 +253,7 @@ class Drive {
       proposerTxHash,
       processingFees,
       storageFees,
+      feeMultiplier,
     );
   }
 }
