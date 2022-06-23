@@ -60,13 +60,13 @@ impl<'e> EpochPool<'e> {
         }
     }
 
-    pub fn get_multiplier(&self, transaction: TransactionArg) -> Result<u64, Error> {
+    pub fn get_fee_multiplier(&self, transaction: TransactionArg) -> Result<u64, Error> {
         let element = self
             .drive
             .grove
             .get(
                 self.get_path(),
-                constants::KEY_MULTIPLIER.as_bytes(),
+                constants::KEY_FEE_MULTIPLIER.as_bytes(),
                 transaction,
             )
             .map_err(Error::GroveDB)?;
@@ -86,6 +86,25 @@ impl<'e> EpochPool<'e> {
         }
     }
 
+    pub fn update_fee_multiplier(
+        &self,
+        multiplier: u64,
+        transaction: TransactionArg,
+    ) -> Result<(), Error> {
+        // setting up multiplier
+        self.drive
+            .grove
+            .insert(
+                self.get_path(),
+                constants::KEY_FEE_MULTIPLIER.as_bytes(),
+                Element::Item(multiplier.to_le_bytes().to_vec(), None),
+                transaction,
+            )
+            .map_err(Error::GroveDB)?;
+
+        Ok(())
+    }
+
     pub fn update_processing_fee(
         &self,
         processing_fee: f64,
@@ -99,7 +118,9 @@ impl<'e> EpochPool<'e> {
                 Element::Item(processing_fee.to_le_bytes().to_vec(), None),
                 transaction,
             )
-            .map_err(Error::GroveDB)
+            .map_err(Error::GroveDB)?;
+
+        Ok(())
     }
 
     pub fn update_storage_fee(
@@ -115,10 +136,13 @@ impl<'e> EpochPool<'e> {
                 Element::Item(storage_fee.to_le_bytes().to_vec(), None),
                 transaction,
             )
-            .map_err(Error::GroveDB)
+            .map_err(Error::GroveDB)?;
+
+        Ok(())
     }
 
-    pub fn get_combined_fee(&self, transaction: TransactionArg) -> Result<f64, Error> {
+    pub fn get_total_fees(&self, transaction: TransactionArg) -> Result<f64, Error> {
+        // TODO: I guess it should be i64
         let storage_credit = self.get_storage_fee(transaction)?;
 
         let processing_credit = self.get_processing_fee(transaction)?;
@@ -142,7 +166,7 @@ mod tests {
     };
 
     #[test]
-    fn test_epoch_pool_update_and_get_storage_fee() {
+    fn test_update_and_get_storage_fee() {
         let tmp_dir = TempDir::new().unwrap();
         let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
 
@@ -224,7 +248,7 @@ mod tests {
     }
 
     #[test]
-    fn test_epoch_pool_update_and_get_processing_fee() {
+    fn test_update_and_get_processing_fee() {
         let tmp_dir = TempDir::new().unwrap();
         let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
 
@@ -298,7 +322,7 @@ mod tests {
     }
 
     #[test]
-    fn test_epoch_pool_get_combined_fee() {
+    fn test_get_total_fees() {
         let tmp_dir = TempDir::new().unwrap();
         let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
 
@@ -328,14 +352,14 @@ mod tests {
             .expect("to update storage fee");
 
         let combined_fee = epoch
-            .get_combined_fee(Some(&transaction))
+            .get_total_fees(Some(&transaction))
             .expect("to get combined fee");
 
         assert_eq!(combined_fee, processing_fee + storage_fee);
     }
 
     #[test]
-    fn test_get_multiplier() {
+    fn test_update_and_get_fee_multiplier() {
         let tmp_dir = TempDir::new().unwrap();
         let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
 
@@ -353,7 +377,7 @@ mod tests {
 
         let epoch = EpochPool::new(7000, &drive);
 
-        match epoch.get_multiplier(Some(&transaction)) {
+        match epoch.get_fee_multiplier(Some(&transaction)) {
             Ok(_) => assert!(
                 false,
                 "should not be able to get multiplier on uninit epoch pool"
@@ -367,7 +391,7 @@ mod tests {
         let epoch = EpochPool::new(0, &drive);
 
         let stored_multiplier = epoch
-            .get_multiplier(Some(&transaction))
+            .get_fee_multiplier(Some(&transaction))
             .expect("to get multiplier");
 
         assert_eq!(stored_multiplier, 1);
@@ -376,13 +400,13 @@ mod tests {
             .grove
             .insert(
                 epoch.get_path(),
-                constants::KEY_MULTIPLIER.as_bytes(),
+                constants::KEY_FEE_MULTIPLIER.as_bytes(),
                 Element::Item(u128::MAX.to_le_bytes().to_vec(), None),
                 Some(&transaction),
             )
             .expect("to insert invalid data");
 
-        match epoch.get_multiplier(Some(&transaction)) {
+        match epoch.get_fee_multiplier(Some(&transaction)) {
             Ok(_) => assert!(false, "should not be able to decode stored value"),
             Err(e) => match e {
                 error::Error::Fee(FeeError::CorruptedMultiplierInvalidItemLength(_)) => {

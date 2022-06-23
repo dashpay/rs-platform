@@ -12,57 +12,31 @@ use crate::fee::pools::constants;
 use crate::fee::pools::epoch::epoch_pool::EpochPool;
 
 impl FeePools {
-    pub fn get_oldest_unpaid_epoch_pool(
+    pub fn distribute_fees_from_unpaid_pools_to_proposers(
         &self,
         drive: &Drive,
-        epoch_index: u16,
-        transaction: TransactionArg,
-    ) -> Result<EpochPool, Error> {
-        if epoch_index == 0 {
-            todo!("must be an error - all epochs paid");
-            return Ok(EpochPool::new(epoch_index, drive));
-        }
-
-        let epoch = EpochPool::new(epoch_index, drive);
-
-        if epoch.is_proposers_tree_empty(transaction)? {
-            todo!("it must be previous");
-            return Ok(epoch);
-        }
-
-        self.get_oldest_unpaid_epoch_pool(&drive, epoch_index - 1, transaction)
-    }
-
-    pub fn distribute_fees_from_pools_to_proposers(
-        &self,
-        drive: &Drive,
-        epoch_index: u16,
-        block_height: u64,
+        current_epoch_index: u16,
         transaction: TransactionArg,
     ) -> Result<(), Error> {
         todo!("we need to do nothing if there is no epochs behind");
 
         let unpaid_epoch_pool =
-            self.get_oldest_unpaid_epoch_pool(&drive, epoch_index, transaction)?;
+            self.get_oldest_unpaid_epoch_pool(&drive, current_epoch_index, transaction)?;
 
         // Process more proposers at once if we have many unpaid epochs in past
-        let proposers_limit: u16 = if unpaid_epoch_pool.index == epoch_index {
+        let proposers_limit: u16 = if unpaid_epoch_pool.index == current_epoch_index {
             50
         } else {
-            (epoch_index - unpaid_epoch_pool.index) * 50
+            (current_epoch_index - unpaid_epoch_pool.index) * 50
         };
 
-        let accumulated_fees = unpaid_epoch_pool.get_combined_fee(transaction)?;
+        let accumulated_fees = unpaid_epoch_pool.get_total_fees(transaction)?;
 
         // TODO: Move to private function for readability
         let next_epoch_pool = EpochPool::new(unpaid_epoch_pool.index + 1, drive);
 
-        let unpaid_epoch_block_count = if unpaid_epoch_pool.index == epoch_index {
-            block_height - unpaid_epoch_pool.get_first_proposer_block_height(transaction)?
-        } else {
-            next_epoch_pool.get_first_proposer_block_height(transaction)?
-                - unpaid_epoch_pool.get_first_proposer_block_height(transaction)?
-        };
+        let unpaid_epoch_block_count =
+            Self::get_epoch_block_count(&drive, unpaid_epoch_pool, transaction)?;
 
         let proposers = unpaid_epoch_pool.get_proposers(proposers_limit, transaction)?;
 
@@ -123,6 +97,8 @@ impl FeePools {
 
                 let share_percentage: f64 = share_percentage_integer as f64 / 100.0;
 
+                // TODO Aren't we loosing / burning some fee like this?
+                //  move leftover to the latest proposer?
                 let reward: f64 =
                     ((accumulated_fees * proposed_block_count as f64 * share_percentage)
                         / unpaid_epoch_block_count as f64)
@@ -142,10 +118,44 @@ impl FeePools {
         // if less then a limit processed - drop the pool
         if proposers_len < proposers_limit.into() {
             todo!("Delete only proposers tree");
-            unpaid_epoch_pool.delete(transaction)?;
+            unpaid_epoch_pool.cleanup(transaction)?;
         }
 
         Ok(())
+    }
+
+    fn get_oldest_unpaid_epoch_pool(
+        &self,
+        drive: &Drive,
+        epoch_index: u16,
+        transaction: TransactionArg,
+    ) -> Result<EpochPool, Error> {
+        if epoch_index == 0 {
+            todo!("must be an error - all epochs paid");
+            return Ok(EpochPool::new(epoch_index, drive));
+        }
+
+        let epoch = EpochPool::new(epoch_index, drive);
+
+        if epoch.is_proposers_tree_empty(transaction)? {
+            todo!("it must be previous");
+            return Ok(epoch);
+        }
+
+        self.get_oldest_unpaid_epoch_pool(&drive, epoch_index - 1, transaction)
+    }
+
+    fn get_epoch_block_count(
+        drive: &Drive,
+        epoch_pool: EpochPool,
+        transaction: TransactionArg,
+    ) -> Result<u64, Error> {
+        let next_epoch_pool = EpochPool::new(epoch_pool.index + 1, drive);
+
+        let block_count = next_epoch_pool.get_first_proposer_block_height(transaction)?
+            - epoch_pool.get_first_proposer_block_height(transaction)?;
+
+        Ok(block_count)
     }
 
     pub fn distribute_fees_into_pools(
@@ -154,7 +164,6 @@ impl FeePools {
         current_epoch_pool: &EpochPool,
         processing_fees: f64,
         storage_fees: f64,
-        proposer_pro_tx_hash: [u8; 32],
         transaction: TransactionArg,
     ) -> Result<(), Error> {
         // update epoch pool processing fees
@@ -166,19 +175,7 @@ impl FeePools {
         let storage_fee_pool = self.get_storage_fee_pool(&drive, transaction)?;
         self.update_storage_fee_pool(&drive, storage_fee_pool + storage_fees, transaction)?;
 
-        // update proposer's block count
-        let proposed_block_count = current_epoch_pool
-            .get_proposer_block_count(&proposer_pro_tx_hash, transaction)
-            .or_else(|e| match e {
-                error::Error::GroveDB(grovedb::Error::PathKeyNotFound(_)) => Ok(0u64),
-                _ => Err(e),
-            })?;
-
-        current_epoch_pool.update_proposer_block_count(
-            &proposer_pro_tx_hash,
-            proposed_block_count + 1,
-            transaction,
-        )
+        Ok(())
     }
 }
 
@@ -298,11 +295,11 @@ mod tests {
                 .expect("to convert vector to array of 32 bytes");
 
         oldest_epoch
-            .init_proposers_tree(Some(&transaction))
+            .init_proposers(Some(&transaction))
             .expect("to init proposers tree");
 
         oldest_epoch
-            .update_proposer_block_count(&proposer_pro_tx_hash, 1, Some(&transaction))
+            .increment_proposer_block_count(&proposer_pro_tx_hash, Some(&transaction))
             .expect("to update proposer block count");
 
         let oldest_epoch = fee_pools
@@ -312,7 +309,7 @@ mod tests {
         assert_eq!(oldest_epoch.index, 998);
     }
 
-    mod distribute_fees_to_proposers {
+    mod distribute_fees_from_unpaid_pools_to_proposers {
         use crate::drive::Drive;
         use crate::fee::pools::epoch::epoch_pool::EpochPool;
         use crate::fee::pools::fee_pools::FeePools;
@@ -367,7 +364,7 @@ mod tests {
 
             // set initial data for test
             fee_pools
-                .process_epoch_change(&drive, &epoch, 1, 1, Some(&transaction))
+                .shift_current_epoch_pool(&drive, &epoch, 1, 1, Some(&transaction))
                 .expect("to process epoch change");
 
             let block_count = 42;
@@ -377,7 +374,7 @@ mod tests {
                 .expect("to update proposer block count");
 
             fee_pools
-                .distribute_fees_from_pools_to_proposers(&drive, 0, 10, Some(&transaction))
+                .distribute_fees_from_unpaid_pools_to_proposers(&drive, 0, Some(&transaction))
                 .expect("to distribute fees to proporsers");
 
             match drive
@@ -396,7 +393,7 @@ mod tests {
     }
 
     #[test]
-    fn test_distribute_fees_to_pools() {
+    fn test_distribute_fees_into_pools() {
         let tmp_dir = TempDir::new().unwrap();
         let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
 
@@ -442,7 +439,6 @@ mod tests {
                 &epoch_pool,
                 processing_fees,
                 storage_fees,
-                proposer_pro_tx_hash,
                 Some(&transaction),
             )
             .expect("to distribute st fees");

@@ -1,6 +1,7 @@
 use grovedb::{Element, PathQuery, Query, SizedQuery, TransactionArg};
 
 use crate::{
+    error,
     error::{drive::DriveError, fee::FeeError, Error},
     fee::pools::epoch::epoch_pool::EpochPool,
 };
@@ -85,7 +86,7 @@ impl<'e> EpochPool<'e> {
 
     pub fn update_proposer_block_count(
         &self,
-        proposer_tx_hash: &[u8; 32],
+        proposer_pro_tx_hash: &[u8; 32],
         block_count: u64,
         transaction: TransactionArg,
     ) -> Result<(), Error> {
@@ -93,11 +94,33 @@ impl<'e> EpochPool<'e> {
             .grove
             .insert(
                 self.get_proposers_path(),
-                proposer_tx_hash,
+                proposer_pro_tx_hash,
                 Element::Item(block_count.to_le_bytes().to_vec(), None),
                 transaction,
             )
             .map_err(Error::GroveDB)
+    }
+
+    pub fn increment_proposer_block_count(
+        &self,
+        proposer_pro_tx_hash: &[u8; 32],
+        transaction: TransactionArg,
+    ) -> Result<(), Error> {
+        // update proposer's block count
+        let proposed_block_count = self
+            .get_proposer_block_count(proposer_pro_tx_hash, transaction)
+            .or_else(|e| match e {
+                error::Error::GroveDB(grovedb::Error::PathKeyNotFound(_)) => Ok(0u64),
+                _ => Err(e),
+            })?;
+
+        self.update_proposer_block_count(
+            &proposer_pro_tx_hash,
+            proposed_block_count + 1,
+            transaction,
+        )?;
+
+        Ok(())
     }
 
     pub fn is_proposers_tree_empty(&self, transaction: TransactionArg) -> Result<bool, Error> {
@@ -116,7 +139,7 @@ impl<'e> EpochPool<'e> {
         }
     }
 
-    pub fn init_proposers_tree(&self, transaction: TransactionArg) -> Result<(), Error> {
+    pub fn init_proposers(&self, transaction: TransactionArg) -> Result<(), Error> {
         self.drive
             .grove
             .insert(
@@ -191,7 +214,7 @@ mod tests {
     };
 
     #[test]
-    fn test_epoch_pool_update_and_get_first_proposed_block_height() {
+    fn test_update_and_get_first_proposed_block_height() {
         let tmp_dir = TempDir::new().unwrap();
         let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
 
@@ -270,7 +293,7 @@ mod tests {
     }
 
     #[test]
-    fn test_epoch_pool_update_and_get_proposer_block_count() {
+    fn test_update_and_get_proposer_block_count() {
         let tmp_dir = TempDir::new().unwrap();
         let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
 
@@ -325,7 +348,7 @@ mod tests {
         assert_eq!(is_proposers_tree_empty, true);
 
         epoch
-            .init_proposers_tree(Some(&transaction))
+            .init_proposers(Some(&transaction))
             .expect("to init proposers tree");
 
         let block_count = 42;
@@ -362,7 +385,7 @@ mod tests {
     }
 
     #[test]
-    fn test_epoch_pool_get_proposers() {
+    fn test_get_proposers() {
         let tmp_dir = TempDir::new().unwrap();
         let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
 
@@ -381,7 +404,7 @@ mod tests {
         let epoch = EpochPool::new(42, &drive);
 
         epoch
-            .init_proposers_tree(Some(&transaction))
+            .init_proposers(Some(&transaction))
             .expect("to init proposers tree");
 
         let pro_tx_hash: [u8; 32] =

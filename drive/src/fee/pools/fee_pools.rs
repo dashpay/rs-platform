@@ -132,7 +132,7 @@ impl FeePools {
         Ok((epoch_index_floored as u16, is_epoch_change))
     }
 
-    pub fn process_epoch_change(
+    pub fn shift_current_epoch_pool(
         &self,
         drive: &Drive,
         current_epoch_pool: &EpochPool,
@@ -147,8 +147,7 @@ impl FeePools {
         // init first_proposer_block_height and processing_fee for an epoch
         current_epoch_pool.init_current(multiplier, first_proposer_block_height, transaction)?;
 
-        // distribute the storage fees
-        self.distribute_storage_fee_pool(&drive, current_epoch_pool.index, transaction)
+        Ok(())
     }
 }
 
@@ -166,7 +165,7 @@ mod tests {
     use super::FeePools;
 
     #[test]
-    fn test_fee_pools_init() {
+    fn test_init() {
         let tmp_dir = TempDir::new().unwrap();
         let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
 
@@ -192,7 +191,7 @@ mod tests {
     }
 
     #[test]
-    fn test_fee_pools_update_and_get_genesis_time() {
+    fn test_update_and_get_genesis_time() {
         let tmp_dir = TempDir::new().unwrap();
         let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
 
@@ -265,50 +264,78 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_fee_pools_get_current_epoch_index() {
-        let tmp_dir = TempDir::new().unwrap();
-        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+    mod calculate_current_epoch_index {
+        use crate::drive::Drive;
+        use crate::fee::pools::fee_pools::FeePools;
+        use tempfile::TempDir;
 
-        drive
-            .create_root_tree(None)
-            .expect("expected to create root tree successfully");
+        #[test]
+        fn test_epoch_0() {
+            let tmp_dir = TempDir::new().unwrap();
+            let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
 
-        let transaction = drive.grove.start_transaction();
+            drive
+                .create_root_tree(None)
+                .expect("expected to create root tree successfully");
 
-        let mut fee_pools = FeePools::new();
+            let transaction = drive.grove.start_transaction();
 
-        fee_pools
-            .init(&drive, Some(&transaction))
-            .expect("fee pools to init");
+            let mut fee_pools = FeePools::new();
 
-        let genesis_time: i64 = 1655396517902;
-        let block_time: i64 = 1655396517922;
-        let prev_block_time: i64 = 1655396517912;
+            fee_pools
+                .init(&drive, Some(&transaction))
+                .expect("fee pools to init");
 
-        fee_pools
-            .update_genesis_time(&drive, genesis_time, Some(&transaction))
-            .expect("to update genesis time");
+            let genesis_time: i64 = 1655396517902;
+            let block_time: i64 = 1655396517922;
+            let prev_block_time: i64 = 1655396517912;
 
-        let (epoch_index, is_epoch_change) = fee_pools
-            .calculate_current_epoch_index(&drive, block_time, prev_block_time, Some(&transaction))
-            .expect("to get current epoch index");
+            fee_pools
+                .update_genesis_time(&drive, genesis_time, Some(&transaction))
+                .expect("to update genesis time");
 
-        assert_eq!(epoch_index, 0);
-        assert_eq!(is_epoch_change, true);
+            let (epoch_index, is_epoch_change) = fee_pools
+                .calculate_current_epoch_index(
+                    &drive,
+                    block_time,
+                    prev_block_time,
+                    Some(&transaction),
+                )
+                .expect("to get current epoch index");
 
-        let block_time: i64 = 1657125244561;
+            assert_eq!(epoch_index, 0);
+            assert_eq!(is_epoch_change, true);
 
-        let (epoch_index, is_epoch_change) = fee_pools
-            .calculate_current_epoch_index(&drive, block_time, prev_block_time, Some(&transaction))
-            .expect("to get current epoch index");
+            let block_time: i64 = 1657125244561;
 
-        assert_eq!(epoch_index, 1);
-        assert_eq!(is_epoch_change, true);
+            let (epoch_index, is_epoch_change) = fee_pools
+                .calculate_current_epoch_index(
+                    &drive,
+                    block_time,
+                    prev_block_time,
+                    Some(&transaction),
+                )
+                .expect("to get current epoch index");
+
+            assert_eq!(epoch_index, 1);
+            assert_eq!(is_epoch_change, true);
+        }
+
+        #[test]
+        fn test_epoch_epoch_1() {
+            todo!()
+        }
+
+        #[test]
+        fn test_epoch_epoch_change() {
+            todo!()
+        }
     }
 
     #[test]
-    fn test_fee_pools_process_epoch_change() {
+    fn test_shift_current_epoch_pool() {
+        todo!("revisit");
+
         let tmp_dir = TempDir::new().unwrap();
         let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
 
@@ -329,7 +356,7 @@ mod tests {
         let epoch_pool = EpochPool::new(0, &drive);
 
         fee_pools
-            .process_epoch_change(
+            .shift_current_epoch_pool(
                 &drive,
                 &epoch_pool,
                 first_proposer_block_height,

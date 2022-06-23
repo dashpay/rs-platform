@@ -2,7 +2,6 @@ use grovedb::TransactionArg;
 
 use crate::drive::Drive;
 use crate::error::Error;
-use crate::fee::pools::fee_pools::FeePools;
 
 use crate::fee::pools::epoch::epoch_pool::EpochPool;
 use chrono::Utc;
@@ -20,59 +19,66 @@ impl Drive {
         previous_block_time: i64,
         proposer_pro_tx_hash: [u8; 32],
         processing_fees: f64,
-        storage_fees: f64,
+        storage_fees: f64, // TODO: It's not a float, it's i64
         fee_multiplier: u64,
         transaction: TransactionArg,
     ) -> Result<(), Error> {
         if block_height == 1 {
             let genesis_time = Utc::now().timestamp();
+
             self.fee_pools
                 .borrow_mut()
                 .update_genesis_time(&self, genesis_time, transaction)?;
         }
 
-        let (current_epoch_index, is_epoch_change) = self
-            .fee_pools
-            .borrow()
-            .calculate_current_epoch_index(&self, block_time, previous_block_time, transaction)?;
+        let fee_pools = self.fee_pools.borrow();
+
+        let (current_epoch_index, is_epoch_change) = fee_pools.calculate_current_epoch_index(
+            &self,
+            block_time,
+            previous_block_time,
+            transaction,
+        )?;
 
         let current_epoch_pool = EpochPool::new(current_epoch_index, self);
 
         if is_epoch_change {
-            self.fee_pools.borrow().process_epoch_change(
+            // make next epoch pool as a current
+            // and create one more in future
+            fee_pools.shift_current_epoch_pool(
                 &self,
                 &current_epoch_pool,
                 block_height,
                 fee_multiplier,
                 transaction,
             )?;
+
+            // distribute accumulated previous epoch storage fees
+            fee_pools.distribute_storage_fee_pool(&self, current_epoch_pool.index, transaction)?;
         }
 
-        self.fee_pools.borrow().distribute_fees_into_pools(
+        fee_pools.distribute_fees_into_pools(
             &self,
             &current_epoch_pool,
             processing_fees,
             storage_fees,
-            proposer_pro_tx_hash,
             transaction,
         )?;
 
-        self.fee_pools
-            .borrow()
-            .distribute_fees_from_pools_to_proposers(
-                &self,
-                current_epoch_index,
-                block_height,
-                transaction,
-            )
+        current_epoch_pool.increment_proposer_block_count(&proposer_pro_tx_hash, transaction)?;
+
+        fee_pools.distribute_fees_from_unpaid_pools_to_proposers(
+            &self,
+            current_epoch_index,
+            transaction,
+        )?;
+
+        Ok(())
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use chrono::Utc;
-    use tempfile::TempDir;
-
     use crate::{
         contract::{Contract, Document},
         drive::{
@@ -155,45 +161,62 @@ mod tests {
             .expect("expected to insert a document successfully");
     }
 
-    #[test]
-    fn test_drive_process_block() {
-        let tmp_dir = TempDir::new().unwrap();
-        let mut drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+    mod process_block {
+        use crate::drive::Drive;
+        use chrono::Utc;
+        use tempfile::TempDir;
 
-        drive
-            .create_root_tree(None)
-            .expect("expected to create root tree successfully");
+        #[test]
+        fn test_process_first_block() {
+            let tmp_dir = TempDir::new().unwrap();
+            let mut drive: Drive =
+                Drive::open(tmp_dir).expect("expected to open Drive successfully");
 
-        setup_mn_share_contract_and_docs(&drive);
+            drive
+                .create_root_tree(None)
+                .expect("expected to create root tree successfully");
 
-        let transaction = drive.grove.start_transaction();
+            super::setup_mn_share_contract_and_docs(&drive);
 
-        drive
-            .init_fee_pools(Some(&transaction))
-            .expect("to init fee pools");
+            let transaction = drive.grove.start_transaction();
 
-        let block_time = Utc::now().timestamp();
-        let previous_block_time = Utc::now().timestamp();
+            drive
+                .init_fee_pools(Some(&transaction))
+                .expect("to init fee pools");
 
-        let proposer_pro_tx_hash = [
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0,
-        ];
+            let block_time = Utc::now().timestamp();
+            let previous_block_time = Utc::now().timestamp();
 
-        let processing_fees = 0.42;
-        let storage_fees = 22.1;
+            let proposer_pro_tx_hash = [
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0,
+            ];
 
-        drive
-            .process_block(
-                1,
-                block_time,
-                previous_block_time,
-                proposer_pro_tx_hash,
-                processing_fees,
-                storage_fees,
-                1,
-                Some(&transaction),
-            )
-            .expect("to process block 1");
+            let processing_fees = 0.42;
+            let storage_fees = 22.1;
+
+            drive
+                .process_block(
+                    1,
+                    block_time,
+                    previous_block_time,
+                    proposer_pro_tx_hash,
+                    processing_fees,
+                    storage_fees,
+                    1,
+                    Some(&transaction),
+                )
+                .expect("to process block 1");
+        }
+
+        #[test]
+        fn test_process_second_block() {
+            todo!()
+        }
+
+        #[test]
+        fn test_process_epoch_change() {
+            todo!()
+        }
     }
 }

@@ -8,15 +8,15 @@ use crate::fee::pools::fee_pools::FeePools;
 
 use super::constants;
 
-fn get_fee_distribution_percent(epoch_index: u16, start_index: u16) -> f64 {
-    let reset_epoch_index = epoch_index - start_index;
-
-    let epoch_year = (reset_epoch_index as f64 / 20.0).trunc() as usize;
-
-    constants::FEE_DISTRIBUTION_TABLE[epoch_year]
-}
-
 impl FeePools {
+    fn get_fee_distribution_percent(epoch_index: u16, start_index: u16) -> f64 {
+        let reset_epoch_index = epoch_index - start_index;
+
+        let epoch_year = (reset_epoch_index as f64 / 20.0).trunc() as usize;
+
+        constants::FEE_DISTRIBUTION_TABLE[epoch_year]
+    }
+
     pub fn distribute_storage_fee_pool(
         &self,
         drive: &Drive,
@@ -32,7 +32,7 @@ impl FeePools {
         for index in epoch_index..epoch_index + 1000 {
             let epoch_pool = EpochPool::new(index, drive);
 
-            let distribution_percent = get_fee_distribution_percent(index, epoch_index);
+            let distribution_percent = Self::get_fee_distribution_percent(index, epoch_index);
 
             let fee_share = fee_pool_value * distribution_percent;
 
@@ -106,7 +106,7 @@ mod tests {
     };
 
     #[test]
-    fn test_fee_pools_distribute_storage_distribution_pool() {
+    fn test_distribute_storage_distribution_pool() {
         let tmp_dir = TempDir::new().unwrap();
         let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
 
@@ -169,7 +169,7 @@ mod tests {
     }
 
     #[test]
-    fn test_fee_pools_update_and_get_storage_fee_pool() {
+    fn test_update_and_get_storage_fee_pool() {
         let tmp_dir = TempDir::new().unwrap();
         let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
 
