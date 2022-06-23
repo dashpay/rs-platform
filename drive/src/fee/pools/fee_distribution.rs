@@ -40,7 +40,7 @@ impl FeePools {
             (current_epoch_index - unpaid_epoch_pool.index) * 50
         };
 
-        let total_fees = unpaid_epoch_pool.get_total_fees(transaction)?;
+        let total_fees = unpaid_epoch_pool.get_total_fees(transaction)? as f64;
 
         let unpaid_epoch_block_count =
             Self::get_epoch_block_count(&drive, &unpaid_epoch_pool, transaction)?;
@@ -48,6 +48,8 @@ impl FeePools {
         let proposers = unpaid_epoch_pool.get_proposers(proposers_limit, transaction)?;
 
         let proposers_len = proposers.len() as u16;
+
+        let mut fee_leftovers = 0.0;
 
         for (proposer_tx_hash, proposed_block_count) in proposers {
             let query_json = json!({
@@ -102,14 +104,25 @@ impl FeePools {
                         ))
                     })?;
 
-                let share_percentage: f64 = share_percentage_integer as f64 / 100.0;
+                let share_percentage = share_percentage_integer as f64 / 100.0;
 
-                // TODO Aren't we loosing / burning some fee like this?
-                //  move leftover to the latest proposer?
-                let reward: f64 =
-                    ((total_fees as f64 * proposed_block_count as f64 * share_percentage)
-                        / unpaid_epoch_block_count as f64)
-                        .floor();
+                // TODO Make overflow safe (all over the place)
+
+                let mut reward = (total_fees * proposed_block_count as f64 * share_percentage)
+                    / unpaid_epoch_block_count as f64;
+
+                // Since identity balance is an integer
+                // Add rewards remainder to other leftovers
+                let reward_floored = reward.floor();
+
+                fee_leftovers += reward - reward_floored;
+
+                let fee_leftovers_floored = fee_leftovers.floor();
+                if fee_leftovers_floored > 0.0 {
+                    fee_leftovers -= fee_leftovers_floored;
+
+                    reward += fee_leftovers_floored;
+                }
 
                 identity.balance += reward as u64;
 
