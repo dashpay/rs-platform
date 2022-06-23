@@ -117,8 +117,9 @@ mod tests {
     use grovedb::Element;
     use tempfile::TempDir;
 
+    use crate::error::fee;
     use crate::fee::pools::epoch::epoch_pool::EpochPool;
-    use crate::fee::pools::test_helpers::{setup_drive, setup_fee_pools};
+    use crate::fee::pools::test_helpers::{setup_drive, setup_fee_pools, TestHelperOptions};
     use crate::{
         drive::Drive,
         error::{self, fee::FeeError},
@@ -266,11 +267,12 @@ mod tests {
     #[test]
     fn test_update_and_get_storage_fee_pool() {
         let drive = setup_drive();
-        let (transaction, fee_pools) = setup_fee_pools(&drive);
-
-        fee_pools
-            .init(&drive, Some(&transaction))
-            .expect("fee pools to init");
+        let (transaction, fee_pools) = setup_fee_pools(
+            &drive,
+            Some(TestHelperOptions {
+                init_fee_pools: false,
+            }),
+        );
 
         let storage_fee = 42;
 
@@ -302,6 +304,10 @@ mod tests {
                 _ => assert!(false, "invalid error type"),
             },
         }
+
+        fee_pools
+            .init(&drive, Some(&transaction))
+            .expect("to init fee pools");
 
         fee_pools
             .storage_fee_distribution_pool
