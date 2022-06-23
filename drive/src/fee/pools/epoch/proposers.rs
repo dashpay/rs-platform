@@ -268,7 +268,7 @@ mod tests {
                 error::Error::Fee(FeeError::CorruptedProposerBlockCountItemLength(_)) => {
                     assert!(true)
                 }
-                _ => assert!(false, "ivalid error type"),
+                _ => assert!(false, "invalid error type"),
             },
         }
     }
