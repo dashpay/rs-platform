@@ -118,7 +118,7 @@ mod tests {
     use tempfile::TempDir;
 
     use crate::fee::pools::epoch::epoch_pool::EpochPool;
-    use crate::fee::pools::test_helpers::setup_fee_pools;
+    use crate::fee::pools::test_helpers::{setup_drive, setup_fee_pools};
     use crate::{
         drive::Drive,
         error::{self, fee::FeeError},
@@ -265,17 +265,18 @@ mod tests {
 
     #[test]
     fn test_update_and_get_storage_fee_pool() {
-        let (drive, transaction, fee_pools) = setup_fee_pools();
+        let drive = setup_drive();
+        let (transaction, fee_pools) = setup_fee_pools(&drive);
 
         fee_pools
-            .init(&drive, transaction)
+            .init(&drive, Some(&transaction))
             .expect("fee pools to init");
 
         let storage_fee = 42;
 
         match fee_pools
             .storage_fee_distribution_pool
-            .value(&drive, transaction)
+            .value(&drive, Some(&transaction))
         {
             Ok(_) => assert!(
                 false,
@@ -287,10 +288,11 @@ mod tests {
             },
         }
 
-        match fee_pools
-            .storage_fee_distribution_pool
-            .update(&drive, storage_fee, transaction)
-        {
+        match fee_pools.storage_fee_distribution_pool.update(
+            &drive,
+            storage_fee,
+            Some(&transaction),
+        ) {
             Ok(_) => assert!(
                 false,
                 "should not be able to update genesis time on uninit fee pools"
@@ -303,12 +305,12 @@ mod tests {
 
         fee_pools
             .storage_fee_distribution_pool
-            .update(&drive, storage_fee, transaction)
+            .update(&drive, storage_fee, Some(&transaction))
             .expect("to update storage fee pool");
 
         let stored_storage_fee = fee_pools
             .storage_fee_distribution_pool
-            .value(&drive, transaction)
+            .value(&drive, Some(&transaction))
             .expect("to get storage fee pool");
 
         assert_eq!(storage_fee, stored_storage_fee);
@@ -319,13 +321,13 @@ mod tests {
                 FeePools::get_path(),
                 constants::KEY_STORAGE_FEE_POOL.as_bytes(),
                 Element::Item(u128::MAX.to_le_bytes().to_vec(), None),
-                transaction,
+                Some(&transaction),
             )
             .expect("to insert invalid data");
 
         match fee_pools
             .storage_fee_distribution_pool
-            .value(&drive, transaction)
+            .value(&drive, Some(&transaction))
         {
             Ok(_) => assert!(false, "should not be able to decode stored value"),
             Err(e) => match e {

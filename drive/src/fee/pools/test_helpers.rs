@@ -1,13 +1,16 @@
 use crate::drive::Drive;
 use crate::fee::pools::fee_pools::FeePools;
-use grovedb::{Transaction, TransactionArg};
-use std::cell::RefCell;
+use grovedb::Transaction;
 use tempfile::TempDir;
 
-pub fn setup_fee_pools<'db, 'a>() -> (Drive, TransactionArg<'db, 'a>, FeePools) {
+pub fn setup_drive() -> Drive {
     let tmp_dir = TempDir::new().unwrap();
     let drive: Drive = Drive::open(tmp_dir).expect("to open Drive successfully");
 
+    drive
+}
+
+pub fn setup_fee_pools<'a>(drive: &'a Drive) -> (Transaction<'a>, FeePools) {
     drive
         .create_root_tree(None)
         .expect("to create root tree successfully");
@@ -20,5 +23,5 @@ pub fn setup_fee_pools<'db, 'a>() -> (Drive, TransactionArg<'db, 'a>, FeePools) 
         .init(&drive, Some(&transaction))
         .expect("to init fee pools");
 
-    (drive, Some(transaction), fee_pools)
+    (transaction, fee_pools)
 }
