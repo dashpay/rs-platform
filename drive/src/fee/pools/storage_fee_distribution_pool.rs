@@ -63,7 +63,10 @@ impl StorageFeeDistributionPool {
             storage_distribution_fees -= fee_share;
         }
 
-        self.update(drive, storage_distribution_fees.floor() as i64, transaction)
+        // Must be always 0
+        let storage_distribution_fees_leftover = storage_distribution_fees.floor() as i64;
+
+        self.update(drive, storage_distribution_fees_leftover, transaction)
     }
 
     pub fn update(
@@ -115,14 +118,36 @@ mod tests {
     use tempfile::TempDir;
 
     use crate::fee::pools::epoch::epoch_pool::EpochPool;
+    use crate::fee::pools::test_helpers::setup_fee_pools;
     use crate::{
         drive::Drive,
         error::{self, fee::FeeError},
         fee::pools::{constants, fee_pools::FeePools},
     };
 
+    mod helpers {
+        use crate::drive::Drive;
+        use crate::fee::pools::epoch::epoch_pool::EpochPool;
+        use grovedb::TransactionArg;
+
+        pub fn get_storage_fees_from_epoch_pools(
+            drive: &Drive,
+            epoch_index: u16,
+            transaction: TransactionArg,
+        ) -> Vec<i64> {
+            (epoch_index..epoch_index + 1000)
+                .map(|index| {
+                    let epoch_pool = EpochPool::new(index, &drive);
+                    epoch_pool
+                        .get_storage_fee(transaction)
+                        .expect("to get storage fee")
+                })
+                .collect()
+        }
+    }
+
     #[test]
-    fn test_distribute_storage_distribution_pool() {
+    fn test_distribute() {
         let tmp_dir = TempDir::new().unwrap();
         let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
 
@@ -160,24 +185,18 @@ mod tests {
             .expect("to distribute storage fee pool");
 
         // check leftover
-        let leftover_storage_fee_pool = fee_pools
+        let storage_fee_pool_leftover = fee_pools
             .storage_fee_distribution_pool
             .value(&drive, Some(&transaction))
             .expect("to get storage fee pool");
 
-        assert_eq!(leftover_storage_fee_pool, 0);
+        assert_eq!(storage_fee_pool_leftover, 0);
 
         // collect all the storage fee values of the 1000 epoch pools
-        let storage_fees: Vec<i64> = (epoch_index..epoch_index + 1000)
-            .map(|index| {
-                let epoch_pool = EpochPool::new(index, &drive);
-                epoch_pool
-                    .get_storage_fee(Some(&transaction))
-                    .expect("to get storage fee")
-            })
-            .collect();
+        let storage_fees =
+            helpers::get_storage_fees_from_epoch_pools(&drive, epoch_index, Some(&transaction));
 
-        // compre them with reference table
+        // compare them with reference table
         let reference_fees = [
             50, 47, 45, 43, 41, 38, 37, 35, 33, 32, 30, 28, 27, 26, 24, 23, 22, 21, 20, 19, 17, 17,
             15, 15, 14, 14, 12, 13, 11, 11, 11, 10, 9, 9, 9, 8, 8, 8, 7, 6, 7, 6, 5, 5, 6, 4, 5, 5,
@@ -231,14 +250,8 @@ mod tests {
             .expect("to distribute storage fee pool");
 
         // collect all the storage fee values of the 1000 epoch pools again
-        let storage_fees: Vec<i64> = (epoch_index..epoch_index + 1000)
-            .map(|index| {
-                let epoch_pool = EpochPool::new(index, &drive);
-                epoch_pool
-                    .get_storage_fee(Some(&transaction))
-                    .expect("to get storage fee")
-            })
-            .collect();
+        let storage_fees =
+            helpers::get_storage_fees_from_epoch_pools(&drive, epoch_index, Some(&transaction));
 
         // assert that all the values doubled meaning that distribution is repoducable
         assert_eq!(
@@ -252,22 +265,17 @@ mod tests {
 
     #[test]
     fn test_update_and_get_storage_fee_pool() {
-        let tmp_dir = TempDir::new().unwrap();
-        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+        let (drive, transaction, fee_pools) = setup_fee_pools();
 
-        drive
-            .create_root_tree(None)
-            .expect("expected to create root tree successfully");
+        fee_pools
+            .init(&drive, transaction)
+            .expect("fee pools to init");
 
-        let transaction = drive.grove.start_transaction();
-
-        let storage_fee: i64 = 42;
-
-        let fee_pools = FeePools::new();
+        let storage_fee = 42;
 
         match fee_pools
             .storage_fee_distribution_pool
-            .value(&drive, Some(&transaction))
+            .value(&drive, transaction)
         {
             Ok(_) => assert!(
                 false,
@@ -279,11 +287,10 @@ mod tests {
             },
         }
 
-        match fee_pools.storage_fee_distribution_pool.update(
-            &drive,
-            storage_fee,
-            Some(&transaction),
-        ) {
+        match fee_pools
+            .storage_fee_distribution_pool
+            .update(&drive, storage_fee, transaction)
+        {
             Ok(_) => assert!(
                 false,
                 "should not be able to update genesis time on uninit fee pools"
@@ -295,17 +302,13 @@ mod tests {
         }
 
         fee_pools
-            .init(&drive, Some(&transaction))
-            .expect("fee pools to init");
-
-        fee_pools
             .storage_fee_distribution_pool
-            .update(&drive, storage_fee, Some(&transaction))
+            .update(&drive, storage_fee, transaction)
             .expect("to update storage fee pool");
 
         let stored_storage_fee = fee_pools
             .storage_fee_distribution_pool
-            .value(&drive, Some(&transaction))
+            .value(&drive, transaction)
             .expect("to get storage fee pool");
 
         assert_eq!(storage_fee, stored_storage_fee);
@@ -316,13 +319,13 @@ mod tests {
                 FeePools::get_path(),
                 constants::KEY_STORAGE_FEE_POOL.as_bytes(),
                 Element::Item(u128::MAX.to_le_bytes().to_vec(), None),
-                Some(&transaction),
+                transaction,
             )
             .expect("to insert invalid data");
 
         match fee_pools
             .storage_fee_distribution_pool
-            .value(&drive, Some(&transaction))
+            .value(&drive, transaction)
         {
             Ok(_) => assert!(false, "should not be able to decode stored value"),
             Err(e) => match e {
