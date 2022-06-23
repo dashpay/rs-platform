@@ -43,7 +43,7 @@ impl FeePools {
             fee_pool_value -= fee_share;
         }
 
-        self.update_storage_fee_pool(drive, fee_pool_value, transaction)
+        self.update_storage_fee_pool(drive, fee_pool_value, transaction) // TODO: it shouldn't be any leftovers?
     }
 
     pub fn update_storage_fee_pool(
