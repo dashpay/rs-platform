@@ -7,6 +7,9 @@ pub enum DriveError {
     #[error("unsupported error: {0}")]
     Unsupported(&'static str),
 
+    #[error("unsupported private error: {0}")]
+    UnsupportedPrivate(&'static str),
+
     #[error("grovedb insertion error: {0}")]
     GroveDBInsertion(&'static str),
 

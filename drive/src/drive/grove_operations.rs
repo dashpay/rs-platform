@@ -764,9 +764,7 @@ impl Drive {
         drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<(), Error> {
         if self.config.batching_enabled {
-            let cost_context = self
-                .grove
-                .apply_sorted_pre_validated_batch(ops, transaction);
+            let cost_context = self.grove.apply_batch(ops, transaction);
             push_drive_operation_result(cost_context, drive_operations)
         } else {
             //println!("changes {} {:#?}", ops.len(), ops);
@@ -790,6 +788,11 @@ impl Drive {
                         transaction,
                         Some(drive_operations),
                     )?,
+                    _ => {
+                        return Err(Error::Drive(DriveError::UnsupportedPrivate(
+                            "Only Insert and Deletion operations are allowed",
+                        )))
+                    }
                 }
             }
             Ok(())
