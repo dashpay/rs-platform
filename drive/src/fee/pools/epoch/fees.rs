@@ -192,6 +192,8 @@ mod tests {
 
     #[test]
     fn test_update_and_get_storage_fee() {
+        todo!();
+
         let tmp_dir = TempDir::new().unwrap();
         let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
 
@@ -348,6 +350,8 @@ mod tests {
 
     #[test]
     fn test_get_total_fees() {
+        todo!();
+
         let tmp_dir = TempDir::new().unwrap();
         let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
 
@@ -385,6 +389,8 @@ mod tests {
 
     #[test]
     fn test_update_and_get_fee_multiplier() {
+        todo!();
+
         let tmp_dir = TempDir::new().unwrap();
         let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
 

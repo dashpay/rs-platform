@@ -181,7 +181,12 @@ mod tests {
     use super::EpochPool;
 
     #[test]
-    fn test_update_and_get_first_proposed_block_height() {
+    fn test_update_and_get_start_time() {
+        todo!()
+    }
+
+    #[test]
+    fn test_update_and_get_start_block_height() {
         let tmp_dir = TempDir::new().unwrap();
         let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
 
@@ -258,6 +263,8 @@ mod tests {
 
     #[test]
     fn test_init_empty() {
+        todo!();
+
         let tmp_dir = TempDir::new().unwrap();
         let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
 
@@ -311,6 +318,8 @@ mod tests {
 
     #[test]
     fn test_mark_as_paid() {
+        todo!();
+
         let tmp_dir = TempDir::new().unwrap();
         let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
 

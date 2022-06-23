@@ -397,6 +397,7 @@ mod tests {
 
         #[test]
         fn test_complete_distribution() {
+            todo!("revisit");
             let tmp_dir = TempDir::new().unwrap();
             let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
 
@@ -468,9 +469,6 @@ mod tests {
         fee_pools
             .init(&drive, Some(&transaction))
             .expect("fee pools to init");
-
-        // TODO: Implement setup method and use everywhere.
-        //  let's create a tests module for pools with helpers like that
 
         let epoch_index = 0;
 

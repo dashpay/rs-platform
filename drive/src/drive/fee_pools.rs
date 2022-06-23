@@ -100,7 +100,9 @@ mod tests {
         use tempfile::TempDir;
 
         #[test]
-        fn test_process_first_block() {
+        fn test_processing_of_three_blocks() {
+            todo!("first block, then epoch change and one after");
+
             let tmp_dir = TempDir::new().unwrap();
             let mut drive: Drive =
                 Drive::open(tmp_dir).expect("expected to open Drive successfully");
@@ -109,7 +111,7 @@ mod tests {
                 .create_root_tree(None)
                 .expect("expected to create root tree successfully");
 
-            super::setup_mn_share_contract_and_docs(&drive);
+            //super::setup_mn_share_contract_and_docs(&drive);
 
             let transaction = drive.grove.start_transaction();
 
@@ -140,16 +142,6 @@ mod tests {
                     Some(&transaction),
                 )
                 .expect("to process block 1");
-        }
-
-        #[test]
-        fn test_process_second_block() {
-            todo!()
-        }
-
-        #[test]
-        fn test_process_epoch_change() {
-            todo!()
         }
     }
 }
