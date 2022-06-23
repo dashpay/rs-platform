@@ -15,7 +15,7 @@ use crate::fee::op::DriveOperation::{CalculatedCostOperation, CostCalculationQue
 use crate::fee::op::{DriveOperation, SizesOfQueryOperation};
 use crate::query::GroveError;
 use costs::CostContext;
-use grovedb::batch::{GroveDbOp, Op};
+use grovedb::batch::{BatchApplyOptions, GroveDbOp, Op};
 use grovedb::{Element, PathQuery, TransactionArg};
 
 fn push_drive_operation_result<T>(
@@ -764,7 +764,7 @@ impl Drive {
         drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<(), Error> {
         if self.config.batching_enabled {
-            let cost_context = self.grove.apply_batch(ops, transaction);
+            let cost_context = self.grove.apply_batch(ops, Some(BatchApplyOptions { validate_tree_insertion_does_not_override: validate }), transaction);
             push_drive_operation_result(cost_context, drive_operations)
         } else {
             //println!("changes {} {:#?}", ops.len(), ops);

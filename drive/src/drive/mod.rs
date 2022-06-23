@@ -251,7 +251,7 @@ impl Drive {
             // println!("batch {:#?}", batch_operations);
             self.grove_apply_batch(
                 DriveOperation::grovedb_operations(&batch_operations),
-                true,
+                false,
                 transaction,
                 drive_operations,
             )?;
