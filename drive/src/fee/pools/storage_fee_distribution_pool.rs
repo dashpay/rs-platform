@@ -40,23 +40,25 @@ impl StorageFeeDistributionPool {
 
             let fee_share = storage_distribution_fees * distribution_percent;
 
-            let storage_fee = epoch_pool.get_storage_fee(transaction)? as f64;
+            // Since storage fee is an integer
+            // Add fee share remainder to other leftovers
+            let mut fee_share_floored = fee_share.floor();
 
-            // store leftovers of the floor operation
-            // and then if it is higher then 0 distribute it to current epoch pool
-            leftovers += fee_share - fee_share.floor();
+            leftovers += fee_share - fee_share_floored;
 
-            let storage_fee = if leftovers.floor() > 0.0 {
-                let leftovers_floored = leftovers.floor();
-
+            // Add floored leftovers to fee share if they bigger than 0
+            let leftovers_floored = leftovers.floor();
+            if leftovers_floored > 0.0 {
                 leftovers -= leftovers_floored;
 
-                (storage_fee + fee_share + leftovers_floored).floor() as i64
-            } else {
-                (storage_fee + fee_share).floor() as i64
-            };
+                fee_share_floored += leftovers_floored;
+            }
 
-            epoch_pool.update_storage_fee(storage_fee, transaction)?;
+            let storage_fee = epoch_pool.get_storage_fee(transaction)?;
+
+            let storage_fee_with_shares = storage_fee + fee_share_floored as i64;
+
+            epoch_pool.update_storage_fee(storage_fee_with_shares, transaction)?;
 
             storage_distribution_fees -= fee_share;
         }
