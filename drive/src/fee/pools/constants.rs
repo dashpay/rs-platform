@@ -4,7 +4,7 @@ pub const KEY_GENESIS_TIME: &str = "g";
 pub const EPOCH_CHANGE_TIME: i64 = 1576800000;
 
 pub const FEE_DISTRIBUTION_TABLE: [f64; 50] = [
-    0.050000,
+    0.0500000000000004,
     0.048000,
     0.046000,
     0.044000,
@@ -53,7 +53,7 @@ pub const FEE_DISTRIBUTION_TABLE: [f64; 50] = [
     0.002750,
     0.002250,
     0.001750,
-    0.0012500000000004,
+    0.001250,
 ];
 
 pub const MN_REWARD_SHARES_CONTRACT_ID: [u8; 32] = [

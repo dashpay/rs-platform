@@ -31,6 +31,8 @@ impl StorageFeeDistributionPool {
             return Ok(());
         }
 
+        let mut leftovers = 0.0;
+
         for index in epoch_index..epoch_index + 1000 {
             let epoch_pool = EpochPool::new(index, drive);
 
@@ -40,7 +42,19 @@ impl StorageFeeDistributionPool {
 
             let storage_fee = epoch_pool.get_storage_fee(transaction)? as f64;
 
-            let storage_fee = (storage_fee + fee_share).floor() as i64;
+            // store leftovers of the floor operation
+            // and then if it is higher then 0 distribute it to current epoch pool
+            leftovers += fee_share - fee_share.floor();
+
+            let storage_fee = if leftovers.floor() > 0.0 {
+                let leftovers_floored = leftovers.floor();
+
+                leftovers -= leftovers_floored;
+
+                (storage_fee + fee_share + leftovers_floored).floor() as i64
+            } else {
+                (storage_fee + fee_share).floor() as i64
+            };
 
             epoch_pool.update_storage_fee(storage_fee, transaction)?;
 
@@ -48,7 +62,6 @@ impl StorageFeeDistributionPool {
         }
 
         self.update(drive, storage_distribution_fees.floor() as i64, transaction)
-        // TODO: it shouldn't be any leftovers?
     }
 
     pub fn update(
@@ -150,26 +163,89 @@ mod tests {
             .value(&drive, Some(&transaction))
             .expect("to get storage fee pool");
 
-        assert_eq!(leftover_storage_fee_pool, 1);
+        assert_eq!(leftover_storage_fee_pool, 0);
 
-        todo!("I guess it must be 0");
+        // collect all the storage fee values of the 1000 epoch pools
+        let storage_fees: Vec<i64> = (epoch_index..epoch_index + 1000)
+            .map(|index| {
+                let epoch_pool = EpochPool::new(index, &drive);
+                epoch_pool
+                    .get_storage_fee(Some(&transaction))
+                    .expect("to get storage fee")
+            })
+            .collect();
 
-        // selectively check 1st and last item
-        let first_epoch = EpochPool::new(epoch_index, &drive);
+        // compre them with reference table
+        let reference_fees = [
+            50, 47, 45, 43, 41, 38, 37, 35, 33, 32, 30, 28, 27, 26, 24, 23, 22, 21, 20, 19, 17, 17,
+            15, 15, 14, 14, 12, 13, 11, 11, 11, 10, 9, 9, 9, 8, 8, 8, 7, 6, 7, 6, 5, 5, 6, 4, 5, 5,
+            4, 4, 4, 3, 4, 3, 3, 3, 3, 3, 3, 2, 3, 2, 2, 2, 2, 2, 1, 2, 2, 1, 2, 1, 1, 2, 1, 1, 1,
+            1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 0, 0,
+            1, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        ];
 
-        let first_epoch_storage_fee = first_epoch
-            .get_storage_fee(Some(&transaction))
-            .expect("to get storage fee");
+        assert_eq!(storage_fees, reference_fees);
 
-        assert_eq!(first_epoch_storage_fee, 50);
+        // refill storage fee pool once more
+        fee_pools
+            .storage_fee_distribution_pool
+            .update(&drive, storage_pool, Some(&transaction))
+            .expect("to update storage fee pool");
 
-        let last_epoch = EpochPool::new(epoch_index + 999, &drive);
+        // distribute fees once more
+        fee_pools
+            .storage_fee_distribution_pool
+            .distribute(&drive, epoch_index, Some(&transaction))
+            .expect("to distribute storage fee pool");
 
-        let last_epoch_storage_fee = last_epoch
-            .get_storage_fee(Some(&transaction))
-            .expect("to get storage fee");
+        // collect all the storage fee values of the 1000 epoch pools again
+        let storage_fees: Vec<i64> = (epoch_index..epoch_index + 1000)
+            .map(|index| {
+                let epoch_pool = EpochPool::new(index, &drive);
+                epoch_pool
+                    .get_storage_fee(Some(&transaction))
+                    .expect("to get storage fee")
+            })
+            .collect();
 
-        assert_eq!(last_epoch_storage_fee, 1);
+        // assert that all the values doubled meaning that distribution is repoducable
+        assert_eq!(
+            storage_fees,
+            reference_fees
+                .iter()
+                .map(|val| val * 2)
+                .collect::<Vec<i64>>()
+        );
     }
 
     #[test]
