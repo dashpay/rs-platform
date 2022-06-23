@@ -3,13 +3,13 @@ use crate::fee::pools::fee_pools::FeePools;
 use grovedb::Transaction;
 use tempfile::TempDir;
 
-pub struct TestHelperOptions {
+pub struct SetupFeePoolsOptions {
     pub init_fee_pools: bool,
 }
 
-impl Default for TestHelperOptions {
-    fn default() -> TestHelperOptions {
-        TestHelperOptions {
+impl Default for SetupFeePoolsOptions {
+    fn default() -> SetupFeePoolsOptions {
+        SetupFeePoolsOptions {
             init_fee_pools: true,
         }
     }
@@ -24,9 +24,9 @@ pub fn setup_drive() -> Drive {
 
 pub fn setup_fee_pools<'a>(
     drive: &'a Drive,
-    options: Option<TestHelperOptions>,
+    options: Option<SetupFeePoolsOptions>,
 ) -> (Transaction<'a>, FeePools) {
-    let options = options.unwrap_or(TestHelperOptions::default());
+    let options = options.unwrap_or(SetupFeePoolsOptions::default());
 
     drive
         .create_root_tree(None)

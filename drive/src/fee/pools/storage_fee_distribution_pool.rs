@@ -119,7 +119,7 @@ mod tests {
 
     use crate::error::fee;
     use crate::fee::pools::epoch::epoch_pool::EpochPool;
-    use crate::fee::pools::test_helpers::{setup_drive, setup_fee_pools, TestHelperOptions};
+    use crate::fee::pools::test_helpers::{setup_drive, setup_fee_pools, SetupFeePoolsOptions};
     use crate::{
         drive::Drive,
         error::{self, fee::FeeError},
@@ -269,7 +269,7 @@ mod tests {
         let drive = setup_drive();
         let (transaction, fee_pools) = setup_fee_pools(
             &drive,
-            Some(TestHelperOptions {
+            Some(SetupFeePoolsOptions {
                 init_fee_pools: false,
             }),
         );
