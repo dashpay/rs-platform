@@ -119,7 +119,9 @@ mod tests {
 
     use crate::error::fee;
     use crate::fee::pools::epoch::epoch_pool::EpochPool;
-    use crate::fee::pools::test_helpers::{setup_drive, setup_fee_pools, SetupFeePoolsOptions};
+    use crate::fee::pools::tests::helpers::setup::{
+        setup_drive, setup_fee_pools, SetupFeePoolsOptions,
+    };
     use crate::{
         drive::Drive,
         error::{self, fee::FeeError},
