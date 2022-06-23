@@ -31,7 +31,7 @@ impl StorageFeeDistributionPool {
             return Ok(());
         }
 
-        let mut leftovers = 0.0;
+        let mut fee_leftovers = 0.0;
 
         for index in epoch_index..epoch_index + 1000 {
             let epoch_pool = EpochPool::new(index, drive);
@@ -44,14 +44,14 @@ impl StorageFeeDistributionPool {
             // Add fee share remainder to other leftovers
             let mut fee_share_floored = fee_share.floor();
 
-            leftovers += fee_share - fee_share_floored;
+            fee_leftovers += fee_share - fee_share_floored;
 
             // Add floored leftovers to fee share if they bigger than 0
-            let leftovers_floored = leftovers.floor();
-            if leftovers_floored > 0.0 {
-                leftovers -= leftovers_floored;
+            let fee_leftovers_floored = fee_leftovers.floor();
+            if fee_leftovers_floored > 0.0 {
+                fee_leftovers -= fee_leftovers_floored;
 
-                fee_share_floored += leftovers_floored;
+                fee_share_floored += fee_leftovers_floored;
             }
 
             let storage_fee = epoch_pool.get_storage_fee(transaction)?;
