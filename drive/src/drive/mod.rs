@@ -207,30 +207,38 @@ impl Drive {
     }
 
     pub fn create_root_tree(&self, transaction: TransactionArg) -> Result<(), Error> {
-        self.grove.insert(
-            [],
-            Into::<&[u8; 1]>::into(RootTree::Identities),
-            Element::empty_tree(),
-            transaction,
-        )?;
-        self.grove.insert(
-            [],
-            Into::<&[u8; 1]>::into(RootTree::ContractDocuments),
-            Element::empty_tree(),
-            transaction,
-        )?;
-        self.grove.insert(
-            [],
-            Into::<&[u8; 1]>::into(RootTree::PublicKeyHashesToIdentities),
-            Element::empty_tree(),
-            transaction,
-        )?;
-        self.grove.insert(
-            [],
-            Into::<&[u8; 1]>::into(RootTree::Misc),
-            Element::empty_tree(),
-            transaction,
-        )?;
+        self.grove
+            .insert(
+                [],
+                Into::<&[u8; 1]>::into(RootTree::Identities),
+                Element::empty_tree(),
+                transaction,
+            )
+            .unwrap()?;
+        self.grove
+            .insert(
+                [],
+                Into::<&[u8; 1]>::into(RootTree::ContractDocuments),
+                Element::empty_tree(),
+                transaction,
+            )
+            .unwrap()?;
+        self.grove
+            .insert(
+                [],
+                Into::<&[u8; 1]>::into(RootTree::PublicKeyHashesToIdentities),
+                Element::empty_tree(),
+                transaction,
+            )
+            .unwrap()?;
+        self.grove
+            .insert(
+                [],
+                Into::<&[u8; 1]>::into(RootTree::Misc),
+                Element::empty_tree(),
+                transaction,
+            )
+            .unwrap()?;
         Ok(())
     }
 
@@ -1833,6 +1841,7 @@ mod tests {
         let root_hash = drive
             .grove
             .root_hash(Some(&db_transaction))
+            .unwrap()
             .expect("expected a root hash calculation to succeed")
             .expect("expected a root hash");
 
@@ -1856,6 +1865,7 @@ mod tests {
         let root_hash_after_fee = drive
             .grove
             .root_hash(Some(&db_transaction))
+            .unwrap()
             .expect("expected a root hash calculation to succeed")
             .expect("expected a root hash");
 
@@ -3578,6 +3588,7 @@ mod tests {
         let initial_root_hash = drive
             .grove
             .root_hash(None)
+            .unwrap()
             .expect("expected a root hash calculation to succeed")
             .expect("expected a root hash");
 
@@ -3597,6 +3608,7 @@ mod tests {
         let final_root_hash = drive
             .grove
             .root_hash(None)
+            .unwrap()
             .expect("expected a root hash calculation to succeed")
             .expect("expected a root hash");
 
@@ -3639,6 +3651,7 @@ mod tests {
         let initial_root_hash = drive
             .grove
             .root_hash(None)
+            .unwrap()
             .expect("expected a root hash calculation to succeed")
             .expect("expected a root hash");
 
@@ -3657,6 +3670,7 @@ mod tests {
         let final_root_hash = drive
             .grove
             .root_hash(None)
+            .unwrap()
             .expect("expected a root hash calculation to succeed")
             .expect("expected a root hash");
 
@@ -3687,6 +3701,7 @@ mod tests {
         let initial_root_hash = drive
             .grove
             .root_hash(None)
+            .unwrap()
             .expect("expected a root hash calculation to succeed")
             .expect("expected a root hash");
 
@@ -3704,6 +3719,7 @@ mod tests {
         let final_root_hash = drive
             .grove
             .root_hash(None)
+            .unwrap()
             .expect("expected a root hash calculation to succeed")
             .expect("expected a root hash");
 

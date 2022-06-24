@@ -835,11 +835,13 @@ impl DriveWrapper {
         db.send_to_drive_thread(move |drive: &Drive, transaction, channel| {
             let grove_db = &drive.grove;
             let path_slice = path.iter().map(|fragment| fragment.as_slice());
-            let result = grove_db.get(
-                path_slice,
-                &key,
-                using_transaction.then(|| transaction).flatten(),
-            );
+            let result = grove_db
+                .get(
+                    path_slice,
+                    &key,
+                    using_transaction.then(|| transaction).flatten(),
+                )
+                .unwrap();
 
             channel.send(move |mut task_context| {
                 let callback = js_callback.into_inner(&mut task_context);
@@ -899,12 +901,14 @@ impl DriveWrapper {
             } else {
                 let grove_db = &drive.grove;
                 let path_slice = path.iter().map(|fragment| fragment.as_slice());
-                let result = grove_db.insert(
-                    path_slice,
-                    &key,
-                    element,
-                    using_transaction.then(|| transaction).flatten(),
-                );
+                let result = grove_db
+                    .insert(
+                        path_slice,
+                        &key,
+                        element,
+                        using_transaction.then(|| transaction).flatten(),
+                    )
+                    .unwrap();
 
                 channel.send(move |mut task_context| {
                     let callback = js_callback.into_inner(&mut task_context);
@@ -957,12 +961,14 @@ impl DriveWrapper {
 
                 let path_slice: Vec<&[u8]> =
                     path.iter().map(|fragment| fragment.as_slice()).collect();
-                let result = grove_db.insert_if_not_exists(
-                    path_slice,
-                    key.as_slice(),
-                    element,
-                    using_transaction.then(|| transaction).flatten(),
-                );
+                let result = grove_db
+                    .insert_if_not_exists(
+                        path_slice,
+                        key.as_slice(),
+                        element,
+                        using_transaction.then(|| transaction).flatten(),
+                    )
+                    .unwrap();
 
                 channel.send(move |mut task_context| {
                     let callback = js_callback.into_inner(&mut task_context);
@@ -1004,11 +1010,13 @@ impl DriveWrapper {
         db.send_to_drive_thread(move |drive: &Drive, transaction, channel| {
             let grove_db = &drive.grove;
 
-            let result = grove_db.put_aux(
-                &key,
-                &value,
-                using_transaction.then(|| transaction).flatten(),
-            );
+            let result = grove_db
+                .put_aux(
+                    &key,
+                    &value,
+                    using_transaction.then(|| transaction).flatten(),
+                )
+                .unwrap();
 
             channel.send(move |mut task_context| {
                 let callback = js_callback.into_inner(&mut task_context);
@@ -1059,8 +1067,9 @@ impl DriveWrapper {
             } else {
                 let grove_db = &drive.grove;
 
-                let result =
-                    grove_db.delete_aux(&key, using_transaction.then(|| transaction).flatten());
+                let result = grove_db
+                    .delete_aux(&key, using_transaction.then(|| transaction).flatten())
+                    .unwrap();
 
                 channel.send(move |mut task_context| {
                     let callback = js_callback.into_inner(&mut task_context);
@@ -1101,7 +1110,9 @@ impl DriveWrapper {
         db.send_to_drive_thread(move |drive: &Drive, transaction, channel| {
             let grove_db = &drive.grove;
 
-            let result = grove_db.get_aux(&key, using_transaction.then(|| transaction).flatten());
+            let result = grove_db
+                .get_aux(&key, using_transaction.then(|| transaction).flatten())
+                .unwrap();
 
             channel.send(move |mut task_context| {
                 let callback = js_callback.into_inner(&mut task_context);
@@ -1148,10 +1159,12 @@ impl DriveWrapper {
         db.send_to_drive_thread(move |drive: &Drive, transaction, channel| {
             let grove_db = &drive.grove;
 
-            let result = grove_db.get_path_query(
-                &path_query,
-                using_transaction.then(|| transaction).flatten(),
-            );
+            let result = grove_db
+                .get_path_query(
+                    &path_query,
+                    using_transaction.then(|| transaction).flatten(),
+                )
+                .unwrap();
 
             channel.send(move |mut task_context| {
                 let callback = js_callback.into_inner(&mut task_context);
@@ -1198,10 +1211,12 @@ impl DriveWrapper {
         db.send_to_drive_thread(move |drive: &Drive, transaction, channel| {
             let grove_db = &drive.grove;
 
-            let result = grove_db.get_proved_path_query(
-                &path_query,
-                using_transaction.then(|| transaction).flatten(),
-            );
+            let result = grove_db
+                .get_proved_path_query(
+                    &path_query,
+                    using_transaction.then(|| transaction).flatten(),
+                )
+                .unwrap();
 
             channel.send(move |mut task_context| {
                 let callback = js_callback.into_inner(&mut task_context);
@@ -1268,7 +1283,9 @@ impl DriveWrapper {
         db.send_to_drive_thread(move |drive: &Drive, transaction, channel| {
             let grove_db = &drive.grove;
 
-            let result = grove_db.root_hash(using_transaction.then(|| transaction).flatten());
+            let result = grove_db
+                .root_hash(using_transaction.then(|| transaction).flatten())
+                .unwrap();
 
             channel.send(move |mut task_context| {
                 let callback = js_callback.into_inner(&mut task_context);
@@ -1327,11 +1344,13 @@ impl DriveWrapper {
 
                 let path_slice: Vec<&[u8]> =
                     path.iter().map(|fragment| fragment.as_slice()).collect();
-                let result = grove_db.delete(
-                    path_slice,
-                    key.as_slice(),
-                    using_transaction.then(|| transaction).flatten(),
-                );
+                let result = grove_db
+                    .delete(
+                        path_slice,
+                        key.as_slice(),
+                        using_transaction.then(|| transaction).flatten(),
+                    )
+                    .unwrap();
 
                 channel.send(move |mut task_context| {
                     let callback = js_callback.into_inner(&mut task_context);
