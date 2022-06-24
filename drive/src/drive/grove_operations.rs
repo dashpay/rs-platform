@@ -798,4 +798,14 @@ impl Drive {
             Ok(())
         }
     }
+
+    pub(crate) fn grove_batch_operations_costs(
+        &self,
+        ops: Vec<GroveDbOp>,
+        validate: bool,
+        drive_operations: &mut Vec<DriveOperation>,
+    ) -> Result<(), Error> {
+            let cost_context = self.grove.worst_case_operations_for_batch(ops, Some(BatchApplyOptions { validate_tree_insertion_does_not_override: validate }));
+            push_drive_operation_result(cost_context, drive_operations)
+    }
 }

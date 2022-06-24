@@ -260,9 +260,11 @@ impl Drive {
                 _ => drive_operations.push(op),
             });
         } else {
-            batch_operations
-                .into_iter()
-                .for_each(|op| drive_operations.push(op));
+            self.grove_batch_operations_costs(DriveOperation::grovedb_operations(&batch_operations), false, drive_operations)?;
+            batch_operations.into_iter().for_each(|op| match op {
+                GroveOperation(_) => (),
+                _ => drive_operations.push(op),
+            });
         }
         Ok(())
     }
