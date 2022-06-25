@@ -1,8 +1,11 @@
 use crate::error::fee::FeeError;
 use crate::error::Error;
-use crate::fee::op::{BaseOp, DriveOperation, SizesOfDeleteOperation, SizesOfQueryOperation};
+use crate::fee::op::{
+    BaseOp, DriveCost, DriveOperation, SizesOfDeleteOperation, SizesOfQueryOperation,
+};
 use enum_map::EnumMap;
 
+pub mod default_costs;
 pub mod op;
 
 pub fn calculate_fee(
@@ -26,13 +29,13 @@ pub fn calculate_fee(
 
     if let Some(drive_operations) = drive_operations {
         // println!("{:#?}", drive_operations);
-        for drive_operation in drive_operations {
-            match processing_cost.checked_add(drive_operation.ephemeral_cost()) {
+        for drive_operation in DriveOperation::consume_to_costs(drive_operations)? {
+            match processing_cost.checked_add(drive_operation.ephemeral_cost()?) {
                 None => return Err(Error::Fee(FeeError::Overflow("overflow error"))),
                 Some(value) => processing_cost = value,
             }
 
-            match storage_cost.checked_add(drive_operation.storage_cost()) {
+            match storage_cost.checked_add(drive_operation.storage_cost()?) {
                 None => return Err(Error::Fee(FeeError::Overflow("overflow error"))),
                 Some(value) => storage_cost = value,
             }

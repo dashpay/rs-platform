@@ -523,9 +523,6 @@ impl Drive {
                 let path_iter: Vec<&[u8]> = path.iter().map(|x| x.as_slice()).collect();
                 let has_raw =
                     self.grove_has_raw(path_iter.clone(), key, transaction, drive_operations)?;
-                drive_operations.push(CostCalculationQueryOperation(
-                    SizesOfQueryOperation::for_key_check_in_path(key.len(), path_iter),
-                ));
                 if has_raw == false {
                     drive_operations.push(DriveOperation::for_empty_tree(
                         path,
@@ -555,9 +552,6 @@ impl Drive {
                     transaction,
                     drive_operations,
                 )?;
-                drive_operations.push(CostCalculationQueryOperation(
-                    SizesOfQueryOperation::for_key_check_in_path(key.len(), path_iter),
-                ));
                 if has_raw == false {
                     drive_operations.push(DriveOperation::for_empty_tree(
                         path,
@@ -582,9 +576,6 @@ impl Drive {
                         storage_flags,
                     ));
                 }
-                drive_operations.push(CostCalculationQueryOperation(
-                    SizesOfQueryOperation::for_key_check_in_path(key.len(), path),
-                ));
                 Ok(!has_raw)
             }
             PathFixedSizeKeyRef((path, key)) => {
@@ -598,9 +589,6 @@ impl Drive {
                         storage_flags,
                     ));
                 }
-                drive_operations.push(CostCalculationQueryOperation(
-                    SizesOfQueryOperation::for_key_check_in_path(key.len(), path),
-                ));
                 Ok(!has_raw)
             }
         }
@@ -651,9 +639,6 @@ impl Drive {
                 let path_iter: Vec<&[u8]> = path.iter().map(|x| x.as_slice()).collect();
                 let has_raw =
                     self.grove_has_raw(path_iter.clone(), key, transaction, drive_operations)?;
-                drive_operations.push(CostCalculationQueryOperation(
-                    SizesOfQueryOperation::for_key_check_in_path(key.len(), path_iter),
-                ));
                 if has_raw == false {
                     drive_operations.push(DriveOperation::for_path_key_element(
                         path,
@@ -687,9 +672,6 @@ impl Drive {
                         element,
                     ));
                 }
-                drive_operations.push(CostCalculationQueryOperation(
-                    SizesOfQueryOperation::for_key_check_in_path(key.len(), path),
-                ));
                 Ok(!has_raw)
             }
         }
@@ -764,7 +746,13 @@ impl Drive {
         drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<(), Error> {
         if self.config.batching_enabled {
-            let cost_context = self.grove.apply_batch(ops, Some(BatchApplyOptions { validate_tree_insertion_does_not_override: validate }), transaction);
+            let cost_context = self.grove.apply_batch(
+                ops,
+                Some(BatchApplyOptions {
+                    validate_tree_insertion_does_not_override: validate,
+                }),
+                transaction,
+            );
             push_drive_operation_result(cost_context, drive_operations)
         } else {
             //println!("changes {} {:#?}", ops.len(), ops);
@@ -805,7 +793,12 @@ impl Drive {
         validate: bool,
         drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<(), Error> {
-            let cost_context = self.grove.worst_case_operations_for_batch(ops, Some(BatchApplyOptions { validate_tree_insertion_does_not_override: validate }));
-            push_drive_operation_result(cost_context, drive_operations)
+        let cost_context = self.grove.worst_case_operations_for_batch(
+            ops,
+            Some(BatchApplyOptions {
+                validate_tree_insertion_does_not_override: validate,
+            }),
+        );
+        push_drive_operation_result(cost_context, drive_operations)
     }
 }
