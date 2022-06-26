@@ -95,16 +95,30 @@ impl Drive {
                           identity_key: IdentityKey,
                           storage_flags: StorageFlags,
                           verify: bool,
-                          apply: bool,
                           transaction: TransactionArg,
                                      drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<(), Error> {
         let key_tree = key_tree_path();
+        if verify {
+            let exists = self.grove_has_raw(
+                key_tree,
+                identity_key.public_key_bytes.as_slice(),
+                transaction,
+                drive_operations,
+            )?;
+            if exists {
+                return Err(Error::Identity(IdentityError::IdentityAlreadyExists(
+                    "trying to insert an identity that already exists",
+                )));
+            }
+        }
+
+        let serialized_identity_key = identity_key.serialize();
         self.batch_insert(
             PathFixedSizeKeyElement((
                 key_tree,
-                identity_key.public_key_bytes.as_slice()
-                Item(revision_bytes, element_flags),
+                identity_key.public_key_bytes.as_slice(),
+                Item(serialized_identity_key, storage_flags.to_element_flags()),
             )),
             drive_operations,
         )

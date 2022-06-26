@@ -44,6 +44,7 @@ pub enum RootTree {
     PublicKeyHashesToIdentities = 2,
     Misc = 3,
     Keys = 5,
+    MasternodeKeys = 6,
 }
 
 pub const STORAGE_COST: i32 = 50;
@@ -68,6 +69,7 @@ impl From<RootTree> for &'static [u8; 1] {
             RootTree::PublicKeyHashesToIdentities => &[2],
             RootTree::Misc => &[3],
             RootTree::Keys => &[5],
+            RootTree::MasternodeKeys => &[6],
         }
     }
 }
@@ -78,6 +80,10 @@ pub(crate) fn identity_tree_path() -> [&'static [u8]; 1] {
 
 pub(crate) fn key_tree_path() -> [&'static [u8]; 1] {
     [Into::<&[u8; 1]>::into(RootTree::Keys)]
+}
+
+pub(crate) fn masternode_key_tree_path() -> [&'static [u8]; 1] {
+    [Into::<&[u8; 1]>::into(RootTree::MasternodeKeys)]
 }
 
 pub(crate) fn contract_documents_path(contract_id: &[u8]) -> [&[u8]; 3] {
