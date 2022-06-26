@@ -283,6 +283,7 @@ impl Drive {
                     self.batch_insert_empty_tree_if_not_exists(
                         PathFixedSizeKeyRef((type_path, index.name.as_bytes())),
                         &storage_flags,
+                        apply,
                         transaction,
                         &mut batch_operations,
                     )?;

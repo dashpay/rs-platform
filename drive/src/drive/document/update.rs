@@ -210,6 +210,7 @@ impl Drive {
                 &document_and_contract_info,
                 block_time,
                 true,
+                apply,
                 transaction,
                 &mut batch_operations,
             )?;
@@ -271,6 +272,7 @@ impl Drive {
                             document_top_field.as_slice(),
                         )),
                         storage_flags,
+                        apply,
                         transaction,
                         &mut batch_operations,
                     )?;
@@ -318,6 +320,7 @@ impl Drive {
                                 index_property.name.as_bytes(),
                             )),
                             storage_flags,
+                            apply,
                             transaction,
                             &mut batch_operations,
                         )?;
@@ -337,6 +340,7 @@ impl Drive {
                                 document_index_field.as_slice(),
                             )),
                             storage_flags,
+                            apply,
                             transaction,
                             &mut batch_operations,
                         )?;
@@ -390,6 +394,7 @@ impl Drive {
                         self.batch_insert_empty_tree_if_not_exists(
                             PathKeyInfo::PathKeyRef::<0>((index_path.clone(), &[0])),
                             storage_flags,
+                            apply,
                             transaction,
                             &mut batch_operations,
                         )?;
@@ -408,6 +413,7 @@ impl Drive {
                         // here we should return an error if the element already exists
                         let inserted = self.batch_insert_if_not_exists(
                             PathKeyElement::<0>((index_path, &[0], document_reference.clone())),
+                            apply,
                             transaction,
                             &mut batch_operations,
                         )?;
