@@ -4,7 +4,7 @@ mod tests {
 
     use crate::common;
     use crate::contract::{Contract, DocumentType, Index, IndexProperty};
-    use crate::error::{Error, query::QueryError};
+    use crate::error::{query::QueryError, Error};
     use crate::query::DriveQuery;
 
     fn construct_indexed_document_type() -> DocumentType {

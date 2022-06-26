@@ -10,6 +10,7 @@ use object_size_info::DocumentInfo::DocumentSize;
 
 use crate::contract::Contract;
 use crate::drive::config::DriveConfig;
+use crate::drive::identity::IdentityRootStructure;
 use crate::error::Error;
 use crate::fee::op::DriveOperation;
 use crate::fee::op::DriveOperation::GroveOperation;
@@ -69,7 +70,11 @@ impl From<RootTree> for &'static [u8; 1] {
     }
 }
 
-fn contract_documents_path(contract_id: &[u8]) -> [&[u8]; 3] {
+pub(crate) fn identity_tree_path() -> [&'static [u8]; 1] {
+    [Into::<&[u8; 1]>::into(RootTree::Identities)]
+}
+
+pub(crate) fn contract_documents_path(contract_id: &[u8]) -> [&[u8]; 3] {
     [
         Into::<&[u8; 1]>::into(RootTree::ContractDocuments),
         contract_id,

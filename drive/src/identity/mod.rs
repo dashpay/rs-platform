@@ -1,14 +1,19 @@
-use std::collections::BTreeMap;
-
+use byteorder::{BigEndian, ReadBytesExt};
 use ciborium::value::Value;
+use integer_encoding::{VarInt, VarIntReader};
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
+use std::io::{BufRead, BufReader, Read};
 
-use crate::common;
-use crate::common::bytes_for_system_value_from_tree_map;
+use crate::common::{bytes_for_system_value_from_tree_map, read_varint_value};
 use crate::drive::Drive;
-use crate::error::Error;
+use crate::error::drive::DriveError;
 use crate::error::identity::IdentityError;
 use crate::error::structure::StructureError;
+use crate::error::Error;
+use crate::identity::key::IdentityKey;
+
+pub mod key;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct Identity {
@@ -18,84 +23,81 @@ pub struct Identity {
     pub keys: BTreeMap<u16, IdentityKey>,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
-pub struct IdentityKey {
-    pub id: u16,
-    pub key_type: u8,
-    pub public_key_bytes: Vec<u8>,
-    pub purpose: u8,
-    pub security_level: u8,
-    pub readonly: bool,
-}
-
-impl IdentityKey {
-    pub fn from_cbor_value(key_value_map: &[(Value, Value)]) -> Result<Self, Error> {
-        let id = match common::cbor_inner_u16_value(key_value_map, "id") {
-            Some(index_values) => index_values,
-            None => {
-                return Err(Error::Identity(IdentityError::IdentityKeyMissingField(
-                    "a key must have an id",
-                )))
-            }
-        };
-
-        let key_type = match common::cbor_inner_u8_value(key_value_map, "type") {
-            Some(index_values) => index_values,
-            None => {
-                return Err(Error::Identity(IdentityError::IdentityKeyMissingField(
-                    "a key must have a type",
-                )))
-            }
-        };
-
-        let purpose = match common::cbor_inner_u8_value(key_value_map, "purpose") {
-            Some(index_values) => index_values,
-            None => {
-                return Err(Error::Identity(IdentityError::IdentityKeyMissingField(
-                    "a key must have a purpose",
-                )))
-            }
-        };
-
-        let security_level = match common::cbor_inner_u8_value(key_value_map, "securityLevel") {
-            Some(index_values) => index_values,
-            None => {
-                return Err(Error::Identity(IdentityError::IdentityKeyMissingField(
-                    "a key must have a securityLevel",
-                )))
-            }
-        };
-
-        let readonly = match common::cbor_inner_bool_value(key_value_map, "readOnly") {
-            Some(index_values) => index_values,
-            None => {
-                return Err(Error::Identity(IdentityError::IdentityKeyMissingField(
-                    "a key must have a readOnly value",
-                )))
-            }
-        };
-
-        let public_key_bytes = match common::cbor_inner_bytes_value(key_value_map, "data") {
-            Some(index_values) => index_values,
-            None => {
-                return Err(Error::Identity(IdentityError::IdentityKeyMissingField(
-                    "a key must have a data value",
-                )))
-            }
-        };
-
-        Ok(IdentityKey {
+impl Identity {
+    /// Serialize will serialize the whole identity, this should not be used for storage
+    pub fn serialize(&self) -> Vec<u8> {
+        let Identity {
             id,
-            key_type,
-            public_key_bytes,
-            purpose,
-            security_level,
-            readonly,
+            revision,
+            balance,
+            keys,
+        } = self;
+        let mut buffer: Vec<u8> = id.as_slice().to_vec();
+        buffer.extend(revision.to_be_bytes().to_vec());
+        buffer.extend(balance.to_be_bytes().to_vec());
+
+        let mut r_vec = keys.len().encode_var_vec();
+        buffer.append(&mut r_vec);
+
+        keys.iter().for_each(|(key_id, key)| {
+            let mut key_vec = key.serialize();
+            let mut r_vec = key_vec.len().encode_var_vec();
+            buffer.append(&mut r_vec);
+            buffer.append(&mut key_vec);
+        });
+        buffer
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+        let mut buf = BufReader::new(bytes);
+        if bytes.len() < 16 {
+            return Err(Error::Drive(DriveError::CorruptedSerialization(
+                "serialized value data is too small, must have revision and owner id",
+            )));
+        }
+
+        let mut id = [0; 32];
+        buf.read_exact(&mut id).map_err(|_| {
+            Error::Drive(DriveError::CorruptedSerialization(
+                "error reading from serialized identity",
+            ))
+        })?;
+
+        let revision = buf.read_u64::<BigEndian>().map_err(|_| {
+            Error::Drive(DriveError::CorruptedSerialization(
+                "error reading from serialized identity",
+            ))
+        })?;
+        let balance = buf.read_u64::<BigEndian>().map_err(|_| {
+            Error::Drive(DriveError::CorruptedSerialization(
+                "error reading from serialized identity",
+            ))
+        })?;
+
+        let key_count: usize = buf.read_varint().map_err(|_| {
+            Error::Drive(DriveError::CorruptedSerialization(
+                "error reading from serialized identity",
+            ))
+        })?;
+
+        let mut keys = BTreeMap::new();
+
+        for _ in 0..key_count {
+            let key_bytes = read_varint_value(&mut buf)?.ok_or(Error::Drive(
+                DriveError::CorruptedSerialization("expected more keys than present"),
+            ))?;
+            let key = IdentityKey::from_bytes(key_bytes.as_slice())?;
+            keys.insert(key.id, key);
+        }
+
+        Ok(Identity {
+            id,
+            revision,
+            balance,
+            keys,
         })
     }
-}
 
-impl Identity {
     pub fn from_cbor(identity_cbor: &[u8]) -> Result<Self, Error> {
         let (version, read_identity_cbor) = identity_cbor.split_at(4);
         if !Drive::check_protocol_version_bytes(version) {

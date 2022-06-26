@@ -1,18 +1,20 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs::File;
 use std::io;
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, Read};
 use std::option::Option::None;
 use std::path::Path;
 
 use byteorder::{BigEndian, WriteBytesExt};
 use ciborium::value::Value;
 use grovedb::TransactionArg;
+use integer_encoding::VarIntReader;
 
 use crate::contract::Contract;
 use crate::drive::Drive;
-use crate::error::Error;
+use crate::error::drive::DriveError;
 use crate::error::structure::StructureError;
+use crate::error::Error;
 
 pub fn setup_contract(
     drive: &Drive,
@@ -398,4 +400,23 @@ pub(crate) fn cbor_inner_u8_value<'a>(
         return Some(i128::from(*integer_value) as u8);
     }
     None
+}
+
+pub(crate) fn read_varint_value(buf: &mut BufReader<&[u8]>) -> Result<Option<Vec<u8>>, Error> {
+    let bytes: usize = buf.read_varint().map_err(|_| {
+        Error::Drive(DriveError::CorruptedSerialization(
+            "error reading from serialized document",
+        ))
+    })?;
+    if bytes == 0 {
+        Ok(None)
+    } else {
+        let mut value: Vec<u8> = vec![0u8; bytes];
+        buf.read_exact(&mut value).map_err(|_| {
+            Error::Drive(DriveError::CorruptedSerialization(
+                "error reading from serialized document",
+            ))
+        })?;
+        Ok(Some(value))
+    }
 }

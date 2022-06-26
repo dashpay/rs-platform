@@ -4,7 +4,6 @@ use costs::CostContext;
 use grovedb::{Element, TransactionArg};
 
 use crate::contract::Contract;
-use crate::drive::{contract_documents_path, defaults, Drive, RootTree};
 use crate::drive::flags::StorageFlags;
 use crate::drive::object_size_info::KeyInfo::{KeyRef, KeySize};
 use crate::drive::object_size_info::KeyValueInfo::KeyRefRequest;
@@ -12,6 +11,7 @@ use crate::drive::object_size_info::PathKeyElementInfo::{
     PathFixedSizeKeyElement, PathKeyElementSize,
 };
 use crate::drive::object_size_info::PathKeyInfo::PathFixedSizeKeyRef;
+use crate::drive::{contract_documents_path, defaults, Drive, RootTree};
 use crate::error::drive::DriveError;
 use crate::error::Error;
 use crate::fee::calculate_fee;
@@ -479,9 +479,9 @@ mod tests {
 
     use crate::common::json_document_to_cbor;
     use crate::contract::Contract;
-    use crate::drive::Drive;
     use crate::drive::flags::StorageFlags;
     use crate::drive::object_size_info::{DocumentAndContractInfo, DocumentInfo};
+    use crate::drive::Drive;
 
     fn setup_deep_nested_contract() -> (Drive, Contract, Vec<u8>) {
         // Todo: make TempDir based on _prefix

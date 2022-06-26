@@ -1,19 +1,19 @@
 use std::collections::{BTreeMap, HashMap};
 use std::option::Option::None;
 
-use rand::{Rng, SeedableRng};
 use rand::seq::SliceRandom;
+use rand::{Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tempfile::TempDir;
 
 use rs_drive::common;
-use rs_drive::contract::{Contract, document::Document};
-use rs_drive::drive::Drive;
+use rs_drive::contract::{document::Document, Contract};
 use rs_drive::drive::flags::StorageFlags;
 use rs_drive::drive::object_size_info::DocumentAndContractInfo;
 use rs_drive::drive::object_size_info::DocumentInfo::DocumentAndSerialization;
-use rs_drive::error::{Error, query::QueryError};
+use rs_drive::drive::Drive;
+use rs_drive::error::{query::QueryError, Error};
 use rs_drive::query::DriveQuery;
 
 #[derive(Serialize, Deserialize)]

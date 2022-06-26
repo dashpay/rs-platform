@@ -6,11 +6,11 @@ use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use ciborium::value::{Integer, Value};
 use integer_encoding::{VarInt, VarIntReader};
 use rand::distributions::{Alphanumeric, Standard};
-use rand::Rng;
 use rand::rngs::StdRng;
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 
-use crate::common::{cbor_map_to_btree_map, cbor_owned_map_to_btree_map};
+use crate::common::{cbor_map_to_btree_map, cbor_owned_map_to_btree_map, read_varint_value};
 use crate::error::contract::ContractError;
 use crate::error::drive::DriveError;
 use crate::error::Error;
@@ -425,25 +425,6 @@ impl DocumentFieldType {
         }
     }
 
-    fn read_varint_value(buf: &mut BufReader<&[u8]>) -> Result<Option<Vec<u8>>, Error> {
-        let bytes: usize = buf.read_varint().map_err(|_| {
-            Error::Drive(DriveError::CorruptedSerialization(
-                "error reading from serialized document",
-            ))
-        })?;
-        if bytes == 0 {
-            Ok(None)
-        } else {
-            let mut value: Vec<u8> = vec![0u8; bytes];
-            buf.read_exact(&mut value).map_err(|_| {
-                Error::Drive(DriveError::CorruptedSerialization(
-                    "error reading from serialized document",
-                ))
-            })?;
-            Ok(Some(value))
-        }
-    }
-
     pub fn read_from(
         &self,
         buf: &mut BufReader<&[u8]>,
@@ -451,7 +432,7 @@ impl DocumentFieldType {
     ) -> Result<Option<Value>, Error> {
         return match self {
             DocumentFieldType::String(_, _) => {
-                let bytes = Self::read_varint_value(buf)?;
+                let bytes = read_varint_value(buf)?;
                 if let Some(bytes) = bytes {
                     let string = String::from_utf8(bytes).map_err(|_| {
                         Error::Drive(DriveError::CorruptedSerialization(
@@ -512,7 +493,7 @@ impl DocumentFieldType {
                 }
             }
             DocumentFieldType::ByteArray(_, _) => {
-                let bytes = Self::read_varint_value(buf)?;
+                let bytes = read_varint_value(buf)?;
                 Ok(bytes.map(Value::Bytes))
             }
 
@@ -938,7 +919,7 @@ impl DocumentFieldType {
                     Error::Contract(ContractError::ValueWrongType("expected integer value"))
                 })?;
 
-                encode_signed_integer(value_as_i64)
+                encode_i64(value_as_i64)
             }
             DocumentFieldType::Number => {
                 let value_as_f64 = if value.is_integer() {
@@ -1157,7 +1138,7 @@ fn get_field_type_matching_error() -> Error {
     ))
 }
 
-pub fn encode_unsigned_integer(val: u64) -> Result<Vec<u8>, Error> {
+pub fn encode_u64(val: u64) -> Result<Vec<u8>, Error> {
     // Positive integers are represented in binary with the signed bit set to 0
     // Negative integers are represented in 2's complement form
 
@@ -1182,7 +1163,32 @@ pub fn encode_unsigned_integer(val: u64) -> Result<Vec<u8>, Error> {
     Ok(wtr)
 }
 
-pub fn encode_signed_integer(val: i64) -> Result<Vec<u8>, Error> {
+pub fn encode_u16(val: u16) -> Result<Vec<u8>, Error> {
+    // Positive integers are represented in binary with the signed bit set to 0
+    // Negative integers are represented in 2's complement form
+
+    // Encode the integer in big endian form
+    // This ensures that most significant bits are compared first
+    // a bigger positive number would be greater than a smaller one
+    // and a bigger negative number would be greater than a smaller one
+    // maintains sort order for each domain
+    let mut wtr = vec![];
+    wtr.write_u16::<BigEndian>(val).unwrap();
+
+    // Flip the sign bit
+    // to deal with interaction between the domains
+    // 2's complement values have the sign bit set to 1
+    // this makes them greater than the positive domain in terms of sort order
+    // to fix this, we just flip the sign bit
+    // so positive integers have the high bit and negative integers have the low bit
+    // the relative order of elements in each domain is still maintained, as the
+    // change was uniform across all elements
+    wtr[0] ^= 0b1000_0000;
+
+    Ok(wtr)
+}
+
+pub fn encode_i64(val: i64) -> Result<Vec<u8>, Error> {
     // Positive integers are represented in binary with the signed bit set to 0
     // Negative integers are represented in 2's complement form
 

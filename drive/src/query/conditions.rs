@@ -10,8 +10,8 @@ use WhereOperator::{
 };
 
 use crate::contract::{document::Document, DocumentType};
-use crate::error::Error;
 use crate::error::query::QueryError;
+use crate::error::Error;
 
 fn sql_value_to_cbor(sql_value: ast::Value) -> Option<Value> {
     match sql_value {

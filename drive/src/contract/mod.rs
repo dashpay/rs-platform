@@ -2,8 +2,8 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fmt;
 
 use ciborium::value::{Value as CborValue, Value};
-use rand::{Rng, SeedableRng};
 use rand::rngs::StdRng;
+use rand::{Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
 
 use document::Document;
@@ -16,13 +16,13 @@ use crate::common::{
     cbor_inner_text_value, cbor_map_to_btree_map,
 };
 use crate::contract::types::{DocumentField, DocumentFieldType};
-use crate::drive::{Drive, RootTree};
 use crate::drive::config::DriveEncoding;
 use crate::drive::defaults::{DEFAULT_HASH_SIZE, MAX_INDEX_SIZE};
+use crate::drive::{Drive, RootTree};
 use crate::error::contract::ContractError;
 use crate::error::drive::DriveError;
-use crate::error::Error;
 use crate::error::structure::StructureError;
+use crate::error::Error;
 
 mod defaults;
 pub mod document;
