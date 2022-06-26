@@ -5,7 +5,7 @@ use crate::drive::identity::{
 };
 use crate::drive::object_size_info::KeyValueInfo::KeyRefRequest;
 use crate::drive::object_size_info::PathKeyElementInfo::PathFixedSizeKeyElement;
-use crate::drive::{identity_tree_path, Drive, RootTree};
+use crate::drive::{identity_tree_path, Drive, RootTree, key_tree_path};
 use crate::error::drive::DriveError;
 use crate::error::identity::IdentityError;
 use crate::error::Error;
@@ -91,26 +91,60 @@ impl Drive {
         )
     }
 
-    pub fn create_identity(
+    pub fn insert_new_key_operations(&self,
+                          identity_key: IdentityKey,
+                          storage_flags: StorageFlags,
+                          verify: bool,
+                          apply: bool,
+                          transaction: TransactionArg,
+                                     drive_operations: &mut Vec<DriveOperation>,
+    ) -> Result<(), Error> {
+        let key_tree = key_tree_path();
+        self.batch_insert(
+            PathFixedSizeKeyElement((
+                key_tree,
+                identity_key.public_key_bytes.as_slice()
+                Item(revision_bytes, element_flags),
+            )),
+            drive_operations,
+        )
+    }
+
+    pub fn insert_new_identity(
         &self,
-        identity_id: [u8; 32],
-        balance: u64,
-        keys: Vec<IdentityKey>,
+        identity: Identity,
         storage_flags: StorageFlags,
         verify: bool,
         apply: bool,
         transaction: TransactionArg,
+    ) -> Result<(i64, u64), Error> {
+        let mut batch_operations: Vec<DriveOperation> = vec![];
+        self.create_identity_operations(identity, storage_flags, verify, transaction, &mut batch_operations)?;
+
+        let mut drive_operations: Vec<DriveOperation> = vec![];
+
+        self.apply_batch(apply, transaction, batch_operations, &mut drive_operations)?;
+
+        calculate_fee(None, Some(drive_operations))
+    }
+
+    pub fn create_identity_operations(
+        &self,
+        identity: Identity,
+        storage_flags: StorageFlags,
+        verify: bool,
+        transaction: TransactionArg,
         drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<(), Error> {
-        let mut batch_operations: Vec<DriveOperation> = vec![];
-
         let identity_tree_path = identity_tree_path();
+
+        let Identity { id, revision, balance, keys } = identity;
 
         // If we are asking to verify we check to make sure the tree for this identity doesn't yet exist
         if verify {
             let exists = self.grove_has_raw(
                 identity_tree_path,
-                identity_id.as_slice(),
+                id.as_slice(),
                 transaction,
                 drive_operations,
             )?;
@@ -125,7 +159,7 @@ impl Drive {
         self.batch_insert(
             PathFixedSizeKeyElement((
                 identity_tree_path,
-                identity_id.as_slice(),
+                id.as_slice(),
                 Element::empty_tree_with_flags(storage_flags.to_element_flags()),
             )),
             drive_operations,
@@ -133,32 +167,27 @@ impl Drive {
 
         // We insert the balance
         self.set_identity_balance(
-            identity_id,
+            id,
             balance,
             storage_flags.to_element_flags(),
-            &mut batch_operations,
+            drive_operations,
         )?;
 
         // We insert the revision
         self.set_revision(
-            identity_id,
-            1,
+            id,
+            revision,
             storage_flags.to_element_flags(),
-            &mut batch_operations,
+            drive_operations,
         )?;
-
-        let keys = keys.into_iter().map(|key| (key.id, key)).collect();
 
         // We insert the key tree and keys
         self.create_key_tree_with_keys(
-            identity_id,
+            id,
             keys,
             storage_flags.to_element_flags(),
-            &mut batch_operations,
-        )?;
-
-        self.apply_batch(apply, transaction, batch_operations, drive_operations)?;
-        Ok(())
+            drive_operations,
+        )
     }
 
     pub fn insert_identity(
