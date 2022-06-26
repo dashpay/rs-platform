@@ -52,7 +52,7 @@ impl Drive {
         Ok(())
     }
 
-    fn set_identity_balance(
+    pub(crate) fn set_identity_balance(
         &self,
         identity_id: [u8; 32],
         balance: u64,
@@ -89,52 +89,6 @@ impl Drive {
             )),
             drive_operations,
         )
-    }
-
-    /// Balances are stored in the identity under key 0
-    pub fn add_to_identity_balance(
-        &self,
-        identity_id: [u8; 32],
-        added_balance: i64,
-        error_if_absent: bool,
-        transaction: TransactionArg,
-        drive_operations: &mut Vec<DriveOperation>,
-    ) -> Result<(), Error> {
-        let identity_balance_element = self.grove_get(
-            identity_path(identity_id.as_slice()),
-            KeyRefRequest(&[0]),
-            transaction,
-            drive_operations,
-        )?;
-        if error_if_absent && identity_balance_element.is_none() {
-            Err(Error::Identity(IdentityError::IdentityNotFound(
-                "identity not found while trying to modify an identity balance",
-            )))
-        } else if identity_balance_element.is_none() {
-            Ok(())
-        } else if let Item(identity_balance_element, element_flags) =
-            identity_balance_element.unwrap()
-        {
-            let balance = balance_from_bytes(identity_balance_element.as_slice())?;
-            let new_balance = if added_balance > 0 {
-                balance
-                    .checked_add(added_balance as u64)
-                    .ok_or(Error::Identity(IdentityError::BalanceOverflow(
-                        "identity overflow error",
-                    )))?
-            } else {
-                (balance as i64)
-                    .checked_add(added_balance)
-                    .ok_or(Error::Identity(IdentityError::BalanceOverflow(
-                        "identity overflow error",
-                    )))? as u64
-            };
-            self.set_identity_balance(identity_id, new_balance, element_flags, drive_operations)
-        } else {
-            Err(Error::Drive(DriveError::CorruptedElementType(
-                "identity balance was present but was not identified as an item",
-            )))
-        }
     }
 
     pub fn create_identity(
@@ -207,7 +161,7 @@ impl Drive {
         Ok(())
     }
 
-    fn insert_identity(
+    pub fn insert_identity(
         &self,
         identity_key: &[u8],
         identity_bytes: Element,

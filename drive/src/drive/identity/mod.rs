@@ -3,6 +3,7 @@ use crate::error::drive::DriveError;
 use crate::error::Error;
 
 pub mod insert;
+pub mod update;
 
 pub(crate) fn identity_path(identity_id: &[u8]) -> [&[u8]; 2] {
     [Into::<&[u8; 1]>::into(RootTree::Identities), identity_id]

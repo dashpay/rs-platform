@@ -4,6 +4,8 @@ use integer_encoding::{VarInt, VarIntReader};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::io::{BufRead, BufReader, Read};
+use rand::{Rng, SeedableRng};
+use rand::rngs::StdRng;
 
 use crate::common::{bytes_for_system_value_from_tree_map, read_varint_value};
 use crate::drive::Drive;
@@ -96,6 +98,41 @@ impl Identity {
             balance,
             keys,
         })
+    }
+
+    pub fn random_identity_with_rng(key_count: u16, rng: &mut StdRng) -> Self {
+        let id = rng.gen::<[u8; 32]>();
+        let revision = rng.gen::<u64>();
+        let balance = rng.gen::<u64>();
+        let keys = IdentityKey::random_keys_with_rng(key_count, 96, rng).into_iter()
+            .map(|key| (key.id, key)).collect();
+
+        Identity {
+            id,
+            revision,
+            balance,
+            keys,
+        }
+    }
+
+    pub fn random_identity(key_count: u16, seed: Option<u64>) -> Self {
+        let mut rng = match seed {
+            None => StdRng::from_entropy(),
+            Some(seed_value) => StdRng::seed_from_u64(seed_value),
+        };
+        Self::random_identity_with_rng(key_count, &mut rng)
+    }
+
+    pub fn random_identities(count: u16, key_count: u16, seed: Option<u64>) -> Vec<Self> {
+        let mut rng = match seed {
+            None => StdRng::from_entropy(),
+            Some(seed_value) => StdRng::seed_from_u64(seed_value),
+        };
+        let mut vec: Vec<Identity> = vec![];
+        for _i in 0..count {
+            vec.push(Self::random_identity_with_rng(key_count, &mut rng));
+        }
+        vec
     }
 
     pub fn from_cbor(identity_cbor: &[u8]) -> Result<Self, Error> {
