@@ -2,8 +2,8 @@ use std::io::{BufReader, Read};
 
 use byteorder::{BigEndian, ReadBytesExt};
 use ciborium::value::Value;
-use rand::Rng;
 use rand::rngs::StdRng;
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 
 use crate::common;
@@ -95,7 +95,7 @@ impl IdentityKey {
         let purpose = rng.gen_range(0..4);
         let security_level = rng.gen_range(0..4);
         let readonly = false;
-        let public_key_bytes = (0..key_size).map(|_| { rng.gen::<u8>() }).collect();
+        let public_key_bytes = (0..key_size).map(|_| rng.gen::<u8>()).collect();
         IdentityKey {
             id,
             key_type,
@@ -107,7 +107,9 @@ impl IdentityKey {
     }
 
     pub fn random_keys_with_rng(key_count: u16, key_size: u16, rng: &mut StdRng) -> Vec<Self> {
-        (0..key_count).map(|i| {Self::random_key_with_rng(i, key_size, rng)}).collect()
+        (0..key_count)
+            .map(|i| Self::random_key_with_rng(i, key_size, rng))
+            .collect()
     }
 
     pub fn from_cbor_value(key_value_map: &[(Value, Value)]) -> Result<Self, Error> {

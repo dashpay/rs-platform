@@ -1,12 +1,12 @@
-use grovedb::Element::Item;
-use grovedb::TransactionArg;
-use crate::drive::Drive;
 use crate::drive::identity::{balance_from_bytes, identity_path};
 use crate::drive::object_size_info::KeyValueInfo::KeyRefRequest;
+use crate::drive::Drive;
 use crate::error::drive::DriveError;
-use crate::error::Error;
 use crate::error::identity::IdentityError;
+use crate::error::Error;
 use crate::fee::op::DriveOperation;
+use grovedb::Element::Item;
+use grovedb::TransactionArg;
 
 impl Drive {
     /// Balances are stored in the identity under key 0
@@ -31,7 +31,7 @@ impl Drive {
         } else if identity_balance_element.is_none() {
             Ok(())
         } else if let Item(identity_balance_element, element_flags) =
-        identity_balance_element.unwrap()
+            identity_balance_element.unwrap()
         {
             let balance = balance_from_bytes(identity_balance_element.as_slice())?;
             let new_balance = if added_balance > 0 {
@@ -55,7 +55,6 @@ impl Drive {
         }
     }
 }
-
 
 #[cfg(test)]
 mod tests {

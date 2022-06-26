@@ -1,11 +1,11 @@
 use byteorder::{BigEndian, ReadBytesExt};
 use ciborium::value::Value;
 use integer_encoding::{VarInt, VarIntReader};
+use rand::rngs::StdRng;
+use rand::{Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::io::{BufRead, BufReader, Read};
-use rand::{Rng, SeedableRng};
-use rand::rngs::StdRng;
 
 use crate::common::{bytes_for_system_value_from_tree_map, read_varint_value};
 use crate::drive::Drive;
@@ -104,8 +104,10 @@ impl Identity {
         let id = rng.gen::<[u8; 32]>();
         let revision = rng.gen::<u64>();
         let balance = rng.gen::<u64>();
-        let keys = IdentityKey::random_keys_with_rng(key_count, 96, rng).into_iter()
-            .map(|key| (key.id, key)).collect();
+        let keys = IdentityKey::random_keys_with_rng(key_count, 96, rng)
+            .into_iter()
+            .map(|key| (key.id, key))
+            .collect();
 
         Identity {
             id,
