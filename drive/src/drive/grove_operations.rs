@@ -461,6 +461,7 @@ impl Drive {
         &self,
         path: P,
         key: &'p [u8],
+        apply: bool,
         transaction: TransactionArg,
         drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<bool, Error>
@@ -468,7 +469,11 @@ impl Drive {
         P: IntoIterator<Item = &'p [u8]>,
         <P as IntoIterator>::IntoIter: ExactSizeIterator + DoubleEndedIterator + Clone,
     {
-        let CostContext { value, cost } = self.grove.has_raw(path, key, transaction);
+        let CostContext { value, cost } = if apply {
+            self.grove.has_raw(path, key, transaction)
+        } else {
+            self.grove.worst_case_for_has_raw(path, key)
+        };
         drive_operations.push(CalculatedCostOperation(cost));
         match value {
             Err(GroveError::PathKeyNotFound(_)) | Err(GroveError::PathNotFound(_)) => Ok(false),
@@ -516,14 +521,20 @@ impl Drive {
         &'a self,
         path_key_info: PathKeyInfo<'c, N>,
         storage_flags: &StorageFlags,
+        apply: bool,
         transaction: TransactionArg,
         drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<bool, Error> {
         match path_key_info {
             PathKeyRef((path, key)) => {
                 let path_iter: Vec<&[u8]> = path.iter().map(|x| x.as_slice()).collect();
-                let has_raw =
-                    self.grove_has_raw(path_iter.clone(), key, transaction, drive_operations)?;
+                let has_raw = self.grove_has_raw(
+                    path_iter.clone(),
+                    key,
+                    apply,
+                    transaction,
+                    drive_operations,
+                )?;
                 if has_raw == false {
                     drive_operations.push(DriveOperation::for_empty_tree(
                         path,
@@ -550,6 +561,7 @@ impl Drive {
                 let has_raw = self.grove_has_raw(
                     path_iter.clone(),
                     key.as_slice(),
+                    apply,
                     transaction,
                     drive_operations,
                 )?;
@@ -566,6 +578,7 @@ impl Drive {
                 let has_raw = self.grove_has_raw(
                     path.clone(),
                     key.as_slice(),
+                    apply,
                     transaction,
                     drive_operations,
                 )?;
@@ -581,7 +594,7 @@ impl Drive {
             }
             PathFixedSizeKeyRef((path, key)) => {
                 let has_raw =
-                    self.grove_has_raw(path.clone(), key, transaction, drive_operations)?;
+                    self.grove_has_raw(path.clone(), key, apply, transaction, drive_operations)?;
                 if has_raw == false {
                     let path_items: Vec<Vec<u8>> = path.into_iter().map(Vec::from).collect();
                     drive_operations.push(DriveOperation::for_empty_tree(
@@ -632,17 +645,36 @@ impl Drive {
     pub(crate) fn batch_insert_if_not_exists<'a, 'c, const N: usize>(
         &'a self,
         path_key_element_info: PathKeyElementInfo<'c, N>,
+        apply: bool,
         transaction: TransactionArg,
         drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<bool, Error> {
         match path_key_element_info {
             PathKeyElement((path, key, element)) => {
                 let path_iter: Vec<&[u8]> = path.iter().map(|x| x.as_slice()).collect();
-                let has_raw =
-                    self.grove_has_raw(path_iter.clone(), key, transaction, drive_operations)?;
+                let has_raw = self.grove_has_raw(
+                    path_iter.clone(),
+                    key,
+                    apply,
+                    transaction,
+                    drive_operations,
+                )?;
                 if has_raw == false {
                     drive_operations.push(DriveOperation::for_path_key_element(
                         path,
+                        key.to_vec(),
+                        element,
+                    ));
+                }
+                Ok(!has_raw)
+            }
+            PathFixedSizeKeyElement((path, key, element)) => {
+                let has_raw =
+                    self.grove_has_raw(path, key, apply, transaction, drive_operations)?;
+                if has_raw == false {
+                    let path_items: Vec<Vec<u8>> = path.into_iter().map(Vec::from).collect();
+                    drive_operations.push(DriveOperation::for_path_key_element(
+                        path_items,
                         key.to_vec(),
                         element,
                     ));
@@ -662,18 +694,6 @@ impl Drive {
                 drive_operations.push(insert_operation);
                 drive_operations.push(CostCalculationQueryOperation(query_operation));
                 Ok(true)
-            }
-            PathFixedSizeKeyElement((path, key, element)) => {
-                let has_raw = self.grove_has_raw(path, key, transaction, drive_operations)?;
-                if has_raw == false {
-                    let path_items: Vec<Vec<u8>> = path.into_iter().map(Vec::from).collect();
-                    drive_operations.push(DriveOperation::for_path_key_element(
-                        path_items,
-                        key.to_vec(),
-                        element,
-                    ));
-                }
-                Ok(!has_raw)
             }
         }
     }

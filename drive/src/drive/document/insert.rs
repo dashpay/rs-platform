@@ -36,6 +36,7 @@ impl Drive {
         document_and_contract_info: &DocumentAndContractInfo,
         block_time: f64,
         insert_without_check: bool,
+        apply: bool,
         transaction: TransactionArg,
         drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<(), Error> {
@@ -67,6 +68,7 @@ impl Drive {
             self.batch_insert_empty_tree_if_not_exists(
                 path_key_info,
                 &storage_flags,
+                apply,
                 transaction,
                 drive_operations,
             )?;
@@ -212,6 +214,7 @@ impl Drive {
             };
             let inserted = self.batch_insert_if_not_exists(
                 path_key_element_info,
+                apply,
                 transaction,
                 drive_operations,
             )?;
@@ -374,6 +377,7 @@ impl Drive {
                 &document_and_contract_info,
                 block_time,
                 override_document,
+                apply,
                 transaction,
                 &mut batch_operations,
             )?;
@@ -415,6 +419,7 @@ impl Drive {
             self.batch_insert_empty_tree_if_not_exists(
                 path_key_info,
                 &storage_flags,
+                apply,
                 transaction,
                 &mut batch_operations,
             )?;
@@ -458,6 +463,7 @@ impl Drive {
                 self.batch_insert_empty_tree_if_not_exists(
                     path_key_info,
                     &storage_flags,
+                    apply,
                     transaction,
                     &mut batch_operations,
                 )?;
@@ -475,6 +481,7 @@ impl Drive {
                 self.batch_insert_empty_tree_if_not_exists(
                     path_key_info,
                     &storage_flags,
+                    apply,
                     transaction,
                     &mut batch_operations,
                 )?;
@@ -515,6 +522,7 @@ impl Drive {
                 self.batch_insert_empty_tree_if_not_exists(
                     path_key_info,
                     &storage_flags,
+                    apply,
                     transaction,
                     &mut batch_operations,
                 )?;
@@ -571,6 +579,7 @@ impl Drive {
                 // here we should return an error if the element already exists
                 let inserted = self.batch_insert_if_not_exists(
                     path_key_element_info,
+                    apply,
                     transaction,
                     &mut batch_operations,
                 )?;
