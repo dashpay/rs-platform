@@ -4,8 +4,8 @@ use grovedb::{batch::GroveDbOp, Element, PathQuery};
 
 use crate::drive::flags::StorageFlags;
 use crate::error::drive::DriveError;
-use crate::error::Error;
 use crate::error::fee::FeeError;
+use crate::error::Error;
 use crate::fee::default_costs::{
     HASH_BYTE_COST, HASH_NODE_COST, NON_STORAGE_LOAD_CREDIT_PER_BYTE,
     STORAGE_DISK_USAGE_CREDIT_PER_BYTE, STORAGE_LOAD_CREDIT_PER_BYTE,

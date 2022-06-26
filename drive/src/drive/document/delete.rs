@@ -1,11 +1,11 @@
 use grovedb::{Element, TransactionArg};
 
-use crate::contract::Contract;
 use crate::contract::document::Document;
+use crate::contract::Contract;
 use crate::drive::defaults::CONTRACT_DOCUMENTS_PATH_HEIGHT;
 use crate::drive::document::{contract_document_type_path, contract_documents_primary_key_path};
-use crate::drive::Drive;
 use crate::drive::object_size_info::KeyValueInfo::KeyRefRequest;
+use crate::drive::Drive;
 use crate::error::drive::DriveError;
 use crate::error::Error;
 use crate::fee::calculate_fee;
@@ -212,13 +212,13 @@ mod tests {
     use crate::common::{
         cbor_from_hex, json_document_to_cbor, setup_contract, setup_contract_from_hex,
         value_to_cbor,
-        };
+    };
     use crate::contract::document::Document;
     use crate::drive::document::tests::setup_dashpay;
-    use crate::drive::Drive;
     use crate::drive::flags::StorageFlags;
     use crate::drive::object_size_info::DocumentAndContractInfo;
     use crate::drive::object_size_info::DocumentInfo::DocumentAndSerialization;
+    use crate::drive::Drive;
     use crate::query::DriveQuery;
 
     #[test]

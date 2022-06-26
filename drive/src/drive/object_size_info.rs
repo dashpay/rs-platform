@@ -1,5 +1,5 @@
-use std::ops::AddAssign;
 use grovedb::Element;
+use std::ops::AddAssign;
 
 use KeyInfo::{Key, KeyRef, KeySize};
 use KeyValueInfo::{KeyRefRequest, KeyValueMaxSize};
@@ -7,8 +7,8 @@ use PathInfo::{PathFixedSizeIterator, PathIterator, PathSize};
 use PathKeyElementInfo::{PathFixedSizeKeyElement, PathKeyElement, PathKeyElementSize};
 use PathKeyInfo::{PathFixedSizeKey, PathFixedSizeKeyRef, PathKey, PathKeyRef, PathKeySize};
 
-use crate::contract::{Contract, DocumentType};
 use crate::contract::document::Document;
+use crate::contract::{Contract, DocumentType};
 use crate::drive::defaults::DEFAULT_HASH_SIZE;
 use crate::drive::flags::StorageFlags;
 use crate::error::contract::ContractError;

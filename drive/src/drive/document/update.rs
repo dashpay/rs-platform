@@ -1,8 +1,7 @@
 use grovedb::{Element, TransactionArg};
 
-use crate::contract::Contract;
 use crate::contract::document::Document;
-use crate::drive::Drive;
+use crate::contract::Contract;
 use crate::drive::defaults::CONTRACT_DOCUMENTS_PATH_HEIGHT;
 use crate::drive::document::{
     contract_document_type_path,
@@ -10,12 +9,11 @@ use crate::drive::document::{
     contract_documents_primary_key_path,
 };
 use crate::drive::flags::StorageFlags;
-use crate::drive::object_size_info::{DocumentAndContractInfo, PathKeyInfo};
-use crate::drive::object_size_info::DocumentInfo::{
-    DocumentAndSerialization, DocumentSize,
-};
+use crate::drive::object_size_info::DocumentInfo::{DocumentAndSerialization, DocumentSize};
 use crate::drive::object_size_info::KeyValueInfo::KeyRefRequest;
 use crate::drive::object_size_info::PathKeyElementInfo::PathKeyElement;
+use crate::drive::object_size_info::{DocumentAndContractInfo, PathKeyInfo};
+use crate::drive::Drive;
 use crate::error::drive::DriveError;
 use crate::error::Error;
 use crate::fee::calculate_fee;
@@ -434,15 +432,12 @@ mod tests {
     use serde_json::json;
     use tempfile::TempDir;
 
-    use crate::common::{
-        json_document_to_cbor, setup_contract,
-        value_to_cbor,
-        };
-    use crate::contract::{Contract, document::Document};
-    use crate::drive::{defaults, Drive};
+    use crate::common::{json_document_to_cbor, setup_contract, value_to_cbor};
+    use crate::contract::{document::Document, Contract};
     use crate::drive::flags::StorageFlags;
     use crate::drive::object_size_info::DocumentAndContractInfo;
     use crate::drive::object_size_info::DocumentInfo::DocumentAndSerialization;
+    use crate::drive::{defaults, Drive};
     use crate::query::DriveQuery;
 
     #[test]

@@ -11,8 +11,8 @@ use grovedb::TransactionArg;
 
 use crate::contract::Contract;
 use crate::drive::Drive;
-use crate::error::Error;
 use crate::error::structure::StructureError;
+use crate::error::Error;
 
 pub fn setup_contract(
     drive: &Drive,

@@ -6,9 +6,9 @@ use serde::{Deserialize, Serialize};
 use crate::common;
 use crate::common::bytes_for_system_value_from_tree_map;
 use crate::drive::Drive;
-use crate::error::Error;
 use crate::error::identity::IdentityError;
 use crate::error::structure::StructureError;
+use crate::error::Error;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct Identity {

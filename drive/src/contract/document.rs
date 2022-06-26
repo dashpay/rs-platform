@@ -11,8 +11,8 @@ use crate::drive::defaults::PROTOCOL_VERSION;
 use crate::drive::Drive;
 use crate::error::contract::ContractError;
 use crate::error::drive::DriveError;
-use crate::error::Error;
 use crate::error::structure::StructureError;
+use crate::error::Error;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Document {
