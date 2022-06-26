@@ -1,16 +1,18 @@
-use crate::contract::Contract;
-use crate::drive::Drive;
-use crate::error::structure::StructureError;
-use crate::error::Error;
-use byteorder::{BigEndian, WriteBytesExt};
-use ciborium::value::Value;
-use grovedb::TransactionArg;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs::File;
 use std::io;
 use std::io::{BufRead, BufReader};
 use std::option::Option::None;
 use std::path::Path;
+
+use byteorder::{BigEndian, WriteBytesExt};
+use ciborium::value::Value;
+use grovedb::TransactionArg;
+
+use crate::contract::Contract;
+use crate::drive::Drive;
+use crate::error::Error;
+use crate::error::structure::StructureError;
 
 pub fn setup_contract(
     drive: &Drive,

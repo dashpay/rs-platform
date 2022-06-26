@@ -1,10 +1,11 @@
 #[cfg(test)]
 mod tests {
+    use serde_json::json;
+
     use crate::common;
     use crate::contract::{Contract, DocumentType, Index, IndexProperty};
-    use crate::error::{query::QueryError, Error};
+    use crate::error::{Error, query::QueryError};
     use crate::query::DriveQuery;
-    use serde_json::json;
 
     fn construct_indexed_document_type() -> DocumentType {
         DocumentType {

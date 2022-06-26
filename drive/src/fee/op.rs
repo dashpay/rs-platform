@@ -1,9 +1,13 @@
+use costs::OperationCost;
+use enum_map::Enum;
+use grovedb::{batch::GroveDbOp, Element, PathQuery};
+
 use crate::drive::flags::StorageFlags;
 use crate::error::drive::DriveError;
-use crate::error::fee::FeeError;
 use crate::error::Error;
+use crate::error::fee::FeeError;
 use crate::fee::default_costs::{
-    HASH_BYTE_COST, HASH_NODE_COST, NON_STORAGE_LOAD_CREDIT_PER_BYTE, QUERY_CREDIT_PER_BYTE,
+    HASH_BYTE_COST, HASH_NODE_COST, NON_STORAGE_LOAD_CREDIT_PER_BYTE,
     STORAGE_DISK_USAGE_CREDIT_PER_BYTE, STORAGE_LOAD_CREDIT_PER_BYTE,
     STORAGE_PROCESSING_CREDIT_PER_BYTE, STORAGE_SEEK_COST,
 };
@@ -11,9 +15,6 @@ use crate::fee::op::DriveOperation::{
     CalculatedCostOperation, ContractFetch, CostCalculationDeleteOperation,
     CostCalculationInsertOperation, CostCalculationQueryOperation, GroveOperation,
 };
-use costs::OperationCost;
-use enum_map::{enum_map, Enum, EnumMap};
-use grovedb::{batch::GroveDbOp, Element, GroveDb, PathQuery};
 
 #[derive(Debug, Enum)]
 pub enum BaseOp {

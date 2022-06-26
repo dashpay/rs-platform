@@ -1,29 +1,32 @@
-mod defaults;
-pub mod document;
-pub mod types;
+use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::fmt;
+
+use ciborium::value::{Value as CborValue, Value};
+use rand::{Rng, SeedableRng};
+use rand::rngs::StdRng;
+use serde::{Deserialize, Serialize};
+
+use document::Document;
 
 use crate::common::{
     bool_for_system_value_from_tree_map, btree_map_inner_bool_value, btree_map_inner_btree_map,
     btree_map_inner_map_value, btree_map_inner_size_value, btree_map_inner_text_value,
     bytes_for_system_value, bytes_for_system_value_from_tree_map, cbor_inner_array_of_strings,
     cbor_inner_array_value, cbor_inner_bool_value_with_default, cbor_inner_btree_map,
-    cbor_inner_text_value, cbor_map_to_btree_map, get_key_from_cbor_map,
+    cbor_inner_text_value, cbor_map_to_btree_map,
 };
 use crate::contract::types::{DocumentField, DocumentFieldType};
-use crate::drive::config::DriveEncoding;
-use crate::drive::defaults::{DEFAULT_HASH_SIZE, MAX_INDEX_SIZE, PROTOCOL_VERSION};
 use crate::drive::{Drive, RootTree};
+use crate::drive::config::DriveEncoding;
+use crate::drive::defaults::{DEFAULT_HASH_SIZE, MAX_INDEX_SIZE};
 use crate::error::contract::ContractError;
 use crate::error::drive::DriveError;
-use crate::error::structure::StructureError;
 use crate::error::Error;
-use ciborium::value::{Value as CborValue, Value};
-use document::Document;
-use rand::rngs::StdRng;
-use rand::{Rng, SeedableRng};
-use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet, HashMap};
-use std::fmt;
+use crate::error::structure::StructureError;
+
+mod defaults;
+pub mod document;
+pub mod types;
 
 // contract
 // - id
@@ -903,10 +906,11 @@ fn contract_document_types(contract: &HashMap<String, CborValue>) -> Option<&Vec
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use crate::common::json_document_to_cbor;
     use crate::contract::{Contract, Document};
     use crate::drive::Drive;
-    use std::collections::HashMap;
 
     #[test]
     fn test_cbor_deserialization() {

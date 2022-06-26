@@ -1,12 +1,14 @@
+use std::collections::BTreeMap;
+
+use ciborium::value::Value;
+use serde::{Deserialize, Serialize};
+
 use crate::common;
 use crate::common::bytes_for_system_value_from_tree_map;
 use crate::drive::Drive;
+use crate::error::Error;
 use crate::error::identity::IdentityError;
 use crate::error::structure::StructureError;
-use crate::error::Error;
-use ciborium::value::Value;
-use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct Identity {
@@ -189,8 +191,6 @@ impl Identity {
 #[cfg(test)]
 mod tests {
     use crate::identity::Identity;
-    use ciborium::value::Value;
-    use std::collections::BTreeMap;
 
     #[test]
     pub fn deserialize() {

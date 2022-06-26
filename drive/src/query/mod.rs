@@ -1,35 +1,38 @@
-pub mod conditions;
-mod defaults;
-pub mod ordering;
-mod test_index;
+use std::collections::BTreeMap;
+use std::ops::BitXor;
 
-use crate::common::bytes_for_system_value;
-use crate::contract::{document::Document, Contract, DocumentType, Index, IndexProperty};
-use crate::drive::object_size_info::KeyValueInfo;
-use crate::drive::Drive;
-use crate::error::drive::DriveError;
-use crate::error::query::QueryError;
-use crate::error::structure::StructureError;
-use crate::error::Error;
-use crate::error::Error::GroveDB;
-use crate::fee::calculate_fee;
-use crate::fee::op::{DriveOperation, SizesOfQueryOperation};
 use ciborium::value::Value;
-use conditions::WhereOperator::{Equal, In};
-pub use conditions::{WhereClause, WhereOperator};
 pub use grovedb::{
     Element, Error as GroveError, GroveDb, PathQuery, Query, QueryItem, SizedQuery, TransactionArg,
 };
 use indexmap::IndexMap;
-pub use ordering::OrderClause;
 use sqlparser::ast;
+use sqlparser::ast::{OrderByExpr, Select, Statement};
 use sqlparser::ast::TableFactor::Table;
 use sqlparser::ast::Value::Number;
-use sqlparser::ast::{OrderByExpr, Select, Statement};
 use sqlparser::dialect::GenericDialect;
 use sqlparser::parser::Parser;
-use std::collections::BTreeMap;
-use std::ops::BitXor;
+
+pub use conditions::{WhereClause, WhereOperator};
+use conditions::WhereOperator::{Equal, In};
+pub use ordering::OrderClause;
+
+use crate::common::bytes_for_system_value;
+use crate::contract::{Contract, document::Document, DocumentType, Index, IndexProperty};
+use crate::drive::Drive;
+use crate::drive::object_size_info::KeyValueInfo;
+use crate::error::drive::DriveError;
+use crate::error::Error;
+use crate::error::Error::GroveDB;
+use crate::error::query::QueryError;
+use crate::error::structure::StructureError;
+use crate::fee::calculate_fee;
+use crate::fee::op::DriveOperation;
+
+pub mod conditions;
+mod defaults;
+pub mod ordering;
+mod test_index;
 
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct InternalClauses {
@@ -1214,15 +1217,16 @@ impl<'a> DriveQuery<'a> {
 
 #[cfg(test)]
 mod tests {
+    use serde_json::json;
+    use tempfile::TempDir;
+
     use crate::common;
     use crate::common::json_document_to_cbor;
     use crate::contract::{Contract, DocumentType};
-    use crate::drive::flags::StorageFlags;
     use crate::drive::Drive;
+    use crate::drive::flags::StorageFlags;
     use crate::query::DriveQuery;
-    use serde_json::json;
     use serde_json::Value::Null;
-    use tempfile::TempDir;
 
     fn setup_family_contract() -> (Drive, Contract) {
         let tmp_dir = TempDir::new().unwrap();

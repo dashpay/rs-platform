@@ -77,22 +77,12 @@ fn contract_documents_keeping_history_storage_time_reference_path_size(
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use crate::common::{
-        cbor_from_hex, json_document_to_cbor, setup_contract, setup_contract_from_hex,
-        value_to_cbor,
-    };
-    use crate::contract::{document::Document, Contract};
-    use crate::drive::flags::StorageFlags;
-    use crate::drive::object_size_info::DocumentInfo::DocumentAndSerialization;
-    use crate::drive::object_size_info::{DocumentAndContractInfo, DocumentInfo};
-    use crate::drive::{defaults, Drive};
-    use crate::fee::op::{DriveOperation, SizesOfQueryOperation};
-    use crate::query::DriveQuery;
-    use rand::Rng;
-    use serde_json::json;
-    use std::collections::HashMap;
     use std::option::Option::None;
+
     use tempfile::TempDir;
+
+    use crate::common::json_document_to_cbor;
+    use crate::drive::Drive;
 
     pub fn setup_dashpay(_prefix: &str, mutable_contact_requests: bool) -> (Drive, Vec<u8>) {
         // Todo: make TempDir based on _prefix

@@ -1,11 +1,12 @@
+use grovedb::{Element, TransactionArg};
+
+use crate::drive::{Drive, RootTree};
 use crate::drive::flags::StorageFlags;
 use crate::drive::object_size_info::PathKeyElementInfo::PathFixedSizeKeyElement;
-use crate::drive::{Drive, RootTree};
 use crate::error::Error;
 use crate::fee::calculate_fee;
 use crate::fee::op::DriveOperation;
 use crate::identity::Identity;
-use grovedb::{Element, TransactionArg};
 
 impl Drive {
     fn insert_identity(
@@ -63,11 +64,12 @@ impl Drive {
 
 #[cfg(test)]
 mod tests {
-    use crate::drive::flags::StorageFlags;
-    use crate::drive::Drive;
-    use crate::identity::Identity;
     use grovedb::Element;
     use tempfile::TempDir;
+
+    use crate::drive::Drive;
+    use crate::drive::flags::StorageFlags;
+    use crate::identity::Identity;
 
     #[test]
     fn test_insert_identity() {

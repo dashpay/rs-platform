@@ -1,16 +1,18 @@
+use std::collections::BTreeMap;
+use std::io::{BufReader, Read};
+
+use byteorder::{BigEndian, WriteBytesExt};
+use ciborium::value::Value;
+use serde::{Deserialize, Serialize};
+
 use crate::common::{bytes_for_system_value_from_tree_map, get_key_from_cbor_map};
 use crate::contract::{Contract, DocumentType};
 use crate::drive::defaults::PROTOCOL_VERSION;
 use crate::drive::Drive;
 use crate::error::contract::ContractError;
 use crate::error::drive::DriveError;
-use crate::error::structure::StructureError;
 use crate::error::Error;
-use byteorder::{BigEndian, WriteBytesExt};
-use ciborium::value::Value;
-use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
-use std::io::{BufReader, Read};
+use crate::error::structure::StructureError;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Document {
@@ -83,7 +85,7 @@ impl Document {
     }
 
     pub fn from_bytes(
-        mut serialized_document: &[u8],
+        serialized_document: &[u8],
         document_type: &DocumentType,
     ) -> Result<Self, Error> {
         let mut buf = BufReader::new(serialized_document);
@@ -343,7 +345,7 @@ impl Document {
 #[cfg(test)]
 mod tests {
     use crate::common::json_document_to_cbor;
-    use crate::contract::{Contract, Document};
+    use crate::contract::Contract;
 
     #[test]
     fn test_drive_serialization() {

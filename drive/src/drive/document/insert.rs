@@ -1,5 +1,8 @@
-use crate::contract::document::Document;
+use grovedb::{Element, TransactionArg};
+
 use crate::contract::{Contract, DocumentType};
+use crate::contract::document::Document;
+use crate::drive::{defaults, Drive};
 use crate::drive::defaults::{DEFAULT_HASH_SIZE, STORAGE_FLAGS_SIZE};
 use crate::drive::document::{
     contract_document_type_path,
@@ -10,6 +13,7 @@ use crate::drive::document::{
     contract_documents_primary_key_path,
 };
 use crate::drive::flags::StorageFlags;
+use crate::drive::object_size_info::{DocumentAndContractInfo, PathInfo, PathKeyElementInfo};
 use crate::drive::object_size_info::DocumentInfo::{
     DocumentAndSerialization, DocumentSize, DocumentWithoutSerialization,
 };
@@ -19,13 +23,10 @@ use crate::drive::object_size_info::PathKeyElementInfo::{
     PathFixedSizeKeyElement, PathKeyElementSize,
 };
 use crate::drive::object_size_info::PathKeyInfo::{PathFixedSizeKeyRef, PathKeySize};
-use crate::drive::object_size_info::{DocumentAndContractInfo, PathInfo, PathKeyElementInfo};
-use crate::drive::{defaults, Drive};
 use crate::error::drive::DriveError;
 use crate::error::Error;
 use crate::fee::calculate_fee;
 use crate::fee::op::DriveOperation;
-use grovedb::{Element, TransactionArg};
 
 impl Drive {
     // If a document isn't sent to this function then we are just calling to know the query and
@@ -586,23 +587,21 @@ impl Drive {
 
 #[cfg(test)]
 mod tests {
+    use std::option::Option::None;
+
+    use rand::Rng;
+    use tempfile::TempDir;
+
     use crate::common::{
-        cbor_from_hex, json_document_to_cbor, setup_contract, setup_contract_from_hex,
-        value_to_cbor,
+        json_document_to_cbor, setup_contract,
     };
-    use crate::contract::{document::Document, Contract};
+    use crate::contract::document::Document;
+    use crate::drive::Drive;
     use crate::drive::document::tests::setup_dashpay;
     use crate::drive::flags::StorageFlags;
     use crate::drive::object_size_info::DocumentAndContractInfo;
     use crate::drive::object_size_info::DocumentInfo::DocumentAndSerialization;
-    use crate::drive::{defaults, Drive};
     use crate::fee::op::DriveOperation;
-    use crate::query::DriveQuery;
-    use rand::Rng;
-    use serde_json::json;
-    use std::collections::HashMap;
-    use std::option::Option::None;
-    use tempfile::TempDir;
 
     #[test]
     fn test_add_dashpay_documents_no_transaction() {

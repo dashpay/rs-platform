@@ -1,16 +1,19 @@
-use crate::contract::document::Document;
-use crate::contract::{Contract, DocumentType};
-use crate::drive::defaults::DEFAULT_HASH_SIZE;
-use crate::drive::flags::StorageFlags;
-use crate::error::contract::ContractError;
-use crate::error::drive::DriveError;
-use crate::error::Error;
+use std::ops::AddAssign;
 use grovedb::Element;
+
 use KeyInfo::{Key, KeyRef, KeySize};
 use KeyValueInfo::{KeyRefRequest, KeyValueMaxSize};
 use PathInfo::{PathFixedSizeIterator, PathIterator, PathSize};
 use PathKeyElementInfo::{PathFixedSizeKeyElement, PathKeyElement, PathKeyElementSize};
 use PathKeyInfo::{PathFixedSizeKey, PathFixedSizeKeyRef, PathKey, PathKeyRef, PathKeySize};
+
+use crate::contract::{Contract, DocumentType};
+use crate::contract::document::Document;
+use crate::drive::defaults::DEFAULT_HASH_SIZE;
+use crate::drive::flags::StorageFlags;
+use crate::error::contract::ContractError;
+use crate::error::drive::DriveError;
+use crate::error::Error;
 
 #[derive(Clone)]
 pub enum PathInfo<'a, const N: usize> {
@@ -62,9 +65,9 @@ impl<'a, const N: usize> PathInfo<'a, N> {
                 }
             },
             PathSize(mut path_size) => match key_info {
-                Key(key) => path_size += key.len(),
-                KeyRef(key_ref) => path_size += key_ref.len(),
-                KeySize(key_size) => path_size += key_size,
+                Key(key) => path_size.add_assign(key.len()),
+                KeyRef(key_ref) => path_size.add_assign(key_ref.len()),
+                KeySize(key_size) => path_size.add_assign(key_size),
             },
         }
         Ok(())

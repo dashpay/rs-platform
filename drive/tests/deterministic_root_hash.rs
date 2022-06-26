@@ -1,7 +1,9 @@
-use grovedb::{Element, Transaction};
-use rs_drive::drive::{Drive, RootTree};
 use std::option::Option::None;
+
+use grovedb::{Element, Transaction};
 use tempfile::TempDir;
+
+use rs_drive::drive::{Drive, RootTree};
 
 fn test_root_hash(drive: &Drive, db_transaction: &Transaction) {
     // [1644293142180] INFO (35 on bf3bb2a2796a): createTree

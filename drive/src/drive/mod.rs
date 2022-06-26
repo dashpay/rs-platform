@@ -1,3 +1,19 @@
+use std::cell::RefCell;
+use std::path::Path;
+use std::sync::Arc;
+
+use grovedb::{Element, GroveDb, Transaction, TransactionArg};
+use moka::sync::Cache;
+
+use object_size_info::DocumentAndContractInfo;
+use object_size_info::DocumentInfo::DocumentSize;
+
+use crate::contract::Contract;
+use crate::drive::config::DriveConfig;
+use crate::error::Error;
+use crate::fee::op::DriveOperation;
+use crate::fee::op::DriveOperation::GroveOperation;
+
 pub mod config;
 pub mod contract;
 pub mod defaults;
@@ -7,37 +23,6 @@ mod grove_operations;
 pub mod identity;
 pub mod object_size_info;
 pub mod query;
-
-use crate::contract::{document::Document, Contract, DocumentType};
-use crate::drive::config::DriveConfig;
-use crate::drive::defaults::STORAGE_FLAGS_SIZE;
-use crate::drive::object_size_info::DocumentInfo::DocumentWithoutSerialization;
-use crate::error::drive::DriveError;
-use crate::error::query::QueryError;
-use crate::error::Error;
-use crate::fee::calculate_fee;
-use crate::fee::op::DriveOperation::GroveOperation;
-use crate::fee::op::{DriveOperation, SizesOfDeleteOperation, SizesOfQueryOperation};
-use crate::query::DriveQuery;
-use defaults::{CONTRACT_DOCUMENTS_PATH_HEIGHT, DEFAULT_HASH_SIZE};
-use flags::StorageFlags;
-use grovedb::{Element, GroveDb, Transaction, TransactionArg};
-use moka::sync::Cache;
-use object_size_info::DocumentInfo::{DocumentAndSerialization, DocumentSize};
-use object_size_info::KeyElementInfo::{KeyElement, KeyElementSize};
-use object_size_info::KeyInfo::{Key, KeyRef};
-use object_size_info::KeyValueInfo::KeyRefRequest;
-use object_size_info::PathKeyElementInfo::{
-    PathFixedSizeKeyElement, PathKeyElement, PathKeyElementSize,
-};
-use object_size_info::PathKeyInfo::{PathFixedSizeKeyRef, PathKeySize};
-use object_size_info::{
-    DocumentAndContractInfo, DocumentInfo, KeyInfo, KeyValueInfo, PathInfo, PathKeyElementInfo,
-    PathKeyInfo,
-};
-use std::cell::RefCell;
-use std::path::Path;
-use std::sync::Arc;
 
 pub struct EpochInfo {
     current_epoch: u16,
@@ -226,10 +211,12 @@ impl Drive {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
+    use tempfile::TempDir;
+
     use crate::common::json_document_to_cbor;
     use crate::drive::Drive;
-    use std::collections::HashMap;
-    use tempfile::TempDir;
 
     #[test]
     fn store_document_1() {

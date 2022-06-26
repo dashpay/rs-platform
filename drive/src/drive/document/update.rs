@@ -1,32 +1,25 @@
-use crate::contract::document::Document;
+use grovedb::{Element, TransactionArg};
+
 use crate::contract::Contract;
-use crate::drive::defaults::{
-    CONTRACT_DOCUMENTS_PATH_HEIGHT, DEFAULT_HASH_SIZE, STORAGE_FLAGS_SIZE,
-};
+use crate::contract::document::Document;
+use crate::drive::Drive;
+use crate::drive::defaults::CONTRACT_DOCUMENTS_PATH_HEIGHT;
 use crate::drive::document::{
     contract_document_type_path,
     contract_documents_keeping_history_primary_key_path_for_document_id,
-    contract_documents_keeping_history_primary_key_path_for_document_id_size,
-    contract_documents_keeping_history_storage_time_reference_path,
-    contract_documents_keeping_history_storage_time_reference_path_size,
     contract_documents_primary_key_path,
 };
 use crate::drive::flags::StorageFlags;
+use crate::drive::object_size_info::{DocumentAndContractInfo, PathKeyInfo};
 use crate::drive::object_size_info::DocumentInfo::{
-    DocumentAndSerialization, DocumentSize, DocumentWithoutSerialization,
+    DocumentAndSerialization, DocumentSize,
 };
 use crate::drive::object_size_info::KeyValueInfo::KeyRefRequest;
-use crate::drive::object_size_info::PathKeyElementInfo::{
-    PathFixedSizeKeyElement, PathKeyElement, PathKeyElementSize,
-};
-use crate::drive::object_size_info::PathKeyInfo::{PathFixedSizeKeyRef, PathKeySize};
-use crate::drive::object_size_info::{DocumentAndContractInfo, PathKeyInfo};
-use crate::drive::{defaults, Drive};
+use crate::drive::object_size_info::PathKeyElementInfo::PathKeyElement;
 use crate::error::drive::DriveError;
 use crate::error::Error;
 use crate::fee::calculate_fee;
 use crate::fee::op::DriveOperation;
-use grovedb::{Element, TransactionArg};
 
 impl Drive {
     pub fn update_document_for_contract_cbor(
@@ -435,23 +428,22 @@ impl Drive {
 
 #[cfg(test)]
 mod tests {
+    use std::option::Option::None;
+
+    use rand::Rng;
+    use serde_json::json;
+    use tempfile::TempDir;
+
     use crate::common::{
-        cbor_from_hex, json_document_to_cbor, setup_contract, setup_contract_from_hex,
+        json_document_to_cbor, setup_contract,
         value_to_cbor,
-    };
-    use crate::contract::{document::Document, Contract};
-    use crate::drive::document::tests::setup_dashpay;
+        };
+    use crate::contract::{Contract, document::Document};
+    use crate::drive::{defaults, Drive};
     use crate::drive::flags::StorageFlags;
     use crate::drive::object_size_info::DocumentAndContractInfo;
     use crate::drive::object_size_info::DocumentInfo::DocumentAndSerialization;
-    use crate::drive::{defaults, Drive};
-    use crate::fee::op::DriveOperation;
     use crate::query::DriveQuery;
-    use rand::Rng;
-    use serde_json::json;
-    use std::collections::HashMap;
-    use std::option::Option::None;
-    use tempfile::TempDir;
 
     #[test]
     fn test_create_and_update_document_same_transaction() {

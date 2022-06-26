@@ -1,4 +1,10 @@
+use std::sync::Arc;
+
+use costs::CostContext;
+use grovedb::{Element, TransactionArg};
+
 use crate::contract::Contract;
+use crate::drive::{contract_documents_path, defaults, Drive, RootTree};
 use crate::drive::flags::StorageFlags;
 use crate::drive::object_size_info::KeyInfo::{KeyRef, KeySize};
 use crate::drive::object_size_info::KeyValueInfo::KeyRefRequest;
@@ -6,17 +12,11 @@ use crate::drive::object_size_info::PathKeyElementInfo::{
     PathFixedSizeKeyElement, PathKeyElementSize,
 };
 use crate::drive::object_size_info::PathKeyInfo::PathFixedSizeKeyRef;
-use crate::drive::{contract_documents_path, defaults, Drive, RootTree};
 use crate::error::drive::DriveError;
 use crate::error::Error;
 use crate::fee::calculate_fee;
-use crate::fee::op::DriveOperation::{
-    CalculatedCostOperation, ContractFetch, CostCalculationQueryOperation,
-};
-use crate::fee::op::{DriveOperation, SizesOfQueryOperation};
-use costs::CostContext;
-use grovedb::{Element, TransactionArg};
-use std::sync::Arc;
+use crate::fee::op::DriveOperation;
+use crate::fee::op::DriveOperation::ContractFetch;
 
 fn contract_root_path(contract_id: &[u8]) -> [&[u8]; 2] {
     [
@@ -474,13 +474,14 @@ impl Drive {
 
 #[cfg(test)]
 mod tests {
-    use crate::common::json_document_to_cbor;
-    use crate::contract::Contract;
-    use crate::drive::flags::StorageFlags;
-    use crate::drive::object_size_info::{DocumentAndContractInfo, DocumentInfo};
-    use crate::drive::Drive;
     use rand::Rng;
     use tempfile::TempDir;
+
+    use crate::common::json_document_to_cbor;
+    use crate::contract::Contract;
+    use crate::drive::Drive;
+    use crate::drive::flags::StorageFlags;
+    use crate::drive::object_size_info::{DocumentAndContractInfo, DocumentInfo};
 
     fn setup_deep_nested_contract() -> (Drive, Contract, Vec<u8>) {
         // Todo: make TempDir based on _prefix

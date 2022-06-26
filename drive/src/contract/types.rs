@@ -1,17 +1,19 @@
-use crate::common::{cbor_inner_array_value, cbor_map_to_btree_map, cbor_owned_map_to_btree_map};
-use crate::error::contract::ContractError;
-use crate::error::drive::DriveError;
-use crate::error::Error;
+use std::collections::BTreeMap;
+use std::fmt;
+use std::io::{BufReader, Read};
+
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use ciborium::value::{Integer, Value};
 use integer_encoding::{VarInt, VarIntReader};
 use rand::distributions::{Alphanumeric, Standard};
-use rand::rngs::StdRng;
 use rand::Rng;
+use rand::rngs::StdRng;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
-use std::fmt;
-use std::io::{BufReader, Read};
+
+use crate::common::{cbor_map_to_btree_map, cbor_owned_map_to_btree_map};
+use crate::error::contract::ContractError;
+use crate::error::drive::DriveError;
+use crate::error::Error;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct DocumentField {
@@ -54,7 +56,7 @@ impl ArrayFieldType {
                     Value::Float(value_as_float) => Ok(value_as_float),
                     _ => Err(get_field_type_matching_error()),
                 }?;
-                let mut value_bytes = value_as_f64.to_be_bytes().to_vec();
+                let value_bytes = value_as_f64.to_be_bytes().to_vec();
                 Ok(value_bytes)
             }
             ArrayFieldType::Integer => {
@@ -65,7 +67,7 @@ impl ArrayFieldType {
                 let value_as_i64: i64 = value_as_integer.try_into().map_err(|_| {
                     Error::Contract(ContractError::ValueWrongType("expected integer value"))
                 })?;
-                let mut value_bytes = value_as_i64.to_be_bytes().to_vec();
+                let value_bytes = value_as_i64.to_be_bytes().to_vec();
                 Ok(value_bytes)
             }
             ArrayFieldType::Number => {
@@ -82,7 +84,7 @@ impl ArrayFieldType {
                 } else {
                     value.as_float().ok_or_else(get_field_type_matching_error)?
                 };
-                let mut value_bytes = value_as_f64.to_be_bytes().to_vec();
+                let value_bytes = value_as_f64.to_be_bytes().to_vec();
                 Ok(value_bytes)
             }
             ArrayFieldType::ByteArray(_, _) => {
@@ -151,7 +153,7 @@ impl ArrayFieldType {
                     Value::Float(value_as_float) => Ok(value_as_float),
                     _ => Err(get_field_type_matching_error()),
                 }?;
-                let mut value_bytes = value_as_f64.to_be_bytes().to_vec();
+                let value_bytes = value_as_f64.to_be_bytes().to_vec();
                 Ok(value_bytes)
             }
             ArrayFieldType::Integer => {
@@ -162,7 +164,7 @@ impl ArrayFieldType {
                 let value_as_i64: i64 = value_as_integer.try_into().map_err(|_| {
                     Error::Contract(ContractError::ValueWrongType("expected integer value"))
                 })?;
-                let mut value_bytes = value_as_i64.to_be_bytes().to_vec();
+                let value_bytes = value_as_i64.to_be_bytes().to_vec();
                 Ok(value_bytes)
             }
             ArrayFieldType::Number => {
@@ -179,7 +181,7 @@ impl ArrayFieldType {
                 } else {
                     value.as_float().ok_or_else(get_field_type_matching_error)?
                 };
-                let mut value_bytes = value_as_f64.to_be_bytes().to_vec();
+                let value_bytes = value_as_f64.to_be_bytes().to_vec();
                 Ok(value_bytes)
             }
             ArrayFieldType::ByteArray(_, _) => {
@@ -759,7 +761,7 @@ impl DocumentFieldType {
                 } else {
                     // if the value wasn't required we need to add a byte to prove it existed
                     let mut r_vec = vec![255u8];
-                    r_vec.extend(value_bytes);
+                    r_vec.append(&mut value_bytes);
                     Ok(r_vec)
                 }
             }
@@ -777,7 +779,7 @@ impl DocumentFieldType {
                 } else {
                     // if the value wasn't required we need to add a byte to prove it existed
                     let mut r_vec = vec![255u8];
-                    r_vec.extend(value_bytes);
+                    r_vec.append(&mut value_bytes);
                     Ok(r_vec)
                 }
             }
@@ -801,7 +803,7 @@ impl DocumentFieldType {
                 } else {
                     // if the value wasn't required we need to add a byte to prove it existed
                     let mut r_vec = vec![255u8];
-                    r_vec.extend(value_bytes);
+                    r_vec.append(&mut value_bytes);
                     Ok(r_vec)
                 }
             }
@@ -1246,9 +1248,11 @@ pub fn encode_float(val: f64) -> Result<Vec<u8>, Error> {
 
 #[cfg(test)]
 mod tests {
-    use crate::contract::types::DocumentFieldType;
-    use ciborium::value::{Integer, Value};
     use std::collections::BTreeMap;
+
+    use ciborium::value::{Integer, Value};
+
+    use crate::contract::types::DocumentFieldType;
 
     #[test]
     fn test_successful_encode() {
