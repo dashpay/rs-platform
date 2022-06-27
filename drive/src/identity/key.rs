@@ -118,7 +118,7 @@ impl IdentityKey {
 
     pub fn random_key_with_rng(id: u16, key_size: u16, rng: &mut StdRng) -> Self {
         let key_type = rng.gen_range(0..2);
-        let purpose = rng.gen_range(0..4);
+        let purpose = rng.gen_range(0..3);
         let security_level = rng.gen_range(0..4);
         let readonly = false;
         let public_key_bytes = (0..key_size).map(|_| rng.gen::<u8>()).collect();

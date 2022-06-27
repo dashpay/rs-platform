@@ -24,6 +24,15 @@ pub(crate) fn identity_key_tree_path(identity_id: &[u8]) -> [&[u8]; 3] {
     ]
 }
 
+pub(crate) fn identity_key_location_vec(identity_id: &[u8], encoded_key_id: &[u8]) -> Vec<Vec<u8>> {
+    vec![
+        Into::<&[u8; 1]>::into(RootTree::Identities).to_vec(),
+        identity_id.to_vec(),
+        Into::<&[u8; 1]>::into(IdentityRootStructure::IdentityTreeKeys).to_vec(),
+        encoded_key_id.to_vec(),
+    ]
+}
+
 pub(crate) fn identity_query_keys_tree_path(identity_id: &[u8]) -> [&[u8]; 4] {
     [
         Into::<&[u8; 1]>::into(RootTree::Identities),
