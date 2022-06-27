@@ -1164,7 +1164,7 @@ impl DriveWrapper {
             let grove_db = &drive.grove;
 
             let result = grove_db
-                .get_path_query(
+                .query(
                     &path_query,
                     using_transaction.then(|| transaction).flatten(),
                 )
