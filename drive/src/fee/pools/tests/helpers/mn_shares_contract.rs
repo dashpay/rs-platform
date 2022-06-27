@@ -75,7 +75,7 @@ fn create_mn_share_document(
 ) -> Document {
     let id = rand::random::<[u8; 32]>();
 
-    let properties: BTreeMap<String, Value> = BTreeMap::new();
+    let mut properties: BTreeMap<String, Value> = BTreeMap::new();
 
     properties.insert(String::from("payToId"), Value::Bytes(identity.id.to_vec()));
     properties.insert(String::from("percentage"), percentage.into());
