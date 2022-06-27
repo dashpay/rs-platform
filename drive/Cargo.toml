@@ -29,15 +29,15 @@ sha2 = "0.10.2"
 
 [dependencies.grovedb]
 git = "https://github.com/dashevo/grovedb"
-branch = "feat/worst_case_operations"
+branch = "develop"
 
 [dependencies.storage]
 git = "https://github.com/dashevo/grovedb"
-branch = "feat/worst_case_operations"
+branch = "develop"
 
 [dependencies.costs]
 git = "https://github.com/dashevo/grovedb"
-branch = "feat/worst_case_operations"
+branch = "develop"
 
 [dev-dependencies]
 criterion = "0.3.5"
