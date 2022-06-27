@@ -458,4 +458,24 @@ mod tests {
             },
         }
     }
+
+    mod overflow {
+        use std::str::FromStr;
+
+        use rust_decimal::Decimal;
+
+        #[test]
+        fn test_u64_fee_conversion() {
+            let processing_fee = u64::MAX;
+
+            let decimal = Decimal::from_str(processing_fee.to_string().as_str())
+                .expect("to convert u64::MAX to Decimal");
+
+            let converted_to_u64: u64 = decimal
+                .try_into()
+                .expect("to convert Decimal back to u64::MAX");
+
+            assert_eq!(processing_fee, converted_to_u64);
+        }
+    }
 }

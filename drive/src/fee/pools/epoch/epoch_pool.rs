@@ -163,7 +163,9 @@ mod tests {
 
     use crate::error::fee::FeeError;
     use crate::fee::pools::epoch::constants;
-    use crate::fee::pools::tests::helpers::setup::{setup_drive, setup_fee_pools};
+    use crate::fee::pools::tests::helpers::setup::{
+        setup_drive, setup_fee_pools, SetupFeePoolsOptions,
+    };
     use crate::{drive::Drive, error, fee::pools::fee_pools::FeePools};
 
     use super::EpochPool;
@@ -408,105 +410,75 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_init_empty() {
-        todo!();
+    mod init_empty {
+        #[test]
+        fn test_error_if_fee_pools_not_initialized() {
+            let drive = super::setup_drive();
+            let (transaction, _) = super::setup_fee_pools(
+                &drive,
+                Some(super::SetupFeePoolsOptions {
+                    init_fee_pools: false,
+                }),
+            );
 
-        let tmp_dir = TempDir::new().unwrap();
-        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+            let epoch = super::EpochPool::new(1042, &drive);
 
-        drive
-            .create_root_tree(None)
-            .expect("expected to create root tree successfully");
-
-        let transaction = drive.grove.start_transaction();
-
-        let epoch = EpochPool::new(1042, &drive);
-
-        match epoch.init_empty(Some(&transaction)) {
-            Ok(_) => assert!(false, "should not be able to init epoch without FeePools"),
-            Err(e) => match e {
-                error::Error::GroveDB(grovedb::Error::InvalidPath(_)) => assert!(true),
-                _ => assert!(false, "ivalid error type"),
-            },
+            match epoch.init_empty(Some(&transaction)) {
+                Ok(_) => assert!(false, "should not be able to init epoch without FeePools"),
+                Err(e) => match e {
+                    super::error::Error::GroveDB(grovedb::Error::InvalidPath(_)) => assert!(true),
+                    _ => assert!(false, "ivalid error type"),
+                },
+            }
         }
 
-        let fee_pools = FeePools::new();
+        #[test]
+        fn test_values_are_set() {
+            let drive = super::setup_drive();
+            let (transaction, _) = super::setup_fee_pools(&drive, None);
 
-        fee_pools
-            .init(&drive, Some(&transaction))
-            .expect("fee pools to init");
+            let epoch = super::EpochPool::new(1042, &drive);
 
-        let epoch = EpochPool::new(1042, &drive);
+            epoch
+                .init_empty(Some(&transaction))
+                .expect("to init an epoch pool");
 
-        let multiplier = 42;
+            let storage_fee = epoch
+                .get_storage_fee(Some(&transaction))
+                .expect("to get storage fee");
 
-        epoch
-            .init_empty(Some(&transaction))
-            .expect("to init an epoch pool");
-
-        let storage_fee = epoch
-            .get_storage_fee(Some(&transaction))
-            .expect("to get storage fee");
-
-        assert_eq!(storage_fee, dec!(0.0));
-
-        let stored_multiplier = epoch
-            .get_fee_multiplier(Some(&transaction))
-            .expect("to get multiplier");
-
-        assert_eq!(stored_multiplier, multiplier);
+            assert_eq!(storage_fee, super::dec!(0.0));
+        }
     }
 
-    #[test]
-    fn test_init_current() {
-        todo!()
+    mod init_current {
+        #[test]
+        fn test_values_are_set() {
+            let drive = super::setup_drive();
+            let (transaction, _) = super::setup_fee_pools(&drive, None);
+
+            let epoch = super::EpochPool::new(1042, &drive);
+
+            let multiplier = 42;
+
+            epoch
+                .init_empty(Some(&transaction))
+                .expect("to init empty epoch pool");
+
+            epoch
+                .init_current(multiplier, 0, 0, Some(&transaction))
+                .expect("to init an epoch pool");
+
+            let stored_multiplier = epoch
+                .get_fee_multiplier(Some(&transaction))
+                .expect("to get multiplier");
+
+            assert_eq!(stored_multiplier, multiplier);
+        }
     }
 
     #[test]
     fn test_mark_as_paid() {
         todo!();
-
-        let tmp_dir = TempDir::new().unwrap();
-        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
-
-        drive
-            .create_root_tree(None)
-            .expect("expected to create root tree successfully");
-
-        let transaction = drive.grove.start_transaction();
-
-        let fee_pools = FeePools::new();
-
-        fee_pools
-            .init(&drive, Some(&transaction))
-            .expect("fee pools to init");
-
-        let uninit_epoch_pool = EpochPool::new(7000, &drive);
-
-        match uninit_epoch_pool.mark_as_paid(Some(&transaction)) {
-            Ok(_) => assert!(false, "should not be able to delete uninit pool"),
-            Err(e) => match e {
-                error::Error::GroveDB(grovedb::Error::PathKeyNotFound(_)) => assert!(true),
-                _ => assert!(false, "error type is wrong"),
-            },
-        }
-
-        let epoch = EpochPool::new(42, &drive);
-
-        epoch
-            .mark_as_paid(Some(&transaction))
-            .expect("to delete 42th epoch");
-
-        match drive
-            .grove
-            .get(FeePools::get_path(), &epoch.key, Some(&transaction))
-        {
-            Ok(_) => assert!(false, "should not be able to get deleted epoch pool"),
-            Err(e) => match e {
-                grovedb::Error::PathKeyNotFound(_) => assert!(true),
-                _ => assert!(false, "error should be of type PathKeyNotFound"),
-            },
-        }
     }
 }
