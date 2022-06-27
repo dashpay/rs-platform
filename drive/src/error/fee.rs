@@ -11,10 +11,14 @@ pub enum FeeError {
     CorruptedProcessingFeeNotItem(&'static str),
     #[error("corrupted processing fee invalid item length error: {0}")]
     CorruptedProcessingFeeInvalidItemLength(&'static str),
-    #[error("corrupted first proposed block height not an item error: {0}")]
-    CorruptedFirstProposedBlockHeightNotItem(&'static str),
-    #[error("corrupted first proposed block height invalid item length error: {0}")]
-    CorruptedFirstProposedBlockHeightItemLength(&'static str),
+    #[error("corrupted start time not an item error")]
+    CorruptedStartTimeNotItem(),
+    #[error("corrupted start time invalid item length error")]
+    CorruptedStartTimeLength(),
+    #[error("corrupted start block height not an item")]
+    CorruptedStartBlockHeightNotItem(),
+    #[error("corrupted start block height invalid item length")]
+    CorruptedStartBlockHeightItemLength(),
     #[error("corrupted proposer block count not an item error: {0}")]
     CorruptedProposerBlockCountNotItem(&'static str),
     #[error("corrupted proposer block count invalid item length error: {0}")]

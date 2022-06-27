@@ -109,18 +109,10 @@ impl<'e> EpochPool<'e> {
 
         if let Element::Item(item, _) = element {
             Ok(i64::from_le_bytes(item.as_slice().try_into().map_err(
-                |_| {
-                    Error::Fee(FeeError::CorruptedFirstProposedBlockHeightItemLength(
-                        "epoch start time item have an invalid length",
-                    ))
-                },
+                |_| Error::Fee(FeeError::CorruptedStartTimeLength()),
             )?))
         } else {
-            Err(Error::Fee(
-                FeeError::CorruptedFirstProposedBlockHeightNotItem(
-                    "epoch start time must be an item",
-                ),
-            ))
+            Err(Error::Fee(FeeError::CorruptedStartTimeNotItem()))
         }
     }
 
@@ -137,18 +129,10 @@ impl<'e> EpochPool<'e> {
 
         if let Element::Item(item, _) = element {
             Ok(u64::from_le_bytes(item.as_slice().try_into().map_err(
-                |_| {
-                    Error::Fee(FeeError::CorruptedFirstProposedBlockHeightItemLength(
-                        "epoch start block height item have an invalid length",
-                    ))
-                },
+                |_| Error::Fee(FeeError::CorruptedStartBlockHeightItemLength()),
             )?))
         } else {
-            Err(Error::Fee(
-                FeeError::CorruptedFirstProposedBlockHeightNotItem(
-                    "epoch start block height must be an item",
-                ),
-            ))
+            Err(Error::Fee(FeeError::CorruptedStartBlockHeightNotItem()))
         }
     }
 
@@ -171,93 +155,254 @@ impl<'e> EpochPool<'e> {
 
 #[cfg(test)]
 mod tests {
+    use chrono::Utc;
     use grovedb::Element;
     use tempfile::TempDir;
 
     use crate::error::fee::FeeError;
     use crate::fee::pools::epoch::constants;
+    use crate::fee::pools::tests::helpers::setup::{setup_drive, setup_fee_pools};
     use crate::{drive::Drive, error, fee::pools::fee_pools::FeePools};
 
     use super::EpochPool;
 
     #[test]
-    fn test_update_and_get_start_time() {
-        todo!()
+    fn test_update_start_time() {
+        let drive = setup_drive();
+
+        let (transaction, fee_pools) = setup_fee_pools(&drive, None);
+
+        let epoch_pool = super::EpochPool::new(0, &drive);
+
+        let start_time: i64 = Utc::now().timestamp_millis();
+
+        epoch_pool
+            .update_start_time(start_time, Some(&transaction))
+            .expect("should update start time");
+
+        let actual_start_time = epoch_pool
+            .get_start_time(Some(&transaction))
+            .expect("should get start time");
+
+        assert_eq!(start_time, actual_start_time);
+    }
+
+    mod get_start_time {
+        #[test]
+        fn test_error_if_epoch_pool_is_not_initiated() {
+            let drive = super::setup_drive();
+
+            let (transaction, _) = super::setup_fee_pools(&drive, None);
+
+            let non_initiated_epoch_pool = super::EpochPool::new(7000, &drive);
+
+            match non_initiated_epoch_pool.get_start_time(Some(&transaction)) {
+                Ok(_) => assert!(
+                    false,
+                    "should not be able to get start time on uninit epoch pool"
+                ),
+                Err(e) => match e {
+                    super::error::Error::GroveDB(grovedb::Error::PathNotFound(_)) => assert!(true),
+                    _ => assert!(false, "invalid error type"),
+                },
+            }
+        }
+
+        #[test]
+        fn test_error_if_value_is_not_set() {
+            let drive = super::setup_drive();
+
+            let (transaction, _) = super::setup_fee_pools(&drive, None);
+
+            let epoch_pool = super::EpochPool::new(0, &drive);
+
+            match epoch_pool.get_start_time(Some(&transaction)) {
+                Ok(_) => assert!(false, "must be an error"),
+                Err(e) => match e {
+                    super::error::Error::GroveDB(_) => assert!(true),
+                    _ => assert!(false, "invalid error type"),
+                },
+            }
+        }
+
+        #[test]
+        fn test_error_if_element_has_invalid_type() {
+            let drive = super::setup_drive();
+
+            let (transaction, _) = super::setup_fee_pools(&drive, None);
+
+            let epoch_pool = super::EpochPool::new(0, &drive);
+
+            drive
+                .grove
+                .insert(
+                    epoch_pool.get_path(),
+                    super::constants::KEY_START_TIME.as_bytes(),
+                    super::Element::empty_tree(),
+                    Some(&transaction),
+                )
+                .expect("to insert invalid data");
+
+            match epoch_pool.get_start_time(Some(&transaction)) {
+                Ok(_) => assert!(false, "must be an error"),
+                Err(e) => match e {
+                    super::error::Error::Fee(super::FeeError::CorruptedStartTimeNotItem()) => {
+                        assert!(true)
+                    }
+                    _ => assert!(false, "invalid error type"),
+                },
+            }
+        }
+
+        #[test]
+        fn test_error_if_value_has_invalid_length() {
+            let drive = super::setup_drive();
+
+            let (transaction, _) = super::setup_fee_pools(&drive, None);
+
+            let epoch_pool = super::EpochPool::new(0, &drive);
+
+            drive
+                .grove
+                .insert(
+                    epoch_pool.get_path(),
+                    super::constants::KEY_START_TIME.as_bytes(),
+                    super::Element::Item(u128::MAX.to_le_bytes().to_vec(), None),
+                    Some(&transaction),
+                )
+                .expect("to insert invalid data");
+
+            match epoch_pool.get_start_time(Some(&transaction)) {
+                Ok(_) => assert!(false, "must be an error"),
+                Err(e) => match e {
+                    super::error::Error::Fee(super::FeeError::CorruptedStartTimeLength()) => {
+                        assert!(true)
+                    }
+                    _ => assert!(false, "invalid error type"),
+                },
+            }
+        }
     }
 
     #[test]
-    fn test_update_and_get_start_block_height() {
-        let tmp_dir = TempDir::new().unwrap();
-        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+    fn test_update_start_block_height() {
+        let drive = setup_drive();
 
-        drive
-            .create_root_tree(None)
-            .expect("expected to create root tree successfully");
+        let (transaction, _) = setup_fee_pools(&drive, None);
 
-        let transaction = drive.grove.start_transaction();
+        let epoch_pool = EpochPool::new(0, &drive);
 
-        let fee_pools = FeePools::new();
+        let start_block_height = 1;
 
-        fee_pools
-            .init(&drive, Some(&transaction))
-            .expect("fee pools to init");
-
-        let epoch = EpochPool::new(7000, &drive);
-
-        match epoch.get_start_block_height(Some(&transaction)) {
-            Ok(_) => assert!(
-                false,
-                "should not be able to get first proposer block height on uninit epoch pool"
-            ),
-            Err(e) => match e {
-                error::Error::GroveDB(grovedb::Error::PathNotFound(_)) => assert!(true),
-                _ => assert!(false, "invalid error type"),
-            },
-        }
-
-        match epoch.update_start_block_height(1, Some(&transaction)) {
-            Ok(_) => assert!(
-                false,
-                "should not be able to update first proposer block count on uninit epoch pool"
-            ),
-            Err(e) => match e {
-                error::Error::GroveDB(grovedb::Error::InvalidPath(_)) => assert!(true),
-                _ => assert!(false, "invalid error type"),
-            },
-        }
-
-        let epoch = EpochPool::new(42, &drive);
-
-        let start_block_height = 42;
-
-        epoch
+        epoch_pool
             .update_start_block_height(start_block_height, Some(&transaction))
-            .expect("to update first proposer block height");
+            .expect("should update start block height");
 
-        let start_block_height = epoch
+        let actual_start_block_height = epoch_pool
             .get_start_block_height(Some(&transaction))
-            .expect("to get first proposer block count");
+            .expect("should get start block height");
 
-        assert_eq!(start_block_height, start_block_height);
+        assert_eq!(start_block_height, actual_start_block_height);
+    }
 
-        drive
-            .grove
-            .insert(
-                epoch.get_path(),
-                constants::KEY_START_BLOCK_HEIGHT.as_bytes(),
-                Element::Item(u128::MAX.to_le_bytes().to_vec(), None),
-                Some(&transaction),
-            )
-            .expect("to insert invalid data");
+    mod get_start_block_height {
+        #[test]
+        fn test_error_if_epoch_pool_is_not_initiated() {
+            let drive = super::setup_drive();
 
-        match epoch.get_start_block_height(Some(&transaction)) {
-            Ok(_) => assert!(false, "should not be able to decode stored value"),
-            Err(e) => match e {
-                error::Error::Fee(FeeError::CorruptedFirstProposedBlockHeightItemLength(_)) => {
-                    assert!(true)
-                }
-                _ => assert!(false, "ivalid error type"),
-            },
+            let (transaction, _) = super::setup_fee_pools(&drive, None);
+
+            let non_initiated_epoch_pool = super::EpochPool::new(7000, &drive);
+
+            match non_initiated_epoch_pool.get_start_block_height(Some(&transaction)) {
+                Ok(_) => assert!(
+                    false,
+                    "should not be able to get start block height on uninit epoch pool"
+                ),
+                Err(e) => match e {
+                    super::error::Error::GroveDB(grovedb::Error::PathNotFound(_)) => assert!(true),
+                    _ => assert!(false, "invalid error type"),
+                },
+            }
+        }
+
+        #[test]
+        fn test_error_if_value_is_not_set() {
+            let drive = super::setup_drive();
+
+            let (transaction, _) = super::setup_fee_pools(&drive, None);
+
+            let epoch_pool = super::EpochPool::new(0, &drive);
+
+            match epoch_pool.get_start_block_height(Some(&transaction)) {
+                Ok(_) => assert!(false, "must be an error"),
+                Err(e) => match e {
+                    super::error::Error::GroveDB(_) => assert!(true),
+                    _ => assert!(false, "invalid error type"),
+                },
+            }
+        }
+
+        #[test]
+        fn test_error_if_value_has_invalid_length() {
+            let drive = super::setup_drive();
+
+            let (transaction, _) = super::setup_fee_pools(&drive, None);
+
+            let epoch_pool = super::EpochPool::new(0, &drive);
+
+            drive
+                .grove
+                .insert(
+                    epoch_pool.get_path(),
+                    super::constants::KEY_START_BLOCK_HEIGHT.as_bytes(),
+                    super::Element::Item(u128::MAX.to_le_bytes().to_vec(), None),
+                    Some(&transaction),
+                )
+                .expect("to insert invalid data");
+
+            match epoch_pool.get_start_block_height(Some(&transaction)) {
+                Ok(_) => assert!(false, "should not be able to decode stored value"),
+                Err(e) => match e {
+                    super::error::Error::Fee(
+                        super::FeeError::CorruptedStartBlockHeightItemLength(),
+                    ) => {
+                        assert!(true)
+                    }
+                    _ => assert!(false, "invalid error type"),
+                },
+            }
+        }
+
+        #[test]
+        fn test_error_if_element_has_invalid_type() {
+            let drive = super::setup_drive();
+
+            let (transaction, _) = super::setup_fee_pools(&drive, None);
+
+            let epoch_pool = super::EpochPool::new(0, &drive);
+
+            drive
+                .grove
+                .insert(
+                    epoch_pool.get_path(),
+                    super::constants::KEY_START_BLOCK_HEIGHT.as_bytes(),
+                    super::Element::empty_tree(),
+                    Some(&transaction),
+                )
+                .expect("to insert invalid data");
+
+            match epoch_pool.get_start_block_height(Some(&transaction)) {
+                Ok(_) => assert!(false, "should not be able to decode stored value"),
+                Err(e) => match e {
+                    super::error::Error::Fee(
+                        super::FeeError::CorruptedStartBlockHeightNotItem(),
+                    ) => {
+                        assert!(true)
+                    }
+                    _ => assert!(false, "invalid error type"),
+                },
+            }
         }
     }
 
