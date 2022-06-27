@@ -35,4 +35,7 @@ pub enum FeeError {
     CorruptedMultiplierNotItem(&'static str),
     #[error("corrupted multiplier invalid item length error: {0}")]
     CorruptedMultiplierInvalidItemLength(&'static str),
+
+    #[error("decimal conversion error: {0}")]
+    DecimalConversion(&'static str),
 }

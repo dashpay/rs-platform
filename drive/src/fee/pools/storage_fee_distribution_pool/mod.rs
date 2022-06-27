@@ -1,5 +1,7 @@
 use crate::drive::Drive;
 use grovedb::{Element, TransactionArg};
+use rust_decimal::Decimal;
+use rust_decimal_macros::dec;
 
 use crate::error::fee::FeeError;
 use crate::error::Error;
@@ -11,62 +13,49 @@ use super::constants;
 pub struct StorageFeeDistributionPool {}
 
 impl StorageFeeDistributionPool {
-    fn get_fee_distribution_percent(epoch_index: u16, start_index: u16) -> f64 {
-        let reset_epoch_index = epoch_index - start_index;
-
-        let epoch_year = (reset_epoch_index as f64 / 20.0).trunc() as usize;
-
-        constants::FEE_DISTRIBUTION_TABLE[epoch_year]
-    }
-
     pub fn distribute(
         &self,
         drive: &Drive,
         epoch_index: u16,
         transaction: TransactionArg,
     ) -> Result<(), Error> {
-        let mut storage_distribution_fees = self.value(drive, transaction)? as f64;
+        let storage_distribution_fees = Decimal::new(self.value(drive, transaction)?, 0);
 
-        if storage_distribution_fees == 0.0 {
+        // a separate buffer from which we withdraw to correctly calculate fee share
+        let mut storage_distribution_fees_buffer = storage_distribution_fees.clone();
+
+        if storage_distribution_fees == dec!(0.0) {
             return Ok(());
         }
 
-        let mut fee_leftovers = 0.0;
+        for year in 0..50u16 {
+            let distribution_percent = constants::FEE_DISTRIBUTION_TABLE[year as usize];
 
-        for index in epoch_index..epoch_index + 1000 {
-            let epoch_pool = EpochPool::new(index, drive);
+            let year_fee_share = storage_distribution_fees * distribution_percent;
+            let epoch_fee_share = year_fee_share / dec!(20.0);
 
-            let distribution_percent = Self::get_fee_distribution_percent(index, epoch_index);
+            let starting_epoch_index = epoch_index + year * 20;
 
-            let fee_share = storage_distribution_fees * distribution_percent;
+            for index in starting_epoch_index..starting_epoch_index + 20 {
+                let epoch_pool = EpochPool::new(index, drive);
 
-            // Since storage fee is an integer
-            // Add fee share remainder to other leftovers
-            let mut fee_share_floored = fee_share.floor();
+                let storage_fee = epoch_pool.get_storage_fee(transaction)?;
 
-            fee_leftovers += fee_share - fee_share_floored;
+                epoch_pool.update_storage_fee(storage_fee + epoch_fee_share, transaction)?;
 
-            // Add floored leftovers to fee share if they bigger than 0
-            let fee_leftovers_floored = fee_leftovers.floor();
-            if fee_leftovers_floored > 0.0 {
-                fee_leftovers -= fee_leftovers_floored;
-
-                fee_share_floored += fee_leftovers_floored;
+                storage_distribution_fees_buffer -= epoch_fee_share;
             }
-
-            let storage_fee = epoch_pool.get_storage_fee(transaction)?;
-
-            let storage_fee_with_shares = storage_fee + fee_share_floored as i64;
-
-            epoch_pool.update_storage_fee(storage_fee_with_shares, transaction)?;
-
-            storage_distribution_fees -= fee_share;
         }
 
-        // Must be always 0
-        let storage_distribution_fees_leftover = storage_distribution_fees.floor() as i64;
-
-        self.update(drive, storage_distribution_fees_leftover, transaction)
+        self.update(
+            drive,
+            storage_distribution_fees_buffer.try_into().map_err(|_| {
+                Error::Fee(FeeError::CorruptedStorageFeePoolInvalidItemLength(
+                    "fee pools storage fee pool is not i64",
+                ))
+            })?,
+            transaction,
+        )
     }
 
     pub fn update(
@@ -114,30 +103,26 @@ impl StorageFeeDistributionPool {
 
 #[cfg(test)]
 mod tests {
-    use grovedb::Element;
-    use tempfile::TempDir;
-
-    use crate::error::fee;
-    use crate::fee::pools::epoch::epoch_pool::EpochPool;
     use crate::fee::pools::tests::helpers::setup::{
         setup_drive, setup_fee_pools, SetupFeePoolsOptions,
     };
     use crate::{
-        drive::Drive,
         error::{self, fee::FeeError},
         fee::pools::{constants, fee_pools::FeePools},
     };
+    use grovedb::Element;
 
     mod helpers {
         use crate::drive::Drive;
         use crate::fee::pools::epoch::epoch_pool::EpochPool;
         use grovedb::TransactionArg;
+        use rust_decimal::Decimal;
 
         pub fn get_storage_fees_from_epoch_pools(
             drive: &Drive,
             epoch_index: u16,
             transaction: TransactionArg,
-        ) -> Vec<i64> {
+        ) -> Vec<Decimal> {
             (epoch_index..epoch_index + 1000)
                 .map(|index| {
                     let epoch_pool = EpochPool::new(index, &drive);
@@ -150,11 +135,12 @@ mod tests {
     }
 
     mod distribute {
-        use crate::drive::Drive;
+        use rust_decimal::Decimal;
+        use rust_decimal_macros::dec;
+
         use crate::fee::pools::epoch::epoch_pool::EpochPool;
-        use crate::fee::pools::fee_pools::FeePools;
         use crate::fee::pools::storage_fee_distribution_pool::tests::helpers;
-        use tempfile::TempDir;
+        use crate::fee::pools::tests::helpers::setup::{setup_drive, setup_fee_pools};
 
         #[test]
         fn test_nothing_to_distribute() {
@@ -162,23 +148,36 @@ mod tests {
         }
 
         #[test]
-        fn test_distribution() {
-            todo!();
+        fn test_distribution_overflow() {
+            let drive = setup_drive();
+            let (transaction, fee_pools) = setup_fee_pools(&drive, None);
 
-            let tmp_dir = TempDir::new().unwrap();
-            let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
-
-            drive
-                .create_root_tree(None)
-                .expect("expected to create root tree successfully");
-
-            let transaction = drive.grove.start_transaction();
-
-            let fee_pools = FeePools::new();
+            let storage_pool = i64::MAX;
+            let epoch_index = 0;
 
             fee_pools
-                .init(&drive, Some(&transaction))
-                .expect("fee pools to init");
+                .storage_fee_distribution_pool
+                .update(&drive, storage_pool, Some(&transaction))
+                .expect("to update storage fee pool");
+
+            fee_pools
+                .storage_fee_distribution_pool
+                .distribute(&drive, epoch_index, Some(&transaction))
+                .expect("to distribute storage fee pool");
+
+            // check leftover
+            let storage_fee_pool_leftover = fee_pools
+                .storage_fee_distribution_pool
+                .value(&drive, Some(&transaction))
+                .expect("to get storage fee pool");
+
+            assert_eq!(storage_fee_pool_leftover, 0);
+        }
+
+        #[test]
+        fn test_distribution() {
+            let drive = setup_drive();
+            let (transaction, fee_pools) = setup_fee_pools(&drive, None);
 
             let storage_pool = 1000;
             let epoch_index = 42;
@@ -214,44 +213,108 @@ mod tests {
                 helpers::get_storage_fees_from_epoch_pools(&drive, epoch_index, Some(&transaction));
 
             // compare them with reference table
+            #[rustfmt::skip]
             let reference_fees = [
-                50, 47, 45, 43, 41, 38, 37, 35, 33, 32, 30, 28, 27, 26, 24, 23, 22, 21, 20, 19, 17,
-                17, 15, 15, 14, 14, 12, 13, 11, 11, 11, 10, 9, 9, 9, 8, 8, 8, 7, 6, 7, 6, 5, 5, 6,
-                4, 5, 5, 4, 4, 4, 3, 4, 3, 3, 3, 3, 3, 3, 2, 3, 2, 2, 2, 2, 2, 1, 2, 2, 1, 2, 1, 1,
-                2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 1,
-                0, 1, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0,
+                dec!(2.5000), dec!(2.5000), dec!(2.5000), dec!(2.5000), dec!(2.5000), dec!(2.5000), dec!(2.5000), dec!(2.5000), dec!(2.5000), dec!(2.5000),
+                dec!(2.5000), dec!(2.5000), dec!(2.5000), dec!(2.5000), dec!(2.5000), dec!(2.5000), dec!(2.5000), dec!(2.5000), dec!(2.5000), dec!(2.5000),
+                dec!(2.4000), dec!(2.4000), dec!(2.4000), dec!(2.4000), dec!(2.4000), dec!(2.4000), dec!(2.4000), dec!(2.4000), dec!(2.4000), dec!(2.4000),
+                dec!(2.4000), dec!(2.4000), dec!(2.4000), dec!(2.4000), dec!(2.4000), dec!(2.4000), dec!(2.4000), dec!(2.4000), dec!(2.4000), dec!(2.4000),
+                dec!(2.3000), dec!(2.3000), dec!(2.3000), dec!(2.3000), dec!(2.3000), dec!(2.3000), dec!(2.3000), dec!(2.3000), dec!(2.3000), dec!(2.3000),
+                dec!(2.3000), dec!(2.3000), dec!(2.3000), dec!(2.3000), dec!(2.3000), dec!(2.3000), dec!(2.3000), dec!(2.3000), dec!(2.3000), dec!(2.3000),
+                dec!(2.2000), dec!(2.2000), dec!(2.2000), dec!(2.2000), dec!(2.2000), dec!(2.2000), dec!(2.2000), dec!(2.2000), dec!(2.2000), dec!(2.2000),
+                dec!(2.2000), dec!(2.2000), dec!(2.2000), dec!(2.2000), dec!(2.2000), dec!(2.2000), dec!(2.2000), dec!(2.2000), dec!(2.2000), dec!(2.2000),
+                dec!(2.1000), dec!(2.1000), dec!(2.1000), dec!(2.1000), dec!(2.1000), dec!(2.1000), dec!(2.1000), dec!(2.1000), dec!(2.1000), dec!(2.1000),
+                dec!(2.1000), dec!(2.1000), dec!(2.1000), dec!(2.1000), dec!(2.1000), dec!(2.1000), dec!(2.1000), dec!(2.1000), dec!(2.1000), dec!(2.1000),
+                dec!(2.0000), dec!(2.0000), dec!(2.0000), dec!(2.0000), dec!(2.0000), dec!(2.0000), dec!(2.0000), dec!(2.0000), dec!(2.0000), dec!(2.0000),
+                dec!(2.0000), dec!(2.0000), dec!(2.0000), dec!(2.0000), dec!(2.0000), dec!(2.0000), dec!(2.0000), dec!(2.0000), dec!(2.0000), dec!(2.0000),
+                dec!(1.9250), dec!(1.9250), dec!(1.9250), dec!(1.9250), dec!(1.9250), dec!(1.9250), dec!(1.9250), dec!(1.9250), dec!(1.9250), dec!(1.9250),
+                dec!(1.9250), dec!(1.9250), dec!(1.9250), dec!(1.9250), dec!(1.9250), dec!(1.9250), dec!(1.9250), dec!(1.9250), dec!(1.9250), dec!(1.9250),
+                dec!(1.8500), dec!(1.8500), dec!(1.8500), dec!(1.8500), dec!(1.8500), dec!(1.8500), dec!(1.8500), dec!(1.8500), dec!(1.8500), dec!(1.8500),
+                dec!(1.8500), dec!(1.8500), dec!(1.8500), dec!(1.8500), dec!(1.8500), dec!(1.8500), dec!(1.8500), dec!(1.8500), dec!(1.8500), dec!(1.8500),
+                dec!(1.7750), dec!(1.7750), dec!(1.7750), dec!(1.7750), dec!(1.7750), dec!(1.7750), dec!(1.7750), dec!(1.7750), dec!(1.7750), dec!(1.7750),
+                dec!(1.7750), dec!(1.7750), dec!(1.7750), dec!(1.7750), dec!(1.7750), dec!(1.7750), dec!(1.7750), dec!(1.7750), dec!(1.7750), dec!(1.7750),
+                dec!(1.7000), dec!(1.7000), dec!(1.7000), dec!(1.7000), dec!(1.7000), dec!(1.7000), dec!(1.7000), dec!(1.7000), dec!(1.7000), dec!(1.7000),
+                dec!(1.7000), dec!(1.7000), dec!(1.7000), dec!(1.7000), dec!(1.7000), dec!(1.7000), dec!(1.7000), dec!(1.7000), dec!(1.7000), dec!(1.7000),
+                dec!(1.6250), dec!(1.6250), dec!(1.6250), dec!(1.6250), dec!(1.6250), dec!(1.6250), dec!(1.6250), dec!(1.6250), dec!(1.6250), dec!(1.6250),
+                dec!(1.6250), dec!(1.6250), dec!(1.6250), dec!(1.6250), dec!(1.6250), dec!(1.6250), dec!(1.6250), dec!(1.6250), dec!(1.6250), dec!(1.6250),
+                dec!(1.5500), dec!(1.5500), dec!(1.5500), dec!(1.5500), dec!(1.5500), dec!(1.5500), dec!(1.5500), dec!(1.5500), dec!(1.5500), dec!(1.5500),
+                dec!(1.5500), dec!(1.5500), dec!(1.5500), dec!(1.5500), dec!(1.5500), dec!(1.5500), dec!(1.5500), dec!(1.5500), dec!(1.5500), dec!(1.5500),
+                dec!(1.4750), dec!(1.4750), dec!(1.4750), dec!(1.4750), dec!(1.4750), dec!(1.4750), dec!(1.4750), dec!(1.4750), dec!(1.4750), dec!(1.4750),
+                dec!(1.4750), dec!(1.4750), dec!(1.4750), dec!(1.4750), dec!(1.4750), dec!(1.4750), dec!(1.4750), dec!(1.4750), dec!(1.4750), dec!(1.4750),
+                dec!(1.4250), dec!(1.4250), dec!(1.4250), dec!(1.4250), dec!(1.4250), dec!(1.4250), dec!(1.4250), dec!(1.4250), dec!(1.4250), dec!(1.4250),
+                dec!(1.4250), dec!(1.4250), dec!(1.4250), dec!(1.4250), dec!(1.4250), dec!(1.4250), dec!(1.4250), dec!(1.4250), dec!(1.4250), dec!(1.4250),
+                dec!(1.3750), dec!(1.3750), dec!(1.3750), dec!(1.3750), dec!(1.3750), dec!(1.3750), dec!(1.3750), dec!(1.3750), dec!(1.3750), dec!(1.3750),
+                dec!(1.3750), dec!(1.3750), dec!(1.3750), dec!(1.3750), dec!(1.3750), dec!(1.3750), dec!(1.3750), dec!(1.3750), dec!(1.3750), dec!(1.3750),
+                dec!(1.3250), dec!(1.3250), dec!(1.3250), dec!(1.3250), dec!(1.3250), dec!(1.3250), dec!(1.3250), dec!(1.3250), dec!(1.3250), dec!(1.3250),
+                dec!(1.3250), dec!(1.3250), dec!(1.3250), dec!(1.3250), dec!(1.3250), dec!(1.3250), dec!(1.3250), dec!(1.3250), dec!(1.3250), dec!(1.3250),
+                dec!(1.2750), dec!(1.2750), dec!(1.2750), dec!(1.2750), dec!(1.2750), dec!(1.2750), dec!(1.2750), dec!(1.2750), dec!(1.2750), dec!(1.2750),
+                dec!(1.2750), dec!(1.2750), dec!(1.2750), dec!(1.2750), dec!(1.2750), dec!(1.2750), dec!(1.2750), dec!(1.2750), dec!(1.2750), dec!(1.2750),
+                dec!(1.2250), dec!(1.2250), dec!(1.2250), dec!(1.2250), dec!(1.2250), dec!(1.2250), dec!(1.2250), dec!(1.2250), dec!(1.2250), dec!(1.2250),
+                dec!(1.2250), dec!(1.2250), dec!(1.2250), dec!(1.2250), dec!(1.2250), dec!(1.2250), dec!(1.2250), dec!(1.2250), dec!(1.2250), dec!(1.2250),
+                dec!(1.1750), dec!(1.1750), dec!(1.1750), dec!(1.1750), dec!(1.1750), dec!(1.1750), dec!(1.1750), dec!(1.1750), dec!(1.1750), dec!(1.1750),
+                dec!(1.1750), dec!(1.1750), dec!(1.1750), dec!(1.1750), dec!(1.1750), dec!(1.1750), dec!(1.1750), dec!(1.1750), dec!(1.1750), dec!(1.1750),
+                dec!(1.1250), dec!(1.1250), dec!(1.1250), dec!(1.1250), dec!(1.1250), dec!(1.1250), dec!(1.1250), dec!(1.1250), dec!(1.1250), dec!(1.1250),
+                dec!(1.1250), dec!(1.1250), dec!(1.1250), dec!(1.1250), dec!(1.1250), dec!(1.1250), dec!(1.1250), dec!(1.1250), dec!(1.1250), dec!(1.1250),
+                dec!(1.0750), dec!(1.0750), dec!(1.0750), dec!(1.0750), dec!(1.0750), dec!(1.0750), dec!(1.0750), dec!(1.0750), dec!(1.0750), dec!(1.0750),
+                dec!(1.0750), dec!(1.0750), dec!(1.0750), dec!(1.0750), dec!(1.0750), dec!(1.0750), dec!(1.0750), dec!(1.0750), dec!(1.0750), dec!(1.0750),
+                dec!(1.0250), dec!(1.0250), dec!(1.0250), dec!(1.0250), dec!(1.0250), dec!(1.0250), dec!(1.0250), dec!(1.0250), dec!(1.0250), dec!(1.0250),
+                dec!(1.0250), dec!(1.0250), dec!(1.0250), dec!(1.0250), dec!(1.0250), dec!(1.0250), dec!(1.0250), dec!(1.0250), dec!(1.0250), dec!(1.0250),
+                dec!(0.9750), dec!(0.9750), dec!(0.9750), dec!(0.9750), dec!(0.9750), dec!(0.9750), dec!(0.9750), dec!(0.9750), dec!(0.9750), dec!(0.9750),
+                dec!(0.9750), dec!(0.9750), dec!(0.9750), dec!(0.9750), dec!(0.9750), dec!(0.9750), dec!(0.9750), dec!(0.9750), dec!(0.9750), dec!(0.9750),
+                dec!(0.9375), dec!(0.9375), dec!(0.9375), dec!(0.9375), dec!(0.9375), dec!(0.9375), dec!(0.9375), dec!(0.9375), dec!(0.9375), dec!(0.9375),
+                dec!(0.9375), dec!(0.9375), dec!(0.9375), dec!(0.9375), dec!(0.9375), dec!(0.9375), dec!(0.9375), dec!(0.9375), dec!(0.9375), dec!(0.9375),
+                dec!(0.9000), dec!(0.9000), dec!(0.9000), dec!(0.9000), dec!(0.9000), dec!(0.9000), dec!(0.9000), dec!(0.9000), dec!(0.9000), dec!(0.9000),
+                dec!(0.9000), dec!(0.9000), dec!(0.9000), dec!(0.9000), dec!(0.9000), dec!(0.9000), dec!(0.9000), dec!(0.9000), dec!(0.9000), dec!(0.9000),
+                dec!(0.8625), dec!(0.8625), dec!(0.8625), dec!(0.8625), dec!(0.8625), dec!(0.8625), dec!(0.8625), dec!(0.8625), dec!(0.8625), dec!(0.8625),
+                dec!(0.8625), dec!(0.8625), dec!(0.8625), dec!(0.8625), dec!(0.8625), dec!(0.8625), dec!(0.8625), dec!(0.8625), dec!(0.8625), dec!(0.8625),
+                dec!(0.8250), dec!(0.8250), dec!(0.8250), dec!(0.8250), dec!(0.8250), dec!(0.8250), dec!(0.8250), dec!(0.8250), dec!(0.8250), dec!(0.8250),
+                dec!(0.8250), dec!(0.8250), dec!(0.8250), dec!(0.8250), dec!(0.8250), dec!(0.8250), dec!(0.8250), dec!(0.8250), dec!(0.8250), dec!(0.8250),
+                dec!(0.7875), dec!(0.7875), dec!(0.7875), dec!(0.7875), dec!(0.7875), dec!(0.7875), dec!(0.7875), dec!(0.7875), dec!(0.7875), dec!(0.7875),
+                dec!(0.7875), dec!(0.7875), dec!(0.7875), dec!(0.7875), dec!(0.7875), dec!(0.7875), dec!(0.7875), dec!(0.7875), dec!(0.7875), dec!(0.7875),
+                dec!(0.7500), dec!(0.7500), dec!(0.7500), dec!(0.7500), dec!(0.7500), dec!(0.7500), dec!(0.7500), dec!(0.7500), dec!(0.7500), dec!(0.7500),
+                dec!(0.7500), dec!(0.7500), dec!(0.7500), dec!(0.7500), dec!(0.7500), dec!(0.7500), dec!(0.7500), dec!(0.7500), dec!(0.7500), dec!(0.7500),
+                dec!(0.7125), dec!(0.7125), dec!(0.7125), dec!(0.7125), dec!(0.7125), dec!(0.7125), dec!(0.7125), dec!(0.7125), dec!(0.7125), dec!(0.7125),
+                dec!(0.7125), dec!(0.7125), dec!(0.7125), dec!(0.7125), dec!(0.7125), dec!(0.7125), dec!(0.7125), dec!(0.7125), dec!(0.7125), dec!(0.7125),
+                dec!(0.6750), dec!(0.6750), dec!(0.6750), dec!(0.6750), dec!(0.6750), dec!(0.6750), dec!(0.6750), dec!(0.6750), dec!(0.6750), dec!(0.6750),
+                dec!(0.6750), dec!(0.6750), dec!(0.6750), dec!(0.6750), dec!(0.6750), dec!(0.6750), dec!(0.6750), dec!(0.6750), dec!(0.6750), dec!(0.6750),
+                dec!(0.6375), dec!(0.6375), dec!(0.6375), dec!(0.6375), dec!(0.6375), dec!(0.6375), dec!(0.6375), dec!(0.6375), dec!(0.6375), dec!(0.6375),
+                dec!(0.6375), dec!(0.6375), dec!(0.6375), dec!(0.6375), dec!(0.6375), dec!(0.6375), dec!(0.6375), dec!(0.6375), dec!(0.6375), dec!(0.6375),
+                dec!(0.6000), dec!(0.6000), dec!(0.6000), dec!(0.6000), dec!(0.6000), dec!(0.6000), dec!(0.6000), dec!(0.6000), dec!(0.6000), dec!(0.6000),
+                dec!(0.6000), dec!(0.6000), dec!(0.6000), dec!(0.6000), dec!(0.6000), dec!(0.6000), dec!(0.6000), dec!(0.6000), dec!(0.6000), dec!(0.6000),
+                dec!(0.5625), dec!(0.5625), dec!(0.5625), dec!(0.5625), dec!(0.5625), dec!(0.5625), dec!(0.5625), dec!(0.5625), dec!(0.5625), dec!(0.5625),
+                dec!(0.5625), dec!(0.5625), dec!(0.5625), dec!(0.5625), dec!(0.5625), dec!(0.5625), dec!(0.5625), dec!(0.5625), dec!(0.5625), dec!(0.5625),
+                dec!(0.5250), dec!(0.5250), dec!(0.5250), dec!(0.5250), dec!(0.5250), dec!(0.5250), dec!(0.5250), dec!(0.5250), dec!(0.5250), dec!(0.5250),
+                dec!(0.5250), dec!(0.5250), dec!(0.5250), dec!(0.5250), dec!(0.5250), dec!(0.5250), dec!(0.5250), dec!(0.5250), dec!(0.5250), dec!(0.5250),
+                dec!(0.4875), dec!(0.4875), dec!(0.4875), dec!(0.4875), dec!(0.4875), dec!(0.4875), dec!(0.4875), dec!(0.4875), dec!(0.4875), dec!(0.4875),
+                dec!(0.4875), dec!(0.4875), dec!(0.4875), dec!(0.4875), dec!(0.4875), dec!(0.4875), dec!(0.4875), dec!(0.4875), dec!(0.4875), dec!(0.4875),
+                dec!(0.4500), dec!(0.4500), dec!(0.4500), dec!(0.4500), dec!(0.4500), dec!(0.4500), dec!(0.4500), dec!(0.4500), dec!(0.4500), dec!(0.4500),
+                dec!(0.4500), dec!(0.4500), dec!(0.4500), dec!(0.4500), dec!(0.4500), dec!(0.4500), dec!(0.4500), dec!(0.4500), dec!(0.4500), dec!(0.4500),
+                dec!(0.4125), dec!(0.4125), dec!(0.4125), dec!(0.4125), dec!(0.4125), dec!(0.4125), dec!(0.4125), dec!(0.4125), dec!(0.4125), dec!(0.4125),
+                dec!(0.4125), dec!(0.4125), dec!(0.4125), dec!(0.4125), dec!(0.4125), dec!(0.4125), dec!(0.4125), dec!(0.4125), dec!(0.4125), dec!(0.4125),
+                dec!(0.3750), dec!(0.3750), dec!(0.3750), dec!(0.3750), dec!(0.3750), dec!(0.3750), dec!(0.3750), dec!(0.3750), dec!(0.3750), dec!(0.3750),
+                dec!(0.3750), dec!(0.3750), dec!(0.3750), dec!(0.3750), dec!(0.3750), dec!(0.3750), dec!(0.3750), dec!(0.3750), dec!(0.3750), dec!(0.3750),
+                dec!(0.3375), dec!(0.3375), dec!(0.3375), dec!(0.3375), dec!(0.3375), dec!(0.3375), dec!(0.3375), dec!(0.3375), dec!(0.3375), dec!(0.3375),
+                dec!(0.3375), dec!(0.3375), dec!(0.3375), dec!(0.3375), dec!(0.3375), dec!(0.3375), dec!(0.3375), dec!(0.3375), dec!(0.3375), dec!(0.3375),
+                dec!(0.3000), dec!(0.3000), dec!(0.3000), dec!(0.3000), dec!(0.3000), dec!(0.3000), dec!(0.3000), dec!(0.3000), dec!(0.3000), dec!(0.3000),
+                dec!(0.3000), dec!(0.3000), dec!(0.3000), dec!(0.3000), dec!(0.3000), dec!(0.3000), dec!(0.3000), dec!(0.3000), dec!(0.3000), dec!(0.3000),
+                dec!(0.2625), dec!(0.2625), dec!(0.2625), dec!(0.2625), dec!(0.2625), dec!(0.2625), dec!(0.2625), dec!(0.2625), dec!(0.2625), dec!(0.2625),
+                dec!(0.2625), dec!(0.2625), dec!(0.2625), dec!(0.2625), dec!(0.2625), dec!(0.2625), dec!(0.2625), dec!(0.2625), dec!(0.2625), dec!(0.2625),
+                dec!(0.2375), dec!(0.2375), dec!(0.2375), dec!(0.2375), dec!(0.2375), dec!(0.2375), dec!(0.2375), dec!(0.2375), dec!(0.2375), dec!(0.2375),
+                dec!(0.2375), dec!(0.2375), dec!(0.2375), dec!(0.2375), dec!(0.2375), dec!(0.2375), dec!(0.2375), dec!(0.2375), dec!(0.2375), dec!(0.2375),
+                dec!(0.2125), dec!(0.2125), dec!(0.2125), dec!(0.2125), dec!(0.2125), dec!(0.2125), dec!(0.2125), dec!(0.2125), dec!(0.2125), dec!(0.2125),
+                dec!(0.2125), dec!(0.2125), dec!(0.2125), dec!(0.2125), dec!(0.2125), dec!(0.2125), dec!(0.2125), dec!(0.2125), dec!(0.2125), dec!(0.2125),
+                dec!(0.1875), dec!(0.1875), dec!(0.1875), dec!(0.1875), dec!(0.1875), dec!(0.1875), dec!(0.1875), dec!(0.1875), dec!(0.1875), dec!(0.1875),
+                dec!(0.1875), dec!(0.1875), dec!(0.1875), dec!(0.1875), dec!(0.1875), dec!(0.1875), dec!(0.1875), dec!(0.1875), dec!(0.1875), dec!(0.1875),
+                dec!(0.1625), dec!(0.1625), dec!(0.1625), dec!(0.1625), dec!(0.1625), dec!(0.1625), dec!(0.1625), dec!(0.1625), dec!(0.1625), dec!(0.1625),
+                dec!(0.1625), dec!(0.1625), dec!(0.1625), dec!(0.1625), dec!(0.1625), dec!(0.1625), dec!(0.1625), dec!(0.1625), dec!(0.1625), dec!(0.1625),
+                dec!(0.1375), dec!(0.1375), dec!(0.1375), dec!(0.1375), dec!(0.1375), dec!(0.1375), dec!(0.1375), dec!(0.1375), dec!(0.1375), dec!(0.1375),
+                dec!(0.1375), dec!(0.1375), dec!(0.1375), dec!(0.1375), dec!(0.1375), dec!(0.1375), dec!(0.1375), dec!(0.1375), dec!(0.1375), dec!(0.1375),
+                dec!(0.1125), dec!(0.1125), dec!(0.1125), dec!(0.1125), dec!(0.1125), dec!(0.1125), dec!(0.1125), dec!(0.1125), dec!(0.1125), dec!(0.1125),
+                dec!(0.1125), dec!(0.1125), dec!(0.1125), dec!(0.1125), dec!(0.1125), dec!(0.1125), dec!(0.1125), dec!(0.1125), dec!(0.1125), dec!(0.1125),
+                dec!(0.0875), dec!(0.0875), dec!(0.0875), dec!(0.0875), dec!(0.0875), dec!(0.0875), dec!(0.0875), dec!(0.0875), dec!(0.0875), dec!(0.0875),
+                dec!(0.0875), dec!(0.0875), dec!(0.0875), dec!(0.0875), dec!(0.0875), dec!(0.0875), dec!(0.0875), dec!(0.0875), dec!(0.0875), dec!(0.0875),
+                dec!(0.0625), dec!(0.0625), dec!(0.0625), dec!(0.0625), dec!(0.0625), dec!(0.0625), dec!(0.0625), dec!(0.0625), dec!(0.0625), dec!(0.0625),
+                dec!(0.0625), dec!(0.0625), dec!(0.0625), dec!(0.0625), dec!(0.0625), dec!(0.0625), dec!(0.0625), dec!(0.0625), dec!(0.0625), dec!(0.0625),
             ];
 
             assert_eq!(storage_fees, reference_fees);
@@ -277,16 +340,14 @@ mod tests {
                 storage_fees,
                 reference_fees
                     .iter()
-                    .map(|val| val * 2)
-                    .collect::<Vec<i64>>()
+                    .map(|val| val * dec!(2))
+                    .collect::<Vec<Decimal>>()
             );
         }
     }
 
     #[test]
     fn test_update_and_value() {
-        todo!();
-
         let drive = setup_drive();
         let (transaction, fee_pools) = setup_fee_pools(
             &drive,

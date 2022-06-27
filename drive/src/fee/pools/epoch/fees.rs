@@ -1,4 +1,5 @@
 use grovedb::{Element, TransactionArg};
+use rust_decimal::Decimal;
 
 use crate::{
     error::{fee::FeeError, Error},
@@ -8,7 +9,7 @@ use crate::{
 use super::constants;
 
 impl<'e> EpochPool<'e> {
-    pub fn get_storage_fee(&self, transaction: TransactionArg) -> Result<i64, Error> {
+    pub fn get_storage_fee(&self, transaction: TransactionArg) -> Result<Decimal, Error> {
         let element = self
             .drive
             .grove
@@ -20,13 +21,11 @@ impl<'e> EpochPool<'e> {
             .map_err(Error::GroveDB)?;
 
         if let Element::Item(item, _) = element {
-            Ok(i64::from_le_bytes(item.as_slice().try_into().map_err(
-                |_| {
-                    Error::Fee(FeeError::CorruptedStorageFeeInvalidItemLength(
-                        "epoch storage fee item have an invalid length",
-                    ))
-                },
-            )?))
+            Ok(Decimal::deserialize(item.try_into().map_err(|_| {
+                Error::Fee(FeeError::CorruptedStorageFeeInvalidItemLength(
+                    "epoch storage fee item have an invalid length",
+                ))
+            })?))
         } else {
             Err(Error::Fee(FeeError::CorruptedStorageFeeNotItem(
                 "epoch storage fee must be an item",
@@ -138,7 +137,7 @@ impl<'e> EpochPool<'e> {
 
     pub fn update_storage_fee(
         &self,
-        storage_fee: i64,
+        storage_fee: Decimal,
         transaction: TransactionArg,
     ) -> Result<(), Error> {
         self.drive
@@ -146,7 +145,7 @@ impl<'e> EpochPool<'e> {
             .insert(
                 self.get_path(),
                 constants::KEY_STORAGE_FEE.as_bytes(),
-                Element::Item(storage_fee.to_le_bytes().to_vec(), None),
+                Element::Item(storage_fee.serialize().to_vec(), None),
                 transaction,
             )
             .map_err(Error::GroveDB)?;
@@ -167,10 +166,17 @@ impl<'e> EpochPool<'e> {
         Ok(())
     }
 
-    pub fn get_total_fees(&self, transaction: TransactionArg) -> Result<i64, Error> {
+    pub fn get_total_fees(&self, transaction: TransactionArg) -> Result<Decimal, Error> {
         let storage_credit = self.get_storage_fee(transaction)?;
 
-        let processing_credit: i64 = self.get_processing_fee(transaction)? as i64;
+        let processing_fee_downcasted = i64::try_from(self.get_processing_fee(transaction)?)
+            .map_err(|_| {
+                Error::Fee(FeeError::CorruptedProcessingFeeInvalidItemLength(
+                    "epoch processing fee is not u64",
+                ))
+            })?;
+
+        let processing_credit = Decimal::new(processing_fee_downcasted, 0);
 
         Ok(storage_credit + processing_credit)
     }
@@ -179,6 +185,8 @@ impl<'e> EpochPool<'e> {
 #[cfg(test)]
 mod tests {
     use grovedb::Element;
+    use rust_decimal::Decimal;
+    use rust_decimal_macros::dec;
     use tempfile::TempDir;
 
     use crate::{
@@ -222,7 +230,7 @@ mod tests {
             },
         }
 
-        match epoch.update_storage_fee(42, Some(&transaction)) {
+        match epoch.update_storage_fee(dec!(42.0), Some(&transaction)) {
             Ok(_) => assert!(
                 false,
                 "should not be able to update storage fee on uninit epoch pool"
@@ -239,9 +247,9 @@ mod tests {
             .get_storage_fee(Some(&transaction))
             .expect("to get storage fee");
 
-        assert_eq!(stored_storage_fee, 0);
+        assert_eq!(stored_storage_fee, dec!(0.0));
 
-        let storage_fee: i64 = 42;
+        let storage_fee = dec!(42.0);
 
         epoch
             .update_storage_fee(storage_fee, Some(&transaction))
@@ -368,7 +376,7 @@ mod tests {
             .expect("fee pools to init");
 
         let processing_fee: u64 = 42;
-        let storage_fee: i64 = 1000;
+        let storage_fee = dec!(1000);
 
         let epoch = EpochPool::new(0, &drive);
 
@@ -384,7 +392,10 @@ mod tests {
             .get_total_fees(Some(&transaction))
             .expect("to get combined fee");
 
-        assert_eq!(combined_fee, processing_fee as i64 + storage_fee);
+        assert_eq!(
+            combined_fee,
+            Decimal::new(processing_fee as i64, 0) + storage_fee
+        );
     }
 
     #[test]

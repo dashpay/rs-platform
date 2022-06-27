@@ -1,59 +1,62 @@
+use rust_decimal::Decimal;
+use rust_decimal_macros::dec;
+
 pub const KEY_STORAGE_FEE_POOL: &str = "s";
 pub const KEY_GENESIS_TIME: &str = "g";
 
 pub const EPOCH_CHANGE_TIME: i64 = 1576800000;
 
-pub const FEE_DISTRIBUTION_TABLE: [f64; 50] = [
-    0.0500000000000004,
-    0.048000,
-    0.046000,
-    0.044000,
-    0.042000,
-    0.040000,
-    0.038500,
-    0.037000,
-    0.035500,
-    0.034000,
-    0.032500,
-    0.031000,
-    0.029500,
-    0.028500,
-    0.027500,
-    0.026500,
-    0.025500,
-    0.024500,
-    0.023500,
-    0.022500,
-    0.021500,
-    0.020500,
-    0.019500,
-    0.018750,
-    0.018000,
-    0.017250,
-    0.016500,
-    0.015750,
-    0.015000,
-    0.014250,
-    0.013500,
-    0.012750,
-    0.012000,
-    0.011250,
-    0.010500,
-    0.009750,
-    0.009000,
-    0.008250,
-    0.007500,
-    0.006750,
-    0.006000,
-    0.005250,
-    0.004750,
-    0.004250,
-    0.003750,
-    0.003250,
-    0.002750,
-    0.002250,
-    0.001750,
-    0.001250,
+pub const FEE_DISTRIBUTION_TABLE: [Decimal; 50] = [
+    dec!(0.05000),
+    dec!(0.04800),
+    dec!(0.04600),
+    dec!(0.04400),
+    dec!(0.04200),
+    dec!(0.04000),
+    dec!(0.03850),
+    dec!(0.03700),
+    dec!(0.03550),
+    dec!(0.03400),
+    dec!(0.03250),
+    dec!(0.03100),
+    dec!(0.02950),
+    dec!(0.02850),
+    dec!(0.02750),
+    dec!(0.02650),
+    dec!(0.02550),
+    dec!(0.02450),
+    dec!(0.02350),
+    dec!(0.02250),
+    dec!(0.02150),
+    dec!(0.02050),
+    dec!(0.01950),
+    dec!(0.01875),
+    dec!(0.01800),
+    dec!(0.01725),
+    dec!(0.01650),
+    dec!(0.01575),
+    dec!(0.01500),
+    dec!(0.01425),
+    dec!(0.01350),
+    dec!(0.01275),
+    dec!(0.01200),
+    dec!(0.01125),
+    dec!(0.01050),
+    dec!(0.00975),
+    dec!(0.00900),
+    dec!(0.00825),
+    dec!(0.00750),
+    dec!(0.00675),
+    dec!(0.00600),
+    dec!(0.00525),
+    dec!(0.00475),
+    dec!(0.00425),
+    dec!(0.00375),
+    dec!(0.00325),
+    dec!(0.00275),
+    dec!(0.00225),
+    dec!(0.00175),
+    dec!(0.00125),
 ];
 
 pub const MN_REWARD_SHARES_CONTRACT_ID: [u8; 32] = [
@@ -65,8 +68,27 @@ pub const MN_REWARD_SHARES_DOCUMENT_TYPE: &'static str = "rewardShare";
 
 #[cfg(test)]
 mod tests {
+    use rust_decimal::Decimal;
+    use rust_decimal_macros::dec;
+
     #[test]
     fn test_distribution_table_sum() {
-        assert_eq!(super::FEE_DISTRIBUTION_TABLE.iter().sum::<f64>(), 1.0);
+        assert_eq!(
+            super::FEE_DISTRIBUTION_TABLE.iter().sum::<Decimal>(),
+            dec!(1.0),
+        );
+    }
+
+    #[test]
+    fn test_distribution_of_value() {
+        let mut buffer = dec!(0.0);
+        let value = Decimal::new(i64::MAX, 0);
+
+        for i in 0..50 {
+            let share = value * super::FEE_DISTRIBUTION_TABLE[i];
+            buffer += share;
+        }
+
+        assert_eq!(buffer, value);
     }
 }

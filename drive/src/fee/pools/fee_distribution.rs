@@ -1,10 +1,15 @@
+use std::str::FromStr;
+
 use grovedb::TransactionArg;
+use rust_decimal::Decimal;
+use rust_decimal_macros::dec;
 use serde_json::json;
 
 use crate::common::value_to_cbor;
 use crate::contract::Document;
 use crate::drive::Drive;
 use crate::error::document::DocumentError;
+use crate::error::fee::FeeError;
 use crate::error::Error;
 use crate::fee::pools::fee_pools::FeePools;
 
@@ -40,7 +45,7 @@ impl FeePools {
             (current_epoch_index - unpaid_epoch_pool.index) * 50
         };
 
-        let total_fees = unpaid_epoch_pool.get_total_fees(transaction)? as f64;
+        let total_fees = unpaid_epoch_pool.get_total_fees(transaction)?;
 
         let unpaid_epoch_block_count =
             Self::get_epoch_block_count(&drive, &unpaid_epoch_pool, transaction)?;
@@ -49,7 +54,7 @@ impl FeePools {
 
         let proposers_len = proposers.len() as u16;
 
-        let mut fee_leftovers = 0.0;
+        let mut fee_leftovers = dec!(0.0);
 
         for (proposer_tx_hash, proposed_block_count) in proposers {
             let query_json = json!({
@@ -87,7 +92,7 @@ impl FeePools {
                 // We ensure an identity existence in the data contract triggers in DPP
                 let mut identity = drive.fetch_identity(pay_to_id, transaction)?;
 
-                let share_percentage_integer: u64 = document
+                let share_percentage_integer: i64 = document
                     .properties
                     .get("percentage")
                     .ok_or(Error::Document(DocumentError::MissingDocumentProperty(
@@ -100,31 +105,47 @@ impl FeePools {
                     .try_into()
                     .map_err(|_| {
                         Error::Document(DocumentError::InvalidDocumentPropertyType(
-                            "percentage property cannot be converted to u64",
+                            "percentage property cannot be converted to i64",
                         ))
                     })?;
 
-                let share_percentage = share_percentage_integer as f64 / 100.0;
+                let share_percentage = Decimal::new(share_percentage_integer, 0) / dec!(100.0);
 
-                // TODO Make overflow safe (all over the place)
+                let proposed_block_count =
+                    Decimal::from_str(proposed_block_count.to_string().as_str()).map_err(|_| {
+                        Error::Fee(FeeError::DecimalConversion(
+                            "can't convert proposed_block_count to Decimal",
+                        ))
+                    })?;
 
-                let mut reward = (total_fees * proposed_block_count as f64 * share_percentage)
-                    / unpaid_epoch_block_count as f64;
+                let unpaid_epoch_block_count = Decimal::from_str(
+                    unpaid_epoch_block_count.to_string().as_str(),
+                )
+                .map_err(|_| {
+                    Error::Fee(FeeError::DecimalConversion(
+                        "can't convert unpaid_epoch_block_count to Decimal",
+                    ))
+                })?;
+
+                let reward = (total_fees * proposed_block_count * share_percentage)
+                    / unpaid_epoch_block_count;
 
                 // Since identity balance is an integer
+                let reward_floored: u64 = reward.floor().try_into().map_err(|_| {
+                    Error::Fee(FeeError::DecimalConversion(
+                        "can't convert reward to u64 from Decimal",
+                    ))
+                })?;
+
                 // Add rewards remainder to other leftovers
-                let reward_floored = reward.floor();
+                fee_leftovers += reward
+                    - Decimal::from_str(reward_floored.to_string().as_str()).map_err(|_| {
+                        Error::Fee(FeeError::DecimalConversion(
+                            "can't convert reward_floored to Decimal",
+                        ))
+                    })?;
 
-                fee_leftovers += reward - reward_floored;
-
-                let fee_leftovers_floored = fee_leftovers.floor();
-                if fee_leftovers_floored > 0.0 {
-                    fee_leftovers -= fee_leftovers_floored;
-
-                    reward += fee_leftovers_floored;
-                }
-
-                identity.balance += reward as u64;
+                identity.balance += reward_floored;
 
                 drive.insert_identity_cbor(
                     Some(pay_to_id),
@@ -135,9 +156,31 @@ impl FeePools {
             }
         }
 
+        // move integer part of the leftovers to processing
+        // and fractional part to storage
+        let storage_leftovers = fee_leftovers.fract();
+        let processing_leftovers: u64 = (fee_leftovers.floor()).try_into().map_err(|_| {
+            Error::Fee(FeeError::DecimalConversion(
+                "can't convert fee_leftovers to u64 from Decimal",
+            ))
+        })?;
+
         // if less then a limit processed - clean up the pool (mark as paid)
+        // and chose epoch pool to distribute leftovers to
         if proposers_len < proposers_limit {
             unpaid_epoch_pool.mark_as_paid(transaction)?;
+
+            let next_epoch_pool = EpochPool::new(unpaid_epoch_pool.index + 1, drive);
+
+            let processing_fee = next_epoch_pool.get_processing_fee(transaction)?;
+            let storage_fee = next_epoch_pool.get_storage_fee(transaction)?;
+
+            next_epoch_pool
+                .update_processing_fee(processing_fee + processing_leftovers, transaction)?;
+            next_epoch_pool.update_storage_fee(storage_fee + storage_leftovers, transaction)?;
+        } else {
+            unpaid_epoch_pool.update_processing_fee(processing_leftovers, transaction)?;
+            unpaid_epoch_pool.update_storage_fee(storage_leftovers, transaction)?;
         }
 
         Ok(())

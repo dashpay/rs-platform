@@ -1,4 +1,5 @@
 use grovedb::{Element, TransactionArg};
+use rust_decimal_macros::dec;
 
 use crate::drive::Drive;
 use crate::error::fee::FeeError;
@@ -35,7 +36,7 @@ impl<'e> EpochPool<'e> {
             .map_err(Error::GroveDB)?;
 
         // init storage fee item to 0
-        self.update_storage_fee(0i64, transaction)?;
+        self.update_storage_fee(dec!(0.0), transaction)?;
 
         Ok(())
     }
@@ -157,6 +158,7 @@ impl<'e> EpochPool<'e> {
 mod tests {
     use chrono::Utc;
     use grovedb::Element;
+    use rust_decimal_macros::dec;
     use tempfile::TempDir;
 
     use crate::error::fee::FeeError;
@@ -447,7 +449,7 @@ mod tests {
             .get_storage_fee(Some(&transaction))
             .expect("to get storage fee");
 
-        assert_eq!(storage_fee, 0);
+        assert_eq!(storage_fee, dec!(0.0));
 
         let stored_multiplier = epoch
             .get_fee_multiplier(Some(&transaction))
