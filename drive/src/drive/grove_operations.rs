@@ -755,7 +755,7 @@ impl Drive {
     ) -> Result<(), Error> {
         if self.config.batching_enabled {
             self.grove
-                .apply_batch(ops, validate, transaction)
+                .apply_batch(ops, None, transaction)
                 .map_err(Error::GroveDB)
                 .unwrap()
         } else {
@@ -782,6 +782,7 @@ impl Drive {
                             .map_err(Error::GroveDB)
                             .unwrap()?;
                     }
+                    _ => {}
                 }
             }
             Ok(())
