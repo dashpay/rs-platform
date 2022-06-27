@@ -37,7 +37,7 @@ use crate::error::Error;
 //     Low = 4,
 // }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct IdentityKey {
     pub id: u16,
     pub key_type: u8,

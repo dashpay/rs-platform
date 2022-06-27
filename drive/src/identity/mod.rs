@@ -17,7 +17,7 @@ use crate::identity::key::IdentityKey;
 
 pub mod key;
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct Identity {
     pub id: [u8; 32],
     pub revision: u64,
