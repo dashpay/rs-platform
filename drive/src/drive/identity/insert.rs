@@ -1,27 +1,27 @@
-use crate::contract::types::{encode_u16, encode_u64};
 use crate::drive::flags::StorageFlags;
 use crate::drive::identity::{
-    balance_from_bytes, identity_key_tree_path, identity_path, IdentityRootStructure,
+    identity_key_tree_path, identity_path, identity_path_vec,
+    identity_query_keys_purpose_tree_path, identity_query_keys_tree_path, IdentityRootStructure,
 };
-use crate::drive::object_size_info::KeyValueInfo::KeyRefRequest;
+
 use crate::drive::object_size_info::PathKeyElementInfo::PathFixedSizeKeyElement;
-use crate::drive::{identity_tree_path, Drive, RootTree, key_tree_path};
-use crate::error::drive::DriveError;
+use crate::drive::{identity_tree_path, key_hashes_tree_path, Drive, RootTree};
 use crate::error::identity::IdentityError;
 use crate::error::Error;
 use crate::fee::calculate_fee;
-use crate::fee::op::DriveOperation;
+use crate::fee::op::DriveOperation::FunctionOperation;
+use crate::fee::op::{DriveOperation, FunctionOp, HashFunction};
 use crate::identity::key::IdentityKey;
 use crate::identity::Identity;
-use grovedb::Element::Item;
+use grovedb::Element::{Item, Reference};
 use grovedb::{Element, ElementFlags, TransactionArg};
-use std::collections::BTreeMap;
+use sha2::{Digest, Sha256};
 
 impl Drive {
-    fn create_key_tree_with_keys(
+    fn create_key_tree_with_keys_operations(
         &self,
         identity_id: [u8; 32],
-        keys: BTreeMap<u16, IdentityKey>,
+        keys: Vec<IdentityKey>,
         element_flags: ElementFlags,
         drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<(), Error> {
@@ -35,17 +35,20 @@ impl Drive {
             drive_operations,
         )?;
 
-        let identity_tree_path = identity_key_tree_path(identity_id.as_slice());
+        // We create the query trees structure
+        self.create_new_identity_query_trees_operations(
+            identity_id,
+            element_flags.clone(),
+            drive_operations,
+        )?;
 
-        for (key_id, key) in keys.into_iter() {
-            let serialized_key = key.serialize();
-            let encoded_key = encode_u16(key_id)?;
-            self.batch_insert(
-                PathFixedSizeKeyElement((
-                    identity_tree_path,
-                    encoded_key.as_slice(),
-                    Element::empty_tree_with_flags(element_flags.clone()),
-                )),
+        for key in keys.into_iter() {
+            self.insert_new_key_operations(
+                identity_id.as_slice(),
+                key,
+                element_flags.clone(),
+                false,
+                None,
                 drive_operations,
             )?;
         }
@@ -91,37 +94,118 @@ impl Drive {
         )
     }
 
-    pub fn insert_new_key_operations(&self,
-                          identity_key: IdentityKey,
-                          storage_flags: StorageFlags,
-                          verify: bool,
-                          transaction: TransactionArg,
-                                     drive_operations: &mut Vec<DriveOperation>,
+    pub fn insert_new_key_operations(
+        &self,
+        identity_id: &[u8],
+        identity_key: IdentityKey,
+        element_flags: ElementFlags,
+        verify: bool,
+        transaction: TransactionArg,
+        drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<(), Error> {
-        let key_tree = key_tree_path();
+        let key_hashes_tree = key_hashes_tree_path();
+        let key_len = identity_key.public_key_bytes.len();
+        let key_hash = Sha256::digest(identity_key.public_key_bytes.clone());
+        drive_operations.push(FunctionOperation(FunctionOp {
+            hash: HashFunction::Sha256,
+            byte_count: key_len as u16,
+        }));
         if verify {
             let exists = self.grove_has_raw(
-                key_tree,
-                identity_key.public_key_bytes.as_slice(),
+                key_hashes_tree,
+                key_hash.as_slice(),
+                true, //if you want to verify you need to know the state
                 transaction,
                 drive_operations,
             )?;
             if exists {
                 return Err(Error::Identity(IdentityError::IdentityAlreadyExists(
-                    "trying to insert an identity that already exists",
+                    "trying to insert a key that already exists",
                 )));
             }
         }
 
+        let identity_path = identity_path_vec(identity_id);
+
+        // Let's first insert the hash with a reference to the identity
+        self.batch_insert(
+            PathFixedSizeKeyElement((
+                key_hashes_tree,
+                key_hash.as_slice(),
+                Reference(identity_path, element_flags.clone()),
+            )),
+            drive_operations,
+        )?;
+
+        // Now lets insert the key
+        let identity_key_tree = identity_key_tree_path(identity_id);
+
+        let identity_key_id_bytes = identity_key.id.to_be_bytes();
         let serialized_identity_key = identity_key.serialize();
         self.batch_insert(
             PathFixedSizeKeyElement((
-                key_tree,
-                identity_key.public_key_bytes.as_slice(),
-                Item(serialized_identity_key, storage_flags.to_element_flags()),
+                identity_key_tree,
+                identity_key_id_bytes.as_slice(),
+                Item(serialized_identity_key, element_flags.clone()),
             )),
             drive_operations,
         )
+
+        // Now lets add in references so we can query keys.
+        // We assume the following, the identity already has a Query Tree with every purpose level
+    }
+
+    pub fn create_new_identity_query_trees_operations(
+        &self,
+        identity_id: [u8; 32],
+        element_flags: ElementFlags,
+        drive_operations: &mut Vec<DriveOperation>,
+    ) -> Result<(), Error> {
+        let identity_key_tree = identity_query_keys_tree_path(identity_id.as_slice());
+
+        // There are 3 Purposes: Authentication, Encryption, Decryption
+        for purpose in 0..3 {
+            self.batch_insert(
+                PathFixedSizeKeyElement((
+                    identity_key_tree,
+                    &[purpose],
+                    Element::empty_tree_with_flags(element_flags.clone()),
+                )),
+                drive_operations,
+            )?;
+        }
+        // There are 4 Security Levels: Master, Critical, High, Medium
+        // For the Authentication Purpose we insert every tree
+        let identity_key_authentication_tree =
+            identity_query_keys_purpose_tree_path(identity_id.as_slice(), &[0]);
+        for security_level in 0..4 {
+            self.batch_insert(
+                PathFixedSizeKeyElement((
+                    identity_key_authentication_tree,
+                    &[security_level],
+                    Element::empty_tree_with_flags(element_flags.clone()),
+                )),
+                drive_operations,
+            )?;
+        }
+        // For Encryption and Decryption we only insert the medium security level
+        for purpose in 1..3 {
+            let purpose_vec = vec![purpose];
+            let identity_key_purpose_tree = identity_query_keys_purpose_tree_path(
+                identity_id.as_slice(),
+                purpose_vec.as_slice(),
+            );
+
+            self.batch_insert(
+                PathFixedSizeKeyElement((
+                    identity_key_purpose_tree,
+                    &[3], //medium
+                    Element::empty_tree_with_flags(element_flags.clone()),
+                )),
+                drive_operations,
+            )?;
+        }
+        Ok(())
     }
 
     pub fn insert_new_identity(
@@ -133,7 +217,14 @@ impl Drive {
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
         let mut batch_operations: Vec<DriveOperation> = vec![];
-        self.create_identity_operations(identity, storage_flags, verify, transaction, &mut batch_operations)?;
+        self.create_identity_operations(
+            identity,
+            storage_flags,
+            verify,
+            apply,
+            transaction,
+            &mut batch_operations,
+        )?;
 
         let mut drive_operations: Vec<DriveOperation> = vec![];
 
@@ -147,18 +238,25 @@ impl Drive {
         identity: Identity,
         storage_flags: StorageFlags,
         verify: bool,
+        apply: bool,
         transaction: TransactionArg,
         drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<(), Error> {
         let identity_tree_path = identity_tree_path();
 
-        let Identity { id, revision, balance, keys } = identity;
+        let Identity {
+            id,
+            revision,
+            balance,
+            keys,
+        } = identity;
 
         // If we are asking to verify we check to make sure the tree for this identity doesn't yet exist
         if verify {
             let exists = self.grove_has_raw(
                 identity_tree_path,
                 id.as_slice(),
+                apply,
                 transaction,
                 drive_operations,
             )?;
@@ -196,9 +294,9 @@ impl Drive {
         )?;
 
         // We insert the key tree and keys
-        self.create_key_tree_with_keys(
+        self.create_key_tree_with_keys_operations(
             id,
-            keys,
+            keys.into_values().collect(),
             storage_flags.to_element_flags(),
             drive_operations,
         )

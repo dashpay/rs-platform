@@ -13,7 +13,8 @@ use crate::fee::default_costs::{
 };
 use crate::fee::op::DriveOperation::{
     CalculatedCostOperation, ContractFetch, CostCalculationDeleteOperation,
-    CostCalculationInsertOperation, CostCalculationQueryOperation, GroveOperation,
+    CostCalculationInsertOperation, CostCalculationQueryOperation, FunctionOperation,
+    GroveOperation,
 };
 
 #[derive(Debug, Enum)]
@@ -72,15 +73,63 @@ impl BaseOp {
 }
 
 #[derive(Debug, Enum)]
-pub enum FunctionOp {
-    Exp,
+pub enum HashFunction {
     Sha256,
     Sha256_2,
     Blake3,
 }
 
+impl HashFunction {
+    fn block_size(&self) -> u16 {
+        match self {
+            HashFunction::Sha256 => 64,
+            HashFunction::Sha256_2 => 64,
+            HashFunction::Blake3 => 64,
+        }
+    }
+
+    fn rounds(&self) -> u16 {
+        match self {
+            HashFunction::Sha256 => 1,
+            HashFunction::Sha256_2 => 2,
+            HashFunction::Blake3 => 1,
+        }
+    }
+
+    fn base_cost(&self) -> u16 {
+        match self {
+            HashFunction::Sha256 => 30,
+            HashFunction::Sha256_2 => 30,
+            HashFunction::Blake3 => 30,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct FunctionOp {
+    pub(crate) hash: HashFunction,
+    pub(crate) byte_count: u16,
+}
+
 impl FunctionOp {
-    pub fn cost(&self, word_count: u32) {}
+    fn events(&self) -> u16 {
+        let blocks = self.byte_count / self.hash.block_size() + 1;
+        let events = blocks + self.hash.rounds() - 1;
+        events
+    }
+}
+
+impl OperationCostConvert for FunctionOp {
+    fn cost(&self) -> OperationCost {
+        OperationCost {
+            seek_count: 0,
+            storage_written_bytes: 0,
+            storage_loaded_bytes: 0,
+            loaded_bytes: 0,
+            hash_byte_calls: 0,
+            hash_node_calls: self.events(),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -272,6 +321,7 @@ pub enum DriveOperation {
     GroveOperation(GroveDbOp),
     CalculatedCostOperation(OperationCost),
     ContractFetch,
+    FunctionOperation(FunctionOp),
     CostCalculationInsertOperation(SizesOfInsertOperation),
     CostCalculationDeleteOperation(SizesOfDeleteOperation),
     CostCalculationQueryOperation(SizesOfQueryOperation),
@@ -292,6 +342,7 @@ impl DriveOperation {
             GroveOperation(_) => Err(Error::Drive(DriveError::CorruptedCodeExecution(
                 "grove operations must be executed, not directly transformed to costs",
             ))),
+            FunctionOperation(function_op) => Ok(function_op.cost()),
             CostCalculationInsertOperation(worst_case_insert_operation) => {
                 Ok(worst_case_insert_operation.cost())
             }

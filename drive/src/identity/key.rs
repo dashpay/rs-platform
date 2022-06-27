@@ -11,6 +11,32 @@ use crate::error::drive::DriveError;
 use crate::error::identity::IdentityError;
 use crate::error::Error;
 
+// #[repr(u8)]
+// #[derive(Serialize, Deserialize, Debug, PartialEq)]
+// pub enum IdentityKeyType {
+//     ECDSA = 0,
+//     BLS = 1,
+// }
+//
+// #[repr(u8)]
+// #[derive(Serialize, Deserialize, Debug, PartialEq)]
+// pub enum IdentityKeyPurpose {
+//     // Input data errors
+//     Encryption = 0,
+//     Authentication = 1, // authentication being at 1 means it will be at the top of the tree
+//     Decryption = 2,
+// }
+//
+// #[derive(Serialize, Deserialize, Debug, PartialEq)]
+// #[repr(u8)]
+// pub enum IdentitySecurityLevel {
+//     Master = 0,
+//     Critical = 1,
+//     High = 2,
+//     Medium = 3,
+//     Low = 4,
+// }
+
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct IdentityKey {
     pub id: u16,

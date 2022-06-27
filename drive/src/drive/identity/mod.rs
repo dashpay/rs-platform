@@ -9,11 +9,55 @@ pub(crate) fn identity_path(identity_id: &[u8]) -> [&[u8]; 2] {
     [Into::<&[u8; 1]>::into(RootTree::Identities), identity_id]
 }
 
+pub(crate) fn identity_path_vec(identity_id: &[u8]) -> Vec<Vec<u8>> {
+    vec![
+        Into::<&[u8; 1]>::into(RootTree::Identities).to_vec(),
+        identity_id.to_vec(),
+    ]
+}
+
 pub(crate) fn identity_key_tree_path(identity_id: &[u8]) -> [&[u8]; 3] {
     [
         Into::<&[u8; 1]>::into(RootTree::Identities),
         identity_id,
         Into::<&[u8; 1]>::into(IdentityRootStructure::IdentityTreeKeys),
+    ]
+}
+
+pub(crate) fn identity_query_keys_tree_path(identity_id: &[u8]) -> [&[u8]; 4] {
+    [
+        Into::<&[u8; 1]>::into(RootTree::Identities),
+        identity_id,
+        Into::<&[u8; 1]>::into(IdentityRootStructure::IdentityTreeKeys),
+        &[],
+    ]
+}
+
+pub(crate) fn identity_query_keys_purpose_tree_path<'a>(
+    identity_id: &'a [u8],
+    purpose: &'a [u8],
+) -> [&'a [u8]; 5] {
+    [
+        Into::<&[u8; 1]>::into(RootTree::Identities),
+        identity_id,
+        Into::<&[u8; 1]>::into(IdentityRootStructure::IdentityTreeKeys),
+        &[],
+        purpose,
+    ]
+}
+
+pub(crate) fn identity_query_keys_full_tree_path<'a>(
+    identity_id: &'a [u8],
+    purpose: &'a [u8],
+    security_level: &'a [u8],
+) -> [&'a [u8]; 6] {
+    [
+        Into::<&[u8; 1]>::into(RootTree::Identities),
+        identity_id,
+        Into::<&[u8; 1]>::into(IdentityRootStructure::IdentityTreeKeys),
+        &[],
+        purpose,
+        security_level,
     ]
 }
 
