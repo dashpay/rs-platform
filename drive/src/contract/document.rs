@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::fmt;
 use std::io::{BufReader, Read};
 
 use byteorder::{BigEndian, WriteBytesExt};
@@ -6,7 +7,7 @@ use ciborium::value::Value;
 use serde::{Deserialize, Serialize};
 
 use crate::common::{bytes_for_system_value_from_tree_map, get_key_from_cbor_map};
-use crate::contract::{Contract, DocumentType};
+use crate::contract::{Contract, DocumentType, reduced_value_string_representation};
 use crate::drive::defaults::PROTOCOL_VERSION;
 use crate::drive::Drive;
 use crate::error::contract::ContractError;
@@ -342,10 +343,26 @@ impl Document {
     }
 }
 
+impl fmt::Display for Document {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "id:{} ", bs58::encode(self.id).into_string())?;
+        write!(f, "owner_id:{} ", bs58::encode(self.owner_id).into_string())?;
+        if self.properties.is_empty() {
+            write!(f, "no properties")?;
+        } else {
+            for (key, value) in self.properties.iter() {
+                write!(f, "{}:{} ", key, reduced_value_string_representation(value))?
+            }
+        }
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::common::json_document_to_cbor;
     use crate::contract::Contract;
+    use crate::contract::document::Document;
 
     #[test]
     fn test_drive_serialization() {
@@ -378,4 +395,44 @@ mod tests {
                 .expect("expected to serialize");
         }
     }
+
+
+    #[test]
+    fn test_document_cbor_serialization() {
+        let dashpay_cbor = json_document_to_cbor(
+            "tests/supporting_files/contract/dashpay/dashpay-contract.json",
+            Some(1),
+        );
+        let contract = Contract::from_cbor(&dashpay_cbor, None).unwrap();
+
+        let document_type = contract
+            .document_type_for_name("profile")
+            .expect("expected to get profile document type");
+        let document = document_type.random_document(Some(3333));
+
+        let document_cbor = document.to_cbor();
+
+        let recovered_document = Document::from_cbor(document_cbor.as_slice(), None, None)
+            .expect("expected to get document");
+
+        assert_eq!(recovered_document, document);
+    }
+
+    #[test]
+    fn test_document_display() {
+        let dashpay_cbor = json_document_to_cbor(
+            "tests/supporting_files/contract/dashpay/dashpay-contract.json",
+            Some(1),
+        );
+        let contract = Contract::from_cbor(&dashpay_cbor, None).unwrap();
+
+        let document_type = contract
+            .document_type_for_name("profile")
+            .expect("expected to get profile document type");
+        let document = document_type.random_document(Some(3333));
+
+        let document_string = format!("{}", document);
+        assert_eq!(document_string.as_str(), "id:2vq574DjKi7ZD8kJ6dMHxT5wu6ZKD2bW5xKAyKAGW7qZ owner_id:ChTEGXJcpyknkADUC5s6tAzvPqVG7x6Lo1Nr5mFtj2mk $createdAt:1627081806.116 $updatedAt:1575820087.909 avatarUrl:W18RuyblDX7hxB38OJYt[...(894)] displayName:wvAD8Grs2h publicMessage:LdWpGtOzOkYXStdxU3G0[...(105)] ")
+    }
+
 }

@@ -11,3 +11,5 @@ pub const DEFAULT_FLOAT_SIZE: usize = 8;
 pub const EMPTY_TREE_STORAGE_SIZE: usize = 33;
 pub const MAX_INDEX_SIZE: usize = 255;
 pub const STORAGE_FLAGS_SIZE: usize = 2;
+
+pub const CONTRACT_MAX_SERIALIZED_SIZE: u16 = 16384;

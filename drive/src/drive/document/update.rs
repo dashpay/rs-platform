@@ -98,7 +98,7 @@ impl Drive {
             )
             .serialized_byte_size();
 
-            DocumentSize(element_size)
+            DocumentSize(element_size as u32)
         };
 
         self.update_document_for_contract_operations(
@@ -180,6 +180,8 @@ impl Drive {
             let document_reference =
                 Element::Reference(reference_path, storage_flags.to_element_flags());
 
+            let query_stateless_max_value_size = if apply { None } else { Some(document_type.max_size()) };
+
             // next we need to get the old document from storage
             let old_document_element: Element = if document_type.documents_keep_history {
                 let contract_documents_keeping_history_primary_key_path_for_document_id =
@@ -191,6 +193,7 @@ impl Drive {
                 self.grove_get(
                     contract_documents_keeping_history_primary_key_path_for_document_id,
                     KeyRefRequest(&[0]),
+                    query_stateless_max_value_size,
                     transaction,
                     &mut batch_operations,
                 )?
@@ -198,6 +201,7 @@ impl Drive {
                 self.grove_get(
                     contract_documents_primary_key_path,
                     KeyRefRequest(document.id.as_slice()),
+                    query_stateless_max_value_size,
                     transaction,
                     &mut batch_operations,
                 )?

@@ -3,7 +3,9 @@ mod tests {
     use serde_json::json;
 
     use crate::common;
-    use crate::contract::{Contract, DocumentType, Index, IndexProperty};
+    use crate::contract::{Contract};
+    use crate::contract::document_type::DocumentType;
+    use crate::contract::index::{Index, IndexProperty};
     use crate::error::{query::QueryError, Error};
     use crate::query::DriveQuery;
 

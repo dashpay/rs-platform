@@ -9,7 +9,8 @@ use WhereOperator::{
     GreaterThanOrEquals, In, LessThan, LessThanOrEquals, StartsWith,
 };
 
-use crate::contract::{document::Document, DocumentType};
+use crate::contract::{document::Document};
+use crate::contract::document_type::DocumentType;
 use crate::error::query::QueryError;
 use crate::error::Error;
 

@@ -12,6 +12,7 @@ use crate::drive::object_size_info::PathKeyElementInfo::{
 };
 use crate::drive::object_size_info::PathKeyInfo::PathFixedSizeKeyRef;
 use crate::drive::{contract_documents_path, defaults, Drive, RootTree};
+use crate::drive::defaults::CONTRACT_MAX_SERIALIZED_SIZE;
 use crate::error::drive::DriveError;
 use crate::error::Error;
 use crate::fee::calculate_fee;
@@ -421,10 +422,13 @@ impl Drive {
         // overlying structure
         let mut already_exists = false;
         let mut original_contract_stored_data = vec![];
+        
+        let query_state_less_max_value_size = if apply { None } else { Some(CONTRACT_MAX_SERIALIZED_SIZE) };
 
         if let Ok(Some(stored_element)) = self.grove_get(
             contract_root_path(&contract.id),
             KeyRefRequest(&[0]),
+            query_state_less_max_value_size,
             transaction,
             &mut drive_operations,
         ) {

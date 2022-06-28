@@ -18,7 +18,9 @@ pub use conditions::{WhereClause, WhereOperator};
 pub use ordering::OrderClause;
 
 use crate::common::bytes_for_system_value;
-use crate::contract::{document::Document, Contract, DocumentType, Index, IndexProperty};
+use crate::contract::{document::Document, Contract};
+use crate::contract::document_type::DocumentType;
+use crate::contract::index::{Index, IndexProperty};
 use crate::drive::object_size_info::KeyValueInfo;
 use crate::drive::Drive;
 use crate::error::drive::DriveError;
@@ -464,6 +466,7 @@ impl<'a> DriveQuery<'a> {
                     .grove_get(
                         start_at_document_path,
                         KeyValueInfo::KeyRefRequest(&start_at_document_key),
+                        None,
                         transaction,
                         drive_operations,
                     )
@@ -1158,7 +1161,7 @@ impl<'a> DriveQuery<'a> {
         drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<([u8; 32], Vec<Vec<u8>>), Error> {
         let path_query =
-            self.construct_path_query_operations(drive, transaction, drive_operations)?;
+            self.construct_path_query_operations(drive, transaction, drive_operations, )?;
 
         let proof =
             drive.grove_get_proved_path_query(&path_query, transaction, drive_operations)?;
@@ -1200,7 +1203,7 @@ impl<'a> DriveQuery<'a> {
         drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<(Vec<Vec<u8>>, u16), Error> {
         let path_query =
-            self.construct_path_query_operations(drive, transaction, drive_operations)?;
+            self.construct_path_query_operations(drive, transaction, drive_operations, )?;
         let query_result = drive.grove_get_path_query(&path_query, transaction, drive_operations);
         match query_result {
             Err(GroveDB(GroveError::PathKeyNotFound(_)))
@@ -1222,11 +1225,12 @@ mod tests {
 
     use crate::common;
     use crate::common::json_document_to_cbor;
-    use crate::contract::{Contract, DocumentType};
+    use crate::contract::{Contract};
     use crate::drive::flags::StorageFlags;
     use crate::drive::Drive;
     use crate::query::DriveQuery;
     use serde_json::Value::Null;
+    use crate::contract::document_type::DocumentType;
 
     fn setup_family_contract() -> (Drive, Contract) {
         let tmp_dir = TempDir::new().unwrap();

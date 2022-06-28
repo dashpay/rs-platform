@@ -120,9 +120,9 @@ impl SizesOfQueryOperation {
     }
 
     pub fn for_value_retrieval_in_path<'a: 'b, 'b, 'c, P>(
-        key_len: usize,
+        key_len: u16,
         path: P,
-        value_len: usize,
+        value_len: u32,
     ) -> Self
     where
         P: IntoIterator<Item = &'c [u8]>,
@@ -135,7 +135,7 @@ impl SizesOfQueryOperation {
         SizesOfQueryOperation {
             key_size: key_len as u32,
             path_size,
-            value_size: value_len as u32,
+            value_size: value_len,
         }
     }
 

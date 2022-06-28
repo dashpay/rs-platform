@@ -196,7 +196,7 @@ impl Drive {
         let document_type = contract.document_type_for_name(document_type_name)?;
         self.add_document_for_contract(
             DocumentAndContractInfo {
-                document_info: DocumentSize(document_type.max_size()),
+                document_info: DocumentSize(document_type.max_size() as u32),
                 contract,
                 document_type,
                 owner_id: None,

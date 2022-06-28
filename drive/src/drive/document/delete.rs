@@ -6,6 +6,8 @@ use crate::drive::defaults::CONTRACT_DOCUMENTS_PATH_HEIGHT;
 use crate::drive::document::{contract_document_type_path, contract_documents_primary_key_path};
 use crate::drive::object_size_info::KeyValueInfo::KeyRefRequest;
 use crate::drive::Drive;
+use crate::drive::flags::StorageFlags;
+use crate::drive::object_size_info::DocumentInfo::{DocumentAndSerialization, DocumentSize};
 use crate::error::drive::DriveError;
 use crate::error::Error;
 use crate::fee::calculate_fee;
@@ -82,26 +84,38 @@ impl Drive {
         let contract_documents_primary_key_path =
             contract_documents_primary_key_path(&contract.id, document_type_name);
 
+        let stateless = !apply;
+        let query_stateless_max_value_size = if stateless { Some(document_type.max_size()) } else { None };
+
         // next we need to get the document from storage
         let document_element: Option<Element> = self.grove_get(
             contract_documents_primary_key_path,
             KeyRefRequest(document_id),
+            query_stateless_max_value_size,
             transaction,
             &mut batch_operations,
         )?;
 
-        if document_element.is_none() {
+        let mut document : Document;
+        let mut storage_flags : StorageFlags;
+        let document_info = if let Some(max_value_size) = query_stateless_max_value_size {
+            DocumentSize(max_value_size as u32)
+        } else if let Some(document_element) = document_element {
+            if let Element::Item(data, element_flags) = document_element {
+                document = Document::from_cbor(data.as_slice(), None, owner_id)?;
+                storage_flags = StorageFlags::from_element_flags(element_flags)?;
+                DocumentAndSerialization((&document, data.as_slice(), &storage_flags))
+            } else {
+                return Err(Error::Drive(DriveError::CorruptedDocumentNotItem(
+                    "document being deleted is not an item",
+                )));
+            }
+        } else {
             return Err(Error::Drive(DriveError::DeletingDocumentThatDoesNotExist(
                 "document being deleted does not exist",
             )));
-        }
-
-        let document_bytes: Vec<u8> = match document_element.unwrap() {
-            Element::Item(data, _) => data,
-            _ => todo!(), // TODO: how should this be handled, possibility that document might not be in storage
         };
 
-        let document = Document::from_cbor(document_bytes.as_slice(), None, owner_id)?;
 
         // third we need to delete the document for it's primary key
         self.batch_delete(

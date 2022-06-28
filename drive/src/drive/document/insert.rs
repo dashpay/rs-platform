@@ -1,7 +1,8 @@
 use grovedb::{Element, TransactionArg};
 
 use crate::contract::document::Document;
-use crate::contract::{Contract, DocumentType};
+use crate::contract::{Contract};
+use crate::contract::document_type::DocumentType;
 use crate::drive::defaults::{DEFAULT_HASH_SIZE, STORAGE_FLAGS_SIZE};
 use crate::drive::document::{
     contract_document_type_path,
@@ -21,7 +22,7 @@ use crate::drive::object_size_info::PathKeyElementInfo::{
     PathFixedSizeKeyElement, PathKeyElementSize,
 };
 use crate::drive::object_size_info::PathKeyInfo::{PathFixedSizeKeyRef, PathKeySize};
-use crate::drive::object_size_info::{DocumentAndContractInfo, PathInfo, PathKeyElementInfo};
+use crate::drive::object_size_info::{DocumentAndContractInfo, DocumentInfo, PathInfo, PathKeyElementInfo};
 use crate::drive::{defaults, Drive};
 use crate::error::drive::DriveError;
 use crate::error::Error;
@@ -116,7 +117,7 @@ impl Drive {
                     PathKeyElementSize((
                         path_max_length,
                         8_usize,
-                        Element::required_item_space(max_size, STORAGE_FLAGS_SIZE),
+                        Element::required_item_space(max_size as usize, STORAGE_FLAGS_SIZE),
                     ))
                 }
             };
@@ -184,7 +185,7 @@ impl Drive {
                 DocumentSize(max_size) => PathKeyElementSize((
                     defaults::BASE_CONTRACT_DOCUMENTS_PRIMARY_KEY_PATH + document_type.name.len(),
                     DEFAULT_HASH_SIZE,
-                    Element::required_item_space(max_size, STORAGE_FLAGS_SIZE),
+                    Element::required_item_space(max_size as usize, STORAGE_FLAGS_SIZE),
                 )),
             };
             self.batch_insert(path_key_element_info, drive_operations)?;
@@ -209,7 +210,7 @@ impl Drive {
                 DocumentSize(max_size) => PathKeyElementSize((
                     defaults::BASE_CONTRACT_DOCUMENTS_PRIMARY_KEY_PATH + document_type.name.len(),
                     DEFAULT_HASH_SIZE,
-                    Element::required_item_space(max_size, STORAGE_FLAGS_SIZE),
+                    Element::required_item_space(max_size as usize, STORAGE_FLAGS_SIZE),
                 )),
             };
             let inserted = self.batch_insert_if_not_exists(
@@ -350,11 +351,18 @@ impl Drive {
             &document_and_contract_info.contract.id,
             document_and_contract_info.document_type.name.as_str(),
         );
+
+        // Apply means statefull query
+        let query_stateless_with_max_value_size = if apply { None } else {
+            Some(document_and_contract_info.document_type.max_size())
+        };
+
         if override_document
             && self
                 .grove_get(
                     primary_key_path,
                     document_and_contract_info.document_info.id_key_value_info(),
+                    query_stateless_with_max_value_size,
                     transaction,
                     &mut batch_operations,
                 )
@@ -542,7 +550,7 @@ impl Drive {
                     }
                     DocumentSize(max_size) => KeyElementSize((
                         DEFAULT_HASH_SIZE,
-                        Element::required_item_space(*max_size, STORAGE_FLAGS_SIZE),
+                        Element::required_item_space(*max_size as usize, STORAGE_FLAGS_SIZE),
                     )),
                 };
 
@@ -567,7 +575,7 @@ impl Drive {
                     }
                     DocumentSize(max_size) => KeyElementSize((
                         1,
-                        Element::required_item_space(*max_size, STORAGE_FLAGS_SIZE),
+                        Element::required_item_space(*max_size as usize, STORAGE_FLAGS_SIZE),
                     )),
                 };
 

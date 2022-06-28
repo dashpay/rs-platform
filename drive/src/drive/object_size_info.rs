@@ -8,7 +8,8 @@ use PathKeyElementInfo::{PathFixedSizeKeyElement, PathKeyElement, PathKeyElement
 use PathKeyInfo::{PathFixedSizeKey, PathFixedSizeKeyRef, PathKey, PathKeyRef, PathKeySize};
 
 use crate::contract::document::Document;
-use crate::contract::{Contract, DocumentType};
+use crate::contract::{Contract};
+use crate::contract::document_type::DocumentType;
 use crate::drive::defaults::DEFAULT_HASH_SIZE;
 use crate::drive::flags::StorageFlags;
 use crate::error::contract::ContractError;
@@ -310,7 +311,7 @@ pub enum DocumentInfo<'a> {
     /// The document without it's serialized form
     DocumentWithoutSerialization((&'a Document, &'a StorageFlags)),
     /// An element size
-    DocumentSize(usize),
+    DocumentSize(u32),
 }
 
 impl<'a> DocumentInfo<'a> {
@@ -386,13 +387,13 @@ pub enum KeyValueInfo<'a> {
     /// A key by reference
     KeyRefRequest(&'a [u8]),
     /// Max size possible for value
-    KeyValueMaxSize((usize, usize)),
+    KeyValueMaxSize((u16, u32)),
 }
 
 impl<'a> KeyValueInfo<'a> {
-    pub fn key_len(&'a self) -> usize {
+    pub fn key_len(&'a self) -> u16 {
         match self {
-            KeyRefRequest(key) => key.len(),
+            KeyRefRequest(key) => key.len() as u16,
             KeyValueMaxSize((key_size, _)) => *key_size,
         }
     }

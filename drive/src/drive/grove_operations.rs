@@ -409,6 +409,7 @@ impl Drive {
         &'a self,
         path: P,
         key_value_info: KeyValueInfo<'c>,
+        query_stateless_with_max_value_size: Option<u16>,
         transaction: TransactionArg,
         drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<Option<Element>, Error>
@@ -419,10 +420,16 @@ impl Drive {
         let path_iter = path.into_iter();
         match key_value_info {
             KeyRefRequest(key) => {
-                let CostContext { value, cost } =
-                    self.grove.get(path_iter.clone(), key, transaction);
-                drive_operations.push(CalculatedCostOperation(cost));
-                Ok(Some(value.map_err(Error::GroveDB)?))
+                if let Some(max_value_size) = query_stateless_with_max_value_size {
+                    let CostContext { value, cost } = self.grove.worst_case_for_get_raw(path, key, max_value_size as u32);
+                    drive_operations.push(CalculatedCostOperation(cost));
+                    value?;
+                    Ok(None)
+                } else {
+                    let CostContext { value, cost } = self.grove.get(path_iter, key, transaction);
+                    drive_operations.push(CalculatedCostOperation(cost));
+                    Ok(Some(value.map_err(Error::GroveDB)?))
+                }
             }
             KeyValueMaxSize((key_size, value_size)) => {
                 drive_operations.push(CostCalculationQueryOperation(
@@ -746,7 +753,7 @@ impl Drive {
             key,
             stop_path_height,
             true,
-            &current_batch_operations,
+            current_batch_operations,
             transaction,
         );
         if let Some(delete_operations) =

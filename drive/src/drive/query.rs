@@ -1,6 +1,7 @@
 use grovedb::TransactionArg;
 
-use crate::contract::{Contract, DocumentType};
+use crate::contract::{Contract};
+use crate::contract::document_type::DocumentType;
 use crate::drive::Drive;
 use crate::error::query::QueryError;
 use crate::error::Error;
