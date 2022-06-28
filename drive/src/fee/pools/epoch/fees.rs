@@ -190,14 +190,11 @@ mod tests {
     use grovedb::Element;
     use rust_decimal::Decimal;
     use rust_decimal_macros::dec;
-    use tempfile::TempDir;
 
     use crate::{
-        drive::Drive,
-        error::{self, fee::FeeError, Error},
+        error::{self, fee::FeeError},
         fee::pools::{
             epoch::{constants, epoch_pool::EpochPool},
-            fee_pools::FeePools,
             tests::helpers::setup::{setup_drive, setup_fee_pools},
         },
     };
