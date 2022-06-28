@@ -822,6 +822,7 @@ mod tests {
         assert_eq!(processing_fee, actual_processing_fee);
     }
 
+    #[ignore]
     #[test]
     fn test_add_dashpay_fee_for_documents_detail() {
         let tmp_dir = TempDir::new().unwrap();

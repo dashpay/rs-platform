@@ -280,10 +280,13 @@ fn test_root_hash(drive: &Drive, db_transaction: &Transaction) {
         .flatten()
         .expect("should return app hash");
 
-    assert_eq!(
-        hex::encode(app_hash),
+    let expected_app_hash = if drive.config.batching_enabled {
         "72b7e8783f763c647e23a6aba6d58b40457c7cbd6486d761aa6f23c1354b7add"
-    );
+    } else {
+        "180efc3caf02fd8e367e7a7a779c97177c19bf1e02e2c424c83bc2b21da41f92"
+    };
+
+    assert_eq!(hex::encode(app_hash), expected_app_hash);
 }
 
 #[test]
