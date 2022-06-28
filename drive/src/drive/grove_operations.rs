@@ -700,7 +700,7 @@ impl Drive {
                 key,
                 stop_path_height,
                 true,
-                &current_batch_operations,
+                current_batch_operations,
                 transaction,
             )
             .unwrap()
