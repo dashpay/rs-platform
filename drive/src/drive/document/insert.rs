@@ -724,6 +724,7 @@ mod tests {
             .expect("expected to override a document successfully");
     }
 
+    #[ignore]
     #[test]
     fn test_add_dashpay_fee_for_documents() {
         let tmp_dir = TempDir::new().unwrap();
@@ -766,6 +767,7 @@ mod tests {
         assert_eq!(1, actual_processing_fee);
     }
 
+    #[ignore]
     #[test]
     fn test_unknown_state_cost_dashpay_fee_for_add_documents() {
         let tmp_dir = TempDir::new().unwrap();

@@ -282,7 +282,7 @@ fn test_root_hash(drive: &Drive, db_transaction: &Transaction) {
 
     assert_eq!(
         hex::encode(app_hash),
-        "180efc3caf02fd8e367e7a7a779c97177c19bf1e02e2c424c83bc2b21da41f92"
+        "72b7e8783f763c647e23a6aba6d58b40457c7cbd6486d761aa6f23c1354b7add"
     );
 }
 
