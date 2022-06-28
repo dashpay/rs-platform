@@ -1,5 +1,6 @@
 use grovedb::{Element, TransactionArg};
 use rust_decimal::Decimal;
+use std::str::FromStr;
 
 use crate::{
     error::{fee::FeeError, Error},
@@ -167,18 +168,18 @@ impl<'e> EpochPool<'e> {
     }
 
     pub fn get_total_fees(&self, transaction: TransactionArg) -> Result<Decimal, Error> {
-        let storage_credit = self.get_storage_fee(transaction)?;
+        let storage_fee = self.get_storage_fee(transaction)?;
 
-        let processing_fee_downcasted = i64::try_from(self.get_processing_fee(transaction)?)
-            .map_err(|_| {
-                Error::Fee(FeeError::CorruptedProcessingFeeInvalidItemLength(
-                    "epoch processing fee is not u64",
+        let processing_fee = self.get_processing_fee(transaction)?;
+
+        let processing_fee =
+            Decimal::from_str(processing_fee.to_string().as_str()).map_err(|_| {
+                Error::Fee(FeeError::DecimalConversion(
+                    "can't convert processing_fee to Decimal",
                 ))
             })?;
 
-        let processing_credit = Decimal::new(processing_fee_downcasted, 0);
-
-        Ok(storage_credit + processing_credit)
+        Ok(storage_fee + processing_fee)
     }
 }
 

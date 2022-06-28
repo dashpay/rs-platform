@@ -57,25 +57,24 @@ impl FeePools {
         let mut fee_leftovers = dec!(0.0);
 
         for (proposer_tx_hash, proposed_block_count) in proposers {
-            let query_json = json!({
-                "where": [
-                    ["$ownerId", "==", bs58::encode(proposer_tx_hash).into_string()]
-                ],
-            });
+            let proposed_block_count = Decimal::from_str(proposed_block_count.to_string().as_str())
+                .map_err(|_| {
+                    Error::Fee(FeeError::DecimalConversion(
+                        "can't convert proposed_block_count to Decimal",
+                    ))
+                })?;
 
-            let query_cbor = value_to_cbor(query_json, None);
+            let unpaid_epoch_block_count =
+                Decimal::from_str(unpaid_epoch_block_count.to_string().as_str()).map_err(|_| {
+                    Error::Fee(FeeError::DecimalConversion(
+                        "can't convert unpaid_epoch_block_count to Decimal",
+                    ))
+                })?;
 
-            let (document_cbors, _, _) = drive.query_documents(
-                &query_cbor,
-                constants::MN_REWARD_SHARES_CONTRACT_ID,
-                constants::MN_REWARD_SHARES_DOCUMENT_TYPE,
-                transaction,
-            )?;
+            let masternode_reward =
+                (total_fees * proposed_block_count * share_percentage) / unpaid_epoch_block_count;
 
-            let documents: Vec<Document> = document_cbors
-                .iter()
-                .map(|cbor| Ok(Document::from_cbor(cbor, None, None)?))
-                .collect::<Result<Vec<Document>, Error>>()?;
+            let documents = Self::get_reward_shares(drive, proposer_tx_hash, transaction)?;
 
             for document in documents {
                 let pay_to_id = document
@@ -88,9 +87,6 @@ impl FeePools {
                     .ok_or(Error::Document(DocumentError::InvalidDocumentPropertyType(
                         "payToId property type is not bytes",
                     )))?;
-
-                // We ensure an identity existence in the data contract triggers in DPP
-                let mut identity = drive.fetch_identity(pay_to_id, transaction)?;
 
                 let share_percentage_integer: i64 = document
                     .properties
@@ -111,49 +107,22 @@ impl FeePools {
 
                 let share_percentage = Decimal::new(share_percentage_integer, 0) / dec!(100.0);
 
-                let proposed_block_count =
-                    Decimal::from_str(proposed_block_count.to_string().as_str()).map_err(|_| {
-                        Error::Fee(FeeError::DecimalConversion(
-                            "can't convert proposed_block_count to Decimal",
-                        ))
-                    })?;
-
-                let unpaid_epoch_block_count = Decimal::from_str(
-                    unpaid_epoch_block_count.to_string().as_str(),
-                )
-                .map_err(|_| {
-                    Error::Fee(FeeError::DecimalConversion(
-                        "can't convert unpaid_epoch_block_count to Decimal",
-                    ))
-                })?;
-
                 let reward = (total_fees * proposed_block_count * share_percentage)
                     / unpaid_epoch_block_count;
 
-                // Since identity balance is an integer
+                // Convert to integer, since identity balance is u64
                 let reward_floored: u64 = reward.floor().try_into().map_err(|_| {
                     Error::Fee(FeeError::DecimalConversion(
                         "can't convert reward to u64 from Decimal",
                     ))
                 })?;
 
-                // Add rewards remainder to other leftovers
-                fee_leftovers += reward
-                    - Decimal::from_str(reward_floored.to_string().as_str()).map_err(|_| {
-                        Error::Fee(FeeError::DecimalConversion(
-                            "can't convert reward_floored to Decimal",
-                        ))
-                    })?;
-
-                identity.balance += reward_floored;
-
-                drive.insert_identity_cbor(
-                    Some(pay_to_id),
-                    identity.to_cbor(),
-                    true,
-                    transaction,
-                )?;
+                Self::pay_reward_to_identity(drive, pay_to_id, reward_floored, transaction)?;
             }
+
+            // Since balance is an integer, we collect rewards remainder and distribute leftovers afterwards
+
+            fee_leftovers += reward - reward_floored;
         }
 
         // move integer part of the leftovers to processing
@@ -184,6 +153,49 @@ impl FeePools {
         }
 
         Ok(())
+    }
+
+    fn pay_reward_to_identity(
+        drive: &Drive,
+        id: &Vec<u8>,
+        reward: u64,
+        transaction: TransactionArg,
+    ) -> Result<(), Error> {
+        // We don't need additional verification, since we ensure an identity
+        // existence in the data contract triggers in DPP
+        let mut identity = drive.fetch_identity(id, transaction)?;
+
+        identity.balance += reward;
+
+        drive.insert_identity_cbor(Some(id), identity.to_cbor(), true, transaction)?;
+
+        Ok(())
+    }
+
+    fn get_reward_shares(
+        drive: &Drive,
+        masternode_owner_id: Vec<u8>,
+        transaction: TransactionArg,
+    ) -> Result<Vec<Document>, Error> {
+        let query_json = json!({
+            "where": [
+                ["$ownerId", "==", bs58::encode(masternode_owner_id).into_string()]
+            ],
+        });
+
+        let query_cbor = value_to_cbor(query_json, None);
+
+        let (document_cbors, _, _) = drive.query_documents(
+            &query_cbor,
+            constants::MN_REWARD_SHARES_CONTRACT_ID,
+            constants::MN_REWARD_SHARES_DOCUMENT_TYPE,
+            transaction,
+        )?;
+
+        document_cbors
+            .iter()
+            .map(|cbor| Ok(Document::from_cbor(cbor, None, None)?))
+            .collect::<Result<Vec<Document>, Error>>()
     }
 
     fn get_oldest_unpaid_epoch_pool<'d>(
