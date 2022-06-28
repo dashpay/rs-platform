@@ -493,6 +493,18 @@ mod tests {
                 .expect("to get start block height");
 
             assert_eq!(stored_block_height, start_block_height);
+
+            let stored_processing_fee = epoch
+                .get_processing_fee(Some(&transaction))
+                .expect("to get processing fee");
+
+            assert_eq!(stored_processing_fee, 0);
+
+            let proposers = epoch
+                .get_proposers(1, Some(&transaction))
+                .expect("to get proposers");
+
+            assert_eq!(proposers, vec!());
         }
     }
 
