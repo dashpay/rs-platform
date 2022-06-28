@@ -71,9 +71,10 @@ impl FeePools {
                     ))
                 })?;
 
-            let masternode_reward = (total_fees * proposed_block_count) / unpaid_epoch_block_count;
+            let mut masternode_reward =
+                (total_fees * proposed_block_count) / unpaid_epoch_block_count;
 
-            let documents = Self::get_reward_shares(drive, proposer_tx_hash, transaction)?;
+            let documents = Self::get_reward_shares(drive, &proposer_tx_hash, transaction)?;
 
             for document in documents {
                 let pay_to_id = document
@@ -108,8 +109,13 @@ impl FeePools {
 
                 let reward = masternode_reward * share_percentage;
 
+                let reward_floored = reward.floor();
+
+                // update masternode reward that would be paid later
+                masternode_reward -= reward_floored;
+
                 // Convert to integer, since identity balance is u64
-                let reward_floored: u64 = reward.floor().try_into().map_err(|_| {
+                let reward_floored: u64 = reward_floored.try_into().map_err(|_| {
                     Error::Fee(FeeError::DecimalConversion(
                         "can't convert reward to u64 from Decimal",
                     ))
@@ -119,8 +125,24 @@ impl FeePools {
             }
 
             // Since balance is an integer, we collect rewards remainder and distribute leftovers afterwards
+            let masternode_reward_floored = masternode_reward.floor();
 
-            fee_leftovers += reward - reward_floored;
+            fee_leftovers += masternode_reward - masternode_reward_floored;
+
+            // Convert to integer, since identity balance is u64
+            let masternode_reward_floored: u64 =
+                masternode_reward_floored.try_into().map_err(|_| {
+                    Error::Fee(FeeError::DecimalConversion(
+                        "can't convert reward to u64 from Decimal",
+                    ))
+                })?;
+
+            Self::pay_reward_to_identity(
+                drive,
+                &proposer_tx_hash,
+                masternode_reward_floored,
+                transaction,
+            )?;
         }
 
         // move integer part of the leftovers to processing
@@ -172,7 +194,7 @@ impl FeePools {
 
     fn get_reward_shares(
         drive: &Drive,
-        masternode_owner_id: Vec<u8>,
+        masternode_owner_id: &Vec<u8>,
         transaction: TransactionArg,
     ) -> Result<Vec<Document>, Error> {
         let query_json = json!({
