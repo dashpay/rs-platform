@@ -306,6 +306,7 @@ describe('Drive', () => {
         documents.map((document) => drive.createDocument(document, blockTime)),
       );
 
+      // eslint-disable-next-line no-unused-vars
       const [fetchedDocuments, processingCost] = await drive.queryDocuments(dataContract, 'indexedDocument', {
         where: [['lastName', '==', 'Kennedy']],
       });
@@ -323,6 +324,7 @@ describe('Drive', () => {
         documents.map((document) => drive.createDocument(document, blockTime)),
       );
 
+      // eslint-disable-next-line no-unused-vars
       const [fetchedDocuments, processingCost] = await drive.queryDocuments(dataContract, 'indexedDocument', {
         where: [['lastName', '==', 'Kennedy']],
       });
@@ -335,6 +337,7 @@ describe('Drive', () => {
     });
 
     it('should return empty array if documents are not exist', async () => {
+      // eslint-disable-next-line no-unused-vars
       const [fetchedDocuments, processingCost] = await drive.queryDocuments(dataContract, 'indexedDocument', {
         where: [['lastName', '==', 'Kennedy']],
       });
