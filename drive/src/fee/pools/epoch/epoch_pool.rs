@@ -159,14 +159,13 @@ mod tests {
     use chrono::Utc;
     use grovedb::Element;
     use rust_decimal_macros::dec;
-    use tempfile::TempDir;
 
+    use crate::error;
     use crate::error::fee::FeeError;
     use crate::fee::pools::epoch::constants;
     use crate::fee::pools::tests::helpers::setup::{
         setup_drive, setup_fee_pools, SetupFeePoolsOptions,
     };
-    use crate::{drive::Drive, error, fee::pools::fee_pools::FeePools};
 
     use super::EpochPool;
 
@@ -174,7 +173,7 @@ mod tests {
     fn test_update_start_time() {
         let drive = setup_drive();
 
-        let (transaction, fee_pools) = setup_fee_pools(&drive, None);
+        let (transaction, _) = setup_fee_pools(&drive, None);
 
         let epoch_pool = super::EpochPool::new(0, &drive);
 
@@ -508,8 +507,57 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_mark_as_paid() {
-        todo!();
+    mod mark_as_paid {
+        #[test]
+        fn test_values_are_deleted() {
+            let drive = super::setup_drive();
+            let (transaction, _) = super::setup_fee_pools(&drive, None);
+
+            let epoch = super::EpochPool::new(0, &drive);
+
+            epoch
+                .init_empty(Some(&transaction))
+                .expect("to init empty epoch pool");
+
+            epoch
+                .init_current(1, 2, 3, Some(&transaction))
+                .expect("to init an epoch pool");
+
+            epoch
+                .mark_as_paid(Some(&transaction))
+                .expect("to mark epoch as paid");
+
+            match drive.grove.get(
+                epoch.get_path(),
+                super::constants::KEY_PROPOSERS.as_bytes(),
+                Some(&transaction),
+            ) {
+                Ok(_) => assert!(false, "should not be able to get proposers"),
+                Err(e) => match e {
+                    grovedb::Error::PathKeyNotFound(_) => assert!(true),
+                    _ => assert!(false, "invalid error type"),
+                },
+            }
+
+            match epoch.get_processing_fee(Some(&transaction)) {
+                Ok(_) => assert!(false, "should not be able to get processing fee"),
+                Err(e) => match e {
+                    super::error::Error::GroveDB(grovedb::Error::PathKeyNotFound(_)) => {
+                        assert!(true)
+                    }
+                    _ => assert!(false, "invalid error type"),
+                },
+            }
+
+            match epoch.get_storage_fee(Some(&transaction)) {
+                Ok(_) => assert!(false, "should not be able to get storage fee"),
+                Err(e) => match e {
+                    super::error::Error::GroveDB(grovedb::Error::PathKeyNotFound(_)) => {
+                        assert!(true)
+                    }
+                    _ => assert!(false, "invalid error type"),
+                },
+            }
+        }
     }
 }
