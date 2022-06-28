@@ -144,7 +144,28 @@ mod tests {
 
         #[test]
         fn test_nothing_to_distribute() {
-            todo!();
+            let drive = setup_drive();
+            let (transaction, fee_pools) = setup_fee_pools(&drive, None);
+
+            let storage_pool = 0;
+            let epoch_index = 0;
+
+            fee_pools
+                .storage_fee_distribution_pool
+                .update(&drive, storage_pool, Some(&transaction))
+                .expect("to update storage fee pool");
+
+            fee_pools
+                .storage_fee_distribution_pool
+                .distribute(&drive, epoch_index, Some(&transaction))
+                .expect("to distribute storage fee pool");
+
+            let storage_fees =
+                helpers::get_storage_fees_from_epoch_pools(&drive, epoch_index, Some(&transaction));
+
+            let reference_fees: Vec<Decimal> = (0..1000).map(|_| dec!(0)).collect();
+
+            assert_eq!(storage_fees, reference_fees);
         }
 
         #[test]

@@ -69,7 +69,7 @@ fn create_mn_identity(
 fn create_mn_share_document(
     contract: &Contract,
     identity: &Identity,
-    payToIdentity: &Identity,
+    pay_to_identity: &Identity,
     percentage: u16,
     drive: &Drive,
 ) -> Document {
@@ -77,7 +77,10 @@ fn create_mn_share_document(
 
     let mut properties: BTreeMap<String, Value> = BTreeMap::new();
 
-    properties.insert(String::from("payToId"), Value::Bytes(identity.id.to_vec()));
+    properties.insert(
+        String::from("payToId"),
+        Value::Bytes(pay_to_identity.id.to_vec()),
+    );
     properties.insert(String::from("percentage"), percentage.into());
 
     let document = Document {

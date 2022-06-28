@@ -400,67 +400,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_update_and_get_fee_multiplier() {
-        todo!();
-
-        let tmp_dir = TempDir::new().unwrap();
-        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
-
-        drive
-            .create_root_tree(None)
-            .expect("expected to create root tree successfully");
-
-        let transaction = drive.grove.start_transaction();
-
-        let fee_pools = FeePools::new();
-
-        fee_pools
-            .init(&drive, Some(&transaction))
-            .expect("fee pools to init");
-
-        let epoch = EpochPool::new(7000, &drive);
-
-        match epoch.get_fee_multiplier(Some(&transaction)) {
-            Ok(_) => assert!(
-                false,
-                "should not be able to get multiplier on uninit epoch pool"
-            ),
-            Err(e) => match e {
-                error::Error::GroveDB(grovedb::Error::InvalidPath(_)) => assert!(true),
-                _ => assert!(false, "invalid error type"),
-            },
-        }
-
-        let epoch = EpochPool::new(0, &drive);
-
-        let stored_multiplier = epoch
-            .get_fee_multiplier(Some(&transaction))
-            .expect("to get multiplier");
-
-        assert_eq!(stored_multiplier, 1);
-
-        drive
-            .grove
-            .insert(
-                epoch.get_path(),
-                constants::KEY_FEE_MULTIPLIER.as_bytes(),
-                Element::Item(u128::MAX.to_le_bytes().to_vec(), None),
-                Some(&transaction),
-            )
-            .expect("to insert invalid data");
-
-        match epoch.get_fee_multiplier(Some(&transaction)) {
-            Ok(_) => assert!(false, "should not be able to decode stored value"),
-            Err(e) => match e {
-                error::Error::Fee(FeeError::CorruptedMultiplierInvalidItemLength(_)) => {
-                    assert!(true)
-                }
-                _ => assert!(false, "ivalid error type"),
-            },
-        }
-    }
-
     mod fee_multiplier {
         #[test]
         fn test_error_if_epoch_pool_is_not_initiated() {
