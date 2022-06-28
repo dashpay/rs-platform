@@ -170,148 +170,228 @@ impl<'e> EpochPool<'e> {
 #[cfg(test)]
 mod tests {
     use grovedb::Element;
-    use tempfile::TempDir;
 
     use crate::{
-        drive::Drive,
         error::{self, fee::FeeError},
         fee::pools::{
-            epoch::{constants, epoch_pool::EpochPool},
-            fee_pools::FeePools,
+            epoch::epoch_pool::EpochPool,
+            tests::helpers::setup::{setup_drive, setup_fee_pools},
         },
     };
 
-    #[test]
-    fn test_update_and_get_proposer_block_count() {
-        let tmp_dir = TempDir::new().unwrap();
-        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+    mod get_proposer_block_count {
+        #[test]
+        fn test_error_if_value_has_invalid_length() {
+            let drive = super::setup_drive();
+            let (transaction, _) = super::setup_fee_pools(&drive, None);
 
-        drive
-            .create_root_tree(None)
-            .expect("expected to create root tree successfully");
+            let pro_tx_hash: [u8; 32] = rand::random();
 
-        let transaction = drive.grove.start_transaction();
+            let epoch = super::EpochPool::new(0, &drive);
 
-        let fee_pools = FeePools::new();
+            epoch
+                .init_proposers(Some(&transaction))
+                .expect("to init proposers");
 
-        fee_pools
-            .init(&drive, Some(&transaction))
-            .expect("fee pools to init");
+            drive
+                .grove
+                .insert(
+                    epoch.get_proposers_path(),
+                    &pro_tx_hash,
+                    super::Element::Item(u128::MAX.to_le_bytes().to_vec(), None),
+                    Some(&transaction),
+                )
+                .expect("to insert invalid value");
 
-        let pro_tx_hash: [u8; 32] =
-            hex::decode("0101010101010101010101010101010101010101010101010101010101010101")
-                .expect("to decode pro tx hash")
-                .try_into()
-                .expect("to convert vector to array of 32 bytes");
-
-        let epoch = EpochPool::new(7000, &drive);
-
-        match epoch.get_proposer_block_count(&pro_tx_hash, Some(&transaction)) {
-            Ok(_) => assert!(
-                false,
-                "should not be able to get proposer block count on uninit epoch pool"
-            ),
-            Err(e) => match e {
-                error::Error::GroveDB(grovedb::Error::PathNotFound(_)) => assert!(true),
-                _ => assert!(false, "invalid error type"),
-            },
+            match epoch.get_proposer_block_count(&pro_tx_hash, Some(&transaction)) {
+                Ok(_) => assert!(false, "should not be able to decode stored value"),
+                Err(e) => match e {
+                    super::error::Error::Fee(
+                        super::FeeError::CorruptedProposerBlockCountItemLength(_),
+                    ) => {
+                        assert!(true)
+                    }
+                    _ => assert!(false, "ivalid error type"),
+                },
+            }
         }
 
-        match epoch.update_proposer_block_count(&pro_tx_hash, 1, Some(&transaction)) {
-            Ok(_) => assert!(
-                false,
-                "should not be able to update proposer block count on uninit epoch pool"
-            ),
-            Err(e) => match e {
-                error::Error::GroveDB(grovedb::Error::InvalidPath(_)) => assert!(true),
-                _ => assert!(false, "invalid error type"),
-            },
-        }
+        #[test]
+        fn test_error_if_epoch_pool_is_not_initiated() {
+            let drive = super::setup_drive();
+            let (transaction, _) = super::setup_fee_pools(&drive, None);
 
-        let epoch = EpochPool::new(42, &drive);
+            let pro_tx_hash: [u8; 32] = rand::random();
 
-        let is_proposers_tree_empty = epoch
-            .is_proposers_tree_empty(Some(&transaction))
-            .expect("to check if proposer tree epmty");
+            let epoch = super::EpochPool::new(7000, &drive);
 
-        assert_eq!(is_proposers_tree_empty, true);
-
-        epoch
-            .init_proposers(Some(&transaction))
-            .expect("to init proposers tree");
-
-        let block_count = 42;
-
-        epoch
-            .update_proposer_block_count(&pro_tx_hash, block_count, Some(&transaction))
-            .expect("to update proposer block count");
-
-        let stored_block_count = epoch
-            .get_proposer_block_count(&pro_tx_hash, Some(&transaction))
-            .expect("to get proposer block count");
-
-        assert_eq!(stored_block_count, block_count);
-
-        drive
-            .grove
-            .insert(
-                epoch.get_proposers_path(),
-                &pro_tx_hash,
-                Element::Item(u128::MAX.to_le_bytes().to_vec(), None),
-                Some(&transaction),
-            )
-            .expect("to insert invalid data");
-
-        match epoch.get_proposer_block_count(&pro_tx_hash, Some(&transaction)) {
-            Ok(_) => assert!(false, "should not be able to decode stored value"),
-            Err(e) => match e {
-                error::Error::Fee(FeeError::CorruptedProposerBlockCountItemLength(_)) => {
-                    assert!(true)
-                }
-                _ => assert!(false, "invalid error type"),
-            },
+            match epoch.get_proposer_block_count(&pro_tx_hash, Some(&transaction)) {
+                Ok(_) => assert!(
+                    false,
+                    "should not be able to get proposer block count on uninit epoch pool"
+                ),
+                Err(e) => match e {
+                    super::error::Error::GroveDB(grovedb::Error::PathNotFound(_)) => {
+                        assert!(true)
+                    }
+                    _ => assert!(false, "invalid error type"),
+                },
+            }
         }
     }
 
-    #[test]
-    fn test_get_proposers() {
-        let tmp_dir = TempDir::new().unwrap();
-        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+    mod update_proposer_block_count {
+        #[test]
+        fn test_value_is_set() {
+            let drive = super::setup_drive();
+            let (transaction, _) = super::setup_fee_pools(&drive, None);
 
-        drive
-            .create_root_tree(None)
-            .expect("expected to create root tree successfully");
+            let pro_tx_hash: [u8; 32] = rand::random();
+            let block_count = 42;
 
-        let transaction = drive.grove.start_transaction();
+            let epoch = super::EpochPool::new(0, &drive);
 
-        let fee_pools = FeePools::new();
+            epoch
+                .init_proposers(Some(&transaction))
+                .expect("to init proposers");
 
-        fee_pools
-            .init(&drive, Some(&transaction))
-            .expect("fee pools to init");
+            epoch
+                .update_proposer_block_count(&pro_tx_hash, block_count, Some(&transaction))
+                .expect("to udpate proposer block count");
 
-        let epoch = EpochPool::new(42, &drive);
+            let stored_block_count = epoch
+                .get_proposer_block_count(&pro_tx_hash, Some(&transaction))
+                .expect("to get proposer block count");
 
-        epoch
-            .init_proposers(Some(&transaction))
-            .expect("to init proposers tree");
+            assert_eq!(stored_block_count, block_count);
+        }
+    }
 
-        let pro_tx_hash: [u8; 32] =
-            hex::decode("0101010101010101010101010101010101010101010101010101010101010101")
-                .expect("to decode pro tx hash")
-                .try_into()
-                .expect("to convert vector to array of 32 bytes");
+    mod increment_proposer_block_count {
+        #[test]
+        fn test_value_is_set_if_epoch_is_not_initialized() {
+            let drive = super::setup_drive();
+            let (transaction, _) = super::setup_fee_pools(&drive, None);
 
-        let block_count = 42;
+            let pro_tx_hash: [u8; 32] = rand::random();
 
-        epoch
-            .update_proposer_block_count(&pro_tx_hash, block_count, Some(&transaction))
-            .expect("to update proposer block count");
+            let epoch = super::EpochPool::new(0, &drive);
 
-        let result = epoch
-            .get_proposers(100, Some(&transaction))
-            .expect("to get proposers");
+            epoch
+                .init_proposers(Some(&transaction))
+                .expect("to init proposers");
 
-        assert_eq!(result, vec!((pro_tx_hash.to_vec(), block_count)));
+            epoch
+                .increment_proposer_block_count(&pro_tx_hash, Some(&transaction))
+                .expect("to udpate proposer block count");
+
+            let stored_block_count = epoch
+                .get_proposer_block_count(&pro_tx_hash, Some(&transaction))
+                .expect("to get proposer block count");
+
+            assert_eq!(stored_block_count, 1);
+        }
+
+        #[test]
+        fn test_value_is_incremented() {
+            let drive = super::setup_drive();
+            let (transaction, _) = super::setup_fee_pools(&drive, None);
+
+            let pro_tx_hash: [u8; 32] = rand::random();
+
+            let epoch = super::EpochPool::new(0, &drive);
+
+            epoch
+                .init_proposers(Some(&transaction))
+                .expect("to init proposers");
+
+            epoch
+                .update_proposer_block_count(&pro_tx_hash, 1, Some(&transaction))
+                .expect("to udpate proposer block count");
+
+            epoch
+                .increment_proposer_block_count(&pro_tx_hash, Some(&transaction))
+                .expect("to udpate proposer block count");
+
+            let stored_block_count = epoch
+                .get_proposer_block_count(&pro_tx_hash, Some(&transaction))
+                .expect("to get proposer block count");
+
+            assert_eq!(stored_block_count, 2);
+        }
+    }
+
+    mod is_empty_tree {
+        #[test]
+        fn test_check_if_empty() {
+            let drive = super::setup_drive();
+            let (transaction, _) = super::setup_fee_pools(&drive, None);
+
+            let epoch = super::EpochPool::new(0, &drive);
+
+            let result = epoch
+                .is_proposers_tree_empty(Some(&transaction))
+                .expect("to check if tree is empty");
+
+            assert_eq!(result, true);
+        }
+    }
+
+    mod get_proposers {
+        #[test]
+        fn test_value() {
+            let drive = super::setup_drive();
+            let (transaction, _) = super::setup_fee_pools(&drive, None);
+
+            let pro_tx_hash: [u8; 32] = rand::random();
+            let block_count = 42;
+
+            let epoch = super::EpochPool::new(0, &drive);
+
+            epoch
+                .init_proposers(Some(&transaction))
+                .expect("to init proposers");
+
+            epoch
+                .update_proposer_block_count(&pro_tx_hash, block_count, Some(&transaction))
+                .expect("to udpate proposer block count");
+
+            let result = epoch
+                .get_proposers(100, Some(&transaction))
+                .expect("to get proposers");
+
+            assert_eq!(result, vec!((pro_tx_hash.to_vec(), block_count)));
+        }
+    }
+
+    mod delete_proposers {
+        #[test]
+        fn test_values_has_been_deleted() {
+            let drive = super::setup_drive();
+            let (transaction, _) = super::setup_fee_pools(&drive, None);
+
+            let pro_tx_hash: [u8; 32] = rand::random();
+            let block_count = 42;
+
+            let epoch = super::EpochPool::new(0, &drive);
+
+            epoch
+                .init_proposers(Some(&transaction))
+                .expect("to init proposers");
+
+            epoch
+                .update_proposer_block_count(&pro_tx_hash, block_count, Some(&transaction))
+                .expect("to udpate proposer block count");
+
+            epoch
+                .delete_proposers(Some(&transaction))
+                .expect("to delete proposers");
+
+            let result = epoch
+                .get_proposers(100, Some(&transaction))
+                .expect("to get proposers");
+
+            assert_eq!(result, vec!());
+        }
     }
 }
