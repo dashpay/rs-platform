@@ -195,6 +195,7 @@ mod tests {
         fee::pools::{
             epoch::{constants, epoch_pool::EpochPool},
             fee_pools::FeePools,
+            tests::helpers::setup::{setup_drive, setup_fee_pools, SetupFeePoolsOptions},
         },
     };
 
@@ -456,6 +457,77 @@ mod tests {
                 }
                 _ => assert!(false, "ivalid error type"),
             },
+        }
+    }
+
+    mod fee_multiplier {
+        #[test]
+        fn test_error_if_epoch_pool_is_not_initiated() {
+            let drive = super::setup_drive();
+            let (transaction, _) = super::setup_fee_pools(&drive, None);
+
+            let epoch = super::EpochPool::new(7000, &drive);
+
+            match epoch.get_fee_multiplier(Some(&transaction)) {
+                Ok(_) => assert!(
+                    false,
+                    "should not be able to get multiplier on uninit epoch pool"
+                ),
+                Err(e) => match e {
+                    super::error::Error::GroveDB(grovedb::Error::InvalidPath(_)) => assert!(true),
+                    _ => assert!(false, "invalid error type"),
+                },
+            }
+        }
+
+        #[test]
+        fn test_error_if_value_has_invalid_length() {
+            let drive = super::setup_drive();
+            let (transaction, _) = super::setup_fee_pools(&drive, None);
+
+            let epoch = super::EpochPool::new(0, &drive);
+
+            drive
+                .grove
+                .insert(
+                    epoch.get_path(),
+                    super::constants::KEY_FEE_MULTIPLIER.as_bytes(),
+                    super::Element::Item(u128::MAX.to_le_bytes().to_vec(), None),
+                    Some(&transaction),
+                )
+                .expect("to insert invalid data");
+
+            match epoch.get_fee_multiplier(Some(&transaction)) {
+                Ok(_) => assert!(false, "should not be able to decode stored value"),
+                Err(e) => match e {
+                    super::error::Error::Fee(
+                        super::FeeError::CorruptedMultiplierInvalidItemLength(_),
+                    ) => {
+                        assert!(true)
+                    }
+                    _ => assert!(false, "ivalid error type"),
+                },
+            }
+        }
+
+        #[test]
+        fn test_value_is_set() {
+            let drive = super::setup_drive();
+            let (transaction, _) = super::setup_fee_pools(&drive, None);
+
+            let epoch = super::EpochPool::new(0, &drive);
+
+            let multiplier = 42;
+            epoch.init_empty(Some(&transaction)).expect("to init empty");
+            epoch
+                .init_current(multiplier, 1, 1, Some(&transaction))
+                .expect("to init current");
+
+            let stored_multiplier = epoch
+                .get_fee_multiplier(Some(&transaction))
+                .expect("to get multiplier");
+
+            assert_eq!(stored_multiplier, multiplier);
         }
     }
 
