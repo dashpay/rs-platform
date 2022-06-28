@@ -460,13 +460,20 @@ mod tests {
             let epoch = super::EpochPool::new(1042, &drive);
 
             let multiplier = 42;
+            let start_time = 1;
+            let start_block_height = 2;
 
             epoch
                 .init_empty(Some(&transaction))
                 .expect("to init empty epoch pool");
 
             epoch
-                .init_current(multiplier, 0, 0, Some(&transaction))
+                .init_current(
+                    multiplier,
+                    start_block_height,
+                    start_time,
+                    Some(&transaction),
+                )
                 .expect("to init an epoch pool");
 
             let stored_multiplier = epoch
@@ -474,6 +481,18 @@ mod tests {
                 .expect("to get multiplier");
 
             assert_eq!(stored_multiplier, multiplier);
+
+            let stored_start_time = epoch
+                .get_start_time(Some(&transaction))
+                .expect("to get start time");
+
+            assert_eq!(stored_start_time, start_time);
+
+            let stored_block_height = epoch
+                .get_start_block_height(Some(&transaction))
+                .expect("to get start block height");
+
+            assert_eq!(stored_block_height, start_block_height);
         }
     }
 
