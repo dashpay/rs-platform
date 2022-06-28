@@ -50,12 +50,7 @@ impl FeePools {
         let unpaid_epoch_block_count =
             Self::get_epoch_block_count(&drive, &unpaid_epoch_pool, transaction)?;
 
-        let unpaid_epoch_block_count =
-            Decimal::from_str(unpaid_epoch_block_count.to_string().as_str()).map_err(|_| {
-                Error::Fee(FeeError::DecimalConversion(
-                    "can't convert unpaid_epoch_block_count to Decimal",
-                ))
-            })?;
+        let unpaid_epoch_block_count = Decimal::from(unpaid_epoch_block_count);
 
         let proposers = unpaid_epoch_pool.get_proposers(proposers_limit, transaction)?;
 
@@ -64,12 +59,7 @@ impl FeePools {
         let mut fee_leftovers = dec!(0.0);
 
         for (proposer_tx_hash, proposed_block_count) in proposers {
-            let proposed_block_count = Decimal::from_str(proposed_block_count.to_string().as_str())
-                .map_err(|_| {
-                    Error::Fee(FeeError::DecimalConversion(
-                        "can't convert proposed_block_count to Decimal",
-                    ))
-                })?;
+            let proposed_block_count = Decimal::from(proposed_block_count);
 
             let mut masternode_reward =
                 (total_fees * proposed_block_count) / unpaid_epoch_block_count;
@@ -114,13 +104,6 @@ impl FeePools {
                 // update masternode reward that would be paid later
                 masternode_reward -= reward_floored;
 
-                // Convert to integer, since identity balance is u64
-                let reward_floored: u64 = reward_floored.try_into().map_err(|_| {
-                    Error::Fee(FeeError::DecimalConversion(
-                        "can't convert reward to u64 from Decimal",
-                    ))
-                })?;
-
                 Self::pay_reward_to_identity(drive, pay_to_id, reward_floored, transaction)?;
             }
 
@@ -128,14 +111,6 @@ impl FeePools {
             let masternode_reward_floored = masternode_reward.floor();
 
             fee_leftovers += masternode_reward - masternode_reward_floored;
-
-            // Convert to integer, since identity balance is u64
-            let masternode_reward_floored: u64 =
-                masternode_reward_floored.try_into().map_err(|_| {
-                    Error::Fee(FeeError::DecimalConversion(
-                        "can't convert reward to u64 from Decimal",
-                    ))
-                })?;
 
             Self::pay_reward_to_identity(
                 drive,
@@ -145,8 +120,25 @@ impl FeePools {
             )?;
         }
 
-        // move integer part of the leftovers to processing
-        // and fractional part to storage
+        // Move integer part of the leftovers to processing
+        // and fractional part to storage fees for the next epoch
+        let next_epoch_pool = EpochPool::new(unpaid_epoch_pool.index + 1, drive);
+
+        Self::move_leftovers_to_the_next_epoch_pool(next_epoch_pool, fee_leftovers, transaction)?;
+
+        // if less then a limit processed then mark the epoch pool as paid
+        if proposers_len < proposers_limit {
+            unpaid_epoch_pool.mark_as_paid(transaction)?;
+        }
+
+        Ok(())
+    }
+
+    fn move_leftovers_to_the_next_epoch_pool(
+        next_epoch_pool: EpochPool,
+        fee_leftovers: Decimal,
+        transaction: TransactionArg,
+    ) -> Result<(), Error> {
         let storage_leftovers = fee_leftovers.fract();
         let processing_leftovers: u64 = (fee_leftovers.floor()).try_into().map_err(|_| {
             Error::Fee(FeeError::DecimalConversion(
@@ -154,23 +146,14 @@ impl FeePools {
             ))
         })?;
 
-        // if less then a limit processed - clean up the pool (mark as paid)
-        // and chose epoch pool to distribute leftovers to
-        if proposers_len < proposers_limit {
-            unpaid_epoch_pool.mark_as_paid(transaction)?;
+        let processing_fee = next_epoch_pool.get_processing_fee(transaction)?;
 
-            let next_epoch_pool = EpochPool::new(unpaid_epoch_pool.index + 1, drive);
+        next_epoch_pool
+            .update_processing_fee(processing_fee + processing_leftovers, transaction)?;
 
-            let processing_fee = next_epoch_pool.get_processing_fee(transaction)?;
-            let storage_fee = next_epoch_pool.get_storage_fee(transaction)?;
+        let storage_fee = next_epoch_pool.get_storage_fee(transaction)?;
 
-            next_epoch_pool
-                .update_processing_fee(processing_fee + processing_leftovers, transaction)?;
-            next_epoch_pool.update_storage_fee(storage_fee + storage_leftovers, transaction)?;
-        } else {
-            unpaid_epoch_pool.update_processing_fee(processing_leftovers, transaction)?;
-            unpaid_epoch_pool.update_storage_fee(storage_leftovers, transaction)?;
-        }
+        next_epoch_pool.update_storage_fee(storage_fee + storage_leftovers, transaction)?;
 
         Ok(())
     }
@@ -178,9 +161,16 @@ impl FeePools {
     fn pay_reward_to_identity(
         drive: &Drive,
         id: &Vec<u8>,
-        reward: u64,
+        reward: Decimal,
         transaction: TransactionArg,
     ) -> Result<(), Error> {
+        // Convert to integer, since identity balance is u64
+        let reward: u64 = reward.try_into().map_err(|_| {
+            Error::Fee(FeeError::DecimalConversion(
+                "can't convert reward to u64 from Decimal",
+            ))
+        })?;
+
         // We don't need additional verification, since we ensure an identity
         // existence in the data contract triggers in DPP
         let mut identity = drive.fetch_identity(id, transaction)?;
@@ -394,6 +384,8 @@ mod tests {
 
         #[test]
         fn test_all_epochs_paid() {
+            todo!();
+
             let tmp_dir = TempDir::new().unwrap();
             let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
 
