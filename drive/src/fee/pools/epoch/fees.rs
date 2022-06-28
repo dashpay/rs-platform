@@ -185,6 +185,8 @@ impl<'e> EpochPool<'e> {
 
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
+
     use grovedb::Element;
     use rust_decimal::Decimal;
     use rust_decimal_macros::dec;
@@ -196,186 +198,179 @@ mod tests {
         fee::pools::{
             epoch::{constants, epoch_pool::EpochPool},
             fee_pools::FeePools,
-            tests::helpers::setup::{setup_drive, setup_fee_pools, SetupFeePoolsOptions},
+            tests::helpers::setup::{setup_drive, setup_fee_pools},
         },
     };
 
-    #[test]
-    fn test_update_and_get_storage_fee() {
-        todo!();
+    mod update_storage_fee {
+        #[test]
+        fn test_error_if_epoch_pool_is_not_initiated() {
+            let drive = super::setup_drive();
+            let (transaction, _) = super::setup_fee_pools(&drive, None);
 
-        let tmp_dir = TempDir::new().unwrap();
-        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+            let epoch = super::EpochPool::new(7000, &drive);
 
-        drive
-            .create_root_tree(None)
-            .expect("expected to create root tree successfully");
-
-        let transaction = drive.grove.start_transaction();
-
-        let fee_pools = FeePools::new();
-
-        fee_pools
-            .init(&drive, Some(&transaction))
-            .expect("fee pools to init");
-
-        let epoch = EpochPool::new(7000, &drive);
-
-        match epoch.get_storage_fee(Some(&transaction)) {
-            Ok(_) => assert!(
-                false,
-                "should not be able to get storage fee on uninit epoch pool"
-            ),
-            Err(e) => match e {
-                error::Error::GroveDB(grovedb::Error::PathNotFound(_)) => assert!(true),
-                _ => assert!(false, "invalid error type"),
-            },
+            match epoch.update_storage_fee(super::dec!(42.0), Some(&transaction)) {
+                Ok(_) => assert!(
+                    false,
+                    "should not be able to update storage fee on uninit epoch pool"
+                ),
+                Err(e) => match e {
+                    super::error::Error::GroveDB(grovedb::Error::InvalidPath(_)) => assert!(true),
+                    _ => assert!(false, "invalid error type"),
+                },
+            }
         }
 
-        match epoch.update_storage_fee(dec!(42.0), Some(&transaction)) {
-            Ok(_) => assert!(
-                false,
-                "should not be able to update storage fee on uninit epoch pool"
-            ),
-            Err(e) => match e {
-                error::Error::GroveDB(grovedb::Error::InvalidPath(_)) => assert!(true),
-                _ => assert!(false, "invalid error type"),
-            },
-        }
+        #[test]
+        fn test_value_is_set() {
+            let drive = super::setup_drive();
+            let (transaction, _) = super::setup_fee_pools(&drive, None);
 
-        let epoch = EpochPool::new(0, &drive);
+            let epoch = super::EpochPool::new(0, &drive);
 
-        let stored_storage_fee = epoch
-            .get_storage_fee(Some(&transaction))
-            .expect("to get storage fee");
+            let storage_fee = super::dec!(42.0);
 
-        assert_eq!(stored_storage_fee, dec!(0.0));
+            epoch
+                .update_storage_fee(storage_fee, Some(&transaction))
+                .expect("to update storage fee");
 
-        let storage_fee = dec!(42.0);
+            let stored_storage_fee = epoch
+                .get_storage_fee(Some(&transaction))
+                .expect("to get storage fee");
 
-        epoch
-            .update_storage_fee(storage_fee, Some(&transaction))
-            .expect("to update storage fee");
-
-        let stored_storage_fee = epoch
-            .get_storage_fee(Some(&transaction))
-            .expect("to get storage fee");
-
-        assert_eq!(stored_storage_fee, storage_fee);
-
-        drive
-            .grove
-            .insert(
-                epoch.get_path(),
-                constants::KEY_STORAGE_FEE.as_bytes(),
-                Element::Item(u128::MAX.to_le_bytes().to_vec(), None),
-                Some(&transaction),
-            )
-            .expect("to insert invalid data");
-
-        match epoch.get_storage_fee(Some(&transaction)) {
-            Ok(_) => assert!(false, "should not be able to decode stored value"),
-            Err(e) => match e {
-                error::Error::Fee(FeeError::CorruptedStorageFeeInvalidItemLength(_)) => {
-                    assert!(true)
-                }
-                _ => assert!(false, "ivalid error type"),
-            },
+            assert_eq!(stored_storage_fee, storage_fee);
         }
     }
 
-    #[test]
-    fn test_update_and_get_processing_fee() {
-        let tmp_dir = TempDir::new().unwrap();
-        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+    mod get_storage_fee {
+        #[test]
+        fn test_error_if_epoch_pool_is_not_initiated() {
+            let drive = super::setup_drive();
+            let (transaction, _) = super::setup_fee_pools(&drive, None);
 
-        drive
-            .create_root_tree(None)
-            .expect("expected to create root tree successfully");
+            let epoch = super::EpochPool::new(7000, &drive);
 
-        let transaction = drive.grove.start_transaction();
-
-        let fee_pools = FeePools::new();
-
-        fee_pools
-            .init(&drive, Some(&transaction))
-            .expect("fee pools to init");
-
-        let epoch = EpochPool::new(7000, &drive);
-
-        match epoch.update_processing_fee(42, Some(&transaction)) {
-            Ok(_) => assert!(
-                false,
-                "should not be able to update processing fee on uninit epoch pool"
-            ),
-            Err(e) => match e {
-                error::Error::GroveDB(grovedb::Error::InvalidPath(_)) => assert!(true),
-                _ => assert!(false, "invalid error type"),
-            },
-        }
-
-        let epoch = EpochPool::new(0, &drive);
-
-        if let Err(e) = epoch.get_processing_fee(Some(&transaction)) {
-            match e {
-                Error::GroveDB(grovedb::Error::PathKeyNotFound(_)) => {}
-                _ => assert!(false, "invalid error type"),
+            match epoch.get_storage_fee(Some(&transaction)) {
+                Ok(_) => assert!(
+                    false,
+                    "should not be able to get storage fee on uninit epoch pool"
+                ),
+                Err(e) => match e {
+                    super::error::Error::GroveDB(grovedb::Error::PathNotFound(_)) => assert!(true),
+                    _ => assert!(false, "invalid error type"),
+                },
             }
-        } else {
-            assert!(false, "processing fee is not set yet");
         }
 
-        let processing_fee: u64 = 42;
+        #[test]
+        fn test_error_if_value_has_invalid_length() {
+            let drive = super::setup_drive();
+            let (transaction, _) = super::setup_fee_pools(&drive, None);
 
-        epoch
-            .update_processing_fee(processing_fee, Some(&transaction))
-            .expect("to update processing fee");
+            let epoch = super::EpochPool::new(0, &drive);
 
-        let stored_processing_fee = epoch
-            .get_processing_fee(Some(&transaction))
-            .expect("to get processing fee");
+            drive
+                .grove
+                .insert(
+                    epoch.get_path(),
+                    super::constants::KEY_STORAGE_FEE.as_bytes(),
+                    super::Element::Item(u128::MAX.to_le_bytes().to_vec(), None),
+                    Some(&transaction),
+                )
+                .expect("to insert invalid data");
 
-        assert_eq!(stored_processing_fee, processing_fee);
+            match epoch.get_storage_fee(Some(&transaction)) {
+                Ok(_) => assert!(false, "should not be able to decode stored value"),
+                Err(e) => match e {
+                    super::error::Error::Fee(
+                        super::FeeError::CorruptedStorageFeeInvalidItemLength(_),
+                    ) => {
+                        assert!(true)
+                    }
+                    _ => assert!(false, "ivalid error type"),
+                },
+            }
+        }
+    }
 
-        drive
-            .grove
-            .insert(
-                epoch.get_path(),
-                constants::KEY_PROCESSING_FEE.as_bytes(),
-                Element::Item(u128::MAX.to_le_bytes().to_vec(), None),
-                Some(&transaction),
-            )
-            .expect("to insert invalid data");
+    mod update_processing_fee {
+        #[test]
+        fn test_error_if_epoch_pool_is_not_initiated() {
+            let drive = super::setup_drive();
+            let (transaction, _) = super::setup_fee_pools(&drive, None);
 
-        match epoch.get_processing_fee(Some(&transaction)) {
-            Ok(_) => assert!(false, "should not be able to decode stored value"),
-            Err(e) => match e {
-                error::Error::Fee(FeeError::CorruptedProcessingFeeInvalidItemLength(_)) => {
-                    assert!(true)
-                }
-                _ => assert!(false, "ivalid error type"),
-            },
+            let epoch = super::EpochPool::new(7000, &drive);
+
+            match epoch.update_processing_fee(42, Some(&transaction)) {
+                Ok(_) => assert!(
+                    false,
+                    "should not be able to update processing fee on uninit epoch pool"
+                ),
+                Err(e) => match e {
+                    super::error::Error::GroveDB(grovedb::Error::InvalidPath(_)) => assert!(true),
+                    _ => assert!(false, "invalid error type"),
+                },
+            }
+        }
+
+        #[test]
+        fn test_value_is_set() {
+            let drive = super::setup_drive();
+            let (transaction, _) = super::setup_fee_pools(&drive, None);
+
+            let epoch = super::EpochPool::new(0, &drive);
+
+            let processing_fee: u64 = 42;
+
+            epoch
+                .update_processing_fee(processing_fee, Some(&transaction))
+                .expect("to update processing fee");
+
+            let stored_processing_fee = epoch
+                .get_processing_fee(Some(&transaction))
+                .expect("to get processing fee");
+
+            assert_eq!(stored_processing_fee, processing_fee);
+        }
+    }
+
+    mod get_processing_fee {
+        #[test]
+        fn test_error_if_value_has_invalid_length() {
+            let drive = super::setup_drive();
+            let (transaction, _) = super::setup_fee_pools(&drive, None);
+
+            let epoch = super::EpochPool::new(0, &drive);
+
+            drive
+                .grove
+                .insert(
+                    epoch.get_path(),
+                    super::constants::KEY_PROCESSING_FEE.as_bytes(),
+                    super::Element::Item(u128::MAX.to_le_bytes().to_vec(), None),
+                    Some(&transaction),
+                )
+                .expect("to insert invalid data");
+
+            match epoch.get_processing_fee(Some(&transaction)) {
+                Ok(_) => assert!(false, "should not be able to decode stored value"),
+                Err(e) => match e {
+                    super::error::Error::Fee(
+                        super::FeeError::CorruptedProcessingFeeInvalidItemLength(_),
+                    ) => {
+                        assert!(true)
+                    }
+                    _ => assert!(false, "ivalid error type"),
+                },
+            }
         }
     }
 
     #[test]
     fn test_get_total_fees() {
-        todo!();
-
-        let tmp_dir = TempDir::new().unwrap();
-        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
-
-        drive
-            .create_root_tree(None)
-            .expect("expected to create root tree successfully");
-
-        let transaction = drive.grove.start_transaction();
-
-        let fee_pools = FeePools::new();
-
-        fee_pools
-            .init(&drive, Some(&transaction))
-            .expect("fee pools to init");
+        let drive = setup_drive();
+        let (transaction, _) = setup_fee_pools(&drive, None);
 
         let processing_fee: u64 = 42;
         let storage_fee = dec!(1000);
@@ -394,10 +389,10 @@ mod tests {
             .get_total_fees(Some(&transaction))
             .expect("to get combined fee");
 
-        assert_eq!(
-            combined_fee,
-            Decimal::new(processing_fee as i64, 0) + storage_fee
-        );
+        let processing_fee = Decimal::from_str(processing_fee.to_string().as_str())
+            .expect("to create a decimal version of fee");
+
+        assert_eq!(combined_fee, processing_fee + storage_fee);
     }
 
     mod fee_multiplier {
