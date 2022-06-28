@@ -463,53 +463,28 @@ mod tests {
 
     #[test]
     fn test_distribute_fees_into_pools() {
-        let tmp_dir = TempDir::new().unwrap();
-        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+        let drive = setup_drive();
+        let (transaction, fee_pools) = setup_fee_pools(&drive, None);
 
-        drive
-            .create_root_tree(None)
-            .expect("expected to create root tree successfully");
+        let current_epoch_pool = EpochPool::new(0, &drive);
+        current_epoch_pool
+            .init_current(1, 1, 1, Some(&transaction))
+            .expect("should init the epoch pool as current");
 
-        let transaction = drive.grove.start_transaction();
-
-        let fee_pools = FeePools::new();
-
-        fee_pools
-            .init(&drive, Some(&transaction))
-            .expect("fee pools to init");
-
-        let epoch_index = 0;
-
-        let start_block_height = 1;
-
-        let epoch_pool = EpochPool::new(epoch_index, &drive);
-
-        epoch_pool
-            .init_current(1, start_block_height, 1, Some(&transaction))
-            .expect("should init current pool");
-
-        // Distribute fees
-
-        let processing_fees = 42;
-        let storage_fees = 1600;
-
-        let proposer_pro_tx_hash: [u8; 32] =
-            hex::decode("0101010101010101010101010101010101010101010101010101010101010101")
-                .expect("to decode pro tx hash")
-                .try_into()
-                .expect("to convert vector to array of 32 bytes");
+        let processing_fees = 1000000;
+        let storage_fees = 2000000;
 
         fee_pools
             .distribute_fees_into_pools(
                 &drive,
-                &epoch_pool,
+                &current_epoch_pool,
                 processing_fees,
                 storage_fees,
                 Some(&transaction),
             )
-            .expect("to distribute st fees");
+            .expect("should distribute fees into pools");
 
-        let stored_processing_fees = epoch_pool
+        let stored_processing_fees = current_epoch_pool
             .get_processing_fee(Some(&transaction))
             .expect("to get processing fees");
 
@@ -518,12 +493,7 @@ mod tests {
             .value(&drive, Some(&transaction))
             .expect("to get storage fee pool");
 
-        let stored_block_count = epoch_pool
-            .get_proposer_block_count(&proposer_pro_tx_hash, Some(&transaction))
-            .expect("to get proposer block count");
-
         assert_eq!(stored_processing_fees, processing_fees);
         assert_eq!(stored_storage_fee_pool, storage_fees);
-        assert_eq!(stored_block_count, 1);
     }
 }
