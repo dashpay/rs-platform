@@ -50,6 +50,13 @@ impl FeePools {
         let unpaid_epoch_block_count =
             Self::get_epoch_block_count(&drive, &unpaid_epoch_pool, transaction)?;
 
+        let unpaid_epoch_block_count =
+            Decimal::from_str(unpaid_epoch_block_count.to_string().as_str()).map_err(|_| {
+                Error::Fee(FeeError::DecimalConversion(
+                    "can't convert unpaid_epoch_block_count to Decimal",
+                ))
+            })?;
+
         let proposers = unpaid_epoch_pool.get_proposers(proposers_limit, transaction)?;
 
         let proposers_len = proposers.len() as u16;
@@ -64,15 +71,7 @@ impl FeePools {
                     ))
                 })?;
 
-            let unpaid_epoch_block_count =
-                Decimal::from_str(unpaid_epoch_block_count.to_string().as_str()).map_err(|_| {
-                    Error::Fee(FeeError::DecimalConversion(
-                        "can't convert unpaid_epoch_block_count to Decimal",
-                    ))
-                })?;
-
-            let masternode_reward =
-                (total_fees * proposed_block_count * share_percentage) / unpaid_epoch_block_count;
+            let masternode_reward = (total_fees * proposed_block_count) / unpaid_epoch_block_count;
 
             let documents = Self::get_reward_shares(drive, proposer_tx_hash, transaction)?;
 
@@ -105,10 +104,9 @@ impl FeePools {
                         ))
                     })?;
 
-                let share_percentage = Decimal::new(share_percentage_integer, 0) / dec!(100.0);
+                let share_percentage = Decimal::new(share_percentage_integer, 0) / dec!(10000.0);
 
-                let reward = (total_fees * proposed_block_count * share_percentage)
-                    / unpaid_epoch_block_count;
+                let reward = masternode_reward * share_percentage;
 
                 // Convert to integer, since identity balance is u64
                 let reward_floored: u64 = reward.floor().try_into().map_err(|_| {
