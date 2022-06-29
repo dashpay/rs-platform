@@ -134,6 +134,8 @@ impl FeePools {
         let epoch_index = (block_time - genesis_time) / epoch_change_time;
         let epoch_index_floored = epoch_index.floor();
 
+        dbg!(epoch_index);
+
         let is_epoch_change = if epoch_index_floored == dec!(0) {
             true
         } else {
