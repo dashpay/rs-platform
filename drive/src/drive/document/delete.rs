@@ -100,10 +100,10 @@ impl Drive {
         let mut storage_flags : StorageFlags;
         let document_info = if let Some(max_value_size) = query_stateless_max_value_size {
             DocumentSize(max_value_size as u32)
-        } else if let Some(document_element) = document_element {
+        } else if let Some(document_element) = &document_element {
             if let Element::Item(data, element_flags) = document_element {
                 document = Document::from_cbor(data.as_slice(), None, owner_id)?;
-                storage_flags = StorageFlags::from_element_flags(element_flags)?;
+                storage_flags = StorageFlags::from_element_flags(element_flags.clone())?;
                 DocumentAndSerialization((&document, data.as_slice(), &storage_flags))
             } else {
                 return Err(Error::Drive(DriveError::CorruptedDocumentNotItem(
@@ -146,11 +146,10 @@ impl Drive {
 
             // with the example of the dashpay contract's first index
             // the index path is now something like Contracts/ContractID/Documents(1)/$ownerId
-            let document_top_field: Vec<u8> = document
-                .get_raw_for_contract(
+            let document_top_field = document_info
+                .get_raw_for_document_type(
                     &top_index_property.name,
-                    document_type_name,
-                    contract,
+                    document_type,
                     owner_id,
                 )?
                 .unwrap_or_default();
