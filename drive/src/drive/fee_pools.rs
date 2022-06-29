@@ -24,11 +24,9 @@ impl Drive {
         transaction: TransactionArg,
     ) -> Result<(), Error> {
         if block_height == 1 {
-            let genesis_time = Utc::now().timestamp();
-
             self.fee_pools
                 .borrow_mut()
-                .update_genesis_time(&self, genesis_time, transaction)?;
+                .update_genesis_time(&self, block_time, transaction)?;
         }
 
         let fee_pools = self.fee_pools.borrow();
@@ -99,11 +97,12 @@ mod tests {
         },
         fee::pools::constants,
     };
+    use chrono::Utc;
 
     mod process_block {
-        use crate::drive::Drive;
-        use chrono::Utc;
-        use tempfile::TempDir;
+        use crate::fee::pools::constants;
+        use crate::fee::pools::epoch::epoch_pool::EpochPool;
+        use chrono::{Duration, NaiveDateTime, TimeZone};
 
         #[test]
         fn test_processing_of_the_first_block_then_new_epoch_and_one_more_block_after() {
@@ -116,8 +115,15 @@ mod tests {
 
             super::create_mn_shares_contract(&drive);
 
-            let block_time = Utc::now().timestamp();
-            let previous_block_time = Utc::now().timestamp() - 100;
+            /*
+
+            Block 1. Epoch 0.
+
+             */
+
+            let block_height = 1;
+            let block_time = super::Utc::now();
+            let block_timestamp = block_time.timestamp_millis();
 
             let proposer_pro_tx_hash = [
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -126,19 +132,83 @@ mod tests {
 
             let processing_fees = 100;
             let storage_fees = 2000;
+            let fee_multiplier = 2;
 
             drive
                 .process_block(
-                    1,
-                    block_time,
-                    Some(previous_block_time),
+                    block_height,
+                    block_timestamp,
+                    None,
                     proposer_pro_tx_hash,
                     processing_fees,
                     storage_fees,
-                    1,
+                    fee_multiplier,
                     Some(&transaction),
                 )
-                .expect("to process block 1");
+                .expect("should process block 1");
+
+            // Genesis time must be set
+            let stored_genesis_time = fee_pools
+                .get_genesis_time(&drive, Some(&transaction))
+                .expect("should get genesis time");
+
+            assert_eq!(stored_genesis_time, block_timestamp);
+
+            // Fees must be distributed
+
+            let stored_storage_fees = fee_pools
+                .storage_fee_distribution_pool
+                .value(&drive, Some(&transaction))
+                .expect("should get storage fees");
+
+            assert_eq!(stored_storage_fees, storage_fees);
+
+            let epoch_pool_0 = EpochPool::new(0, &drive);
+
+            let stored_processing_fees = epoch_pool_0
+                .get_processing_fee(Some(&transaction))
+                .expect("should get processing fees");
+
+            assert_eq!(stored_processing_fees, processing_fees);
+
+            // Proposer must be added
+
+            let stored_proposer_block_count = epoch_pool_0
+                .get_proposer_block_count(&proposer_pro_tx_hash, Some(&transaction))
+                .expect("should get proposer block count");
+
+            assert_eq!(stored_proposer_block_count, 1);
+
+            /*
+
+            Block 2. Epoch 1
+
+             */
+
+            let block_height = 2;
+            let previous_block_timestamp = block_timestamp;
+            let block_time = block_time + Duration::milliseconds(constants::EPOCH_CHANGE_TIME + 1);
+
+            let block_timestamp = block_time.timestamp_millis();
+
+            drive
+                .process_block(
+                    block_height,
+                    block_timestamp,
+                    Some(previous_block_timestamp),
+                    proposer_pro_tx_hash,
+                    processing_fees,
+                    storage_fees,
+                    fee_multiplier,
+                    Some(&transaction),
+                )
+                .expect("should process block 2");
+
+            /*
+
+            Block 3. Epoch 1
+
+            */
         }
     }
 }
