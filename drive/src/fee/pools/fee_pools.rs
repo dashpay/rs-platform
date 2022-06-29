@@ -1,5 +1,6 @@
 use grovedb::{Element, TransactionArg};
-use std::cell::RefCell;
+use rust_decimal::Decimal;
+use rust_decimal_macros::dec;
 
 use crate::drive::{Drive, RootTree};
 use crate::error::fee::FeeError;
@@ -122,20 +123,30 @@ impl FeePools {
     ) -> Result<(u16, bool), Error> {
         let genesis_time = self.get_genesis_time(drive, transaction)?;
 
-        let prev_epoch_index =
-            (previous_block_time - genesis_time) as f64 / constants::EPOCH_CHANGE_TIME as f64;
+        let epoch_change_time = Decimal::from(constants::EPOCH_CHANGE_TIME);
+        let block_time = Decimal::from(block_time);
+        let genesis_time = Decimal::from(genesis_time);
+        let previous_block_time = Decimal::from(previous_block_time);
+
+        let prev_epoch_index = (previous_block_time - genesis_time) / epoch_change_time;
         let prev_epoch_index_floored = prev_epoch_index.floor();
 
-        let epoch_index = (block_time - genesis_time) as f64 / constants::EPOCH_CHANGE_TIME as f64;
+        let epoch_index = (block_time - genesis_time) / epoch_change_time;
         let epoch_index_floored = epoch_index.floor();
 
-        let is_epoch_change = if epoch_index_floored as u16 == 0 {
+        let is_epoch_change = if epoch_index_floored == dec!(0) {
             true
         } else {
             epoch_index_floored > prev_epoch_index_floored
         };
 
-        Ok((epoch_index_floored as u16, is_epoch_change))
+        let epoch_index: u16 = epoch_index_floored.try_into().map_err(|_| {
+            Error::Fee(FeeError::DecimalConversion(
+                "can't convert reward to u16 from Decimal",
+            ))
+        })?;
+
+        Ok((epoch_index, is_epoch_change))
     }
 
     pub fn shift_current_epoch_pool(

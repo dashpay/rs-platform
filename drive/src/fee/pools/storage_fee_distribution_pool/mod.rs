@@ -356,7 +356,7 @@ mod tests {
             let storage_fees =
                 helpers::get_storage_fees_from_epoch_pools(&drive, epoch_index, Some(&transaction));
 
-            // assert that all the values doubled meaning that distribution is repoducable
+            // assert that all the values doubled meaning that distribution is reproducible
             assert_eq!(
                 storage_fees,
                 reference_fees
@@ -443,7 +443,7 @@ mod tests {
                 error::Error::Fee(FeeError::CorruptedStorageFeePoolInvalidItemLength(_)) => {
                     assert!(true)
                 }
-                _ => assert!(false, "ivalid error type"),
+                _ => assert!(false, "invalid error type"),
             },
         }
     }

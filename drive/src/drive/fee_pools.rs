@@ -16,7 +16,7 @@ impl Drive {
         &self,
         block_height: u64,
         block_time: i64,
-        previous_block_time: i64,
+        previous_block_time: Option<i64>,
         proposer_pro_tx_hash: [u8; 32],
         processing_fees: u64,
         storage_fees: i64,
@@ -33,12 +33,15 @@ impl Drive {
 
         let fee_pools = self.fee_pools.borrow();
 
-        let (current_epoch_index, is_epoch_change) = fee_pools.calculate_current_epoch_index(
-            &self,
-            block_time,
-            previous_block_time,
-            transaction,
-        )?;
+        let (current_epoch_index, is_epoch_change) = match previous_block_time {
+            Some(previous_block_time) => fee_pools.calculate_current_epoch_index(
+                &self,
+                block_time,
+                previous_block_time,
+                transaction,
+            )?,
+            None => (0, true),
+        };
 
         let current_epoch_pool = EpochPool::new(current_epoch_index, self);
 
@@ -84,6 +87,9 @@ impl Drive {
 
 #[cfg(test)]
 mod tests {
+    use crate::fee::pools::tests::helpers::fee_pools::create_mn_shares_contract;
+    use crate::fee::pools::tests::helpers::setup::setup_drive;
+    use crate::fee::pools::tests::helpers::setup::setup_fee_pools;
     use crate::{
         contract::{Contract, Document},
         drive::{
@@ -100,27 +106,18 @@ mod tests {
         use tempfile::TempDir;
 
         #[test]
-        fn test_processing_of_three_blocks() {
-            todo!("first block, then epoch change and one after");
+        fn test_processing_of_the_first_block_then_new_epoch_and_one_more_block_after() {
+            let drive = super::setup_drive();
+            let (transaction, fee_pools) = super::setup_fee_pools(&drive, None);
 
-            let tmp_dir = TempDir::new().unwrap();
-            let mut drive: Drive =
-                Drive::open(tmp_dir).expect("expected to open Drive successfully");
+            fee_pools
+                .init(&drive, Some(&transaction))
+                .expect("should init fee pools");
 
-            drive
-                .create_root_tree(None)
-                .expect("expected to create root tree successfully");
-
-            //super::setup_mn_share_contract_and_docs(&drive);
-
-            let transaction = drive.grove.start_transaction();
-
-            drive
-                .init_fee_pools(Some(&transaction))
-                .expect("to init fee pools");
+            super::create_mn_shares_contract(&drive);
 
             let block_time = Utc::now().timestamp();
-            let previous_block_time = Utc::now().timestamp();
+            let previous_block_time = Utc::now().timestamp() - 100;
 
             let proposer_pro_tx_hash = [
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -134,7 +131,7 @@ mod tests {
                 .process_block(
                     1,
                     block_time,
-                    previous_block_time,
+                    Some(previous_block_time),
                     proposer_pro_tx_hash,
                     processing_fees,
                     storage_fees,
