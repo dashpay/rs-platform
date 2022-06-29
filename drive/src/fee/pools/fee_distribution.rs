@@ -22,9 +22,9 @@ impl FeePools {
         drive: &Drive,
         current_epoch_index: u16,
         transaction: TransactionArg,
-    ) -> Result<(), Error> {
+    ) -> Result<u16, Error> {
         if current_epoch_index == 0 {
-            return Ok(());
+            return Ok(0);
         }
 
         // For current epoch we pay for previous
@@ -35,7 +35,7 @@ impl FeePools {
             transaction,
         )? {
             Some(epoch_pool) => epoch_pool,
-            None => return Ok(()),
+            None => return Ok(0),
         };
 
         // Process more proposers at once if we have many unpaid epochs in past
@@ -131,7 +131,7 @@ impl FeePools {
             unpaid_epoch_pool.mark_as_paid(transaction)?;
         }
 
-        Ok(())
+        Ok(proposers_len)
     }
 
     fn move_leftovers_to_the_next_epoch_pool(
@@ -297,8 +297,8 @@ impl FeePools {
 
 #[cfg(test)]
 mod tests {
-    use tempfile::TempDir;
-
+    use crate::fee::pools::tests::helpers::fee_pools::create_mn_shares_contract;
+    use crate::fee::pools::tests::helpers::fee_pools::populate_proposers;
     use crate::fee::pools::tests::helpers::setup::setup_drive;
     use crate::fee::pools::tests::helpers::setup::setup_fee_pools;
 
@@ -313,6 +313,7 @@ mod tests {
     };
 
     mod get_oldest_unpaid_epoch_pool {
+
         #[test]
         fn test_all_epochs_paid() {
             let drive = super::setup_drive();
@@ -332,39 +333,21 @@ mod tests {
             let drive = super::setup_drive();
             let (transaction, fee_pools) = super::setup_fee_pools(&drive, None);
 
-            let proposer_pro_tx_hash_1: [u8; 32] = [
-                1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
-                24, 22, 25, 26, 27, 28, 29, 30, 31,
-            ];
-            let proposer_pro_tx_hash_2: [u8; 32] = [
-                20, 21, 22, 23, 24, 22, 25, 26, 27, 28, 29, 30, 31, 32, 1, 2, 3, 4, 5, 6, 7, 8, 9,
-                10, 11, 12, 13, 14, 15, 16, 17, 18,
-            ];
-
             let unpaid_epoch_pool_0 = super::EpochPool::new(0, &drive);
+
+            unpaid_epoch_pool_0
+                .init_proposers(Some(&transaction))
+                .expect("should create proposers tree");
+
+            super::populate_proposers(&unpaid_epoch_pool_0, 2, Some(&transaction));
+
             let unpaid_epoch_pool_1 = super::EpochPool::new(1, &drive);
 
-            unpaid_epoch_pool_0
-                .init_proposers(Some(&transaction))
-                .expect("should create proposers tree");
-
-            unpaid_epoch_pool_0
-                .increment_proposer_block_count(&proposer_pro_tx_hash_1, Some(&transaction))
-                .expect("should increment block count for proposer");
-            unpaid_epoch_pool_0
-                .increment_proposer_block_count(&proposer_pro_tx_hash_2, Some(&transaction))
-                .expect("should increment block count for proposer");
-
             unpaid_epoch_pool_1
                 .init_proposers(Some(&transaction))
                 .expect("should create proposers tree");
 
-            unpaid_epoch_pool_1
-                .increment_proposer_block_count(&proposer_pro_tx_hash_1, Some(&transaction))
-                .expect("should increment block count for proposer");
-            unpaid_epoch_pool_1
-                .increment_proposer_block_count(&proposer_pro_tx_hash_2, Some(&transaction))
-                .expect("should increment block count for proposer");
+            super::populate_proposers(&unpaid_epoch_pool_1, 2, Some(&transaction));
 
             match fee_pools
                 .get_oldest_unpaid_epoch_pool(&drive, 1, Some(&transaction))
@@ -383,18 +366,95 @@ mod tests {
         use tempfile::TempDir;
 
         #[test]
-        fn test_no_previous_epochs() {
-            todo!()
+        fn test_no_distribution_on_epoch_0() {
+            let drive = super::setup_drive();
+            let (transaction, fee_pools) = super::setup_fee_pools(&drive, None);
+
+            let current_epoch_index = 0;
+
+            let proposers_paid = fee_pools
+                .distribute_fees_from_unpaid_pools_to_proposers(
+                    &drive,
+                    current_epoch_index,
+                    Some(&transaction),
+                )
+                .expect("should distribute fees");
+
+            assert_eq!(proposers_paid, 0);
         }
 
         #[test]
-        fn test_all_epochs_paid() {
-            todo!()
+        fn test_no_distribution_when_all_epochs_paid() {
+            let drive = super::setup_drive();
+            let (transaction, fee_pools) = super::setup_fee_pools(&drive, None);
+
+            let current_epoch_index = 1;
+
+            let proposers_paid = fee_pools
+                .distribute_fees_from_unpaid_pools_to_proposers(
+                    &drive,
+                    current_epoch_index,
+                    Some(&transaction),
+                )
+                .expect("should distribute fees");
+
+            assert_eq!(proposers_paid, 0);
         }
 
         #[test]
-        fn test_distribution_for_2_epochs_ago() {
-            todo!()
+        fn test_increased_proposers_limit_for_two_unpaid_epochs() {
+            let drive = super::setup_drive();
+            let (transaction, fee_pools) = super::setup_fee_pools(&drive, None);
+
+            // Create epoch 0
+
+            let unpaid_epoch_pool_0 = super::EpochPool::new(0, &drive);
+
+            let unpaid_epoch_pool_0_proposers_count = 200;
+
+            unpaid_epoch_pool_0
+                .init_current(1, 1, 1, Some(&transaction))
+                .expect("should create proposers tree");
+
+            fee_pools
+                .distribute_fees_into_pools(
+                    &drive,
+                    &unpaid_epoch_pool_0,
+                    10000,
+                    10000,
+                    Some(&transaction),
+                )
+                .expect("distribute fees into epoch pool 0");
+
+            super::populate_proposers(
+                &unpaid_epoch_pool_0,
+                unpaid_epoch_pool_0_proposers_count,
+                Some(&transaction),
+            );
+
+            // Create epoch 1
+
+            let unpaid_epoch_pool_1 = super::EpochPool::new(1, &drive);
+
+            unpaid_epoch_pool_1
+                .init_current(
+                    1,
+                    unpaid_epoch_pool_0_proposers_count as u64 + 1,
+                    2,
+                    Some(&transaction),
+                )
+                .expect("should create proposers tree");
+
+            super::populate_proposers(&unpaid_epoch_pool_1, 200, Some(&transaction));
+
+            // Create masternode reward shares contract
+            super::create_mn_shares_contract(&drive);
+
+            let proposers_paid = fee_pools
+                .distribute_fees_from_unpaid_pools_to_proposers(&drive, 2, Some(&transaction))
+                .expect("should distribute fees");
+
+            assert_eq!(proposers_paid, 100);
         }
 
         #[test]

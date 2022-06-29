@@ -1,2 +1,2 @@
-pub mod mn_shares_contract;
+pub mod fee_pools;
 pub mod setup;
