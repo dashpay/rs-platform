@@ -710,6 +710,7 @@ impl Drive {
         path: P,
         key: &'c [u8],
         only_delete_tree_if_empty: bool,
+        apply: bool,
         transaction: TransactionArg,
         drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<(), Error>
@@ -718,20 +719,38 @@ impl Drive {
         <P as IntoIterator>::IntoIter: ExactSizeIterator + DoubleEndedIterator + Clone,
     {
         let current_batch_operations = DriveOperation::grovedb_operations(drive_operations);
-        let cost_context = self.grove.delete_operation_for_delete_internal(
-            path,
-            key,
-            only_delete_tree_if_empty,
-            true,
-            &current_batch_operations,
-            transaction,
-        );
+        if apply {
+            let cost_context = self.grove.delete_operation_for_delete_internal(
+                path,
+                key,
+                only_delete_tree_if_empty,
+                true,
+                &current_batch_operations,
+                transaction,
+            );
 
-        if let Some(delete_operation) = push_drive_operation_result(cost_context, drive_operations)?
-        {
-            // we also add the actual delete operation
-            drive_operations.push(DriveOperation::GroveOperation(delete_operation))
+            if let Some(delete_operation) = push_drive_operation_result(cost_context, drive_operations)?
+            {
+                // we also add the actual delete operation
+                drive_operations.push(DriveOperation::GroveOperation(delete_operation))
+            }
+        } else {
+            let cost_context = self.grove.worst_case_deletion_cost(
+                path,
+                key,
+                only_delete_tree_if_empty,
+                true,
+                &current_batch_operations,
+                transaction,
+            );
+
+            if let Some(delete_operation) = push_drive_operation_result(cost_context, drive_operations)?
+            {
+                // we also add the actual delete operation
+                drive_operations.push(DriveOperation::GroveOperation(delete_operation))
+            }
         }
+
         Ok(())
     }
 

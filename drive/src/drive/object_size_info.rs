@@ -398,3 +398,8 @@ impl<'a> KeyValueInfo<'a> {
         }
     }
 }
+
+pub struct DeletionInfo<'a, const N: usize> {
+    upper_path : PathInfo<'a, N>,
+    lower_path : Vec<KeyValueInfo<'a>>,
+}

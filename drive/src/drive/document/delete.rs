@@ -121,7 +121,8 @@ impl Drive {
         self.batch_delete(
             contract_documents_primary_key_path,
             document_id,
-            true, // not a tree, irrelevant
+            true,
+            , // not a tree, irrelevant
             transaction,
             &mut batch_operations,
         )?;
