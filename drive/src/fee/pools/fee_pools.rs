@@ -37,6 +37,7 @@ impl FeePools {
                 Element::empty_tree(),
                 transaction,
             )
+            .unwrap()
             .map_err(Error::GroveDB)?;
 
         // Update storage credit pool
@@ -48,6 +49,7 @@ impl FeePools {
                 Element::Item(0i64.to_le_bytes().to_vec(), None),
                 transaction,
             )
+            .unwrap()
             .map_err(Error::GroveDB)?;
 
         // We need to insert 50 years worth of epochs,
@@ -76,6 +78,7 @@ impl FeePools {
                 constants::KEY_GENESIS_TIME.as_bytes(),
                 transaction,
             )
+            .unwrap()
             .map_err(Error::GroveDB)?;
 
         if let Element::Item(item, _) = element {
@@ -107,6 +110,7 @@ impl FeePools {
                 Element::Item(genesis_time.to_le_bytes().to_vec(), None),
                 transaction,
             )
+            .unwrap()
             .map_err(Error::GroveDB)?;
 
         self.genesis_time = Some(genesis_time);
@@ -268,6 +272,7 @@ mod tests {
                     super::Element::Item(u128::MAX.to_le_bytes().to_vec(), None),
                     Some(&transaction),
                 )
+                .unwrap()
                 .expect("to insert invalid data");
 
             match fee_pools.get_genesis_time(&drive, Some(&transaction)) {

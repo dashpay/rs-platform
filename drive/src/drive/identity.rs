@@ -1,11 +1,13 @@
+use grovedb::{Element, TransactionArg};
+
 use crate::drive::flags::StorageFlags;
 use crate::drive::object_size_info::PathKeyElementInfo::PathFixedSizeKeyElement;
 use crate::drive::{Drive, RootTree};
+use crate::error::drive::DriveError;
 use crate::error::Error;
 use crate::fee::calculate_fee;
 use crate::fee::op::DriveOperation;
 use crate::identity::Identity;
-use grovedb::{Element, TransactionArg};
 
 impl Drive {
     fn insert_identity(
@@ -15,7 +17,7 @@ impl Drive {
         apply: bool,
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
-        let mut drive_operations: Vec<DriveOperation> = vec![];
+        let mut batch_operations: Vec<DriveOperation> = vec![];
 
         self.batch_insert(
             PathFixedSizeKeyElement((
@@ -23,18 +25,14 @@ impl Drive {
                 identity_key,
                 identity_bytes,
             )),
-            &mut drive_operations,
+            &mut batch_operations,
         )?;
 
-        if apply {
-            self.grove_apply_batch(
-                DriveOperation::grovedb_operations(&drive_operations),
-                false,
-                transaction,
-            )?;
-        }
+        let mut drive_operations: Vec<DriveOperation> = vec![];
 
-        calculate_fee(None, None, Some(drive_operations))
+        self.apply_batch(apply, transaction, batch_operations, &mut drive_operations)?;
+
+        calculate_fee(None, Some(drive_operations))
     }
 
     pub fn insert_identity_cbor(
@@ -63,15 +61,42 @@ impl Drive {
             transaction,
         )
     }
+
+    pub fn fetch_identity(
+        &self,
+        id: &[u8],
+        transaction: TransactionArg,
+    ) -> Result<Identity, Error> {
+        let element = self
+            .grove
+            .get(
+                [Into::<&[u8; 1]>::into(RootTree::Identities).as_slice()],
+                id,
+                transaction,
+            )
+            .unwrap()
+            .map_err(Error::GroveDB)?;
+
+        if let Element::Item(identity_cbor, _) = element {
+            let identity = Identity::from_cbor(identity_cbor.as_slice())?;
+
+            Ok(identity)
+        } else {
+            Err(Error::Drive(DriveError::CorruptedIdentityNotItem(
+                "identity must be an item",
+            )))
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use grovedb::Element;
+    use tempfile::TempDir;
+
     use crate::drive::flags::StorageFlags;
     use crate::drive::Drive;
     use crate::identity::Identity;
-    use grovedb::Element;
-    use tempfile::TempDir;
 
     #[test]
     fn test_insert_identity() {

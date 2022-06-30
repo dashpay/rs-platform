@@ -9,6 +9,7 @@ private = true
 [dependencies]
 serde = { version = "1.0.132", features = ["derive"] }
 ciborium = "0.2.0"
+integer-encoding = "3.0.3"
 bs58 = "0.4.0"
 base64 = "0.13.0"
 rand = "0.8.4"
@@ -30,8 +31,19 @@ rust_decimal_macros = "1.25"
 
 [dependencies.grovedb]
 git = "https://github.com/dashevo/grovedb"
-rev = "3e62a80d133f1253d15478afe13093a0a11d9176"
+branch = "develop"
 
 [dependencies.storage]
 git = "https://github.com/dashevo/grovedb"
-rev = "3e62a80d133f1253d15478afe13093a0a11d9176"
+branch = "develop"
+
+[dependencies.costs]
+git = "https://github.com/dashevo/grovedb"
+branch = "develop"
+
+[dev-dependencies]
+criterion = "0.3.5"
+
+[[bench]]
+name = "benchmarks"
+harness = false

@@ -4,7 +4,7 @@ use rust_decimal_macros::dec;
 use serde_json::json;
 
 use crate::common::value_to_cbor;
-use crate::contract::Document;
+use crate::contract::document::Document;
 use crate::drive::Drive;
 use crate::error::document::DocumentError;
 use crate::error::fee::FeeError;
@@ -301,7 +301,7 @@ mod tests {
     use crate::fee::pools::tests::helpers::setup::setup_fee_pools;
 
     use crate::{
-        contract::{Contract, Document},
+        contract::document::Document,
         drive::{
             flags::StorageFlags,
             object_size_info::{DocumentAndContractInfo, DocumentInfo::DocumentAndSerialization},
@@ -507,6 +507,7 @@ mod tests {
             match drive
                 .grove
                 .get(FeePools::get_path(), &epoch.key, Some(&transaction))
+                .unwrap()
             {
                 Ok(_) => assert!(false, "should not be able to get deleted epoch pool"),
                 Err(e) => match e {

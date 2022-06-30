@@ -89,7 +89,7 @@ mod tests {
     use crate::fee::pools::tests::helpers::setup::setup_drive;
     use crate::fee::pools::tests::helpers::setup::setup_fee_pools;
     use crate::{
-        contract::{Contract, Document},
+        contract::document::Document,
         drive::{
             flags::StorageFlags,
             object_size_info::{DocumentAndContractInfo, DocumentInfo::DocumentAndSerialization},

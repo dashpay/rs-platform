@@ -20,6 +20,7 @@ impl<'e> EpochPool<'e> {
             .get(self.get_proposers_path(), proposer_tx_hash, transaction)
             // TODO: Shouldn't we wrap all errors to Fee Pool errors?
             //  in this case we know the source of error
+            .unwrap()
             .map_err(Error::GroveDB)?;
 
         if let Element::Item(item, _) = element {
@@ -51,6 +52,7 @@ impl<'e> EpochPool<'e> {
                 Element::Item(block_count.to_le_bytes().to_vec(), None),
                 transaction,
             )
+            .unwrap()
             .map_err(Error::GroveDB)
     }
 
@@ -81,6 +83,7 @@ impl<'e> EpochPool<'e> {
             .drive
             .grove
             .is_empty_tree(self.get_proposers_path(), transaction)
+            .unwrap()
         {
             Ok(result) => Ok(result),
             Err(err) => match err {
@@ -101,6 +104,7 @@ impl<'e> EpochPool<'e> {
                 Element::empty_tree(),
                 transaction,
             )
+            .unwrap()
             .map_err(Error::GroveDB)?;
 
         Ok(())
@@ -122,18 +126,17 @@ impl<'e> EpochPool<'e> {
 
         let path_query = PathQuery::new(path_as_vec, SizedQuery::new(query, Some(limit), None));
 
-        let path_queries = [&path_query];
-
-        let elements = self
+        let (elements, _) = self
             .drive
             .grove
-            .get_path_queries_raw(&path_queries, transaction)
+            .query_raw(&path_query, transaction)
+            .unwrap()
             .map_err(Error::GroveDB)?;
 
         let result = elements
             .into_iter()
-            .map(|(pro_tx_hash, e)| {
-                if let Element::Item(item, _) = e {
+            .map(|(pro_tx_hash, element)| {
+                if let Element::Item(item, _) = element {
                     let block_count =
                         u64::from_le_bytes(item.as_slice().try_into().map_err(|_| {
                             Error::Fee(FeeError::CorruptedProposerBlockCountItemLength(
@@ -161,6 +164,7 @@ impl<'e> EpochPool<'e> {
                 constants::KEY_PROPOSERS.as_bytes(),
                 transaction,
             )
+            .unwrap()
             .map_err(Error::GroveDB)?;
 
         Ok(())
@@ -201,6 +205,7 @@ mod tests {
                     super::Element::Item(u128::MAX.to_le_bytes().to_vec(), None),
                     Some(&transaction),
                 )
+                .unwrap()
                 .expect("to insert invalid value");
 
             match epoch.get_proposer_block_count(&pro_tx_hash, Some(&transaction)) {

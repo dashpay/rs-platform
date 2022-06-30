@@ -19,6 +19,7 @@ impl<'e> EpochPool<'e> {
                 constants::KEY_STORAGE_FEE.as_bytes(),
                 transaction,
             )
+            .unwrap()
             .map_err(Error::GroveDB)?;
 
         if let Element::Item(item, _) = element {
@@ -43,6 +44,7 @@ impl<'e> EpochPool<'e> {
                 constants::KEY_PROCESSING_FEE.as_bytes(),
                 transaction,
             )
+            .unwrap()
             .map_err(Error::GroveDB)?;
 
         if let Element::Item(item, _) = element {
@@ -69,6 +71,7 @@ impl<'e> EpochPool<'e> {
                 constants::KEY_FEE_MULTIPLIER.as_bytes(),
                 transaction,
             )
+            .unwrap()
             .map_err(Error::GroveDB)?;
 
         if let Element::Item(item, _) = element {
@@ -100,6 +103,7 @@ impl<'e> EpochPool<'e> {
                 Element::Item(multiplier.to_le_bytes().to_vec(), None),
                 transaction,
             )
+            .unwrap()
             .map_err(Error::GroveDB)?;
 
         Ok(())
@@ -118,6 +122,7 @@ impl<'e> EpochPool<'e> {
                 Element::Item(processing_fee.to_le_bytes().to_vec(), None),
                 transaction,
             )
+            .unwrap()
             .map_err(Error::GroveDB)?;
 
         Ok(())
@@ -131,6 +136,7 @@ impl<'e> EpochPool<'e> {
                 constants::KEY_PROCESSING_FEE.as_bytes(),
                 transaction,
             )
+            .unwrap()
             .map_err(Error::GroveDB)?;
 
         Ok(())
@@ -149,6 +155,7 @@ impl<'e> EpochPool<'e> {
                 Element::Item(storage_fee.serialize().to_vec(), None),
                 transaction,
             )
+            .unwrap()
             .map_err(Error::GroveDB)?;
 
         Ok(())
@@ -162,6 +169,7 @@ impl<'e> EpochPool<'e> {
                 constants::KEY_STORAGE_FEE.as_bytes(),
                 transaction,
             )
+            .unwrap()
             .map_err(Error::GroveDB)?;
 
         Ok(())
@@ -275,6 +283,7 @@ mod tests {
                     super::Element::Item(u128::MAX.to_le_bytes().to_vec(), None),
                     Some(&transaction),
                 )
+                .unwrap()
                 .expect("to insert invalid data");
 
             match epoch.get_storage_fee(Some(&transaction)) {
@@ -348,6 +357,7 @@ mod tests {
                     super::Element::Item(u128::MAX.to_le_bytes().to_vec(), None),
                     Some(&transaction),
                 )
+                .unwrap()
                 .expect("to insert invalid data");
 
             match epoch.get_processing_fee(Some(&transaction)) {
@@ -427,6 +437,7 @@ mod tests {
                     super::Element::Item(u128::MAX.to_le_bytes().to_vec(), None),
                     Some(&transaction),
                 )
+                .unwrap()
                 .expect("to insert invalid data");
 
             match epoch.get_fee_multiplier(Some(&transaction)) {

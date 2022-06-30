@@ -72,6 +72,7 @@ impl StorageFeeDistributionPool {
                 Element::Item(storage_fee.to_le_bytes().to_vec(), None),
                 transaction,
             )
+            .unwrap()
             .map_err(Error::GroveDB)
     }
 
@@ -83,6 +84,7 @@ impl StorageFeeDistributionPool {
                 constants::KEY_STORAGE_FEE_POOL.as_bytes(),
                 transaction,
             )
+            .unwrap()
             .map_err(Error::GroveDB)?;
 
         if let Element::Item(item, _) = element {
@@ -432,6 +434,7 @@ mod tests {
                 Element::Item(u128::MAX.to_le_bytes().to_vec(), None),
                 Some(&transaction),
             )
+            .unwrap()
             .expect("to insert invalid data");
 
         match fee_pools

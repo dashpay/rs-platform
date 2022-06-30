@@ -33,6 +33,7 @@ impl<'e> EpochPool<'e> {
                 Element::empty_tree(),
                 transaction,
             )
+            .unwrap()
             .map_err(Error::GroveDB)?;
 
         // init storage fee item to 0
@@ -92,6 +93,7 @@ impl<'e> EpochPool<'e> {
                 Element::Item(time.to_le_bytes().to_vec(), None),
                 transaction,
             )
+            .unwrap()
             .map_err(Error::GroveDB)?;
 
         Ok(())
@@ -106,6 +108,7 @@ impl<'e> EpochPool<'e> {
                 constants::KEY_START_TIME.as_bytes(),
                 transaction,
             )
+            .unwrap()
             .map_err(Error::GroveDB)?;
 
         if let Element::Item(item, _) = element {
@@ -126,6 +129,7 @@ impl<'e> EpochPool<'e> {
                 constants::KEY_START_BLOCK_HEIGHT.as_bytes(),
                 transaction,
             )
+            .unwrap()
             .map_err(Error::GroveDB)?;
 
         if let Element::Item(item, _) = element {
@@ -150,6 +154,7 @@ impl<'e> EpochPool<'e> {
                 Element::Item(start_block_height.to_le_bytes().to_vec(), None),
                 transaction,
             )
+            .unwrap()
             .map_err(Error::GroveDB)
     }
 }
@@ -244,6 +249,7 @@ mod tests {
                     super::Element::empty_tree(),
                     Some(&transaction),
                 )
+                .unwrap()
                 .expect("to insert invalid data");
 
             match epoch_pool.get_start_time(Some(&transaction)) {
@@ -273,6 +279,7 @@ mod tests {
                     super::Element::Item(u128::MAX.to_le_bytes().to_vec(), None),
                     Some(&transaction),
                 )
+                .unwrap()
                 .expect("to insert invalid data");
 
             match epoch_pool.get_start_time(Some(&transaction)) {
@@ -362,6 +369,7 @@ mod tests {
                     super::Element::Item(u128::MAX.to_le_bytes().to_vec(), None),
                     Some(&transaction),
                 )
+                .unwrap()
                 .expect("to insert invalid data");
 
             match epoch_pool.get_start_block_height(Some(&transaction)) {
@@ -393,6 +401,7 @@ mod tests {
                     super::Element::empty_tree(),
                     Some(&transaction),
                 )
+                .unwrap()
                 .expect("to insert invalid data");
 
             match epoch_pool.get_start_block_height(Some(&transaction)) {
@@ -527,11 +536,15 @@ mod tests {
                 .mark_as_paid(Some(&transaction))
                 .expect("to mark epoch as paid");
 
-            match drive.grove.get(
-                epoch.get_path(),
-                super::constants::KEY_PROPOSERS.as_bytes(),
-                Some(&transaction),
-            ) {
+            match drive
+                .grove
+                .get(
+                    epoch.get_path(),
+                    super::constants::KEY_PROPOSERS.as_bytes(),
+                    Some(&transaction),
+                )
+                .unwrap()
+            {
                 Ok(_) => assert!(false, "should not be able to get proposers"),
                 Err(e) => match e {
                     grovedb::Error::PathKeyNotFound(_) => assert!(true),

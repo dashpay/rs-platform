@@ -4,11 +4,11 @@ use std::collections::BTreeMap;
 
 use ciborium::value::Value;
 use grovedb::TransactionArg;
-use rand::random;
 
 use crate::identity::IdentityKey;
 use crate::{
-    contract::{Contract, Document},
+    contract::document::Document,
+    contract::Contract,
     drive::{
         flags::StorageFlags,
         object_size_info::{DocumentAndContractInfo, DocumentInfo::DocumentAndSerialization},
