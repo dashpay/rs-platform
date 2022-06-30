@@ -476,6 +476,7 @@ impl Drive {
 #[cfg(test)]
 mod tests {
     use rand::Rng;
+    use std::option::Option::None;
     use tempfile::TempDir;
 
     use crate::common::json_document_to_cbor;
@@ -487,7 +488,7 @@ mod tests {
     fn setup_deep_nested_contract() -> (Drive, Contract, Vec<u8>) {
         // Todo: make TempDir based on _prefix
         let tmp_dir = TempDir::new().unwrap();
-        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+        let drive: Drive = Drive::open(tmp_dir, None).expect("expected to open Drive successfully");
 
         drive
             .create_root_tree(None)
@@ -514,7 +515,7 @@ mod tests {
 
     fn setup_reference_contract() -> (Drive, Contract, Vec<u8>) {
         let tmp_dir = TempDir::new().unwrap();
-        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+        let drive: Drive = Drive::open(tmp_dir, None).expect("expected to open Drive successfully");
 
         drive
             .create_root_tree(None)
@@ -543,7 +544,7 @@ mod tests {
     #[test]
     fn test_create_and_update_contract() {
         let tmp_dir = TempDir::new().unwrap();
-        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+        let drive: Drive = Drive::open(tmp_dir, None).expect("expected to open Drive successfully");
 
         drive
             .create_root_tree(None)

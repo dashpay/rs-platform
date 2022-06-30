@@ -767,10 +767,11 @@ impl Drive {
         drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<(), Error> {
         if self.config.batching_enabled {
+            //println!("batch {:#?}", ops);
             let cost_context = self.grove.apply_batch(
                 ops,
                 Some(BatchApplyOptions {
-                    validate_tree_insertion_does_not_override: validate,
+                    validate_insertion_does_not_override: validate,
                 }),
                 transaction,
             );
@@ -817,7 +818,7 @@ impl Drive {
         let cost_context = self.grove.worst_case_operations_for_batch(
             ops,
             Some(BatchApplyOptions {
-                validate_tree_insertion_does_not_override: validate,
+                validate_insertion_does_not_override: validate,
             }),
         );
         push_drive_operation_result(cost_context, drive_operations)

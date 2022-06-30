@@ -449,7 +449,7 @@ mod tests {
     #[test]
     fn test_create_and_update_document_same_transaction() {
         let tmp_dir = TempDir::new().unwrap();
-        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+        let drive: Drive = Drive::open(tmp_dir, None).expect("expected to open Drive successfully");
 
         let db_transaction = drive.grove.start_transaction();
 
@@ -506,7 +506,7 @@ mod tests {
     #[test]
     fn test_create_and_update_document_no_transactions() {
         let tmp_dir = TempDir::new().unwrap();
-        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+        let drive: Drive = Drive::open(tmp_dir, None).expect("expected to open Drive successfully");
 
         drive
             .create_root_tree(None)
@@ -587,7 +587,7 @@ mod tests {
     #[test]
     fn test_create_and_update_document_in_different_transactions() {
         let tmp_dir = TempDir::new().unwrap();
-        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+        let drive: Drive = Drive::open(tmp_dir, None).expect("expected to open Drive successfully");
 
         let db_transaction = drive.grove.start_transaction();
 
@@ -694,7 +694,7 @@ mod tests {
     #[test]
     fn test_create_and_update_document_in_different_transactions_with_delete_rollback() {
         let tmp_dir = TempDir::new().unwrap();
-        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+        let drive: Drive = Drive::open(tmp_dir, None).expect("expected to open Drive successfully");
 
         let db_transaction = drive.grove.start_transaction();
 
@@ -818,7 +818,7 @@ mod tests {
     #[test]
     fn test_create_update_and_delete_document() {
         let tmp_dir = TempDir::new().unwrap();
-        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+        let drive: Drive = Drive::open(tmp_dir, None).expect("expected to open Drive successfully");
 
         drive
             .create_root_tree(None)
@@ -943,7 +943,7 @@ mod tests {
     #[test]
     fn test_modify_dashpay_contact_request() {
         let tmp_dir = TempDir::new().unwrap();
-        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+        let drive: Drive = Drive::open(tmp_dir, None).expect("expected to open Drive successfully");
 
         let db_transaction = drive.grove.start_transaction();
 
@@ -1006,7 +1006,7 @@ mod tests {
     #[test]
     fn test_update_dashpay_profile_with_history() {
         let tmp_dir = TempDir::new().unwrap();
-        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+        let drive: Drive = Drive::open(tmp_dir, None).expect("expected to open Drive successfully");
 
         let db_transaction = drive.grove.start_transaction();
 

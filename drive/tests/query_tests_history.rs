@@ -96,7 +96,7 @@ impl Person {
 
 pub fn setup(count: u32, seed: u64) -> (Drive, Contract, TempDir) {
     let tmp_dir = TempDir::new().unwrap();
-    let drive: Drive = Drive::open(&tmp_dir).expect("expected to open Drive successfully");
+    let drive: Drive = Drive::open(&tmp_dir, None).expect("expected to open Drive successfully");
 
     let db_transaction = drive.grove.start_transaction();
 

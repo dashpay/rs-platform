@@ -59,7 +59,7 @@ impl DriveWrapper {
             let path = Path::new(&path_string);
             // Open a connection to groveDb, this will be moved to a separate thread
             // TODO: think how to pass this error to JS
-            let drive = Drive::open(path).unwrap();
+            let drive = Drive::open(path, None).unwrap();
 
             let mut transaction: Option<Transaction> = None;
 

@@ -1,9 +1,115 @@
 use std::option::Option::None;
 
-use grovedb::{Element, Transaction};
+use grovedb::{Element, Transaction, TransactionArg};
+use rand::seq::SliceRandom;
+use rand::{Rng, SeedableRng};
+use rs_drive::common;
+use rs_drive::common::setup_contract;
+use rs_drive::contract::document::Document;
+use rs_drive::contract::Contract;
+use serde::{Deserialize, Serialize};
+use serde_json::json;
 use tempfile::TempDir;
 
+use rs_drive::drive::config::DriveConfig;
+use rs_drive::drive::flags::StorageFlags;
+use rs_drive::drive::object_size_info::DocumentAndContractInfo;
+use rs_drive::drive::object_size_info::DocumentInfo::DocumentAndSerialization;
 use rs_drive::drive::{Drive, RootTree};
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Records {
+    dash_unique_identity_id: Vec<u8>,
+}
+
+// In the real dpns label is required, we make it optional here for a test
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Domain {
+    #[serde(rename = "$id")]
+    id: Vec<u8>,
+    #[serde(rename = "$ownerId")]
+    owner_id: Vec<u8>,
+    label: Option<String>,
+    normalized_label: Option<String>,
+    normalized_parent_domain_name: String,
+    records: Records,
+    preorder_salt: Vec<u8>,
+    subdomain_rules: bool,
+}
+
+impl Domain {
+    fn random_domains_in_parent(
+        count: u32,
+        seed: u64,
+        normalized_parent_domain_name: &str,
+    ) -> Vec<Self> {
+        let first_names =
+            common::text_file_strings("tests/supporting_files/contract/family/first-names.txt");
+        let mut vec: Vec<Domain> = Vec::with_capacity(count as usize);
+
+        let mut rng = rand::rngs::StdRng::seed_from_u64(seed);
+        for _i in 0..count {
+            let label = first_names.choose(&mut rng).unwrap();
+            let domain = Domain {
+                id: Vec::from(rng.gen::<[u8; 32]>()),
+                owner_id: Vec::from(rng.gen::<[u8; 32]>()),
+                label: Some(label.clone()),
+                normalized_label: Some(label.to_lowercase()),
+                normalized_parent_domain_name: normalized_parent_domain_name.to_string(),
+                records: Records {
+                    dash_unique_identity_id: Vec::from(rng.gen::<[u8; 32]>()),
+                },
+                preorder_salt: Vec::from(rng.gen::<[u8; 32]>()),
+                subdomain_rules: false,
+            };
+            vec.push(domain);
+        }
+        vec
+    }
+}
+
+pub fn add_domains_to_contract(
+    drive: &Drive,
+    contract: &Contract,
+    transaction: TransactionArg,
+    count: u32,
+    seed: u64,
+) {
+    let domains = Domain::random_domains_in_parent(count, seed, "dash");
+    for domain in domains {
+        let value = serde_json::to_value(&domain).expect("serialized domain");
+        let document_cbor =
+            common::value_to_cbor(value, Some(rs_drive::drive::defaults::PROTOCOL_VERSION));
+        let document = Document::from_cbor(document_cbor.as_slice(), None, None)
+            .expect("document should be properly deserialized");
+        let document_type = contract
+            .document_type_for_name("domain")
+            .expect("expected to get document type");
+
+        let storage_flags = StorageFlags { epoch: 0 };
+
+        drive
+            .add_document_for_contract(
+                DocumentAndContractInfo {
+                    document_info: DocumentAndSerialization((
+                        &document,
+                        &document_cbor,
+                        &storage_flags,
+                    )),
+                    contract: &contract,
+                    document_type,
+                    owner_id: None,
+                },
+                true,
+                0f64,
+                true,
+                transaction,
+            )
+            .expect("document should be inserted");
+    }
+}
 
 fn test_root_hash(drive: &Drive, db_transaction: &Transaction) {
     // [1644293142180] INFO (35 on bf3bb2a2796a): createTree
@@ -280,11 +386,7 @@ fn test_root_hash(drive: &Drive, db_transaction: &Transaction) {
         .flatten()
         .expect("should return app hash");
 
-    let expected_app_hash = if drive.config.batching_enabled {
-        "72b7e8783f763c647e23a6aba6d58b40457c7cbd6486d761aa6f23c1354b7add"
-    } else {
-        "180efc3caf02fd8e367e7a7a779c97177c19bf1e02e2c424c83bc2b21da41f92"
-    };
+    let expected_app_hash = "180efc3caf02fd8e367e7a7a779c97177c19bf1e02e2c424c83bc2b21da41f92";
 
     assert_eq!(hex::encode(app_hash), expected_app_hash);
 }
@@ -292,7 +394,7 @@ fn test_root_hash(drive: &Drive, db_transaction: &Transaction) {
 #[test]
 fn test_deterministic_root_hash() {
     let tmp_dir = TempDir::new().unwrap();
-    let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+    let drive: Drive = Drive::open(tmp_dir, None).expect("expected to open Drive successfully");
 
     let db_transaction = drive.grove.start_transaction();
 
@@ -304,4 +406,127 @@ fn test_deterministic_root_hash() {
             .rollback_transaction(&db_transaction)
             .expect("transaction should be rolled back");
     }
+}
+
+#[test]
+fn test_root_hash_matches_with_batching_just_contract() {
+    let tmp_dir_1 = TempDir::new().unwrap();
+    let tmp_dir_2 = TempDir::new().unwrap();
+    let drive_with_batches: Drive =
+        Drive::open(&tmp_dir_1, Some(DriveConfig::default_with_batches()))
+            .expect("expected to open Drive successfully");
+    let drive_without_batches: Drive =
+        Drive::open(&tmp_dir_2, Some(DriveConfig::default_without_batches()))
+            .expect("expected to open Drive successfully");
+
+    let db_transaction_with_batches = drive_with_batches.grove.start_transaction();
+    let db_transaction_without_batches = drive_without_batches.grove.start_transaction();
+
+    drive_with_batches
+        .create_root_tree(Some(&db_transaction_with_batches))
+        .expect("expected to create root tree successfully");
+
+    drive_without_batches
+        .create_root_tree(Some(&db_transaction_without_batches))
+        .expect("expected to create root tree successfully");
+
+    // setup code
+    setup_contract(
+        &drive_with_batches,
+        "tests/supporting_files/contract/dpns/dpns-contract.json",
+        None,
+        Some(&db_transaction_with_batches),
+    );
+
+    setup_contract(
+        &drive_without_batches,
+        "tests/supporting_files/contract/dpns/dpns-contract.json",
+        None,
+        Some(&db_transaction_without_batches),
+    );
+
+    let root_hash_with_batches = drive_with_batches
+        .grove
+        .root_hash(Some(&db_transaction_with_batches))
+        .unwrap()
+        .unwrap()
+        .expect("there is always a root hash");
+
+    let root_hash_without_batches = drive_without_batches
+        .grove
+        .root_hash(Some(&db_transaction_without_batches))
+        .unwrap()
+        .unwrap()
+        .expect("there is always a root hash");
+
+    assert_eq!(root_hash_with_batches, root_hash_without_batches);
+}
+
+#[test]
+fn test_root_hash_matches_with_batching_contract_and_one_document() {
+    let tmp_dir_1 = TempDir::new().unwrap();
+    let tmp_dir_2 = TempDir::new().unwrap();
+    let drive_with_batches: Drive =
+        Drive::open(&tmp_dir_1, Some(DriveConfig::default_with_batches()))
+            .expect("expected to open Drive successfully");
+    let drive_without_batches: Drive =
+        Drive::open(&tmp_dir_2, Some(DriveConfig::default_without_batches()))
+            .expect("expected to open Drive successfully");
+
+    let db_transaction_with_batches = drive_with_batches.grove.start_transaction();
+    let db_transaction_without_batches = drive_without_batches.grove.start_transaction();
+
+    drive_with_batches
+        .create_root_tree(Some(&db_transaction_with_batches))
+        .expect("expected to create root tree successfully");
+
+    drive_without_batches
+        .create_root_tree(Some(&db_transaction_without_batches))
+        .expect("expected to create root tree successfully");
+
+    // setup code
+    let contract_with_batches = setup_contract(
+        &drive_with_batches,
+        "tests/supporting_files/contract/dpns/dpns-contract.json",
+        None,
+        Some(&db_transaction_with_batches),
+    );
+
+    let contract_without_batches = setup_contract(
+        &drive_without_batches,
+        "tests/supporting_files/contract/dpns/dpns-contract.json",
+        None,
+        Some(&db_transaction_without_batches),
+    );
+
+    add_domains_to_contract(
+        &drive_with_batches,
+        &contract_with_batches,
+        Some(&db_transaction_with_batches),
+        1,
+        5,
+    );
+    add_domains_to_contract(
+        &drive_without_batches,
+        &contract_without_batches,
+        Some(&db_transaction_without_batches),
+        1,
+        5,
+    );
+
+    let root_hash_with_batches = drive_with_batches
+        .grove
+        .root_hash(Some(&db_transaction_with_batches))
+        .unwrap()
+        .unwrap()
+        .expect("there is always a root hash");
+
+    let root_hash_without_batches = drive_without_batches
+        .grove
+        .root_hash(Some(&db_transaction_without_batches))
+        .unwrap()
+        .unwrap()
+        .expect("there is always a root hash");
+
+    assert_eq!(root_hash_with_batches, root_hash_without_batches);
 }

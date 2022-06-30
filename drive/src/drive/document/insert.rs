@@ -663,7 +663,7 @@ mod tests {
     #[test]
     fn test_add_dashpay_documents() {
         let tmp_dir = TempDir::new().unwrap();
-        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+        let drive: Drive = Drive::open(tmp_dir, None).expect("expected to open Drive successfully");
 
         let db_transaction = drive.grove.start_transaction();
 
@@ -728,7 +728,7 @@ mod tests {
     #[test]
     fn test_add_dashpay_fee_for_documents() {
         let tmp_dir = TempDir::new().unwrap();
-        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+        let drive: Drive = Drive::open(tmp_dir, None).expect("expected to open Drive successfully");
 
         let db_transaction = drive.grove.start_transaction();
 
@@ -771,7 +771,7 @@ mod tests {
     #[test]
     fn test_unknown_state_cost_dashpay_fee_for_add_documents() {
         let tmp_dir = TempDir::new().unwrap();
-        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+        let drive: Drive = Drive::open(tmp_dir, None).expect("expected to open Drive successfully");
 
         let db_transaction = drive.grove.start_transaction();
 
@@ -826,7 +826,7 @@ mod tests {
     #[test]
     fn test_add_dashpay_fee_for_documents_detail() {
         let tmp_dir = TempDir::new().unwrap();
-        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+        let drive: Drive = Drive::open(tmp_dir, None).expect("expected to open Drive successfully");
 
         let db_transaction = drive.grove.start_transaction();
 
@@ -915,7 +915,7 @@ mod tests {
     #[test]
     fn test_add_dpns_documents() {
         let tmp_dir = TempDir::new().unwrap();
-        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+        let drive: Drive = Drive::open(tmp_dir, None).expect("expected to open Drive successfully");
 
         let db_transaction = drive.grove.start_transaction();
 
@@ -1077,7 +1077,7 @@ mod tests {
     #[test]
     fn test_create_two_documents_with_the_same_index_in_different_transactions() {
         let tmp_dir = TempDir::new().unwrap();
-        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+        let drive: Drive = Drive::open(tmp_dir, None).expect("expected to open Drive successfully");
 
         let db_transaction = drive.grove.start_transaction();
 

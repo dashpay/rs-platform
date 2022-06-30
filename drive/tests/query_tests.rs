@@ -1,3 +1,4 @@
+use grovedb::TransactionArg;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{self, BufRead};
@@ -113,7 +114,7 @@ impl PersonWithOptionalValues {
 
 pub fn setup_family_tests(count: u32, seed: u64) -> (Drive, Contract, TempDir) {
     let tmp_dir = TempDir::new().unwrap();
-    let drive: Drive = Drive::open(&tmp_dir).expect("expected to open Drive successfully");
+    let drive: Drive = Drive::open(&tmp_dir, None).expect("expected to open Drive successfully");
 
     let db_transaction = drive.grove.start_transaction();
 
@@ -171,7 +172,7 @@ pub fn setup_family_tests(count: u32, seed: u64) -> (Drive, Contract, TempDir) {
 
 pub fn setup_family_tests_with_nulls(count: u32, seed: u64) -> (Drive, Contract, TempDir) {
     let tmp_dir = TempDir::new().unwrap();
-    let drive: Drive = Drive::open(&tmp_dir).expect("expected to open Drive successfully");
+    let drive: Drive = Drive::open(&tmp_dir, None).expect("expected to open Drive successfully");
 
     let db_transaction = drive.grove.start_transaction();
 
@@ -279,24 +280,13 @@ impl Domain {
     }
 }
 
-pub fn setup_dpns_tests(count: u32, seed: u64) -> (Drive, Contract, TempDir) {
-    let tmp_dir = TempDir::new().unwrap();
-    let drive: Drive = Drive::open(&tmp_dir).expect("expected to open Drive successfully");
-
-    let db_transaction = drive.grove.start_transaction();
-
-    drive
-        .create_root_tree(Some(&db_transaction))
-        .expect("expected to create root tree successfully");
-
-    // setup code
-    let contract = common::setup_contract(
-        &drive,
-        "tests/supporting_files/contract/dpns/dpns-contract.json",
-        None,
-        Some(&db_transaction),
-    );
-
+pub fn add_domains_to_contract(
+    drive: &Drive,
+    contract: &Contract,
+    transaction: TransactionArg,
+    count: u32,
+    seed: u64,
+) {
     let domains = Domain::random_domains_in_parent(count, seed, "dash");
     for domain in domains {
         let value = serde_json::to_value(&domain).expect("serialized domain");
@@ -325,10 +315,31 @@ pub fn setup_dpns_tests(count: u32, seed: u64) -> (Drive, Contract, TempDir) {
                 true,
                 0f64,
                 true,
-                Some(&db_transaction),
+                transaction,
             )
             .expect("document should be inserted");
     }
+}
+
+pub fn setup_dpns_tests(count: u32, seed: u64) -> (Drive, Contract, TempDir) {
+    let tmp_dir = TempDir::new().unwrap();
+    let drive: Drive = Drive::open(&tmp_dir, None).expect("expected to open Drive successfully");
+
+    let db_transaction = drive.grove.start_transaction();
+
+    drive
+        .create_root_tree(Some(&db_transaction))
+        .expect("expected to create root tree successfully");
+
+    // setup code
+    let contract = setup_contract(
+        &drive,
+        "tests/supporting_files/contract/dpns/dpns-contract.json",
+        None,
+        Some(&db_transaction),
+    );
+
+    add_domains_to_contract(&drive, &contract, Some(&db_transaction), count, seed);
     drive
         .grove
         .commit_transaction(db_transaction)
@@ -338,7 +349,7 @@ pub fn setup_dpns_tests(count: u32, seed: u64) -> (Drive, Contract, TempDir) {
 
 pub fn setup_dpns_test_with_data(path: &str) -> (Drive, Contract, TempDir) {
     let tmp_dir = TempDir::new().unwrap();
-    let drive: Drive = Drive::open(&tmp_dir).expect("expected to open Drive successfully");
+    let drive: Drive = Drive::open(&tmp_dir, None).expect("expected to open Drive successfully");
 
     let db_transaction = drive.grove.start_transaction();
 
@@ -456,17 +467,10 @@ fn test_family_basic_queries() {
         .unwrap()
         .expect("there is always a root hash");
 
-    let expected_app_hash = if drive.config.batching_enabled {
-        vec![
-            85, 9, 92, 105, 53, 163, 28, 4, 191, 62, 84, 39, 246, 168, 131, 121, 232, 76, 26, 212,
-            205, 226, 12, 175, 24, 0, 223, 230, 193, 62, 167, 127,
-        ]
-    } else {
-        vec![
-            123, 1, 243, 182, 206, 153, 145, 224, 140, 59, 64, 60, 26, 152, 194, 202, 184, 117, 75,
-            43, 210, 43, 22, 255, 27, 72, 107, 178, 235, 96, 40, 248,
-        ]
-    };
+    let expected_app_hash = vec![
+        123, 1, 243, 182, 206, 153, 145, 224, 140, 59, 64, 60, 26, 152, 194, 202, 184, 117, 75, 43,
+        210, 43, 22, 255, 27, 72, 107, 178, 235, 96, 40, 248,
+    ];
 
     assert_eq!(
         root_hash.expect("cannot get root hash").as_slice(),
@@ -1651,17 +1655,10 @@ fn test_family_starts_at_queries() {
         .unwrap()
         .expect("there is always a root hash");
 
-    let expected_app_hash = if drive.config.batching_enabled {
-        vec![
-            85, 9, 92, 105, 53, 163, 28, 4, 191, 62, 84, 39, 246, 168, 131, 121, 232, 76, 26, 212,
-            205, 226, 12, 175, 24, 0, 223, 230, 193, 62, 167, 127,
-        ]
-    } else {
-        vec![
-            123, 1, 243, 182, 206, 153, 145, 224, 140, 59, 64, 60, 26, 152, 194, 202, 184, 117, 75,
-            43, 210, 43, 22, 255, 27, 72, 107, 178, 235, 96, 40, 248,
-        ]
-    };
+    let expected_app_hash = vec![
+        123, 1, 243, 182, 206, 153, 145, 224, 140, 59, 64, 60, 26, 152, 194, 202, 184, 117, 75, 43,
+        210, 43, 22, 255, 27, 72, 107, 178, 235, 96, 40, 248,
+    ];
 
     assert_eq!(
         root_hash.expect("cannot get root hash").as_slice(),
@@ -2038,17 +2035,10 @@ fn test_family_with_nulls_query() {
         .unwrap()
         .expect("there is always a root hash");
 
-    let expected_app_hash = if drive.config.batching_enabled {
-        vec![
-            41, 116, 181, 13, 110, 120, 71, 226, 3, 7, 1, 18, 216, 138, 55, 195, 252, 52, 86, 114,
-            209, 50, 100, 11, 36, 231, 94, 199, 212, 163, 186, 113,
-        ]
-    } else {
-        vec![
-            106, 19, 219, 178, 226, 142, 21, 91, 78, 168, 66, 193, 44, 14, 17, 208, 149, 147, 92,
-            231, 155, 97, 136, 32, 136, 68, 79, 121, 207, 15, 55, 23,
-        ]
-    };
+    let expected_app_hash = vec![
+        106, 19, 219, 178, 226, 142, 21, 91, 78, 168, 66, 193, 44, 14, 17, 208, 149, 147, 92, 231,
+        155, 97, 136, 32, 136, 68, 79, 121, 207, 15, 55, 23,
+    ];
 
     assert_eq!(
         root_hash.expect("cannot get root hash").as_slice(),
@@ -2159,17 +2149,10 @@ fn test_query_with_cached_contract() {
         .unwrap()
         .expect("there is always a root hash");
 
-    let expected_app_hash = if drive.config.batching_enabled {
-        vec![
-            85, 9, 92, 105, 53, 163, 28, 4, 191, 62, 84, 39, 246, 168, 131, 121, 232, 76, 26, 212,
-            205, 226, 12, 175, 24, 0, 223, 230, 193, 62, 167, 127,
-        ]
-    } else {
-        vec![
-            123, 1, 243, 182, 206, 153, 145, 224, 140, 59, 64, 60, 26, 152, 194, 202, 184, 117, 75,
-            43, 210, 43, 22, 255, 27, 72, 107, 178, 235, 96, 40, 248,
-        ]
-    };
+    let expected_app_hash = vec![
+        123, 1, 243, 182, 206, 153, 145, 224, 140, 59, 64, 60, 26, 152, 194, 202, 184, 117, 75, 43,
+        210, 43, 22, 255, 27, 72, 107, 178, 235, 96, 40, 248,
+    ];
 
     assert_eq!(
         root_hash.expect("cannot get root hash").as_slice(),
@@ -2235,17 +2218,10 @@ fn test_dpns_query() {
         .unwrap()
         .expect("there is always a root hash");
 
-    let expected_app_hash = if drive.config.batching_enabled {
-        vec![
-            149, 67, 230, 197, 191, 5, 71, 144, 181, 128, 16, 52, 46, 98, 92, 128, 145, 90, 74,
-            110, 227, 192, 137, 127, 102, 240, 171, 251, 144, 149, 39, 203,
-        ]
-    } else {
-        vec![
-            218, 128, 56, 56, 209, 94, 168, 11, 78, 56, 234, 204, 159, 5, 54, 64, 127, 166, 149,
-            38, 35, 48, 116, 41, 230, 176, 235, 252, 208, 16, 47, 86,
-        ]
-    };
+    let expected_app_hash = vec![
+        218, 128, 56, 56, 209, 94, 168, 11, 78, 56, 234, 204, 159, 5, 54, 64, 127, 166, 149, 38,
+        35, 48, 116, 41, 230, 176, 235, 252, 208, 16, 47, 86,
+    ];
 
     assert_eq!(
         root_hash.expect("cannot get root hash").as_slice(),
@@ -2743,17 +2719,10 @@ fn test_dpns_query_start_at() {
         .unwrap()
         .expect("there is always a root hash");
 
-    let expected_app_hash = if drive.config.batching_enabled {
-        vec![
-            149, 67, 230, 197, 191, 5, 71, 144, 181, 128, 16, 52, 46, 98, 92, 128, 145, 90, 74,
-            110, 227, 192, 137, 127, 102, 240, 171, 251, 144, 149, 39, 203,
-        ]
-    } else {
-        vec![
-            218, 128, 56, 56, 209, 94, 168, 11, 78, 56, 234, 204, 159, 5, 54, 64, 127, 166, 149,
-            38, 35, 48, 116, 41, 230, 176, 235, 252, 208, 16, 47, 86,
-        ]
-    };
+    let expected_app_hash = vec![
+        218, 128, 56, 56, 209, 94, 168, 11, 78, 56, 234, 204, 159, 5, 54, 64, 127, 166, 149, 38,
+        35, 48, 116, 41, 230, 176, 235, 252, 208, 16, 47, 86,
+    ];
 
     assert_eq!(
         root_hash.expect("cannot get root hash").as_slice(),
@@ -2839,17 +2808,10 @@ fn test_dpns_query_start_after() {
         .unwrap()
         .expect("there is always a root hash");
 
-    let expected_app_hash = if drive.config.batching_enabled {
-        vec![
-            149, 67, 230, 197, 191, 5, 71, 144, 181, 128, 16, 52, 46, 98, 92, 128, 145, 90, 74,
-            110, 227, 192, 137, 127, 102, 240, 171, 251, 144, 149, 39, 203,
-        ]
-    } else {
-        vec![
-            218, 128, 56, 56, 209, 94, 168, 11, 78, 56, 234, 204, 159, 5, 54, 64, 127, 166, 149,
-            38, 35, 48, 116, 41, 230, 176, 235, 252, 208, 16, 47, 86,
-        ]
-    };
+    let expected_app_hash = vec![
+        218, 128, 56, 56, 209, 94, 168, 11, 78, 56, 234, 204, 159, 5, 54, 64, 127, 166, 149, 38,
+        35, 48, 116, 41, 230, 176, 235, 252, 208, 16, 47, 86,
+    ];
 
     assert_eq!(
         root_hash.expect("cannot get root hash").as_slice(),
@@ -2935,17 +2897,10 @@ fn test_dpns_query_start_at_desc() {
         .unwrap()
         .expect("there is always a root hash");
 
-    let expected_app_hash = if drive.config.batching_enabled {
-        vec![
-            149, 67, 230, 197, 191, 5, 71, 144, 181, 128, 16, 52, 46, 98, 92, 128, 145, 90, 74,
-            110, 227, 192, 137, 127, 102, 240, 171, 251, 144, 149, 39, 203,
-        ]
-    } else {
-        vec![
-            218, 128, 56, 56, 209, 94, 168, 11, 78, 56, 234, 204, 159, 5, 54, 64, 127, 166, 149,
-            38, 35, 48, 116, 41, 230, 176, 235, 252, 208, 16, 47, 86,
-        ]
-    };
+    let expected_app_hash = vec![
+        218, 128, 56, 56, 209, 94, 168, 11, 78, 56, 234, 204, 159, 5, 54, 64, 127, 166, 149, 38,
+        35, 48, 116, 41, 230, 176, 235, 252, 208, 16, 47, 86,
+    ];
 
     assert_eq!(
         root_hash.expect("cannot get root hash").as_slice(),
@@ -3031,17 +2986,10 @@ fn test_dpns_query_start_after_desc() {
         .unwrap()
         .expect("there is always a root hash");
 
-    let expected_app_hash = if drive.config.batching_enabled {
-        vec![
-            149, 67, 230, 197, 191, 5, 71, 144, 181, 128, 16, 52, 46, 98, 92, 128, 145, 90, 74,
-            110, 227, 192, 137, 127, 102, 240, 171, 251, 144, 149, 39, 203,
-        ]
-    } else {
-        vec![
-            218, 128, 56, 56, 209, 94, 168, 11, 78, 56, 234, 204, 159, 5, 54, 64, 127, 166, 149,
-            38, 35, 48, 116, 41, 230, 176, 235, 252, 208, 16, 47, 86,
-        ]
-    };
+    let expected_app_hash = vec![
+        218, 128, 56, 56, 209, 94, 168, 11, 78, 56, 234, 204, 159, 5, 54, 64, 127, 166, 149, 38,
+        35, 48, 116, 41, 230, 176, 235, 252, 208, 16, 47, 86,
+    ];
 
     assert_eq!(
         root_hash.expect("cannot get root hash").as_slice(),
@@ -3224,17 +3172,10 @@ fn test_dpns_query_start_at_with_null_id() {
         .unwrap()
         .expect("there is always a root hash");
 
-    let expected_app_hash = if drive.config.batching_enabled {
-        vec![
-            125, 196, 210, 13, 33, 174, 128, 205, 131, 6, 8, 101, 145, 27, 136, 16, 180, 99, 96,
-            137, 23, 80, 148, 125, 172, 67, 79, 207, 239, 123, 127, 208,
-        ]
-    } else {
-        vec![
-            129, 14, 2, 125, 180, 93, 191, 143, 255, 116, 8, 44, 77, 164, 244, 52, 227, 62, 99,
-            254, 206, 33, 205, 73, 224, 118, 162, 155, 213, 232, 46, 174,
-        ]
-    };
+    let expected_app_hash = vec![
+        129, 14, 2, 125, 180, 93, 191, 143, 255, 116, 8, 44, 77, 164, 244, 52, 227, 62, 99, 254,
+        206, 33, 205, 73, 224, 118, 162, 155, 213, 232, 46, 174,
+    ];
 
     assert_eq!(
         root_hash.expect("cannot get root hash").as_slice(),
@@ -3426,17 +3367,10 @@ fn test_dpns_query_start_after_with_null_id() {
         .unwrap()
         .expect("there is always a root hash");
 
-    let expected_app_hash = if drive.config.batching_enabled {
-        vec![
-            125, 196, 210, 13, 33, 174, 128, 205, 131, 6, 8, 101, 145, 27, 136, 16, 180, 99, 96,
-            137, 23, 80, 148, 125, 172, 67, 79, 207, 239, 123, 127, 208,
-        ]
-    } else {
-        vec![
-            129, 14, 2, 125, 180, 93, 191, 143, 255, 116, 8, 44, 77, 164, 244, 52, 227, 62, 99,
-            254, 206, 33, 205, 73, 224, 118, 162, 155, 213, 232, 46, 174,
-        ]
-    };
+    let expected_app_hash = vec![
+        129, 14, 2, 125, 180, 93, 191, 143, 255, 116, 8, 44, 77, 164, 244, 52, 227, 62, 99, 254,
+        206, 33, 205, 73, 224, 118, 162, 155, 213, 232, 46, 174,
+    ];
 
     assert_eq!(
         root_hash.expect("cannot get root hash").as_slice(),
@@ -3630,17 +3564,10 @@ fn test_dpns_query_start_after_with_null_id_desc() {
         .unwrap()
         .expect("there is always a root hash");
 
-    let expected_app_hash = if drive.config.batching_enabled {
-        vec![
-            125, 196, 210, 13, 33, 174, 128, 205, 131, 6, 8, 101, 145, 27, 136, 16, 180, 99, 96,
-            137, 23, 80, 148, 125, 172, 67, 79, 207, 239, 123, 127, 208,
-        ]
-    } else {
-        vec![
-            129, 14, 2, 125, 180, 93, 191, 143, 255, 116, 8, 44, 77, 164, 244, 52, 227, 62, 99,
-            254, 206, 33, 205, 73, 224, 118, 162, 155, 213, 232, 46, 174,
-        ]
-    };
+    let expected_app_hash = vec![
+        129, 14, 2, 125, 180, 93, 191, 143, 255, 116, 8, 44, 77, 164, 244, 52, 227, 62, 99, 254,
+        206, 33, 205, 73, 224, 118, 162, 155, 213, 232, 46, 174,
+    ];
 
     assert_eq!(
         root_hash.expect("cannot get root hash").as_slice(),
