@@ -63,7 +63,7 @@ impl FeePools {
     }
 
     pub fn get_genesis_time(
-        &self,
+        &mut self,
         drive: &Drive,
         transaction: TransactionArg,
     ) -> Result<i64, Error> {
@@ -87,6 +87,8 @@ impl FeePools {
                     "genesis time item have an invalid length",
                 ))
             })?);
+
+            self.genesis_time = Some(genesis_time);
 
             Ok(genesis_time)
         } else {
@@ -119,7 +121,7 @@ impl FeePools {
     }
 
     pub fn calculate_current_epoch_index(
-        &self,
+        &mut self,
         drive: &Drive,
         block_time: i64,
         previous_block_time: i64,
@@ -240,7 +242,7 @@ mod tests {
         #[test]
         fn test_error_if_fee_pools_is_not_initiated() {
             let drive = super::setup_drive();
-            let (transaction, fee_pools) = super::setup_fee_pools(
+            let (transaction, mut fee_pools) = super::setup_fee_pools(
                 &drive,
                 Some(super::SetupFeePoolsOptions {
                     init_fee_pools: false,
@@ -262,7 +264,7 @@ mod tests {
         #[test]
         fn test_error_if_value_has_invalid_length() {
             let drive = super::setup_drive();
-            let (transaction, fee_pools) = super::setup_fee_pools(&drive, None);
+            let (transaction, mut fee_pools) = super::setup_fee_pools(&drive, None);
 
             drive
                 .grove
@@ -328,6 +330,11 @@ mod tests {
             let stored_genesis_time = fee_pools
                 .get_genesis_time(&drive, Some(&transaction))
                 .expect("to get genesis time");
+
+            match fee_pools.genesis_time {
+                None => assert!(false, "genesis_time must be set to FeePools"),
+                Some(t) => assert_eq!(t, genesis_time),
+            }
 
             assert_eq!(stored_genesis_time, genesis_time);
         }

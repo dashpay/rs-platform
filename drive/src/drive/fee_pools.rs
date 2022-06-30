@@ -1,4 +1,5 @@
 use grovedb::TransactionArg;
+use std::borrow::BorrowMut;
 
 use crate::drive::Drive;
 use crate::error::Error;
@@ -29,17 +30,19 @@ impl Drive {
                 .update_genesis_time(&self, block_time, transaction)?;
         }
 
-        let fee_pools = self.fee_pools.borrow();
-
         let (current_epoch_index, is_epoch_change) = match previous_block_time {
-            Some(previous_block_time) => fee_pools.calculate_current_epoch_index(
-                &self,
-                block_time,
-                previous_block_time,
-                transaction,
-            )?,
+            Some(previous_block_time) => {
+                self.fee_pools.borrow_mut().calculate_current_epoch_index(
+                    &self,
+                    block_time,
+                    previous_block_time,
+                    transaction,
+                )?
+            }
             None => (0, true),
         };
+
+        let fee_pools = self.fee_pools.borrow();
 
         let current_epoch_pool = EpochPool::new(current_epoch_index, self);
 
@@ -103,11 +106,12 @@ mod tests {
         use crate::fee::pools::constants;
         use crate::fee::pools::epoch::epoch_pool::EpochPool;
         use chrono::{Duration, NaiveDateTime, TimeZone};
+        use std::borrow::BorrowMut;
 
         #[test]
         fn test_processing_of_the_first_block_then_new_epoch_and_one_more_block_after() {
             let drive = super::setup_drive();
-            let (transaction, fee_pools) = super::setup_fee_pools(&drive, None);
+            let (transaction, mut fee_pools) = super::setup_fee_pools(&drive, None);
 
             fee_pools
                 .init(&drive, Some(&transaction))
