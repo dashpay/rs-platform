@@ -3,9 +3,12 @@ use crate::fee::pools::epoch::epoch_pool::EpochPool;
 use std::collections::BTreeMap;
 
 use ciborium::value::Value;
+use dpp::{
+    identifier::Identifier,
+    identity::{Identity, IdentityPublicKey, KeyType},
+};
 use grovedb::TransactionArg;
 
-use crate::identity::IdentityKey;
 use crate::{
     contract::document::Document,
     contract::Contract,
@@ -15,7 +18,6 @@ use crate::{
         Drive,
     },
     fee::pools::constants,
-    identity::Identity,
 };
 
 pub fn create_mn_shares_contract(drive: &Drive) -> Contract {
@@ -41,26 +43,27 @@ pub fn create_mn_shares_contract(drive: &Drive) -> Contract {
 }
 
 fn create_identity(drive: &Drive, id: [u8; 32], transaction: TransactionArg) -> Identity {
-    let mut identity = Identity {
-        id,
+    let identity_key = IdentityPublicKey {
+        id: 1,
+        key_type: KeyType::ECDSA_SECP256K1,
+        data: vec![0, 1, 2, 3],
+        purpose: dpp::identity::Purpose::AUTHENTICATION,
+        security_level: dpp::identity::SecurityLevel::MASTER,
+        read_only: false,
+    };
+
+    let identity = Identity {
+        id: Identifier::new(id),
         revision: 1,
         balance: 0,
-        keys: BTreeMap::new(),
+        protocol_version: 0,
+        public_keys: vec![identity_key],
+        asset_lock_proof: None,
+        metadata: None,
     };
-
-    let identity_key = IdentityKey {
-        id: 1,
-        key_type: 0,
-        public_key_bytes: vec![0, 1, 2, 3],
-        purpose: 0,
-        security_level: 0,
-        readonly: false,
-    };
-
-    identity.keys.insert(1, identity_key);
 
     drive
-        .insert_identity_cbor(Some(&identity.id), identity.to_cbor(), true, transaction)
+        .insert_identity(identity.clone(), true, transaction)
         .expect("to insert identity");
 
     identity
@@ -79,14 +82,14 @@ fn create_mn_share_document(
 
     properties.insert(
         String::from("payToId"),
-        Value::Bytes(pay_to_identity.id.to_vec()),
+        Value::Bytes(pay_to_identity.id.buffer.to_vec()),
     );
     properties.insert(String::from("percentage"), percentage.into());
 
     let document = Document {
         id,
         properties,
-        owner_id: identity.id,
+        owner_id: identity.id.buffer,
     };
 
     let document_type = contract

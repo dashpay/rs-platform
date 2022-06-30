@@ -2,6 +2,7 @@ mod converter;
 
 use std::{option::Option::None, path::Path, sync::mpsc, thread};
 
+use dpp::identity::Identity;
 use grovedb::{Transaction, TransactionArg};
 use neon::prelude::*;
 use neon::types::JsDate;
@@ -543,11 +544,13 @@ impl DriveWrapper {
         let apply = js_apply.value(&mut cx);
         let using_transaction = js_using_transaction.value(&mut cx);
 
+        let identity =
+            Identity::from_buffer(identity_cbor).or_else(|e| cx.throw_error(e.to_string()))?;
+
         drive
             .send_to_drive_thread(move |drive: &Drive, transaction, channel| {
-                let result = drive.insert_identity_cbor(
-                    Some(&identity_id),
-                    identity_cbor,
+                let result = drive.insert_identity(
+                    identity,
                     apply,
                     using_transaction.then(|| transaction).flatten(),
                 );

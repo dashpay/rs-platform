@@ -163,9 +163,9 @@ impl FeePools {
         transaction: TransactionArg,
     ) -> Result<(), Error> {
         // Convert to integer, since identity balance is u64
-        let reward: u64 = reward.try_into().map_err(|_| {
+        let reward: i64 = reward.try_into().map_err(|_| {
             Error::Fee(FeeError::DecimalConversion(
-                "can't convert reward to u64 from Decimal",
+                "can't convert reward to i64 from Decimal",
             ))
         })?;
 
@@ -175,7 +175,7 @@ impl FeePools {
 
         identity.balance += reward;
 
-        drive.insert_identity_cbor(Some(id), identity.to_cbor(), true, transaction)?;
+        drive.insert_identity(identity, true, transaction)?;
 
         Ok(())
     }
