@@ -491,7 +491,91 @@ mod tests {
 
         #[test]
         fn test_partial_distribution() {
-            todo!()
+            let drive = super::setup_drive();
+            let (transaction, fee_pools) = super::setup_fee_pools(&drive, None);
+
+            let unpaid_epoch_pool = super::EpochPool::new(0, &drive);
+            let next_epoch_pool = super::EpochPool::new(1, &drive);
+
+            drive
+                .start_current_batch()
+                .expect("should start current batch");
+
+            unpaid_epoch_pool
+                .init_current(1, 1, 1)
+                .expect("should create proposers tree");
+
+            // emulating epoch change
+            next_epoch_pool
+                .init_current(1, 11, 10)
+                .expect("to init current for next epoch");
+
+            drive
+                .apply_current_batch(true, Some(&transaction))
+                .expect("should apply batch");
+
+            drive
+                .start_current_batch()
+                .expect("should start current batch");
+
+            fee_pools
+                .distribute_fees_into_pools(
+                    &drive,
+                    &unpaid_epoch_pool,
+                    10000,
+                    10000,
+                    Some(&transaction),
+                )
+                .expect("distribute fees into epoch pool");
+
+            let pro_tx_hashes =
+                super::populate_proposers(&unpaid_epoch_pool, 60, Some(&transaction));
+
+            let contract = create_mn_shares_contract(&drive);
+
+            let _ = setup_identities_with_share_documents(
+                &drive,
+                &contract,
+                &pro_tx_hashes,
+                Some(&transaction),
+            );
+
+            // Create masternode reward shares contract
+            super::create_mn_shares_contract(&drive);
+
+            drive
+                .apply_current_batch(true, Some(&transaction))
+                .expect("should apply batch");
+
+            drive
+                .start_current_batch()
+                .expect("should start current batch");
+
+            let proposers_paid = fee_pools
+                .distribute_fees_from_unpaid_pools_to_proposers(&drive, 1, Some(&transaction))
+                .expect("should distribute fees");
+
+            drive
+                .apply_current_batch(true, Some(&transaction))
+                .expect("should apply batch");
+
+            assert_eq!(proposers_paid, 50);
+
+            // check we've removed proposers tree
+            match drive
+                .grove
+                .get(
+                    unpaid_epoch_pool.get_path(),
+                    constants::KEY_PROPOSERS.as_bytes(),
+                    Some(&transaction),
+                )
+                .unwrap()
+            {
+                Ok(_) => assert!(true),
+                Err(e) => match e {
+                    _ => assert!(false, "should be able to get proposers tree"),
+                },
+            }
         }
 
         #[test]
