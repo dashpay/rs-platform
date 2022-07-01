@@ -5,6 +5,7 @@ use crate::error::Error;
 use crate::fee::op::{BaseOp, DriveCost, DriveOperation};
 
 pub mod default_costs;
+pub mod epoch;
 pub mod op;
 pub(crate) mod pools;
 

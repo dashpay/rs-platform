@@ -11,25 +11,22 @@ use object_size_info::DocumentInfo::DocumentSize;
 use crate::contract::Contract;
 use crate::drive::config::DriveConfig;
 use crate::error::Error;
+use crate::fee::epoch::EpochInfo;
 use crate::fee::op::DriveOperation;
 use crate::fee::op::DriveOperation::GroveOperation;
 use crate::fee::pools::fee_pools::FeePools;
 
+pub mod abci;
+pub mod block;
 pub mod config;
 pub mod contract;
 pub mod defaults;
 pub mod document;
-pub mod fee_pools;
 pub mod flags;
 mod grove_operations;
 pub mod identity;
 pub mod object_size_info;
 pub mod query;
-
-// TODO: Use FeePools instead
-pub struct EpochInfo {
-    current_epoch: u16,
-}
 
 pub struct Drive {
     pub grove: GroveDb,
@@ -91,7 +88,7 @@ impl Drive {
                 grove,
                 config: DriveConfig::default(),
                 cached_contracts: RefCell::new(Cache::new(200)),
-                epoch_info: RefCell::new(EpochInfo { current_epoch: 0 }),
+                epoch_info: RefCell::new(EpochInfo::default()),
                 fee_pools: RefCell::new(FeePools::new()),
                 current_batch: RefCell::new(Vec::new()),
             }),

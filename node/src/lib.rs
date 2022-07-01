@@ -6,6 +6,10 @@ use dpp::identity::Identity;
 use grovedb::{Transaction, TransactionArg};
 use neon::prelude::*;
 use neon::types::JsDate;
+use rs_drive::drive::abci::handlers;
+use rs_drive::drive::abci::messages::{
+    BlockBeginRequest, BlockEndRequest, InitChainRequest, Serializable,
+};
 use rs_drive::drive::Drive;
 
 const READONLY_MSG: &str =
@@ -1381,23 +1385,38 @@ impl DriveWrapper {
         Ok(cx.undefined())
     }
 
-    fn js_fee_pools_init(mut cx: FunctionContext) -> JsResult<JsUndefined> {
-        let js_callback = cx.argument::<JsFunction>(0)?.root(&mut cx);
+    fn js_abci_init_chain(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+        let js_request = cx.argument::<JsBuffer>(0)?;
+        let js_using_transaction = cx.argument::<JsBoolean>(1)?;
+        let js_callback = cx.argument::<JsFunction>(2)?.root(&mut cx);
 
         let db = cx
             .this()
             .downcast_or_throw::<JsBox<DriveWrapper>, _>(&mut cx)?;
 
+        let request_bytes = converter::js_buffer_to_vec_u8(js_request, &mut cx);
+        let using_transaction = js_using_transaction.value(&mut cx);
+
         db.send_to_drive_thread(move |drive: &Drive, transaction, channel| {
-            let result = drive.init_fee_pools(transaction);
+            let result = InitChainRequest::from_bytes(&request_bytes)
+                .and_then(|request| {
+                    handlers::init_chain(
+                        &drive,
+                        request,
+                        using_transaction.then(|| transaction).flatten(),
+                    )
+                })
+                .and_then(|response| response.to_bytes());
 
             channel.send(move |mut task_context| {
                 let callback = js_callback.into_inner(&mut task_context);
                 let this = task_context.undefined();
 
                 let callback_arguments: Vec<Handle<JsValue>> = match result {
-                    Ok(()) => {
-                        vec![task_context.null().upcast()]
+                    Ok(response_bytes) => {
+                        let value = JsBuffer::external(&mut task_context, response_bytes);
+
+                        vec![task_context.null().upcast(), value.upcast()]
                     }
 
                     // Convert the error to a JavaScript exception on failure
@@ -1415,57 +1434,87 @@ impl DriveWrapper {
         Ok(cx.undefined())
     }
 
-    fn js_fee_pools_process_block(mut cx: FunctionContext) -> JsResult<JsUndefined> {
-        let js_block_height = cx.argument::<JsNumber>(0)?;
-        let js_block_time = cx.argument::<JsNumber>(1)?;
-        let js_previous_block_time = cx.argument::<JsNumber>(2)?;
-        let js_proposer_tx_hash = cx.argument::<JsBuffer>(3)?;
-        let js_processing_fees = cx.argument::<JsNumber>(4)?;
-        let js_storage_fees = cx.argument::<JsNumber>(5)?;
-        let js_fee_multiplier = cx.argument::<JsNumber>(6)?;
-
-        let block_height = js_block_height.value(&mut cx) as u64;
-        let block_time = js_block_time.value(&mut cx) as i64;
-        let previous_block_time = js_previous_block_time.value(&mut cx) as i64;
-        let proposer_pro_tx_hash: [u8; 32] =
-            converter::js_buffer_to_vec_u8(js_proposer_tx_hash, &mut cx)
-                .try_into()
-                .or_else(|_| cx.throw_error("proposer_pro_tx_hash has invalid length"))?;
-        let processing_fees = js_processing_fees.value(&mut cx) as u64;
-        let storage_fees = js_storage_fees.value(&mut cx) as i64;
-        let fee_multiplier = js_fee_multiplier.value(&mut cx) as u64;
-
-        let js_callback = cx.argument::<JsFunction>(7)?.root(&mut cx);
+    fn js_abci_block_begin(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+        let js_request = cx.argument::<JsBuffer>(0)?;
+        let js_using_transaction = cx.argument::<JsBoolean>(1)?;
+        let js_callback = cx.argument::<JsFunction>(2)?.root(&mut cx);
 
         let db = cx
             .this()
             .downcast_or_throw::<JsBox<DriveWrapper>, _>(&mut cx)?;
 
-        db.send_to_drive_thread(move |drive: &Drive, transaction, channel| {
-            let previous_block_time = if previous_block_time == 0 {
-                None
-            } else {
-                Some(previous_block_time)
-            };
+        let request_bytes = converter::js_buffer_to_vec_u8(js_request, &mut cx);
+        let using_transaction = js_using_transaction.value(&mut cx);
 
-            let result = drive.process_block(
-                block_height,
-                block_time,
-                previous_block_time,
-                proposer_pro_tx_hash,
-                processing_fees,
-                storage_fees,
-                fee_multiplier,
-                transaction,
-            );
+        db.send_to_drive_thread(move |drive: &Drive, transaction, channel| {
+            let result = BlockBeginRequest::from_bytes(&request_bytes)
+                .and_then(|request| {
+                    handlers::block_begin(
+                        &drive,
+                        request,
+                        using_transaction.then(|| transaction).flatten(),
+                    )
+                })
+                .and_then(|response| response.to_bytes());
 
             channel.send(move |mut task_context| {
                 let callback = js_callback.into_inner(&mut task_context);
                 let this = task_context.undefined();
 
                 let callback_arguments: Vec<Handle<JsValue>> = match result {
-                    Ok(()) => {
-                        vec![task_context.null().upcast()]
+                    Ok(response_bytes) => {
+                        let value = JsBuffer::external(&mut task_context, response_bytes);
+
+                        vec![task_context.null().upcast(), value.upcast()]
+                    }
+
+                    // Convert the error to a JavaScript exception on failure
+                    Err(err) => vec![task_context.error(err.to_string())?.upcast()],
+                };
+
+                callback.call(&mut task_context, this, callback_arguments)?;
+
+                Ok(())
+            });
+        })
+        .or_else(|err| cx.throw_error(err.to_string()))?;
+
+        // The result is returned through the callback, not through direct return
+        Ok(cx.undefined())
+    }
+
+    fn js_abci_block_end(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+        let js_request = cx.argument::<JsBuffer>(0)?;
+        let js_using_transaction = cx.argument::<JsBoolean>(1)?;
+        let js_callback = cx.argument::<JsFunction>(2)?.root(&mut cx);
+
+        let db = cx
+            .this()
+            .downcast_or_throw::<JsBox<DriveWrapper>, _>(&mut cx)?;
+
+        let request_bytes = converter::js_buffer_to_vec_u8(js_request, &mut cx);
+        let using_transaction = js_using_transaction.value(&mut cx);
+
+        db.send_to_drive_thread(move |drive: &Drive, transaction, channel| {
+            let result = BlockEndRequest::from_bytes(&request_bytes)
+                .and_then(|request| {
+                    handlers::block_end(
+                        &drive,
+                        request,
+                        using_transaction.then(|| transaction).flatten(),
+                    )
+                })
+                .and_then(|response| response.to_bytes());
+
+            channel.send(move |mut task_context| {
+                let callback = js_callback.into_inner(&mut task_context);
+                let this = task_context.undefined();
+
+                let callback_arguments: Vec<Handle<JsValue>> = match result {
+                    Ok(response_bytes) => {
+                        let value = JsBuffer::external(&mut task_context, response_bytes);
+
+                        vec![task_context.null().upcast(), value.upcast()]
                     }
 
                     // Convert the error to a JavaScript exception on failure
@@ -1542,11 +1591,9 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("groveDbProveQuery", DriveWrapper::js_grove_db_prove_query)?;
     cx.export_function("groveDbRootHash", DriveWrapper::js_grove_db_root_hash)?;
 
-    cx.export_function("driveInitFeePools", DriveWrapper::js_fee_pools_init)?;
-    cx.export_function(
-        "driveFeePoolsProcessBlock",
-        DriveWrapper::js_fee_pools_process_block,
-    )?;
+    cx.export_function("abciInitChain", DriveWrapper::js_abci_init_chain)?;
+    cx.export_function("abciBlockBegin", DriveWrapper::js_abci_block_begin)?;
+    cx.export_function("abciBlockEnd", DriveWrapper::js_abci_block_end)?;
 
     Ok(())
 }

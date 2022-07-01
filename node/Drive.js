@@ -214,48 +214,69 @@ class Drive {
       useTransaction,
     );
   }
-
-  /**
-   * Initialize fee pools
-   *
-   * @returns {Promise<void>}
-   */
-  async initFeePools() {
-    return driveInitFeePoolsAsync.call(this.drive);
-  }
-
-  /**
-   * @param {number} blockHeight
-   * @param {number} blockTime
-   * @param {number} previousBlockTime
-   * @param {Buffer} proposerTxHash
-   * @param {number} processingFees
-   * @param {number} storageFees
-   * @param {number} feeMultiplier
-   *
-   * @returns {Promise<void>}
-   */
-  async feePoolsProcessBlock(
-    blockHeight,
-    blockTime,
-    previousBlockTime,
-    proposerTxHash,
-    processingFees,
-    storageFees,
-    feeMultiplier,
-  ) {
-    return driveFeePoolsProcessBlockAsync.call(
-      this.drive,
-      blockHeight,
-      blockTime,
-      previousBlockTime,
-      proposerTxHash,
-      processingFees,
-      storageFees,
-      feeMultiplier,
-    );
-  }
 }
+
+Drive.prototype.abci = {
+  /**
+   * ABCI init chain
+   *
+   * @param {InitChainRequest} request
+   * @param {boolean} [useTransaction=false]
+   *
+   * @returns {Promise<InitChainResponse>}
+   */
+  async initChain(request, useTransaction = false) {
+    const requestBytes = cbor.encode(request);
+
+    const responseBytes = await abciInitChainAsync.call(
+      this.drive,
+      requestBytes,
+      useTransaction,
+    );
+
+    return cbor.decode(responseBytes);
+  },
+
+  /**
+   * ABCI init chain
+   *
+   * @param {BlockBeginRequest} request
+   * @param {boolean} [useTransaction=false]
+   *
+   * @returns {Promise<BlockBeginResponse>}
+   */
+  async blockBegin(request, useTransaction = false) {
+    const requestBytes = cbor.encode(request);
+
+    const responseBytes = await abciBlockBeginAsync.call(
+      this.drive,
+      requestBytes,
+      useTransaction,
+    );
+
+    return cbor.decode(responseBytes);
+  },
+
+  /**
+   * ABCI init chain
+   *
+   * @param {BlockEndRequest} request
+   * @param {boolean} [useTransaction=false]
+   *
+   * @returns {Promise<BlockEndResponse>}
+   */
+  async blockEnd(request, useTransaction = false) {
+    const requestBytes = cbor.encode(request);
+
+    const responseBytes = await abciBlockEndAsync.call(
+      this.drive,
+      requestBytes,
+      useTransaction,
+    );
+
+    return cbor.decode(responseBytes);
+  },
+};
 
 /**
  * @typedef Element

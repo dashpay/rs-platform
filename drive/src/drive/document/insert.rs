@@ -246,7 +246,7 @@ impl Drive {
 
         let document = Document::from_cbor(serialized_document, None, owner_id)?;
 
-        let epoch = self.epoch_info.borrow().current_epoch;
+        let epoch = self.epoch_info.borrow().current_epoch_index;
 
         let storage_flags = StorageFlags { epoch };
 
@@ -282,7 +282,7 @@ impl Drive {
     ) -> Result<(i64, u64), Error> {
         let document = Document::from_cbor(serialized_document, None, owner_id)?;
 
-        let epoch = self.epoch_info.borrow().current_epoch;
+        let epoch = self.epoch_info.borrow().current_epoch_index;
 
         let storage_flags = StorageFlags { epoch };
 

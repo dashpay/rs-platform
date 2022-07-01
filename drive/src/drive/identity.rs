@@ -19,7 +19,7 @@ impl Drive {
         identity: Identity,
         drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<(), Error> {
-        let epoch = self.epoch_info.borrow().current_epoch;
+        let epoch = self.epoch_info.borrow().current_epoch_index;
 
         let storage_flags = StorageFlags { epoch };
 

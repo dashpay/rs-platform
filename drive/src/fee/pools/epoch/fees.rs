@@ -142,12 +142,7 @@ impl<'e> EpochPool<'e> {
 
         let processing_fee = self.get_processing_fee(transaction)?;
 
-        let processing_fee =
-            Decimal::from_str(processing_fee.to_string().as_str()).map_err(|_| {
-                Error::Fee(FeeError::DecimalConversion(
-                    "can't convert processing_fee to Decimal",
-                ))
-            })?;
+        let processing_fee = Decimal::from(processing_fee);
 
         Ok(storage_fee + processing_fee)
     }
@@ -398,8 +393,7 @@ mod tests {
             .get_total_fees(Some(&transaction))
             .expect("should get combined fee");
 
-        let processing_fee = Decimal::from_str(processing_fee.to_string().as_str())
-            .expect("should create a decimal version of fee");
+        let processing_fee = Decimal::from(processing_fee);
 
         assert_eq!(combined_fee, processing_fee + storage_fee);
     }

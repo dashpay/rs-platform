@@ -339,7 +339,7 @@ impl Drive {
         // first we need to deserialize the contract
         let contract = Contract::from_cbor(&contract_cbor, contract_id)?;
 
-        let epoch = self.epoch_info.borrow().current_epoch;
+        let epoch = self.epoch_info.borrow().current_epoch_index;
 
         self.apply_contract(
             &contract,

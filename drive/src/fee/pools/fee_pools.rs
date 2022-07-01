@@ -1,12 +1,11 @@
 use grovedb::{Element, TransactionArg};
 use rust_decimal::Decimal;
-use rust_decimal_macros::dec;
 
+use crate::drive::block::BlockInfo;
 use crate::drive::object_size_info::{KeyInfo, PathKeyElementInfo};
 use crate::drive::{Drive, RootTree};
 use crate::error::fee::FeeError;
 use crate::error::Error;
-use crate::fee::op::DriveOperation;
 use crate::fee::pools::storage_fee_distribution_pool::StorageFeeDistributionPool;
 
 use super::constants;
@@ -102,42 +101,6 @@ impl FeePools {
         Ok(())
     }
 
-    pub fn calculate_current_epoch_index(
-        &mut self,
-        drive: &Drive,
-        block_time: i64,
-        previous_block_time: Option<i64>,
-        transaction: TransactionArg,
-    ) -> Result<(u16, bool), Error> {
-        let previous_block_time = match previous_block_time {
-            Some(block_time) => block_time,
-            None => return Ok((0, true)),
-        };
-
-        let genesis_time = self.get_genesis_time(drive, transaction)?;
-
-        let epoch_change_time = Decimal::from(constants::EPOCH_CHANGE_TIME);
-        let block_time = Decimal::from(block_time);
-        let genesis_time = Decimal::from(genesis_time);
-        let previous_block_time = Decimal::from(previous_block_time);
-
-        let prev_epoch_index = (previous_block_time - genesis_time) / epoch_change_time;
-        let prev_epoch_index_floored = prev_epoch_index.floor();
-
-        let epoch_index = (block_time - genesis_time) / epoch_change_time;
-        let epoch_index_floored = epoch_index.floor();
-
-        let is_epoch_change = epoch_index_floored > prev_epoch_index_floored;
-
-        let epoch_index: u16 = epoch_index_floored.try_into().map_err(|_| {
-            Error::Fee(FeeError::DecimalConversion(
-                "can't convert reward to u16 from Decimal",
-            ))
-        })?;
-
-        Ok((epoch_index, is_epoch_change))
-    }
-
     pub fn shift_current_epoch_pool(
         &self,
         drive: &Drive,
@@ -152,6 +115,64 @@ impl FeePools {
 
         // init first_proposer_block_height and processing_fee for an epoch
         current_epoch_pool.init_current(multiplier, start_block_height, start_block_time)?;
+
+        Ok(())
+    }
+
+    pub fn process_block_fees(
+        &self,
+        drive: &Drive,
+        block_info: &BlockInfo,
+        processing_fees: u64,
+        storage_fees: i64,
+        transaction: TransactionArg,
+    ) -> Result<(), Error> {
+        let epoch_info = drive.epoch_info.borrow();
+
+        let current_epoch_pool = EpochPool::new(epoch_info.current_epoch_index, drive);
+
+        if epoch_info.is_epoch_change {
+            // make next epoch pool as a current
+            // and create one more in future
+            self.shift_current_epoch_pool(
+                drive,
+                &current_epoch_pool,
+                block_info.block_height,
+                block_info.block_time,
+                block_info.fee_multiplier,
+            )?;
+
+            // distribute accumulated previous epoch storage fees
+            if current_epoch_pool.index > 0 {
+                self.storage_fee_distribution_pool.distribute(
+                    drive,
+                    current_epoch_pool.index - 1,
+                    transaction,
+                )?;
+            }
+
+            // We need to apply new epoch tree structure and distributed storage fee
+            drive.apply_current_batch(false, transaction)?;
+
+            drive.start_current_batch()?;
+        }
+
+        self.distribute_fees_into_pools(
+            drive,
+            &current_epoch_pool,
+            processing_fees,
+            storage_fees,
+            transaction,
+        )?;
+
+        current_epoch_pool
+            .increment_proposer_block_count(&block_info.proposer_pro_tx_hash, transaction)?;
+
+        self.distribute_fees_from_unpaid_pools_to_proposers(
+            drive,
+            epoch_info.current_epoch_index,
+            transaction,
+        )?;
 
         Ok(())
     }
@@ -331,108 +352,6 @@ mod tests {
         }
     }
 
-    mod calculate_current_epoch_index {
-        use crate::fee::op::DriveOperation;
-
-        #[test]
-        fn test_epoch_change_to_0_epoch() {
-            let drive = super::setup_drive();
-            let (transaction, mut fee_pools) = super::setup_fee_pools(&drive, None);
-
-            let genesis_time: i64 = 1655396517902;
-            let block_time: i64 = 1655396517922;
-
-            // Set genesis time
-            drive
-                .start_current_batch()
-                .expect("should start current batch");
-
-            fee_pools
-                .update_genesis_time(&drive, genesis_time)
-                .expect("should update genesis time");
-
-            drive
-                .apply_current_batch(true, Some(&transaction))
-                .expect("should apply batch");
-
-            let (epoch_index, is_epoch_change) = fee_pools
-                .calculate_current_epoch_index(&drive, block_time, None, Some(&transaction))
-                .expect("should get current epoch index");
-
-            assert_eq!(epoch_index, 0);
-            assert_eq!(is_epoch_change, true);
-        }
-
-        #[test]
-        fn test_no_epoch_change() {
-            let drive = super::setup_drive();
-            let (transaction, mut fee_pools) = super::setup_fee_pools(&drive, None);
-
-            let genesis_time: i64 = 1655396517902;
-            let block_time: i64 = 1655396517922;
-            let prev_block_time: i64 = 1655396517912;
-
-            // Set genesis time
-            drive
-                .start_current_batch()
-                .expect("should start current batch");
-
-            fee_pools
-                .update_genesis_time(&drive, genesis_time)
-                .expect("should update genesis time");
-
-            drive
-                .apply_current_batch(true, Some(&transaction))
-                .expect("should apply batch");
-
-            let (epoch_index, is_epoch_change) = fee_pools
-                .calculate_current_epoch_index(
-                    &drive,
-                    block_time,
-                    Some(prev_block_time),
-                    Some(&transaction),
-                )
-                .expect("should get current epoch index");
-
-            assert_eq!(epoch_index, 0);
-            assert_eq!(is_epoch_change, false);
-        }
-
-        #[test]
-        fn test_epoch_change_to_epoch_1() {
-            let drive = super::setup_drive();
-            let (transaction, mut fee_pools) = super::setup_fee_pools(&drive, None);
-
-            let genesis_time: i64 = 1655396517902;
-            let prev_block_time: i64 = 1655396517912;
-            let block_time: i64 = 1657125244561;
-
-            drive
-                .start_current_batch()
-                .expect("should start current batch");
-
-            fee_pools
-                .update_genesis_time(&drive, genesis_time)
-                .expect("should update genesis time");
-
-            drive
-                .apply_current_batch(true, Some(&transaction))
-                .expect("should apply batch");
-
-            let (epoch_index, is_epoch_change) = fee_pools
-                .calculate_current_epoch_index(
-                    &drive,
-                    block_time,
-                    Some(prev_block_time),
-                    Some(&transaction),
-                )
-                .expect("should get current epoch index");
-
-            assert_eq!(epoch_index, 1);
-            assert_eq!(is_epoch_change, true);
-        }
-    }
-
     mod shift_current_epoch_pool {
         use rust_decimal_macros::dec;
 
@@ -492,6 +411,129 @@ mod tests {
                 .expect("should get fee multiplier");
 
             assert_eq!(stored_multiplier, multiplier);
+        }
+    }
+
+    use crate::drive::{
+        object_size_info::{DocumentAndContractInfo, DocumentInfo::DocumentAndSerialization},
+        Drive,
+    };
+    use crate::fee::pools::tests::helpers::fee_pools::create_mn_shares_contract;
+    use chrono::Utc;
+
+    mod process_block_fees {
+        use crate::drive::block::BlockInfo;
+        use crate::fee::epoch;
+        use crate::fee::pools::epoch::epoch_pool::EpochPool;
+        use chrono::Duration;
+
+        #[test]
+        fn test_processing_of_the_first_block_then_new_epoch_and_one_more_block_after() {
+            let drive = super::setup_drive();
+            let (transaction, mut fee_pools) = super::setup_fee_pools(&drive, None);
+
+            fee_pools.init(&drive).expect("should init fee pools");
+
+            super::create_mn_shares_contract(&drive);
+
+            /*
+
+            Block 1. Epoch 0.
+
+             */
+
+            let block_time = super::Utc::now();
+
+            let processing_fees = 100;
+            let storage_fees = 2000;
+
+            let block_1_info = BlockInfo {
+                block_height: 1,
+                block_time: block_time.timestamp_millis(),
+                previous_block_time: None,
+                proposer_pro_tx_hash: [
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0,
+                ],
+                fee_multiplier: 2,
+            };
+
+            fee_pools
+                .process_block_fees(
+                    &drive,
+                    &block_1_info,
+                    processing_fees,
+                    storage_fees,
+                    Some(&transaction),
+                )
+                .expect("should process block 1");
+
+            // Genesis time must be set
+            let stored_genesis_time = fee_pools
+                .get_genesis_time(&drive, Some(&transaction))
+                .expect("should get genesis time");
+
+            assert_eq!(stored_genesis_time, block_1_info.block_time);
+
+            // Fees must be distributed
+
+            let stored_storage_fees = fee_pools
+                .storage_fee_distribution_pool
+                .value(&drive, Some(&transaction))
+                .expect("should get storage fees");
+
+            assert_eq!(stored_storage_fees, storage_fees);
+
+            let epoch_pool_0 = EpochPool::new(0, &drive);
+
+            let stored_processing_fees = epoch_pool_0
+                .get_processing_fee(Some(&transaction))
+                .expect("should get processing fees");
+
+            assert_eq!(stored_processing_fees, processing_fees);
+
+            // Proposer must be added
+
+            let stored_proposer_block_count = epoch_pool_0
+                .get_proposer_block_count(&block_1_info.proposer_pro_tx_hash, Some(&transaction))
+                .expect("should get proposer block count");
+
+            assert_eq!(stored_proposer_block_count, 1);
+
+            /*
+
+            Block 2. Epoch 1
+
+             */
+
+            let block_time = block_time + Duration::milliseconds(epoch::EPOCH_CHANGE_TIME + 1);
+
+            let processing_fees = 100;
+            let storage_fees = 2000;
+
+            let block_2_info = BlockInfo {
+                block_height: 2,
+                block_time: block_time.timestamp_millis(),
+                previous_block_time: Some(block_1_info.block_time),
+                proposer_pro_tx_hash: block_1_info.proposer_pro_tx_hash,
+                fee_multiplier: 2,
+            };
+
+            fee_pools
+                .process_block_fees(
+                    &drive,
+                    &block_2_info,
+                    processing_fees,
+                    storage_fees,
+                    Some(&transaction),
+                )
+                .expect("should process block 2");
+
+            /*
+
+            Block 3. Epoch 1
+
+            */
         }
     }
 }
