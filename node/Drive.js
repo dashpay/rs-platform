@@ -209,7 +209,6 @@ class Drive {
   async insertIdentity(identity, useTransaction = false, dryRun = false) {
     return driveInsertIdentityAsync.call(
       this.drive,
-      identity.id.toBuffer(),
       identity.toBuffer(),
       !dryRun,
       useTransaction,

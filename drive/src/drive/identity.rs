@@ -2,6 +2,7 @@ use dpp::identity::Identity;
 use grovedb::{Element, TransactionArg};
 
 use crate::drive::flags::StorageFlags;
+use crate::drive::object_size_info::KeyInfo;
 use crate::drive::object_size_info::PathKeyElementInfo::PathFixedSizeKeyElement;
 use crate::drive::{Drive, RootTree};
 use crate::error::drive::DriveError;
@@ -9,6 +10,8 @@ use crate::error::identity::IdentityError;
 use crate::error::Error;
 use crate::fee::calculate_fee;
 use crate::fee::op::DriveOperation;
+
+const IDENTITY_KEY: [u8; 1] = [0];
 
 impl Drive {
     pub fn insert_identity_operations(
@@ -26,10 +29,19 @@ impl Drive {
             ))
         })?;
 
+        let identities_tree_key = Into::<&[u8; 1]>::into(RootTree::Identities).as_slice();
+
+        self.batch_insert_empty_tree(
+            [identities_tree_key],
+            KeyInfo::KeyRef(&identity.id.buffer),
+            Some(&storage_flags),
+            drive_operations,
+        )?;
+
         self.batch_insert(
             PathFixedSizeKeyElement((
-                [Into::<&[u8; 1]>::into(RootTree::Identities).as_slice()],
-                &identity.id.buffer,
+                [identities_tree_key, &identity.id.buffer],
+                &IDENTITY_KEY,
                 Element::Item(identity_bytes, storage_flags.to_element_flags()),
             )),
             drive_operations,
@@ -61,8 +73,8 @@ impl Drive {
         let element = self
             .grove
             .get(
-                [Into::<&[u8; 1]>::into(RootTree::Identities).as_slice()],
-                id,
+                [Into::<&[u8; 1]>::into(RootTree::Identities).as_slice(), id],
+                &IDENTITY_KEY,
                 transaction,
             )
             .unwrap()
@@ -111,11 +123,11 @@ mod tests {
 
         let fetched_identity = drive
             .fetch_identity(&identity.id.buffer, Some(&transaction))
-            .expect("to fetch an identity");
+            .expect("should fetch an identity");
 
         assert_eq!(
-            fetched_identity.to_buffer().expect("to serialize"),
-            identity.to_buffer().expect("to serialize")
+            fetched_identity.to_buffer().expect("should serialize"),
+            identity.to_buffer().expect("should serialize")
         );
     }
 }
