@@ -430,99 +430,126 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_update_and_value() {
-        todo!("split into multiple test for each function and case");
+    mod update {
+        #[test]
+        fn test_error_if_pool_is_not_initiated() {
+            let drive = super::setup_drive();
+            let (transaction, fee_pools) = super::setup_fee_pools(
+                &drive,
+                Some(super::SetupFeePoolsOptions {
+                    init_fee_pools: false,
+                }),
+            );
 
-        let drive = setup_drive();
-        let (transaction, fee_pools) = setup_fee_pools(
-            &drive,
-            Some(SetupFeePoolsOptions {
-                init_fee_pools: false,
-            }),
-        );
+            let storage_fee = 42;
 
-        let storage_fee = 42;
+            fee_pools
+                .storage_fee_distribution_pool
+                .update(&drive, storage_fee)
+                .expect("should update storage fee distribution pool");
 
-        match fee_pools
-            .storage_fee_distribution_pool
-            .value(&drive, Some(&transaction))
-        {
-            Ok(_) => assert!(
-                false,
-                "should not be able to get genesis time on uninit fee pools"
-            ),
-            Err(e) => match e {
-                error::Error::GroveDB(grovedb::Error::PathNotFound(_)) => assert!(true),
-                _ => assert!(false, "invalid error type"),
-            },
+            match drive.apply_current_batch(true, Some(&transaction)) {
+                Ok(_) => assert!(
+                    false,
+                    "should not be able to update genesis time on uninit fee pools"
+                ),
+                Err(e) => match e {
+                    super::error::Error::GroveDB(grovedb::Error::InvalidPath(_)) => assert!(true),
+                    _ => assert!(false, "invalid error type"),
+                },
+            }
         }
 
-        fee_pools
-            .storage_fee_distribution_pool
-            .update(&drive, storage_fee)
-            .expect("should update storage fee distribution pool");
+        #[test]
+        fn test_update_and_get_value() {
+            let drive = super::setup_drive();
+            let (transaction, fee_pools) = super::setup_fee_pools(&drive, None);
 
-        match drive.apply_current_batch(true, Some(&transaction)) {
-            Ok(_) => assert!(
-                false,
-                "should not be able to update genesis time on uninit fee pools"
-            ),
-            Err(e) => match e {
-                error::Error::GroveDB(grovedb::Error::InvalidPath(_)) => assert!(true),
-                _ => assert!(false, "invalid error type"),
-            },
+            drive
+                .start_current_batch()
+                .expect("should start current batch");
+
+            let storage_fee = 42;
+
+            fee_pools
+                .storage_fee_distribution_pool
+                .update(&drive, storage_fee)
+                .expect("should update storage fee pool");
+
+            drive
+                .apply_current_batch(true, Some(&transaction))
+                .expect("should apply batch");
+
+            let stored_storage_fee = fee_pools
+                .storage_fee_distribution_pool
+                .value(&drive, Some(&transaction))
+                .expect("should get storage fee pool");
+
+            assert_eq!(storage_fee, stored_storage_fee);
+        }
+    }
+
+    mod value {
+        #[test]
+        fn test_error_if_pool_is_not_initiated() {
+            let drive = super::setup_drive();
+            let (transaction, fee_pools) = super::setup_fee_pools(
+                &drive,
+                Some(super::SetupFeePoolsOptions {
+                    init_fee_pools: false,
+                }),
+            );
+
+            match fee_pools
+                .storage_fee_distribution_pool
+                .value(&drive, Some(&transaction))
+            {
+                Ok(_) => assert!(
+                    false,
+                    "should not be able to get genesis time on uninit fee pools"
+                ),
+                Err(e) => match e {
+                    super::error::Error::GroveDB(grovedb::Error::PathNotFound(_)) => assert!(true),
+                    _ => assert!(false, "invalid error type"),
+                },
+            }
         }
 
-        drive
-            .start_current_batch()
-            .expect("should start current batch");
+        #[test]
+        fn test_error_if_wrong_value_encoded() {
+            let drive = super::setup_drive();
+            let (transaction, fee_pools) = super::setup_fee_pools(&drive, None);
 
-        fee_pools.init(&drive).expect("should init fee pools");
+            drive
+                .start_current_batch()
+                .expect("should start current batch");
 
-        fee_pools
-            .storage_fee_distribution_pool
-            .update(&drive, storage_fee)
-            .expect("should update storage fee pool");
+            drive
+                .current_batch_insert(super::PathKeyElementInfo::PathFixedSizeKeyElement((
+                    super::FeePools::get_path(),
+                    super::constants::KEY_STORAGE_FEE_POOL.as_bytes(),
+                    super::Element::Item(u128::MAX.to_le_bytes().to_vec(), None),
+                )))
+                .expect("should insert invalid data");
 
-        drive
-            .apply_current_batch(true, Some(&transaction))
-            .expect("should apply batch");
+            drive
+                .apply_current_batch(true, Some(&transaction))
+                .expect("should apply batch");
 
-        let stored_storage_fee = fee_pools
-            .storage_fee_distribution_pool
-            .value(&drive, Some(&transaction))
-            .expect("should get storage fee pool");
-
-        assert_eq!(storage_fee, stored_storage_fee);
-
-        drive
-            .start_current_batch()
-            .expect("should start current batch");
-
-        drive
-            .current_batch_insert(PathKeyElementInfo::PathFixedSizeKeyElement((
-                FeePools::get_path(),
-                constants::KEY_STORAGE_FEE_POOL.as_bytes(),
-                Element::Item(u128::MAX.to_le_bytes().to_vec(), None),
-            )))
-            .expect("should insert invalid data");
-
-        drive
-            .apply_current_batch(true, Some(&transaction))
-            .expect("should apply batch");
-
-        match fee_pools
-            .storage_fee_distribution_pool
-            .value(&drive, Some(&transaction))
-        {
-            Ok(_) => assert!(false, "should not be able to decode stored value"),
-            Err(e) => match e {
-                error::Error::Fee(FeeError::CorruptedStorageFeePoolInvalidItemLength(_)) => {
-                    assert!(true)
-                }
-                _ => assert!(false, "invalid error type"),
-            },
+            match fee_pools
+                .storage_fee_distribution_pool
+                .value(&drive, Some(&transaction))
+            {
+                Ok(_) => assert!(false, "should not be able to decode stored value"),
+                Err(e) => match e {
+                    super::error::Error::Fee(
+                        super::FeeError::CorruptedStorageFeePoolInvalidItemLength(_),
+                    ) => {
+                        assert!(true)
+                    }
+                    _ => assert!(false, "invalid error type"),
+                },
+            }
         }
     }
 }
