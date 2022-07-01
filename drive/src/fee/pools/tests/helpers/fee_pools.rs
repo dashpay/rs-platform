@@ -143,3 +143,47 @@ pub fn populate_proposers(
 
     proposers
 }
+
+pub fn setup_identities_with_share_documents(
+    drive: &Drive,
+    contract: &Contract,
+    pro_tx_hashes: &Vec<[u8; 32]>,
+    transaction: TransactionArg,
+) -> Vec<(Identity, Document)> {
+    fetch_identities_by_pro_tx_hashes(drive, pro_tx_hashes, transaction)
+        .iter()
+        .map(|mn_identity| {
+            let id: [u8; 32] = rand::random();
+            let identity = create_identity(drive, id, transaction);
+            let document = create_mn_share_document(drive, contract, mn_identity, &identity, 5000);
+
+            (identity, document)
+        })
+        .collect()
+}
+
+pub fn fetch_identities_by_pro_tx_hashes(
+    drive: &Drive,
+    pro_tx_hashes: &Vec<[u8; 32]>,
+    transaction: TransactionArg,
+) -> Vec<Identity> {
+    pro_tx_hashes
+        .iter()
+        .map(|pro_tx_hash| drive.fetch_identity(pro_tx_hash, transaction).unwrap())
+        .collect()
+}
+
+pub fn refetch_identities(
+    drive: &Drive,
+    identities: Vec<&Identity>,
+    transaction: TransactionArg,
+) -> Vec<Identity> {
+    identities
+        .iter()
+        .map(|identity| {
+            drive
+                .fetch_identity(&identity.id.buffer, transaction)
+                .unwrap()
+        })
+        .collect()
+}

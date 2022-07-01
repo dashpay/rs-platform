@@ -302,15 +302,7 @@ mod tests {
     use crate::fee::pools::tests::helpers::setup::setup_drive;
     use crate::fee::pools::tests::helpers::setup::setup_fee_pools;
 
-    use crate::{
-        contract::document::Document,
-        drive::{
-            flags::StorageFlags,
-            object_size_info::{DocumentAndContractInfo, DocumentInfo::DocumentAndSerialization},
-            Drive,
-        },
-        fee::pools::{constants, epoch::epoch_pool::EpochPool, fee_pools::FeePools},
-    };
+    use crate::fee::pools::epoch::epoch_pool::EpochPool;
 
     mod get_oldest_unpaid_epoch_pool {
 
@@ -386,10 +378,16 @@ mod tests {
     }
 
     mod distribute_fees_from_unpaid_pools_to_proposers {
-        use crate::drive::Drive;
-        use crate::fee::pools::epoch::epoch_pool::EpochPool;
-        use crate::fee::pools::fee_pools::FeePools;
-        use tempfile::TempDir;
+        use crate::{
+            error::Error,
+            fee::pools::{
+                epoch::constants,
+                tests::helpers::fee_pools::{
+                    create_mn_shares_contract, fetch_identities_by_pro_tx_hashes,
+                    refetch_identities, setup_identities_with_share_documents,
+                },
+            },
+        };
 
         #[test]
         fn test_no_distribution_on_epoch_0() {
@@ -493,59 +491,112 @@ mod tests {
 
         #[test]
         fn test_complete_distribution() {
-            todo!();
+            let drive = super::setup_drive();
+            let (transaction, fee_pools) = super::setup_fee_pools(&drive, None);
 
-            let tmp_dir = TempDir::new().unwrap();
-            let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+            let unpaid_epoch_pool = super::EpochPool::new(0, &drive);
+            let next_epoch_pool = super::EpochPool::new(1, &drive);
 
             drive
-                .create_root_tree(None)
-                .expect("expected to create root tree successfully");
+                .start_current_batch()
+                .expect("should start current batch");
 
-            // super::setup_mn_share_contract_and_docs(&drive);
+            unpaid_epoch_pool
+                .init_current(1, 1, 1)
+                .expect("should create proposers tree");
 
-            let proposer_pro_tx_hash: [u8; 32] =
-                hex::decode("0101010101010101010101010101010101010101010101010101010101010101")
-                    .expect("should decode pro tx hash")
-                    .try_into()
-                    .expect("should convert vector to array of 32 bytes");
+            // emulating epoch change
+            next_epoch_pool
+                .init_current(1, 11, 10)
+                .expect("to init current for next epoch");
 
-            let transaction = drive.grove.start_transaction();
+            drive
+                .apply_current_batch(true, Some(&transaction))
+                .expect("should apply batch");
 
-            let fee_pools = FeePools::new();
-
-            fee_pools.init(&drive).expect("fee pools to init");
-
-            let epoch = EpochPool::new(0, &drive);
-
-            // set initial data for test
-            fee_pools
-                .shift_current_epoch_pool(&drive, &epoch, 1, 1, 1)
-                .expect("should process epoch change");
-
-            let block_count = 42;
-
-            epoch
-                .update_proposer_block_count(&proposer_pro_tx_hash, block_count)
-                .expect("should update proposer block count");
+            drive
+                .start_current_batch()
+                .expect("should start current batch");
 
             fee_pools
-                .distribute_fees_from_unpaid_pools_to_proposers(&drive, 0, Some(&transaction))
-                .expect("should distribute fees to proporsers");
+                .distribute_fees_into_pools(
+                    &drive,
+                    &unpaid_epoch_pool,
+                    10000,
+                    10000,
+                    Some(&transaction),
+                )
+                .expect("distribute fees into epoch pool");
 
+            let pro_tx_hashes =
+                super::populate_proposers(&unpaid_epoch_pool, 10, Some(&transaction));
+
+            let contract = create_mn_shares_contract(&drive);
+
+            let share_identities_and_documents = setup_identities_with_share_documents(
+                &drive,
+                &contract,
+                &pro_tx_hashes,
+                Some(&transaction),
+            );
+
+            // Create masternode reward shares contract
+            super::create_mn_shares_contract(&drive);
+
+            drive
+                .apply_current_batch(true, Some(&transaction))
+                .expect("should apply batch");
+
+            drive
+                .start_current_batch()
+                .expect("should start current batch");
+
+            let proposers_paid = fee_pools
+                .distribute_fees_from_unpaid_pools_to_proposers(&drive, 1, Some(&transaction))
+                .expect("should distribute fees");
+
+            drive
+                .apply_current_batch(true, Some(&transaction))
+                .expect("should apply batch");
+
+            assert_eq!(proposers_paid, 10);
+
+            // check we paid 500 to every mn identity
+            let paid_mn_identities =
+                fetch_identities_by_pro_tx_hashes(&drive, &pro_tx_hashes, Some(&transaction));
+
+            for paid_mn_identity in paid_mn_identities {
+                assert_eq!(paid_mn_identity.balance, 500);
+            }
+
+            let share_identities = share_identities_and_documents
+                .iter()
+                .map(|(identity, _)| identity)
+                .collect();
+
+            let refetched_share_identities =
+                refetch_identities(&drive, share_identities, Some(&transaction));
+
+            for identity in refetched_share_identities {
+                assert_eq!(identity.balance, 500);
+            }
+
+            // check we've removed proposers tree
             match drive
                 .grove
-                .get(FeePools::get_path(), &epoch.key, Some(&transaction))
+                .get(
+                    unpaid_epoch_pool.get_path(),
+                    constants::KEY_PROPOSERS.as_bytes(),
+                    Some(&transaction),
+                )
                 .unwrap()
             {
-                Ok(_) => assert!(false, "should not be able to get deleted epoch pool"),
+                Ok(_) => assert!(false, "expect tree not exists"),
                 Err(e) => match e {
                     grovedb::Error::PathKeyNotFound(_) => assert!(true),
                     _ => assert!(false, "invalid error type"),
                 },
             }
-
-            todo!("Check updated balances");
         }
     }
 
