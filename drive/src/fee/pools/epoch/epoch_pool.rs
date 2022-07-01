@@ -57,7 +57,7 @@ impl<'e> EpochPool<'e> {
     }
 
     pub fn mark_as_paid(&self, transaction: TransactionArg) -> Result<(), Error> {
-        self.delete_proposers(transaction)?;
+        self.delete_proposers_tree(transaction)?;
 
         self.delete_storage_fee(transaction)?;
 

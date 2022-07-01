@@ -141,13 +141,30 @@ impl<'e> EpochPool<'e> {
         Ok(result)
     }
 
-    pub fn delete_proposers(&self, transaction: TransactionArg) -> Result<(), Error> {
+    pub fn delete_proposers_tree(&self, transaction: TransactionArg) -> Result<(), Error> {
         self.drive.current_batch_delete(
             self.get_path(),
             constants::KEY_PROPOSERS.as_bytes(),
             true,
             transaction,
         )
+    }
+
+    pub fn delete_proposers(
+        &self,
+        pro_tx_hashes: Vec<Vec<u8>>,
+        transaction: TransactionArg,
+    ) -> Result<(), Error> {
+        for pro_tx_hash in pro_tx_hashes {
+            self.drive.current_batch_delete(
+                self.get_proposers_path(),
+                &pro_tx_hash,
+                true,
+                transaction,
+            )?;
+        }
+
+        Ok(())
     }
 }
 
@@ -405,18 +422,14 @@ mod tests {
         }
     }
 
-    mod delete_proposers {
+    mod delete_proposers_tree {
         use crate::fee::pools::epoch::constants;
-        use costs::CostResult;
-        use grovedb::{Element, Error};
+        use grovedb::Error;
 
         #[test]
         fn test_values_has_been_deleted() {
             let drive = super::setup_drive();
             let (transaction, _) = super::setup_fee_pools(&drive, None);
-
-            let pro_tx_hash: [u8; 32] = rand::random();
-            let block_count = 42;
 
             let epoch = super::EpochPool::new(0, &drive);
 
@@ -436,7 +449,7 @@ mod tests {
                 .expect("should start current batch");
 
             epoch
-                .delete_proposers(Some(&transaction))
+                .delete_proposers_tree(Some(&transaction))
                 .expect("should delete proposers");
 
             drive
@@ -458,6 +471,100 @@ mod tests {
                     _ => assert!(false, "invalid error type"),
                 },
             }
+        }
+    }
+
+    mod delete_proposers {
+        #[test]
+        fn test_values_are_being_deleted() {
+            let drive = super::setup_drive();
+            let (transaction, _) = super::setup_fee_pools(&drive, None);
+
+            let epoch = super::EpochPool::new(0, &drive);
+
+            drive
+                .start_current_batch()
+                .expect("should start current batch");
+
+            epoch.init_proposers().expect("should init proposers");
+
+            // Apply proposers tree
+            drive
+                .apply_current_batch(true, Some(&transaction))
+                .expect("should apply batch");
+
+            let pro_tx_hashes: Vec<[u8; 32]> = (0..10).map(|_| rand::random()).collect();
+
+            drive
+                .start_current_batch()
+                .expect("should start current batch");
+
+            for pro_tx_hash in pro_tx_hashes.iter() {
+                epoch
+                    .update_proposer_block_count(pro_tx_hash, 1)
+                    .expect("to update block count");
+            }
+
+            // Apply proposers block count updates
+            drive
+                .apply_current_batch(true, Some(&transaction))
+                .expect("should apply batch");
+
+            let mut stored_proposers = epoch
+                .get_proposers(20, Some(&transaction))
+                .expect("to get proposers");
+
+            let mut awaited_result = pro_tx_hashes
+                .iter()
+                .map(|hash| (hash.to_vec(), 1))
+                .collect::<Vec<(Vec<u8>, u64)>>();
+
+            // sort both result to be able to compare them
+            stored_proposers.sort();
+            awaited_result.sort();
+
+            assert_eq!(stored_proposers, awaited_result);
+
+            drive
+                .start_current_batch()
+                .expect("should start current batch");
+
+            let deleted_pro_tx_hashes = vec![
+                awaited_result.get(0).unwrap().0.clone(),
+                awaited_result.get(1).unwrap().0.clone(),
+            ];
+
+            // remove items we deleted
+            awaited_result.remove(0);
+            awaited_result.remove(1);
+
+            epoch
+                .delete_proposers(deleted_pro_tx_hashes, Some(&transaction))
+                .expect("to delete several proposers");
+
+            // Apply proposers deletion
+            drive
+                .apply_current_batch(true, Some(&transaction))
+                .expect("should apply batch");
+
+            let stored_proposers = epoch
+                .get_proposers(20, Some(&transaction))
+                .expect("to get proposers");
+
+            let mut stored_hexes: Vec<String> = stored_proposers
+                .iter()
+                .map(|(hash, _)| hex::encode(hash))
+                .collect();
+
+            let mut awaited_hexes: Vec<String> = stored_proposers
+                .iter()
+                .map(|(hash, _)| hex::encode(hash))
+                .collect();
+
+            stored_hexes.sort();
+            awaited_hexes.sort();
+
+            assert_eq!(stored_hexes, awaited_hexes);
         }
     }
 }

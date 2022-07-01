@@ -57,8 +57,8 @@ impl FeePools {
 
         let mut fee_leftovers = dec!(0.0);
 
-        for (proposer_tx_hash, proposed_block_count) in proposers {
-            let proposed_block_count = Decimal::from(proposed_block_count);
+        for (proposer_tx_hash, proposed_block_count) in proposers.iter() {
+            let proposed_block_count = Decimal::from(*proposed_block_count);
 
             let mut masternode_reward =
                 (total_fees * proposed_block_count) / unpaid_epoch_block_count;
@@ -119,7 +119,11 @@ impl FeePools {
             )?;
         }
 
-        // TODO: Remove paid proposers
+        // remove proposers we've paid out
+        let proposer_pro_tx_hashes: Vec<Vec<u8>> =
+            proposers.iter().map(|(hash, _)| hash.clone()).collect();
+
+        unpaid_epoch_pool.delete_proposers(proposer_pro_tx_hashes, transaction)?;
 
         // Move integer part of the leftovers to processing
         // and fractional part to storage fees for the next epoch
