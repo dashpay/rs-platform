@@ -62,7 +62,7 @@ impl Drive {
             self.batch_insert_empty_tree(
                 contract_root_path,
                 KeyRef(&[0]),
-                &storage_flags,
+                Some(&storage_flags),
                 insert_operations,
             )?;
             let encoded_time = crate::common::encode::encode_float(block_time)?;
@@ -126,7 +126,7 @@ impl Drive {
         self.batch_insert_empty_tree(
             [Into::<&[u8; 1]>::into(RootTree::ContractDocuments).as_slice()],
             KeyRef(contract.id.as_slice()),
-            &storage_flags,
+            Some(&storage_flags),
             &mut batch_operations,
         )?;
 
@@ -144,7 +144,7 @@ impl Drive {
         self.batch_insert_empty_tree(
             contract_root_path,
             key_info,
-            &storage_flags,
+            Some(&storage_flags),
             &mut batch_operations,
         )?;
 
@@ -157,7 +157,7 @@ impl Drive {
             self.batch_insert_empty_tree(
                 contract_documents_path,
                 KeyRef(type_key.as_bytes()),
-                &storage_flags,
+                Some(&storage_flags),
                 &mut batch_operations,
             )?;
 
@@ -173,7 +173,7 @@ impl Drive {
             self.batch_insert_empty_tree(
                 type_path,
                 key_info,
-                &storage_flags,
+                Some(&storage_flags),
                 &mut batch_operations,
             )?;
 
@@ -183,7 +183,7 @@ impl Drive {
                 self.batch_insert_empty_tree(
                     type_path,
                     KeyRef(index.name.as_bytes()),
-                    &storage_flags,
+                    Some(&storage_flags),
                     &mut batch_operations,
                 )?;
             }
@@ -293,7 +293,7 @@ impl Drive {
                 self.batch_insert_empty_tree(
                     contract_documents_path,
                     KeyRef(type_key.as_bytes()),
-                    &storage_flags,
+                    Some(&storage_flags),
                     &mut batch_operations,
                 )?;
 
@@ -308,7 +308,7 @@ impl Drive {
                 self.batch_insert_empty_tree(
                     type_path,
                     KeyRef(&[0]),
-                    &storage_flags,
+                    Some(&storage_flags),
                     &mut batch_operations,
                 )?;
 
@@ -318,7 +318,7 @@ impl Drive {
                     self.batch_insert_empty_tree(
                         type_path,
                         KeyRef(index.name.as_bytes()),
-                        &storage_flags,
+                        Some(&storage_flags),
                         &mut batch_operations,
                     )?;
                 }

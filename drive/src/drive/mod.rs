@@ -37,6 +37,7 @@ pub struct Drive {
     pub epoch_info: RefCell<EpochInfo>,
     pub fee_pools: RefCell<FeePools>,
     pub cached_contracts: RefCell<Cache<[u8; 32], Arc<Contract>>>, //HashMap<[u8; 32], Rc<Contract>>>,
+    pub current_batch: RefCell<Vec<DriveOperation>>,
 }
 
 #[repr(u8)]
@@ -92,6 +93,7 @@ impl Drive {
                 cached_contracts: RefCell::new(Cache::new(200)),
                 epoch_info: RefCell::new(EpochInfo { current_epoch: 0 }),
                 fee_pools: RefCell::new(FeePools::new()),
+                current_batch: RefCell::new(Vec::new()),
             }),
             Err(e) => Err(Error::GroveDB(e)),
         }

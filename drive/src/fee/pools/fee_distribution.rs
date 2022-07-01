@@ -2,6 +2,7 @@ use grovedb::TransactionArg;
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use serde_json::json;
+use std::ops::DerefMut;
 
 use crate::common::value_to_cbor;
 use crate::contract::document::Document;
@@ -118,6 +119,8 @@ impl FeePools {
             )?;
         }
 
+        // TODO: Remove paid proposers
+
         // Move integer part of the leftovers to processing
         // and fractional part to storage fees for the next epoch
         let next_epoch_pool = EpochPool::new(unpaid_epoch_pool.index + 1, drive);
@@ -146,12 +149,11 @@ impl FeePools {
 
         let processing_fee = next_epoch_pool.get_processing_fee(transaction)?;
 
-        next_epoch_pool
-            .update_processing_fee(processing_fee + processing_leftovers, transaction)?;
+        next_epoch_pool.update_processing_fee(processing_fee + processing_leftovers)?;
 
         let storage_fee = next_epoch_pool.get_storage_fee(transaction)?;
 
-        next_epoch_pool.update_storage_fee(storage_fee + storage_leftovers, transaction)?;
+        next_epoch_pool.update_storage_fee(storage_fee + storage_leftovers)?;
 
         Ok(())
     }
@@ -175,7 +177,7 @@ impl FeePools {
 
         identity.balance += reward;
 
-        drive.insert_identity(identity, true, transaction)?;
+        drive.insert_identity_operations(identity, drive.current_batch.borrow_mut().deref_mut())?;
 
         Ok(())
     }
@@ -275,19 +277,15 @@ impl FeePools {
         // update epoch pool processing fees
         let epoch_processing_fees = current_epoch_pool.get_processing_fee(transaction)?;
 
-        current_epoch_pool
-            .update_processing_fee(epoch_processing_fees + processing_fees, transaction)?;
+        current_epoch_pool.update_processing_fee(epoch_processing_fees + processing_fees)?;
 
         // update storage fee pool
         let storage_fee_pool = self
             .storage_fee_distribution_pool
             .value(&drive, transaction)?;
 
-        self.storage_fee_distribution_pool.update(
-            &drive,
-            storage_fee_pool + storage_fees,
-            transaction,
-        )?;
+        self.storage_fee_distribution_pool
+            .update(&drive, storage_fee_pool + storage_fees)?;
 
         Ok(())
     }
@@ -319,7 +317,7 @@ mod tests {
 
             match fee_pools
                 .get_oldest_unpaid_epoch_pool(&drive, 999, Some(&transaction))
-                .expect("to get oldest epoch pool")
+                .expect("should get oldest epoch pool")
             {
                 Some(_) => assert!(false, "shouldn't return any unpaid epoch"),
                 None => assert!(true),
@@ -333,23 +331,49 @@ mod tests {
 
             let unpaid_epoch_pool_0 = super::EpochPool::new(0, &drive);
 
+            drive
+                .start_current_batch()
+                .expect("should start current batch");
+
             unpaid_epoch_pool_0
-                .init_proposers(Some(&transaction))
+                .init_proposers()
                 .expect("should create proposers tree");
+
+            // Apply proposers tree
+            drive
+                .apply_current_batch(true, Some(&transaction))
+                .expect("should apply batch");
+
+            drive
+                .start_current_batch()
+                .expect("should start current batch");
 
             super::populate_proposers(&unpaid_epoch_pool_0, 2, Some(&transaction));
 
             let unpaid_epoch_pool_1 = super::EpochPool::new(1, &drive);
 
             unpaid_epoch_pool_1
-                .init_proposers(Some(&transaction))
+                .init_proposers()
                 .expect("should create proposers tree");
+
+            // Apply proposers tree
+            drive
+                .apply_current_batch(true, Some(&transaction))
+                .expect("should apply batch");
+
+            drive
+                .start_current_batch()
+                .expect("should start current batch");
 
             super::populate_proposers(&unpaid_epoch_pool_1, 2, Some(&transaction));
 
+            drive
+                .apply_current_batch(true, Some(&transaction))
+                .expect("should apply batch");
+
             match fee_pools
                 .get_oldest_unpaid_epoch_pool(&drive, 1, Some(&transaction))
-                .expect("to get oldest epoch pool")
+                .expect("should get oldest epoch pool")
             {
                 Some(epoch_pool) => assert_eq!(epoch_pool.index, 0),
                 None => assert!(false, "should have unpaid epochs"),
@@ -410,8 +434,12 @@ mod tests {
 
             let unpaid_epoch_pool_0_proposers_count = 200;
 
+            drive
+                .start_current_batch()
+                .expect("should start current batch");
+
             unpaid_epoch_pool_0
-                .init_current(1, 1, 1, Some(&transaction))
+                .init_current(1, 1, 1)
                 .expect("should create proposers tree");
 
             fee_pools
@@ -435,18 +463,17 @@ mod tests {
             let unpaid_epoch_pool_1 = super::EpochPool::new(1, &drive);
 
             unpaid_epoch_pool_1
-                .init_current(
-                    1,
-                    unpaid_epoch_pool_0_proposers_count as u64 + 1,
-                    2,
-                    Some(&transaction),
-                )
+                .init_current(1, unpaid_epoch_pool_0_proposers_count as u64 + 1, 2)
                 .expect("should create proposers tree");
 
             super::populate_proposers(&unpaid_epoch_pool_1, 200, Some(&transaction));
 
             // Create masternode reward shares contract
             super::create_mn_shares_contract(&drive);
+
+            drive
+                .apply_current_batch(true, Some(&transaction))
+                .expect("should apply batch");
 
             let proposers_paid = fee_pools
                 .distribute_fees_from_unpaid_pools_to_proposers(&drive, 2, Some(&transaction))
@@ -475,9 +502,9 @@ mod tests {
 
             let proposer_pro_tx_hash: [u8; 32] =
                 hex::decode("0101010101010101010101010101010101010101010101010101010101010101")
-                    .expect("to decode pro tx hash")
+                    .expect("should decode pro tx hash")
                     .try_into()
-                    .expect("to convert vector to array of 32 bytes");
+                    .expect("should convert vector to array of 32 bytes");
 
             let transaction = drive.grove.start_transaction();
 
@@ -491,18 +518,18 @@ mod tests {
 
             // set initial data for test
             fee_pools
-                .shift_current_epoch_pool(&drive, &epoch, 1, 1, 1, Some(&transaction))
-                .expect("to process epoch change");
+                .shift_current_epoch_pool(&drive, &epoch, 1, 1, 1)
+                .expect("should process epoch change");
 
             let block_count = 42;
 
             epoch
-                .update_proposer_block_count(&proposer_pro_tx_hash, block_count, Some(&transaction))
-                .expect("to update proposer block count");
+                .update_proposer_block_count(&proposer_pro_tx_hash, block_count)
+                .expect("should update proposer block count");
 
             fee_pools
                 .distribute_fees_from_unpaid_pools_to_proposers(&drive, 0, Some(&transaction))
-                .expect("to distribute fees to proporsers");
+                .expect("should distribute fees to proporsers");
 
             match drive
                 .grove
@@ -526,9 +553,23 @@ mod tests {
         let (transaction, fee_pools) = setup_fee_pools(&drive, None);
 
         let current_epoch_pool = EpochPool::new(0, &drive);
+
+        drive
+            .start_current_batch()
+            .expect("should start current batch");
+
         current_epoch_pool
-            .init_current(1, 1, 1, Some(&transaction))
+            .init_current(1, 1, 1)
             .expect("should init the epoch pool as current");
+
+        // Apply new pool structure
+        drive
+            .apply_current_batch(true, Some(&transaction))
+            .expect("should apply batch");
+
+        drive
+            .start_current_batch()
+            .expect("should start current batch");
 
         let processing_fees = 1000000;
         let storage_fees = 2000000;
@@ -543,14 +584,18 @@ mod tests {
             )
             .expect("should distribute fees into pools");
 
+        drive
+            .apply_current_batch(true, Some(&transaction))
+            .expect("should apply batch");
+
         let stored_processing_fees = current_epoch_pool
             .get_processing_fee(Some(&transaction))
-            .expect("to get processing fees");
+            .expect("should get processing fees");
 
         let stored_storage_fee_pool = fee_pools
             .storage_fee_distribution_pool
             .value(&drive, Some(&transaction))
-            .expect("to get storage fee pool");
+            .expect("should get storage fee pool");
 
         assert_eq!(stored_processing_fees, processing_fees);
         assert_eq!(stored_storage_fee_pool, storage_fees);

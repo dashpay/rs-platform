@@ -17,7 +17,7 @@ impl Default for SetupFeePoolsOptions {
 
 pub fn setup_drive() -> Drive {
     let tmp_dir = TempDir::new().unwrap();
-    let drive: Drive = Drive::open(tmp_dir).expect("to open Drive successfully");
+    let drive: Drive = Drive::open(tmp_dir).expect("should open Drive successfully");
 
     drive
 }
@@ -30,16 +30,24 @@ pub fn setup_fee_pools<'a>(
 
     drive
         .create_root_tree(None)
-        .expect("to create root tree successfully");
+        .expect("should create root tree successfully");
 
     let transaction = drive.grove.start_transaction();
 
     let fee_pools = FeePools::new();
 
     if options.init_fee_pools {
+        drive
+            .start_current_batch()
+            .expect("should start current batch");
+
         fee_pools
             .init(&drive, Some(&transaction))
-            .expect("to init fee pools");
+            .expect("should init fee pools");
+
+        drive
+            .apply_current_batch(true, Some(&transaction))
+            .expect("should apply batch");
     }
 
     (transaction, fee_pools)

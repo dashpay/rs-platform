@@ -4,6 +4,7 @@ use std::borrow::BorrowMut;
 use crate::drive::Drive;
 use crate::error::Error;
 
+use crate::fee::op::DriveOperation;
 use crate::fee::pools::epoch::epoch_pool::EpochPool;
 use chrono::Utc;
 
@@ -24,23 +25,18 @@ impl Drive {
         fee_multiplier: u64,
         transaction: TransactionArg,
     ) -> Result<(), Error> {
+        self.start_current_batch()?;
+
         if block_height == 1 {
             self.fee_pools
                 .borrow_mut()
-                .update_genesis_time(&self, block_time, transaction)?;
+                .update_genesis_time(&self, block_time)?;
         }
 
-        let (current_epoch_index, is_epoch_change) = match previous_block_time {
-            Some(previous_block_time) => {
-                self.fee_pools.borrow_mut().calculate_current_epoch_index(
-                    &self,
-                    block_time,
-                    previous_block_time,
-                    transaction,
-                )?
-            }
-            None => (0, true),
-        };
+        let (current_epoch_index, is_epoch_change) = self
+            .fee_pools
+            .borrow_mut()
+            .calculate_current_epoch_index(&self, block_time, previous_block_time, transaction)?;
 
         let fee_pools = self.fee_pools.borrow();
 
@@ -55,15 +51,21 @@ impl Drive {
                 block_height,
                 block_time,
                 fee_multiplier,
-                transaction,
             )?;
 
             // distribute accumulated previous epoch storage fees
-            fee_pools.storage_fee_distribution_pool.distribute(
-                &self,
-                current_epoch_pool.index,
-                transaction,
-            )?;
+            if current_epoch_pool.index > 0 {
+                fee_pools.storage_fee_distribution_pool.distribute(
+                    &self,
+                    current_epoch_pool.index - 1,
+                    transaction,
+                )?;
+            }
+
+            // We need to apply new epoch tree structure and distributed storage fee
+            self.apply_current_batch(false, transaction)?;
+
+            self.start_current_batch()?;
         }
 
         fee_pools.distribute_fees_into_pools(
@@ -81,6 +83,8 @@ impl Drive {
             current_epoch_index,
             transaction,
         )?;
+
+        self.apply_current_batch(false, transaction)?;
 
         Ok(())
     }

@@ -323,10 +323,19 @@ impl DriveOperation {
             .collect()
     }
 
-    pub fn for_empty_tree(path: Vec<Vec<u8>>, key: Vec<u8>, storage_flags: &StorageFlags) -> Self {
-        let tree = Element::empty_tree_with_flags(storage_flags.to_element_flags());
+    pub fn for_empty_tree(
+        path: Vec<Vec<u8>>,
+        key: Vec<u8>,
+        storage_flags: Option<&StorageFlags>,
+    ) -> Self {
+        let tree = match storage_flags {
+            Some(storage_flags) => Element::empty_tree_with_flags(storage_flags.to_element_flags()),
+            None => Element::empty_tree(),
+        };
+
         DriveOperation::for_path_key_element(path, key, tree)
     }
+
     pub fn for_path_key_element(path: Vec<Vec<u8>>, key: Vec<u8>, element: Element) -> Self {
         GroveOperation(GroveDbOp::insert(path, key, element))
     }

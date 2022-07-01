@@ -1,3 +1,4 @@
+use crate::drive::object_size_info::PathKeyElementInfo;
 use crate::drive::Drive;
 use grovedb::{Element, TransactionArg};
 use rust_decimal::Decimal;
@@ -41,39 +42,30 @@ impl StorageFeeDistributionPool {
 
                 let storage_fee = epoch_pool.get_storage_fee(transaction)?;
 
-                epoch_pool.update_storage_fee(storage_fee + epoch_fee_share, transaction)?;
+                epoch_pool.update_storage_fee(storage_fee + epoch_fee_share)?;
 
                 storage_distribution_fees_buffer -= epoch_fee_share;
             }
         }
 
-        self.update(
-            drive,
+        let storage_distribution_fees_buffer =
             storage_distribution_fees_buffer.try_into().map_err(|_| {
                 Error::Fee(FeeError::CorruptedStorageFeePoolInvalidItemLength(
                     "fee pools storage fee pool is not i64",
                 ))
-            })?,
-            transaction,
-        )
+            })?;
+
+        self.update(drive, storage_distribution_fees_buffer)?;
+
+        Ok(())
     }
 
-    pub fn update(
-        &self,
-        drive: &Drive,
-        storage_fee: i64,
-        transaction: TransactionArg,
-    ) -> Result<(), Error> {
-        drive
-            .grove
-            .insert(
-                FeePools::get_path(),
-                constants::KEY_STORAGE_FEE_POOL.as_bytes(),
-                Element::Item(storage_fee.to_le_bytes().to_vec(), None),
-                transaction,
-            )
-            .unwrap()
-            .map_err(Error::GroveDB)
+    pub fn update(&self, drive: &Drive, storage_fee: i64) -> Result<(), Error> {
+        drive.current_batch_insert(PathKeyElementInfo::PathFixedSizeKeyElement((
+            FeePools::get_path(),
+            constants::KEY_STORAGE_FEE_POOL.as_bytes(),
+            Element::Item(storage_fee.to_le_bytes().to_vec(), None),
+        )))
     }
 
     pub fn value(&self, drive: &Drive, transaction: TransactionArg) -> Result<i64, Error> {
@@ -105,6 +97,7 @@ impl StorageFeeDistributionPool {
 
 #[cfg(test)]
 mod tests {
+    use crate::drive::object_size_info::PathKeyElementInfo;
     use crate::fee::pools::tests::helpers::setup::{
         setup_drive, setup_fee_pools, SetupFeePoolsOptions,
     };
@@ -130,13 +123,14 @@ mod tests {
                     let epoch_pool = EpochPool::new(index, &drive);
                     epoch_pool
                         .get_storage_fee(transaction)
-                        .expect("to get storage fee")
+                        .expect("should get storage fee")
                 })
                 .collect()
         }
     }
 
     mod distribute {
+        use crate::error;
         use rust_decimal::Decimal;
         use rust_decimal_macros::dec;
 
@@ -149,18 +143,28 @@ mod tests {
             let drive = setup_drive();
             let (transaction, fee_pools) = setup_fee_pools(&drive, None);
 
-            let storage_pool = 0;
             let epoch_index = 0;
 
-            fee_pools
-                .storage_fee_distribution_pool
-                .update(&drive, storage_pool, Some(&transaction))
-                .expect("to update storage fee pool");
+            drive
+                .start_current_batch()
+                .expect("should start current batch");
+
+            // Storage fee distribution pool is 0 after fee pools initialization
 
             fee_pools
                 .storage_fee_distribution_pool
                 .distribute(&drive, epoch_index, Some(&transaction))
-                .expect("to distribute storage fee pool");
+                .expect("should distribute storage fee pool");
+
+            match drive.apply_current_batch(true, Some(&transaction)) {
+                Ok(_) => assert!(false, "batch should be empty"),
+                Err(e) => match e {
+                    error::Error::Drive(error::drive::DriveError::CurrentBranchIsEmpty()) => {
+                        assert!(true)
+                    }
+                    _ => assert!(false, "expect DriveError::CurrentBranchIsEmpty error"),
+                },
+            }
 
             let storage_fees =
                 helpers::get_storage_fees_from_epoch_pools(&drive, epoch_index, Some(&transaction));
@@ -178,27 +182,44 @@ mod tests {
             let storage_pool = i64::MAX;
             let epoch_index = 0;
 
+            drive
+                .start_current_batch()
+                .expect("should start current batch");
+
             fee_pools
                 .storage_fee_distribution_pool
-                .update(&drive, storage_pool, Some(&transaction))
-                .expect("to update storage fee pool");
+                .update(&drive, storage_pool)
+                .expect("should update storage fee pool");
+
+            // Apply storage fee distribution pool update
+            drive
+                .apply_current_batch(true, Some(&transaction))
+                .expect("should apply batch");
+
+            drive
+                .start_current_batch()
+                .expect("should start current batch");
 
             fee_pools
                 .storage_fee_distribution_pool
                 .distribute(&drive, epoch_index, Some(&transaction))
-                .expect("to distribute storage fee pool");
+                .expect("should distribute storage fee pool");
+
+            drive
+                .apply_current_batch(true, Some(&transaction))
+                .expect("should apply batch");
 
             // check leftover
             let storage_fee_pool_leftover = fee_pools
                 .storage_fee_distribution_pool
                 .value(&drive, Some(&transaction))
-                .expect("to get storage fee pool");
+                .expect("should get storage fee pool");
 
             assert_eq!(storage_fee_pool_leftover, 0);
         }
 
         #[test]
-        fn test_distribution() {
+        fn test_deterministic_distribution() {
             let drive = setup_drive();
             let (transaction, fee_pools) = setup_fee_pools(&drive, None);
 
@@ -206,28 +227,45 @@ mod tests {
             let epoch_index = 42;
 
             // init additional epoch pools as it will be done in epoch_change
+            drive
+                .start_current_batch()
+                .expect("should start current batch");
+
             for i in 1000..=1000 + epoch_index {
                 let epoch = EpochPool::new(i, &drive);
                 epoch
-                    .init_empty(Some(&transaction))
-                    .expect("to init additional epoch pool");
+                    .init_empty()
+                    .expect("should init additional epoch pool");
             }
 
             fee_pools
                 .storage_fee_distribution_pool
-                .update(&drive, storage_pool, Some(&transaction))
-                .expect("to update storage fee pool");
+                .update(&drive, storage_pool)
+                .expect("should update storage fee pool");
+
+            // Apply storage fee distribution pool update
+            drive
+                .apply_current_batch(true, Some(&transaction))
+                .expect("should apply batch");
+
+            drive
+                .start_current_batch()
+                .expect("should start current batch");
 
             fee_pools
                 .storage_fee_distribution_pool
                 .distribute(&drive, epoch_index, Some(&transaction))
-                .expect("to distribute storage fee pool");
+                .expect("should distribute storage fee pool");
+
+            drive
+                .apply_current_batch(true, Some(&transaction))
+                .expect("should apply batch");
 
             // check leftover
             let storage_fee_pool_leftover = fee_pools
                 .storage_fee_distribution_pool
                 .value(&drive, Some(&transaction))
-                .expect("to get storage fee pool");
+                .expect("should get storage fee pool");
 
             assert_eq!(storage_fee_pool_leftover, 0);
 
@@ -342,17 +380,40 @@ mod tests {
 
             assert_eq!(storage_fees, reference_fees);
 
+            /*
+
+            Repeat distribution to ensure deterministic results
+
+             */
+
             // refill storage fee pool once more
+            drive
+                .start_current_batch()
+                .expect("should start current batch");
+
             fee_pools
                 .storage_fee_distribution_pool
-                .update(&drive, storage_pool, Some(&transaction))
-                .expect("to update storage fee pool");
+                .update(&drive, storage_pool)
+                .expect("should update storage fee pool");
+
+            // Apply storage fee distribution pool update
+            drive
+                .apply_current_batch(true, Some(&transaction))
+                .expect("should apply batch");
+
+            drive
+                .start_current_batch()
+                .expect("should start current batch");
 
             // distribute fees once more
             fee_pools
                 .storage_fee_distribution_pool
                 .distribute(&drive, epoch_index, Some(&transaction))
-                .expect("to distribute storage fee pool");
+                .expect("should distribute storage fee pool");
+
+            drive
+                .apply_current_batch(true, Some(&transaction))
+                .expect("should apply batch");
 
             // collect all the storage fee values of the 1000 epoch pools again
             let storage_fees =
@@ -371,6 +432,8 @@ mod tests {
 
     #[test]
     fn test_update_and_value() {
+        todo!("split into multiple test for each function and case");
+
         let drive = setup_drive();
         let (transaction, fee_pools) = setup_fee_pools(
             &drive,
@@ -395,11 +458,12 @@ mod tests {
             },
         }
 
-        match fee_pools.storage_fee_distribution_pool.update(
-            &drive,
-            storage_fee,
-            Some(&transaction),
-        ) {
+        fee_pools
+            .storage_fee_distribution_pool
+            .update(&drive, storage_fee)
+            .expect("should update storage fee distribution pool");
+
+        match drive.apply_current_batch(true, Some(&transaction)) {
             Ok(_) => assert!(
                 false,
                 "should not be able to update genesis time on uninit fee pools"
@@ -410,32 +474,45 @@ mod tests {
             },
         }
 
+        drive
+            .start_current_batch()
+            .expect("should start current batch");
+
         fee_pools
             .init(&drive, Some(&transaction))
-            .expect("to init fee pools");
+            .expect("should init fee pools");
 
         fee_pools
             .storage_fee_distribution_pool
-            .update(&drive, storage_fee, Some(&transaction))
-            .expect("to update storage fee pool");
+            .update(&drive, storage_fee)
+            .expect("should update storage fee pool");
+
+        drive
+            .apply_current_batch(true, Some(&transaction))
+            .expect("should apply batch");
 
         let stored_storage_fee = fee_pools
             .storage_fee_distribution_pool
             .value(&drive, Some(&transaction))
-            .expect("to get storage fee pool");
+            .expect("should get storage fee pool");
 
         assert_eq!(storage_fee, stored_storage_fee);
 
         drive
-            .grove
-            .insert(
+            .start_current_batch()
+            .expect("should start current batch");
+
+        drive
+            .current_batch_insert(PathKeyElementInfo::PathFixedSizeKeyElement((
                 FeePools::get_path(),
                 constants::KEY_STORAGE_FEE_POOL.as_bytes(),
                 Element::Item(u128::MAX.to_le_bytes().to_vec(), None),
-                Some(&transaction),
-            )
-            .unwrap()
-            .expect("to insert invalid data");
+            )))
+            .expect("should insert invalid data");
+
+        drive
+            .apply_current_batch(true, Some(&transaction))
+            .expect("should apply batch");
 
         match fee_pools
             .storage_fee_distribution_pool

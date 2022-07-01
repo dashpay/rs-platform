@@ -1,5 +1,6 @@
 use grovedb::{Element, PathQuery, Query, SizedQuery, TransactionArg};
 
+use crate::drive::object_size_info::{KeyInfo, PathKeyElementInfo};
 use crate::{
     error,
     error::{drive::DriveError, fee::FeeError, Error},
@@ -42,18 +43,13 @@ impl<'e> EpochPool<'e> {
         &self,
         proposer_pro_tx_hash: &[u8; 32],
         block_count: u64,
-        transaction: TransactionArg,
     ) -> Result<(), Error> {
         self.drive
-            .grove
-            .insert(
+            .current_batch_insert(PathKeyElementInfo::PathFixedSizeKeyElement((
                 self.get_proposers_path(),
                 proposer_pro_tx_hash,
                 Element::Item(block_count.to_le_bytes().to_vec(), None),
-                transaction,
-            )
-            .unwrap()
-            .map_err(Error::GroveDB)
+            )))
     }
 
     pub fn increment_proposer_block_count(
@@ -69,11 +65,7 @@ impl<'e> EpochPool<'e> {
                 _ => Err(e),
             })?;
 
-        self.update_proposer_block_count(
-            &proposer_pro_tx_hash,
-            proposed_block_count + 1,
-            transaction,
-        )?;
+        self.update_proposer_block_count(&proposer_pro_tx_hash, proposed_block_count + 1)?;
 
         Ok(())
     }
@@ -95,19 +87,12 @@ impl<'e> EpochPool<'e> {
         }
     }
 
-    pub fn init_proposers(&self, transaction: TransactionArg) -> Result<(), Error> {
-        self.drive
-            .grove
-            .insert(
-                self.get_path(),
-                constants::KEY_PROPOSERS.as_bytes(),
-                Element::empty_tree(),
-                transaction,
-            )
-            .unwrap()
-            .map_err(Error::GroveDB)?;
-
-        Ok(())
+    pub fn init_proposers(&self) -> Result<(), Error> {
+        self.drive.current_batch_insert_empty_tree(
+            self.get_path(),
+            KeyInfo::KeyRef(constants::KEY_PROPOSERS.as_bytes()),
+            None,
+        )
     }
 
     pub fn get_proposers(
@@ -157,17 +142,12 @@ impl<'e> EpochPool<'e> {
     }
 
     pub fn delete_proposers(&self, transaction: TransactionArg) -> Result<(), Error> {
-        self.drive
-            .grove
-            .delete(
-                self.get_path(),
-                constants::KEY_PROPOSERS.as_bytes(),
-                transaction,
-            )
-            .unwrap()
-            .map_err(Error::GroveDB)?;
-
-        Ok(())
+        self.drive.current_batch_delete(
+            self.get_path(),
+            constants::KEY_PROPOSERS.as_bytes(),
+            true,
+            transaction,
+        )
     }
 }
 
@@ -184,6 +164,8 @@ mod tests {
     };
 
     mod get_proposer_block_count {
+        use crate::drive::object_size_info::PathKeyElementInfo;
+
         #[test]
         fn test_error_if_value_has_invalid_length() {
             let drive = super::setup_drive();
@@ -193,20 +175,23 @@ mod tests {
 
             let epoch = super::EpochPool::new(0, &drive);
 
-            epoch
-                .init_proposers(Some(&transaction))
-                .expect("to init proposers");
+            drive
+                .start_current_batch()
+                .expect("should start current batch");
+
+            epoch.init_proposers().expect("should init proposers");
 
             drive
-                .grove
-                .insert(
+                .current_batch_insert(PathKeyElementInfo::PathFixedSizeKeyElement((
                     epoch.get_proposers_path(),
                     &pro_tx_hash,
                     super::Element::Item(u128::MAX.to_le_bytes().to_vec(), None),
-                    Some(&transaction),
-                )
-                .unwrap()
-                .expect("to insert invalid value");
+                )))
+                .expect("should insert invalid value");
+
+            drive
+                .apply_current_batch(true, Some(&transaction))
+                .expect("should apply batch");
 
             match epoch.get_proposer_block_count(&pro_tx_hash, Some(&transaction)) {
                 Ok(_) => assert!(false, "should not be able to decode stored value"),
@@ -216,7 +201,7 @@ mod tests {
                     ) => {
                         assert!(true)
                     }
-                    _ => assert!(false, "ivalid error type"),
+                    _ => assert!(false, "invalid error type"),
                 },
             }
         }
@@ -256,17 +241,23 @@ mod tests {
 
             let epoch = super::EpochPool::new(0, &drive);
 
-            epoch
-                .init_proposers(Some(&transaction))
-                .expect("to init proposers");
+            drive
+                .start_current_batch()
+                .expect("should start current batch");
+
+            epoch.init_proposers().expect("should init proposers");
 
             epoch
-                .update_proposer_block_count(&pro_tx_hash, block_count, Some(&transaction))
-                .expect("to udpate proposer block count");
+                .update_proposer_block_count(&pro_tx_hash, block_count)
+                .expect("should update proposer block count");
+
+            drive
+                .apply_current_batch(true, Some(&transaction))
+                .expect("should apply batch");
 
             let stored_block_count = epoch
                 .get_proposer_block_count(&pro_tx_hash, Some(&transaction))
-                .expect("to get proposer block count");
+                .expect("should get proposer block count");
 
             assert_eq!(stored_block_count, block_count);
         }
@@ -282,17 +273,32 @@ mod tests {
 
             let epoch = super::EpochPool::new(0, &drive);
 
-            epoch
-                .init_proposers(Some(&transaction))
-                .expect("to init proposers");
+            drive
+                .start_current_batch()
+                .expect("should start current batch");
+
+            epoch.init_proposers().expect("should init proposers");
+
+            // Apply proposers tree
+            drive
+                .apply_current_batch(true, Some(&transaction))
+                .expect("should apply batch");
+
+            drive
+                .start_current_batch()
+                .expect("should start current batch");
 
             epoch
                 .increment_proposer_block_count(&pro_tx_hash, Some(&transaction))
-                .expect("to udpate proposer block count");
+                .expect("should update proposer block count");
+
+            drive
+                .apply_current_batch(true, Some(&transaction))
+                .expect("should apply batch");
 
             let stored_block_count = epoch
                 .get_proposer_block_count(&pro_tx_hash, Some(&transaction))
-                .expect("to get proposer block count");
+                .expect("should get proposer block count");
 
             assert_eq!(stored_block_count, 1);
         }
@@ -306,21 +312,45 @@ mod tests {
 
             let epoch = super::EpochPool::new(0, &drive);
 
-            epoch
-                .init_proposers(Some(&transaction))
-                .expect("to init proposers");
+            drive
+                .start_current_batch()
+                .expect("should start current batch");
+
+            epoch.init_proposers().expect("should init proposers");
+
+            // Apply proposers tree
+            drive
+                .apply_current_batch(true, Some(&transaction))
+                .expect("should apply batch");
+
+            drive
+                .start_current_batch()
+                .expect("should start current batch");
 
             epoch
-                .update_proposer_block_count(&pro_tx_hash, 1, Some(&transaction))
-                .expect("to udpate proposer block count");
+                .update_proposer_block_count(&pro_tx_hash, 1)
+                .expect("should update proposer block count");
+
+            // Apply proposer block count
+            drive
+                .apply_current_batch(true, Some(&transaction))
+                .expect("should apply batch");
+
+            drive
+                .start_current_batch()
+                .expect("should start current batch");
 
             epoch
                 .increment_proposer_block_count(&pro_tx_hash, Some(&transaction))
-                .expect("to udpate proposer block count");
+                .expect("should update proposer block count");
+
+            drive
+                .apply_current_batch(true, Some(&transaction))
+                .expect("should apply batch");
 
             let stored_block_count = epoch
                 .get_proposer_block_count(&pro_tx_hash, Some(&transaction))
-                .expect("to get proposer block count");
+                .expect("should get proposer block count");
 
             assert_eq!(stored_block_count, 2);
         }
@@ -336,7 +366,7 @@ mod tests {
 
             let result = epoch
                 .is_proposers_tree_empty(Some(&transaction))
-                .expect("to check if tree is empty");
+                .expect("should check if tree is empty");
 
             assert_eq!(result, true);
         }
@@ -353,23 +383,33 @@ mod tests {
 
             let epoch = super::EpochPool::new(0, &drive);
 
-            epoch
-                .init_proposers(Some(&transaction))
-                .expect("to init proposers");
+            drive
+                .start_current_batch()
+                .expect("should start current batch");
+
+            epoch.init_proposers().expect("should init proposers");
 
             epoch
-                .update_proposer_block_count(&pro_tx_hash, block_count, Some(&transaction))
-                .expect("to udpate proposer block count");
+                .update_proposer_block_count(&pro_tx_hash, block_count)
+                .expect("should update proposer block count");
+
+            drive
+                .apply_current_batch(true, Some(&transaction))
+                .expect("should apply batch");
 
             let result = epoch
                 .get_proposers(100, Some(&transaction))
-                .expect("to get proposers");
+                .expect("should get proposers");
 
             assert_eq!(result, vec!((pro_tx_hash.to_vec(), block_count)));
         }
     }
 
     mod delete_proposers {
+        use crate::fee::pools::epoch::constants;
+        use costs::CostResult;
+        use grovedb::{Element, Error};
+
         #[test]
         fn test_values_has_been_deleted() {
             let drive = super::setup_drive();
@@ -380,23 +420,44 @@ mod tests {
 
             let epoch = super::EpochPool::new(0, &drive);
 
-            epoch
-                .init_proposers(Some(&transaction))
-                .expect("to init proposers");
+            drive
+                .start_current_batch()
+                .expect("should start current batch");
 
-            epoch
-                .update_proposer_block_count(&pro_tx_hash, block_count, Some(&transaction))
-                .expect("to udpate proposer block count");
+            epoch.init_proposers().expect("should init proposers");
+
+            // Apply proposers tree
+            drive
+                .apply_current_batch(true, Some(&transaction))
+                .expect("should apply batch");
+
+            drive
+                .start_current_batch()
+                .expect("should start current batch");
 
             epoch
                 .delete_proposers(Some(&transaction))
-                .expect("to delete proposers");
+                .expect("should delete proposers");
 
-            let result = epoch
-                .get_proposers(100, Some(&transaction))
-                .expect("to get proposers");
+            drive
+                .apply_current_batch(true, Some(&transaction))
+                .expect("should apply batch");
 
-            assert_eq!(result, vec!());
+            match drive
+                .grove
+                .get(
+                    epoch.get_path(),
+                    constants::KEY_PROPOSERS.as_bytes(),
+                    Some(&transaction),
+                )
+                .unwrap()
+            {
+                Ok(_) => assert!(false, "expect tree not exists"),
+                Err(e) => match e {
+                    Error::PathKeyNotFound(_) => assert!(true),
+                    _ => assert!(false, "invalid error type"),
+                },
+            }
         }
     }
 }

@@ -1,6 +1,7 @@
 use grovedb::{Element, TransactionArg};
 use rust_decimal_macros::dec;
 
+use crate::drive::object_size_info::{KeyInfo, PathKeyElementInfo};
 use crate::drive::Drive;
 use crate::error::fee::FeeError;
 use crate::error::Error;
@@ -23,21 +24,15 @@ impl<'e> EpochPool<'e> {
         }
     }
 
-    pub fn init_empty(&self, transaction: TransactionArg) -> Result<(), Error> {
-        // init epoch tree
-        self.drive
-            .grove
-            .insert(
-                FeePools::get_path(),
-                &self.key,
-                Element::empty_tree(),
-                transaction,
-            )
-            .unwrap()
-            .map_err(Error::GroveDB)?;
+    pub fn init_empty(&self) -> Result<(), Error> {
+        self.drive.current_batch_insert_empty_tree(
+            FeePools::get_path(),
+            KeyInfo::KeyRef(&self.key),
+            None,
+        )?;
 
         // init storage fee item to 0
-        self.update_storage_fee(dec!(0.0), transaction)?;
+        self.update_storage_fee(dec!(0.0))?;
 
         Ok(())
     }
@@ -47,17 +42,16 @@ impl<'e> EpochPool<'e> {
         multiplier: u64,
         start_block_height: u64,
         start_time: i64,
-        transaction: TransactionArg,
     ) -> Result<(), Error> {
-        self.update_start_block_height(start_block_height, transaction)?;
+        self.update_start_block_height(start_block_height)?;
 
-        self.update_processing_fee(0u64, transaction)?;
+        self.update_processing_fee(0u64)?;
 
-        self.init_proposers(transaction)?;
+        self.init_proposers()?;
 
-        self.update_fee_multiplier(multiplier, transaction)?;
+        self.update_fee_multiplier(multiplier)?;
 
-        self.update_start_time(start_time, transaction)?;
+        self.update_start_time(start_time)?;
 
         Ok(())
     }
@@ -84,19 +78,13 @@ impl<'e> EpochPool<'e> {
         ]
     }
 
-    pub fn update_start_time(&self, time: i64, transaction: TransactionArg) -> Result<(), Error> {
+    pub fn update_start_time(&self, time: i64) -> Result<(), Error> {
         self.drive
-            .grove
-            .insert(
+            .current_batch_insert(PathKeyElementInfo::PathFixedSizeKeyElement((
                 self.get_path(),
                 constants::KEY_START_TIME.as_bytes(),
                 Element::Item(time.to_le_bytes().to_vec(), None),
-                transaction,
-            )
-            .unwrap()
-            .map_err(Error::GroveDB)?;
-
-        Ok(())
+            )))
     }
 
     pub fn get_start_time(&self, transaction: TransactionArg) -> Result<i64, Error> {
@@ -141,21 +129,13 @@ impl<'e> EpochPool<'e> {
         }
     }
 
-    pub fn update_start_block_height(
-        &self,
-        start_block_height: u64,
-        transaction: TransactionArg,
-    ) -> Result<(), Error> {
+    pub fn update_start_block_height(&self, start_block_height: u64) -> Result<(), Error> {
         self.drive
-            .grove
-            .insert(
+            .current_batch_insert(PathKeyElementInfo::PathFixedSizeKeyElement((
                 self.get_path(),
                 constants::KEY_START_BLOCK_HEIGHT.as_bytes(),
                 Element::Item(start_block_height.to_le_bytes().to_vec(), None),
-                transaction,
-            )
-            .unwrap()
-            .map_err(Error::GroveDB)
+            )))
     }
 }
 
@@ -168,9 +148,7 @@ mod tests {
     use crate::error;
     use crate::error::fee::FeeError;
     use crate::fee::pools::epoch::constants;
-    use crate::fee::pools::tests::helpers::setup::{
-        setup_drive, setup_fee_pools, SetupFeePoolsOptions,
-    };
+    use crate::fee::pools::tests::helpers::setup::{setup_drive, setup_fee_pools};
 
     use super::EpochPool;
 
@@ -184,9 +162,17 @@ mod tests {
 
         let start_time: i64 = Utc::now().timestamp_millis();
 
+        drive
+            .start_current_batch()
+            .expect("should start current batch");
+
         epoch_pool
-            .update_start_time(start_time, Some(&transaction))
+            .update_start_time(start_time)
             .expect("should update start time");
+
+        drive
+            .apply_current_batch(true, Some(&transaction))
+            .expect("should apply batch");
 
         let actual_start_time = epoch_pool
             .get_start_time(Some(&transaction))
@@ -250,7 +236,7 @@ mod tests {
                     Some(&transaction),
                 )
                 .unwrap()
-                .expect("to insert invalid data");
+                .expect("should insert invalid data");
 
             match epoch_pool.get_start_time(Some(&transaction)) {
                 Ok(_) => assert!(false, "must be an error"),
@@ -280,7 +266,7 @@ mod tests {
                     Some(&transaction),
                 )
                 .unwrap()
-                .expect("to insert invalid data");
+                .expect("should insert invalid data");
 
             match epoch_pool.get_start_time(Some(&transaction)) {
                 Ok(_) => assert!(false, "must be an error"),
@@ -304,9 +290,17 @@ mod tests {
 
         let start_block_height = 1;
 
+        drive
+            .start_current_batch()
+            .expect("should start current batch");
+
         epoch_pool
-            .update_start_block_height(start_block_height, Some(&transaction))
+            .update_start_block_height(start_block_height)
             .expect("should update start block height");
+
+        drive
+            .apply_current_batch(true, Some(&transaction))
+            .expect("should apply batch");
 
         let actual_start_block_height = epoch_pool
             .get_start_block_height(Some(&transaction))
@@ -370,7 +364,7 @@ mod tests {
                     Some(&transaction),
                 )
                 .unwrap()
-                .expect("to insert invalid data");
+                .expect("should insert invalid data");
 
             match epoch_pool.get_start_block_height(Some(&transaction)) {
                 Ok(_) => assert!(false, "should not be able to decode stored value"),
@@ -402,7 +396,7 @@ mod tests {
                     Some(&transaction),
                 )
                 .unwrap()
-                .expect("to insert invalid data");
+                .expect("should insert invalid data");
 
             match epoch_pool.get_start_block_height(Some(&transaction)) {
                 Ok(_) => assert!(false, "should not be able to decode stored value"),
@@ -419,23 +413,31 @@ mod tests {
     }
 
     mod init_empty {
+        use crate::fee::pools::tests::helpers::setup::SetupFeePoolsOptions;
+
         #[test]
         fn test_error_if_fee_pools_not_initialized() {
             let drive = super::setup_drive();
             let (transaction, _) = super::setup_fee_pools(
                 &drive,
-                Some(super::SetupFeePoolsOptions {
+                Some(SetupFeePoolsOptions {
                     init_fee_pools: false,
                 }),
             );
 
             let epoch = super::EpochPool::new(1042, &drive);
 
-            match epoch.init_empty(Some(&transaction)) {
+            drive
+                .start_current_batch()
+                .expect("should start current batch");
+
+            epoch.init_empty().expect("should init empty pool");
+
+            match drive.apply_current_batch(true, Some(&transaction)) {
                 Ok(_) => assert!(false, "should not be able to init epoch without FeePools"),
                 Err(e) => match e {
                     super::error::Error::GroveDB(grovedb::Error::InvalidPath(_)) => assert!(true),
-                    _ => assert!(false, "ivalid error type"),
+                    _ => assert!(false, "invalid error type"),
                 },
             }
         }
@@ -447,13 +449,19 @@ mod tests {
 
             let epoch = super::EpochPool::new(1042, &drive);
 
-            epoch
-                .init_empty(Some(&transaction))
-                .expect("to init an epoch pool");
+            drive
+                .start_current_batch()
+                .expect("should start current batch");
+
+            epoch.init_empty().expect("should init an epoch pool");
+
+            drive
+                .apply_current_batch(true, Some(&transaction))
+                .expect("should apply batch");
 
             let storage_fee = epoch
                 .get_storage_fee(Some(&transaction))
-                .expect("to get storage fee");
+                .expect("should get storage fee");
 
             assert_eq!(storage_fee, super::dec!(0.0));
         }
@@ -471,46 +479,47 @@ mod tests {
             let start_time = 1;
             let start_block_height = 2;
 
-            epoch
-                .init_empty(Some(&transaction))
-                .expect("to init empty epoch pool");
+            drive
+                .start_current_batch()
+                .expect("should start current batch");
+
+            epoch.init_empty().expect("should init empty epoch pool");
 
             epoch
-                .init_current(
-                    multiplier,
-                    start_block_height,
-                    start_time,
-                    Some(&transaction),
-                )
-                .expect("to init an epoch pool");
+                .init_current(multiplier, start_block_height, start_time)
+                .expect("should init an epoch pool");
+
+            drive
+                .apply_current_batch(true, Some(&transaction))
+                .expect("should apply batch");
 
             let stored_multiplier = epoch
                 .get_fee_multiplier(Some(&transaction))
-                .expect("to get multiplier");
+                .expect("should get multiplier");
 
             assert_eq!(stored_multiplier, multiplier);
 
             let stored_start_time = epoch
                 .get_start_time(Some(&transaction))
-                .expect("to get start time");
+                .expect("should get start time");
 
             assert_eq!(stored_start_time, start_time);
 
             let stored_block_height = epoch
                 .get_start_block_height(Some(&transaction))
-                .expect("to get start block height");
+                .expect("should get start block height");
 
             assert_eq!(stored_block_height, start_block_height);
 
             let stored_processing_fee = epoch
                 .get_processing_fee(Some(&transaction))
-                .expect("to get processing fee");
+                .expect("should get processing fee");
 
             assert_eq!(stored_processing_fee, 0);
 
             let proposers = epoch
                 .get_proposers(1, Some(&transaction))
-                .expect("to get proposers");
+                .expect("should get proposers");
 
             assert_eq!(proposers, vec!());
         }
@@ -524,17 +533,30 @@ mod tests {
 
             let epoch = super::EpochPool::new(0, &drive);
 
-            epoch
-                .init_empty(Some(&transaction))
-                .expect("to init empty epoch pool");
+            drive
+                .start_current_batch()
+                .expect("should start current batch");
 
             epoch
-                .init_current(1, 2, 3, Some(&transaction))
-                .expect("to init an epoch pool");
+                .init_current(1, 2, 3)
+                .expect("should init an epoch pool");
+
+            // Apply init current
+            drive
+                .apply_current_batch(true, Some(&transaction))
+                .expect("should apply batch");
+
+            drive
+                .start_current_batch()
+                .expect("should start current batch");
 
             epoch
                 .mark_as_paid(Some(&transaction))
-                .expect("to mark epoch as paid");
+                .expect("should mark epoch as paid");
+
+            drive
+                .apply_current_batch(true, Some(&transaction))
+                .expect("should apply batch");
 
             match drive
                 .grove

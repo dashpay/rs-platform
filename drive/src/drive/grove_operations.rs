@@ -1,6 +1,7 @@
 use costs::CostContext;
 use grovedb::batch::{BatchApplyOptions, GroveDbOp, Op};
 use grovedb::{Element, PathQuery, TransactionArg};
+use std::ops::DerefMut;
 
 use crate::drive::flags::StorageFlags;
 use crate::drive::object_size_info::KeyInfo::{Key, KeyRef, KeySize};
@@ -75,7 +76,7 @@ impl Drive {
                     drive_operations.push(DriveOperation::for_empty_tree(
                         path_items,
                         key.to_vec(),
-                        storage_flags,
+                        Some(storage_flags),
                     ));
                 }
 
@@ -123,7 +124,7 @@ impl Drive {
                         drive_operations.push(DriveOperation::for_empty_tree(
                             path,
                             key.to_vec(),
-                            storage_flags,
+                            Some(storage_flags),
                         ));
                         drive_operations.push(CostCalculationQueryOperation(
                             SizesOfQueryOperation::for_key_check_in_path(key.len(), path_iter),
@@ -166,7 +167,7 @@ impl Drive {
                         drive_operations.push(DriveOperation::for_empty_tree(
                             path,
                             key.to_vec(),
-                            storage_flags,
+                            Some(storage_flags),
                         ));
                         drive_operations.push(CostCalculationQueryOperation(
                             SizesOfQueryOperation::for_key_check_in_path(key.len(), path_iter),
@@ -194,7 +195,7 @@ impl Drive {
                         drive_operations.push(DriveOperation::for_empty_tree(
                             path_items,
                             key.to_vec(),
-                            storage_flags,
+                            Some(storage_flags),
                         ));
                         drive_operations.push(CostCalculationQueryOperation(
                             SizesOfQueryOperation::for_key_check_in_path(key.len(), path),
@@ -222,7 +223,7 @@ impl Drive {
                         drive_operations.push(DriveOperation::for_empty_tree(
                             path_items,
                             key.to_vec(),
-                            storage_flags,
+                            Some(storage_flags),
                         ));
                         drive_operations.push(CostCalculationQueryOperation(
                             SizesOfQueryOperation::for_key_check_in_path(key.len(), path),
@@ -485,7 +486,7 @@ impl Drive {
         &'a self,
         path: P,
         key_info: KeyInfo<'c>,
-        storage_flags: &StorageFlags,
+        storage_flags: Option<&StorageFlags>,
         drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<(), Error>
     where
@@ -539,7 +540,7 @@ impl Drive {
                     drive_operations.push(DriveOperation::for_empty_tree(
                         path,
                         key.to_vec(),
-                        storage_flags,
+                        Some(storage_flags),
                     ));
                 }
                 Ok(!has_raw)
@@ -569,7 +570,7 @@ impl Drive {
                     drive_operations.push(DriveOperation::for_empty_tree(
                         path,
                         key.to_vec(),
-                        storage_flags,
+                        Some(storage_flags),
                     ));
                 }
                 Ok(!has_raw)
@@ -587,7 +588,7 @@ impl Drive {
                     drive_operations.push(DriveOperation::for_empty_tree(
                         path_items,
                         key.to_vec(),
-                        storage_flags,
+                        Some(storage_flags),
                     ));
                 }
                 Ok(!has_raw)
@@ -600,7 +601,7 @@ impl Drive {
                     drive_operations.push(DriveOperation::for_empty_tree(
                         path_items,
                         key.to_vec(),
-                        storage_flags,
+                        Some(storage_flags),
                     ));
                 }
                 Ok(!has_raw)
@@ -821,5 +822,90 @@ impl Drive {
             }),
         );
         push_drive_operation_result(cost_context, drive_operations)
+    }
+
+    pub(crate) fn start_current_batch(&self) -> Result<(), Error> {
+        let current_batch = self.current_batch.borrow();
+
+        if current_batch.len() > 0 {
+            return Err(Error::Drive(DriveError::CurrentBranchIsAlreadyStarted()));
+        }
+
+        Ok(())
+    }
+
+    pub(crate) fn current_batch_insert_empty_tree<'a, 'c, P>(
+        &'a self,
+        path: P,
+        key_info: KeyInfo<'c>,
+        storage_flags: Option<&StorageFlags>,
+    ) -> Result<(), Error>
+    where
+        P: IntoIterator<Item = &'c [u8]>,
+        <P as IntoIterator>::IntoIter: ExactSizeIterator + DoubleEndedIterator + Clone,
+    {
+        self.batch_insert_empty_tree(
+            path,
+            key_info,
+            storage_flags,
+            self.current_batch.borrow_mut().deref_mut(),
+        )
+    }
+
+    pub(crate) fn current_batch_insert<const N: usize>(
+        &self,
+        path_key_element_info: PathKeyElementInfo<N>,
+    ) -> Result<(), Error> {
+        self.batch_insert(
+            path_key_element_info,
+            self.current_batch.borrow_mut().deref_mut(),
+        )
+    }
+
+    pub(crate) fn current_batch_delete<'a, 'c, P>(
+        &'a self,
+        path: P,
+        key: &'c [u8],
+        only_delete_tree_if_empty: bool,
+        transaction: TransactionArg,
+    ) -> Result<(), Error>
+    where
+        P: IntoIterator<Item = &'c [u8]>,
+        <P as IntoIterator>::IntoIter: ExactSizeIterator + DoubleEndedIterator + Clone,
+    {
+        self.batch_delete(
+            path,
+            key,
+            only_delete_tree_if_empty,
+            transaction,
+            self.current_batch.borrow_mut().deref_mut(),
+        )
+    }
+
+    pub(crate) fn apply_current_batch(
+        &self,
+        validate: bool,
+        transaction: TransactionArg,
+    ) -> Result<(), Error> {
+        {
+            let current_batch = self.current_batch.borrow();
+
+            if current_batch.len() == 0 {
+                return Err(Error::Drive(DriveError::CurrentBranchIsEmpty()));
+            }
+        }
+
+        let grovedb_operations = DriveOperation::grovedb_operations(&self.current_batch.borrow());
+
+        self.grove_apply_batch(
+            grovedb_operations,
+            validate,
+            transaction,
+            self.current_batch.borrow_mut().deref_mut(),
+        )?;
+
+        self.current_batch.borrow_mut().clear();
+
+        Ok(())
     }
 }

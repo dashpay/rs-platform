@@ -11,37 +11,44 @@ use crate::fee::calculate_fee;
 use crate::fee::op::DriveOperation;
 
 impl Drive {
+    pub fn insert_identity_operations(
+        &self,
+        identity: Identity,
+        drive_operations: &mut Vec<DriveOperation>,
+    ) -> Result<(), Error> {
+        let epoch = self.epoch_info.borrow().current_epoch;
+
+        let storage_flags = StorageFlags { epoch };
+
+        let identity_bytes = identity.to_buffer().map_err(|_| {
+            Error::Identity(IdentityError::IdentitySerialization(
+                "failed to serialize identity to CBOR",
+            ))
+        })?;
+
+        self.batch_insert(
+            PathFixedSizeKeyElement((
+                [Into::<&[u8; 1]>::into(RootTree::Identities).as_slice()],
+                &identity.id.buffer,
+                Element::Item(identity_bytes, storage_flags.to_element_flags()),
+            )),
+            drive_operations,
+        )
+    }
+
     pub fn insert_identity(
         &self,
         identity: Identity,
         apply: bool,
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
-        let mut batch_operations: Vec<DriveOperation> = vec![];
+        let mut operations_batch: Vec<DriveOperation> = vec![];
 
-        let epoch = self.epoch_info.borrow().current_epoch;
-
-        let storage_flags = StorageFlags { epoch };
-
-        self.batch_insert(
-            PathFixedSizeKeyElement((
-                [Into::<&[u8; 1]>::into(RootTree::Identities).as_slice()],
-                &identity.id.buffer,
-                Element::Item(
-                    identity.to_buffer().map_err(|_| {
-                        Error::Identity(IdentityError::IdentitySerialization(
-                            "failed to serialize identity to CBOR",
-                        ))
-                    })?,
-                    storage_flags.to_element_flags(),
-                ),
-            )),
-            &mut batch_operations,
-        )?;
+        self.insert_identity_operations(identity, &mut operations_batch)?;
 
         let mut drive_operations: Vec<DriveOperation> = vec![];
 
-        self.apply_batch(apply, transaction, batch_operations, &mut drive_operations)?;
+        self.apply_batch(apply, transaction, operations_batch, &mut drive_operations)?;
 
         calculate_fee(None, Some(drive_operations))
     }

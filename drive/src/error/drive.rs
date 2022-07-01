@@ -52,4 +52,10 @@ pub enum DriveError {
 
     #[error("corrupted serialization error: {0}")]
     CorruptedSerialization(&'static str),
+
+    #[error("current batch is already started")]
+    CurrentBranchIsAlreadyStarted(),
+
+    #[error("current batch is empty")]
+    CurrentBranchIsEmpty(),
 }
