@@ -430,11 +430,10 @@ mod tests {
             let drive = super::setup_drive();
             let (transaction, fee_pools) = super::setup_fee_pools(&drive, None);
 
-            // Create epoch 0
+            // Create epochs
 
             let unpaid_epoch_pool_0 = super::EpochPool::new(0, &drive);
-
-            let unpaid_epoch_pool_0_proposers_count = 200;
+            let unpaid_epoch_pool_1 = super::EpochPool::new(1, &drive);
 
             drive
                 .start_current_batch()
@@ -443,6 +442,20 @@ mod tests {
             unpaid_epoch_pool_0
                 .init_current(1, 1, 1)
                 .expect("should create proposers tree");
+
+            let unpaid_epoch_pool_0_proposers_count = 200;
+
+            unpaid_epoch_pool_1
+                .init_current(1, unpaid_epoch_pool_0_proposers_count as u64 + 1, 2)
+                .expect("should create proposers tree");
+
+            drive
+                .apply_current_batch(true, Some(&transaction))
+                .expect("should apply batch");
+
+            drive
+                .start_current_batch()
+                .expect("should start current batch");
 
             fee_pools
                 .distribute_fees_into_pools(
@@ -459,14 +472,6 @@ mod tests {
                 unpaid_epoch_pool_0_proposers_count,
                 Some(&transaction),
             );
-
-            // Create epoch 1
-
-            let unpaid_epoch_pool_1 = super::EpochPool::new(1, &drive);
-
-            unpaid_epoch_pool_1
-                .init_current(1, unpaid_epoch_pool_0_proposers_count as u64 + 1, 2)
-                .expect("should create proposers tree");
 
             super::populate_proposers(&unpaid_epoch_pool_1, 200, Some(&transaction));
 
