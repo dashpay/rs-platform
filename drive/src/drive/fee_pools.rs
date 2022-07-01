@@ -10,8 +10,12 @@ use chrono::Utc;
 
 impl Drive {
     pub fn init_fee_pools(&self, transaction: TransactionArg) -> Result<(), Error> {
+        self.start_current_batch()?;
+
         // initialize the pools with epochs
-        self.fee_pools.borrow().init(self, transaction)
+        self.fee_pools.borrow().init(self)?;
+
+        self.apply_current_batch(false, transaction)
     }
 
     pub fn process_block(
@@ -117,9 +121,7 @@ mod tests {
             let drive = super::setup_drive();
             let (transaction, mut fee_pools) = super::setup_fee_pools(&drive, None);
 
-            fee_pools
-                .init(&drive, Some(&transaction))
-                .expect("should init fee pools");
+            fee_pools.init(&drive).expect("should init fee pools");
 
             super::create_mn_shares_contract(&drive);
 

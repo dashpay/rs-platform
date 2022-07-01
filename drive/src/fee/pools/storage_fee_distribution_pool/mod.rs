@@ -478,9 +478,7 @@ mod tests {
             .start_current_batch()
             .expect("should start current batch");
 
-        fee_pools
-            .init(&drive, Some(&transaction))
-            .expect("should init fee pools");
+        fee_pools.init(&drive).expect("should init fee pools");
 
         fee_pools
             .storage_fee_distribution_pool

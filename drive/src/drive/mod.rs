@@ -161,7 +161,6 @@ impl Drive {
                 transaction,
             )
             .unwrap()?;
-        // TODO: Create fee pools tree?
         Ok(())
     }
 

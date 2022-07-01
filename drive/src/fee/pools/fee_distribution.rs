@@ -510,9 +510,7 @@ mod tests {
 
             let fee_pools = FeePools::new();
 
-            fee_pools
-                .init(&drive, Some(&transaction))
-                .expect("fee pools to init");
+            fee_pools.init(&drive).expect("fee pools to init");
 
             let epoch = EpochPool::new(0, &drive);
 

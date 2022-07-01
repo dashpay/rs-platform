@@ -2,7 +2,7 @@ use grovedb::{Element, TransactionArg};
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 
-use crate::drive::object_size_info::PathKeyElementInfo;
+use crate::drive::object_size_info::{KeyInfo, PathKeyElementInfo};
 use crate::drive::{Drive, RootTree};
 use crate::error::fee::FeeError;
 use crate::error::Error;
@@ -29,19 +29,13 @@ impl FeePools {
         [Into::<&[u8; 1]>::into(RootTree::Pools)]
     }
 
-    pub fn init(&self, drive: &Drive, transaction: TransactionArg) -> Result<(), Error> {
+    pub fn init(&self, drive: &Drive) -> Result<(), Error> {
         // init fee pool subtree
-        // TODO: Move to create root tree?
-        drive
-            .grove
-            .insert(
-                [],
-                FeePools::get_path()[0],
-                Element::empty_tree(),
-                transaction,
-            )
-            .unwrap()
-            .map_err(Error::GroveDB)?;
+        drive.current_batch_insert_empty_tree(
+            [],
+            KeyInfo::KeyRef(FeePools::get_path()[0]),
+            None,
+        )?;
 
         // Update storage credit pool
         drive.current_batch_insert(PathKeyElementInfo::PathFixedSizeKeyElement((

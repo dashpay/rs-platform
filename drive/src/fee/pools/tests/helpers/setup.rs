@@ -41,9 +41,7 @@ pub fn setup_fee_pools<'a>(
             .start_current_batch()
             .expect("should start current batch");
 
-        fee_pools
-            .init(&drive, Some(&transaction))
-            .expect("should init fee pools");
+        fee_pools.init(&drive).expect("should init fee pools");
 
         drive
             .apply_current_batch(true, Some(&transaction))
