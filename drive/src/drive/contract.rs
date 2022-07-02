@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use costs::CostContext;
@@ -177,15 +178,20 @@ impl Drive {
                 &mut batch_operations,
             )?;
 
+            let mut index_cache: HashSet<&[u8]> = HashSet::new();
             // for each type we should insert the indices that are top level
             for index in document_type.top_level_indices()? {
                 // toDo: change this to be a reference by index
-                self.batch_insert_empty_tree(
-                    type_path,
-                    KeyRef(index.name.as_bytes()),
-                    &storage_flags,
-                    &mut batch_operations,
-                )?;
+                let index_bytes = index.name.as_bytes();
+                if !index_cache.contains(index_bytes) {
+                    self.batch_insert_empty_tree(
+                        type_path,
+                        KeyRef(index_bytes),
+                        &storage_flags,
+                        &mut batch_operations,
+                    )?;
+                    index_cache.insert(index_bytes);
+                }
             }
         }
         self.apply_batch(apply, transaction, batch_operations, drive_operations)
@@ -277,16 +283,21 @@ impl Drive {
                     type_key.as_bytes(),
                 ];
 
+                let mut index_cache: HashSet<&[u8]> = HashSet::new();
                 // for each type we should insert the indices that are top level
                 for index in document_type.top_level_indices()? {
                     // toDo: we can save a little by only inserting on new indexes
-                    self.batch_insert_empty_tree_if_not_exists(
-                        PathFixedSizeKeyRef((type_path, index.name.as_bytes())),
-                        &storage_flags,
-                        apply,
-                        transaction,
-                        &mut batch_operations,
-                    )?;
+                    let index_bytes = index.name.as_bytes();
+                    if !index_cache.contains(index_bytes) {
+                        self.batch_insert_empty_tree_if_not_exists(
+                            PathFixedSizeKeyRef((type_path, index.name.as_bytes())),
+                            &storage_flags,
+                            apply,
+                            transaction,
+                            &mut batch_operations,
+                        )?;
+                        index_cache.insert(index_bytes);
+                    }
                 }
             } else {
                 // We can just insert this directly because the original document type already exists
@@ -312,15 +323,20 @@ impl Drive {
                     &mut batch_operations,
                 )?;
 
+                let mut index_cache: HashSet<&[u8]> = HashSet::new();
                 // for each type we should insert the indices that are top level
                 for index in document_type.top_level_indices()? {
                     // toDo: change this to be a reference by index
-                    self.batch_insert_empty_tree(
-                        type_path,
-                        KeyRef(index.name.as_bytes()),
-                        &storage_flags,
-                        &mut batch_operations,
-                    )?;
+                    let index_bytes = index.name.as_bytes();
+                    if !index_cache.contains(index_bytes) {
+                        self.batch_insert_empty_tree(
+                            type_path,
+                            KeyRef(index.name.as_bytes()),
+                            &storage_flags,
+                            &mut batch_operations,
+                        )?;
+                        index_cache.insert(index_bytes);
+                    }
                 }
             }
         }

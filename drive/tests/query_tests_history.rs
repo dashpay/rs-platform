@@ -16,7 +16,7 @@ use rs_drive::drive::Drive;
 use rs_drive::error::{query::QueryError, Error};
 use rs_drive::query::DriveQuery;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 struct Person {
     #[serde(rename = "$id")]
@@ -115,8 +115,11 @@ pub fn setup(count: u32, seed: u64) -> (Drive, Contract, TempDir) {
     let block_times: Vec<u64> = vec![0, 15, 100, 1000];
 
     let people_at_block_times = Person::random_people_for_block_times(count, seed, block_times);
+
+    dbg!(&people_at_block_times);
+
     for (block_time, people) in people_at_block_times {
-        for person in people {
+        for (i, person) in people.iter().enumerate() {
             let value = serde_json::to_value(&person).expect("serialized person");
             let document_cbor =
                 common::value_to_cbor(value, Some(rs_drive::drive::defaults::PROTOCOL_VERSION));
@@ -127,6 +130,10 @@ pub fn setup(count: u32, seed: u64) -> (Drive, Contract, TempDir) {
                 .expect("expected to get document type");
 
             let storage_flags = StorageFlags { epoch: 0 };
+
+            if block_time == 100 && i == 9 {
+                dbg!("block time {} {} {:#?}",block_time, i, person);
+            }
 
             drive
                 .add_document_for_contract(
@@ -144,8 +151,7 @@ pub fn setup(count: u32, seed: u64) -> (Drive, Contract, TempDir) {
                     block_time as f64,
                     true,
                     Some(&db_transaction),
-                )
-                .expect("document should be inserted");
+                ).expect("expected to add document");
         }
     }
     drive

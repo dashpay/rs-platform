@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+use std::option::Option::None;
 use grovedb::{Element, TransactionArg};
 
 use crate::contract::document::Document;
@@ -385,6 +387,8 @@ impl Drive {
 
         let storage_flags = document_and_contract_info.document_info.get_storage_flags();
 
+        let mut batch_insertion_cache: HashSet<Vec<Vec<u8>>> = HashSet::new();
+
         // fourth we need to store a reference to the document for each index
         for index in &document_and_contract_info.document_type.indices {
             // at this point the contract path is to the contract documents
@@ -415,14 +419,19 @@ impl Drive {
             // The zero will not matter here, because the PathKeyInfo is variable
             let path_key_info = document_top_field.clone().add_path::<0>(index_path.clone());
 
-            // here we are inserting an empty tree that will have a subtree of all other index properties
-            self.batch_insert_empty_tree_if_not_exists(
-                path_key_info,
-                &storage_flags,
-                apply,
-                transaction,
-                &mut batch_operations,
-            )?;
+            if !path_key_info.is_contained_in_cache(&batch_insertion_cache) {
+                // here we are inserting an empty tree that will have a subtree of all other index properties
+                let inserted = self.batch_insert_empty_tree_if_not_exists(
+                    path_key_info.clone(),
+                    &storage_flags,
+                    apply,
+                    transaction,
+                    &mut batch_operations,
+                )?;
+                if inserted {
+                    path_key_info.add_to_cache(&mut batch_insertion_cache);
+                }
+            }
 
             let mut any_fields_null = document_top_field.is_empty();
 
@@ -459,14 +468,19 @@ impl Drive {
                     .clone()
                     .add_path_info(index_path_info.clone());
 
-                // here we are inserting an empty tree that will have a subtree of all other index properties
-                self.batch_insert_empty_tree_if_not_exists(
-                    path_key_info,
-                    &storage_flags,
-                    apply,
-                    transaction,
-                    &mut batch_operations,
-                )?;
+                if !path_key_info.is_contained_in_cache(&batch_insertion_cache) {
+                    // here we are inserting an empty tree that will have a subtree of all other index properties
+                    let inserted = self.batch_insert_empty_tree_if_not_exists(
+                        path_key_info.clone(),
+                        &storage_flags,
+                        apply,
+                        transaction,
+                        &mut batch_operations,
+                    )?;
+                    if inserted {
+                        path_key_info.add_to_cache(&mut batch_insertion_cache);
+                    }
+                }
 
                 index_path_info.push(index_property_key)?;
 
@@ -477,14 +491,19 @@ impl Drive {
                     .clone()
                     .add_path_info(index_path_info.clone());
 
-                // here we are inserting an empty tree that will have a subtree of all other index properties
-                self.batch_insert_empty_tree_if_not_exists(
-                    path_key_info,
-                    &storage_flags,
-                    apply,
-                    transaction,
-                    &mut batch_operations,
-                )?;
+                if !path_key_info.is_contained_in_cache(&batch_insertion_cache) {
+                    // here we are inserting an empty tree that will have a subtree of all other index properties
+                    let inserted = self.batch_insert_empty_tree_if_not_exists(
+                        path_key_info.clone(),
+                        &storage_flags,
+                        apply,
+                        transaction,
+                        &mut batch_operations,
+                    )?;
+                    if inserted {
+                        path_key_info.add_to_cache(&mut batch_insertion_cache);
+                    }
+                }
 
                 any_fields_null |= document_index_field.is_empty();
 

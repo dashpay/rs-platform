@@ -1,3 +1,5 @@
+use std::collections::{HashMap, HashSet};
+use std::option::Option::None;
 use grovedb::{Element, TransactionArg};
 
 use crate::contract::document::Document;
@@ -228,6 +230,7 @@ impl Drive {
                     )))
                 }?;
 
+            let mut batch_insertion_cache: HashSet<Vec<Vec<u8>>> = HashSet::new();
             // fourth we need to store a reference to the document for each index
             for index in &document_type.indices {
                 // at this point the contract path is to the contract documents
@@ -266,16 +269,24 @@ impl Drive {
 
                 if change_occurred_on_index {
                     // here we are inserting an empty tree that will have a subtree of all other index properties
-                    self.batch_insert_empty_tree_if_not_exists(
-                        PathKeyInfo::PathKeyRef::<0>((
-                            index_path.clone(),
-                            document_top_field.as_slice(),
-                        )),
-                        storage_flags,
-                        apply,
-                        transaction,
-                        &mut batch_operations,
-                    )?;
+                    let mut qualified_path = index_path.clone();
+                    qualified_path.push(document_top_field.clone());
+
+                    if !batch_insertion_cache.contains(&qualified_path) {
+                        let inserted = self.batch_insert_empty_tree_if_not_exists(
+                            PathKeyInfo::PathKeyRef::<0>((
+                                index_path.clone(),
+                                document_top_field.as_slice(),
+                            )),
+                            storage_flags,
+                            apply,
+                            transaction,
+                            &mut batch_operations,
+                        )?;
+                        if inserted {
+                            batch_insertion_cache.insert(qualified_path);
+                        }
+                    }
                 }
 
                 let mut all_fields_null = document_top_field.is_empty();
@@ -314,16 +325,25 @@ impl Drive {
 
                     if change_occurred_on_index {
                         // here we are inserting an empty tree that will have a subtree of all other index properties
-                        self.batch_insert_empty_tree_if_not_exists(
-                            PathKeyInfo::PathKeyRef::<0>((
-                                index_path.clone(),
-                                index_property.name.as_bytes(),
-                            )),
-                            storage_flags,
-                            apply,
-                            transaction,
-                            &mut batch_operations,
-                        )?;
+
+                        let mut qualified_path = index_path.clone();
+                        qualified_path.push(index_property.name.as_bytes().to_vec());
+
+                        if !batch_insertion_cache.contains(&qualified_path) {
+                            let inserted = self.batch_insert_empty_tree_if_not_exists(
+                                PathKeyInfo::PathKeyRef::<0>((
+                                    index_path.clone(),
+                                    index_property.name.as_bytes(),
+                                )),
+                                storage_flags,
+                                apply,
+                                transaction,
+                                &mut batch_operations,
+                            )?;
+                            if inserted {
+                                batch_insertion_cache.insert(qualified_path);
+                            }
+                        }
                     }
 
                     index_path.push(Vec::from(index_property.name.as_bytes()));
@@ -334,16 +354,25 @@ impl Drive {
 
                     if change_occurred_on_index {
                         // here we are inserting an empty tree that will have a subtree of all other index properties
-                        self.batch_insert_empty_tree_if_not_exists(
-                            PathKeyInfo::PathKeyRef::<0>((
-                                index_path.clone(),
-                                document_index_field.as_slice(),
-                            )),
-                            storage_flags,
-                            apply,
-                            transaction,
-                            &mut batch_operations,
-                        )?;
+
+                        let mut qualified_path = index_path.clone();
+                        qualified_path.push(document_index_field.clone());
+
+                        if !batch_insertion_cache.contains(&qualified_path) {
+                            let inserted = self.batch_insert_empty_tree_if_not_exists(
+                                PathKeyInfo::PathKeyRef::<0>((
+                                    index_path.clone(),
+                                    document_index_field.as_slice(),
+                                )),
+                                storage_flags,
+                                apply,
+                                transaction,
+                                &mut batch_operations,
+                            )?;
+                            if inserted {
+                                batch_insertion_cache.insert(qualified_path);
+                            }
+                        }
                     }
 
                     all_fields_null &= document_index_field.is_empty();
@@ -410,6 +439,7 @@ impl Drive {
                             &mut batch_operations,
                         )?;
                     } else {
+                        // in one update you can't insert an element twice, so need to check the cache
                         // here we should return an error if the element already exists
                         let inserted = self.batch_insert_if_not_exists(
                             PathKeyElement::<0>((index_path, &[0], document_reference.clone())),
