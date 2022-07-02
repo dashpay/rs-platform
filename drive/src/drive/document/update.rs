@@ -1,5 +1,6 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::option::Option::None;
+
 use grovedb::{Element, TransactionArg};
 
 use crate::contract::document::Document;
@@ -462,14 +463,18 @@ impl Drive {
 
 #[cfg(test)]
 mod tests {
+    use base64::Config;
+    use std::collections::BTreeMap;
     use std::option::Option::None;
 
     use rand::Rng;
+    use serde::{Deserialize, Serialize};
     use serde_json::json;
     use tempfile::TempDir;
 
     use crate::common::{json_document_to_cbor, setup_contract, value_to_cbor};
     use crate::contract::{document::Document, Contract};
+    use crate::drive::config::DriveConfig;
     use crate::drive::flags::StorageFlags;
     use crate::drive::object_size_info::DocumentAndContractInfo;
     use crate::drive::object_size_info::DocumentInfo::DocumentAndSerialization;
@@ -1086,5 +1091,225 @@ mod tests {
                 Some(&db_transaction),
             )
             .expect("expected to update a document with history successfully");
+    }
+
+    #[derive(Serialize, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct Person {
+        #[serde(rename = "$id")]
+        id: Vec<u8>,
+        #[serde(rename = "$ownerId")]
+        owner_id: Vec<u8>,
+        first_name: String,
+        middle_name: String,
+        last_name: String,
+        message: Option<String>,
+        age: u8,
+    }
+
+    #[test]
+    fn test_update_complex_person_with_history_no_transaction() {
+        let tmp_dir = TempDir::new().unwrap();
+        let drive: Drive =
+            Drive::open(&tmp_dir, None).expect("expected to open Drive successfully");
+
+        drive
+            .create_root_tree(None)
+            .expect("expected to create root tree successfully");
+
+        // setup code
+        let contract = setup_contract(
+            &drive,
+            "tests/supporting_files/contract/family/family-contract-with-history-only-message-index.json",
+            None,
+            None,
+        );
+
+        let person_0_original = Person {
+            id: [0u8; 32].to_vec(),
+            owner_id: [0u8; 32].to_vec(),
+            first_name: "Samuel".to_string(),
+            middle_name: "Abraham".to_string(),
+            last_name: "Westrich".to_string(),
+            message: Some("My apples are safe".to_string()),
+            age: 33,
+        };
+
+        let person_0_updated = Person {
+            id: [0u8; 32].to_vec(),
+            owner_id: [0u8; 32].to_vec(),
+            first_name: "Samuel".to_string(),
+            middle_name: "Abraham".to_string(),
+            last_name: "Westrich".to_string(),
+            message: Some("Lemons are now my thing".to_string()),
+            age: 35,
+        };
+
+        let person_1_original = Person {
+            id: [1u8; 32].to_vec(),
+            owner_id: [1u8; 32].to_vec(),
+            first_name: "Wisdom".to_string(),
+            middle_name: "Madabuchukwu".to_string(),
+            last_name: "Ogwu".to_string(),
+            message: Some("Cantaloupe is the best fruit".to_string()),
+            age: 20,
+        };
+
+        let person_1_updated = Person {
+            id: [1u8; 32].to_vec(),
+            owner_id: [1u8; 32].to_vec(),
+            first_name: "Wisdom".to_string(),
+            middle_name: "Madabuchukwu".to_string(),
+            last_name: "Ogwu".to_string(),
+            message: Some("My apples are safe".to_string()),
+            age: 22,
+        };
+
+        let mut people_at_block_times: BTreeMap<u64, Vec<Person>> = BTreeMap::new();
+        people_at_block_times.insert(0, vec![person_0_original, person_1_original]);
+        people_at_block_times.insert(100, vec![person_0_updated, person_1_updated]);
+
+        for (block_time, people) in people_at_block_times {
+            for (i, person) in people.iter().enumerate() {
+                let value = serde_json::to_value(&person).expect("serialized person");
+                let document_cbor = value_to_cbor(value, Some(defaults::PROTOCOL_VERSION));
+                let document = Document::from_cbor(document_cbor.as_slice(), None, None)
+                    .expect("document should be properly deserialized");
+                let document_type = contract
+                    .document_type_for_name("person")
+                    .expect("expected to get document type");
+
+                let storage_flags = StorageFlags { epoch: 0 };
+
+                // if block_time == 100 && i == 9 {
+                //     dbg!("block time {} {} {:#?}",block_time, i, person);
+                // }
+
+                drive
+                    .add_document_for_contract(
+                        DocumentAndContractInfo {
+                            document_info: DocumentAndSerialization((
+                                &document,
+                                &document_cbor,
+                                &storage_flags,
+                            )),
+                            contract: &contract,
+                            document_type,
+                            owner_id: None,
+                        },
+                        true,
+                        block_time as f64,
+                        true,
+                        None,
+                    )
+                    .expect("expected to add document");
+            }
+        }
+    }
+
+    #[test]
+    fn test_update_complex_person_with_history() {
+        let tmp_dir = TempDir::new().unwrap();
+        let drive: Drive =
+            Drive::open(&tmp_dir, None).expect("expected to open Drive successfully");
+
+        let db_transaction = drive.grove.start_transaction();
+
+        drive
+            .create_root_tree(Some(&db_transaction))
+            .expect("expected to create root tree successfully");
+
+        // setup code
+        let contract = setup_contract(
+            &drive,
+            "tests/supporting_files/contract/family/family-contract-with-history-only-message-index.json",
+            None,
+            Some(&db_transaction),
+        );
+
+        let person_0_original = Person {
+            id: [0u8; 32].to_vec(),
+            owner_id: [0u8; 32].to_vec(),
+            first_name: "Samuel".to_string(),
+            middle_name: "Abraham".to_string(),
+            last_name: "Westrich".to_string(),
+            message: Some("My apples are safe".to_string()),
+            age: 33,
+        };
+
+        let person_0_updated = Person {
+            id: [0u8; 32].to_vec(),
+            owner_id: [0u8; 32].to_vec(),
+            first_name: "Samuel".to_string(),
+            middle_name: "Abraham".to_string(),
+            last_name: "Westrich".to_string(),
+            message: Some("Lemons are now my thing".to_string()),
+            age: 35,
+        };
+
+        let person_1_original = Person {
+            id: [1u8; 32].to_vec(),
+            owner_id: [1u8; 32].to_vec(),
+            first_name: "Wisdom".to_string(),
+            middle_name: "Madabuchukwu".to_string(),
+            last_name: "Ogwu".to_string(),
+            message: Some("Cantaloupe is the best fruit".to_string()),
+            age: 20,
+        };
+
+        let person_1_updated = Person {
+            id: [1u8; 32].to_vec(),
+            owner_id: [1u8; 32].to_vec(),
+            first_name: "Wisdom".to_string(),
+            middle_name: "Madabuchukwu".to_string(),
+            last_name: "Ogwu".to_string(),
+            message: Some("My apples are safe".to_string()),
+            age: 22,
+        };
+
+        let mut people_at_block_times: BTreeMap<u64, Vec<Person>> = BTreeMap::new();
+        people_at_block_times.insert(0, vec![person_0_original, person_1_original]);
+        people_at_block_times.insert(100, vec![person_0_updated, person_1_updated]);
+
+        for (block_time, people) in people_at_block_times {
+            for (i, person) in people.iter().enumerate() {
+                let value = serde_json::to_value(&person).expect("serialized person");
+                let document_cbor = value_to_cbor(value, Some(defaults::PROTOCOL_VERSION));
+                let document = Document::from_cbor(document_cbor.as_slice(), None, None)
+                    .expect("document should be properly deserialized");
+                let document_type = contract
+                    .document_type_for_name("person")
+                    .expect("expected to get document type");
+
+                let storage_flags = StorageFlags { epoch: 0 };
+
+                // if block_time == 100 && i == 9 {
+                //     dbg!("block time {} {} {:#?}",block_time, i, person);
+                // }
+
+                drive
+                    .add_document_for_contract(
+                        DocumentAndContractInfo {
+                            document_info: DocumentAndSerialization((
+                                &document,
+                                &document_cbor,
+                                &storage_flags,
+                            )),
+                            contract: &contract,
+                            document_type,
+                            owner_id: None,
+                        },
+                        true,
+                        block_time as f64,
+                        true,
+                        Some(&db_transaction),
+                    )
+                    .expect("expected to add document");
+            }
+        }
+        drive
+            .grove
+            .commit_transaction(db_transaction)
+            .expect("transaction should be committed");
     }
 }

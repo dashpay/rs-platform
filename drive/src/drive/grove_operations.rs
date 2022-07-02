@@ -1,8 +1,8 @@
-use std::collections::HashMap;
 use costs::CostContext;
 use grovedb::batch::{BatchApplyOptions, GroveDbOp, Op};
 use grovedb::{Element, PathQuery, TransactionArg};
 use nohash_hasher::IntMap;
+use std::collections::HashMap;
 
 use crate::drive::flags::StorageFlags;
 use crate::drive::object_size_info::KeyInfo::{Key, KeyRef, KeySize};
@@ -769,11 +769,13 @@ impl Drive {
         drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<(), Error> {
         if self.config.batching_enabled {
-            //println!("batch {:#?}", ops);
+            println!("batch {:#?}", ops);
             let consistency_results = GroveDbOp::verify_consistency_of_operations(&ops);
             if !consistency_results.is_empty() {
                 println!("results {:#?}", consistency_results);
-                return Err(Error::Drive(DriveError::GroveDBInsertion("insertion order error")));
+                return Err(Error::Drive(DriveError::GroveDBInsertion(
+                    "insertion order error",
+                )));
             }
 
             let cost_context = self.grove.apply_batch(

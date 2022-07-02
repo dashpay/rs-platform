@@ -1,5 +1,5 @@
-use std::collections::HashSet;
 use grovedb::Element;
+use std::collections::HashSet;
 use std::ops::AddAssign;
 
 use KeyInfo::{Key, KeyRef, KeySize};
@@ -214,13 +214,11 @@ impl<'a, const N: usize> PathKeyInfo<'a, N> {
                 let mut qualified_path = path.clone();
                 qualified_path.push(key.to_vec());
                 qualified_paths.contains(&qualified_path)
-
             }
             PathFixedSizeKey((path, key)) => {
                 let mut qualified_path = path.map(|a| a.to_vec()).to_vec();
                 qualified_path.push(key.clone());
                 qualified_paths.contains(&qualified_path)
-
             }
             PathFixedSizeKeyRef((path, key)) => {
                 let mut qualified_path = path.map(|a| a.to_vec()).to_vec();
@@ -242,20 +240,18 @@ impl<'a, const N: usize> PathKeyInfo<'a, N> {
                 let mut qualified_path = path.clone();
                 qualified_path.push(key.to_vec());
                 qualified_paths.insert(qualified_path)
-
             }
             PathFixedSizeKey((path, key)) => {
                 let mut qualified_path = path.map(|a| a.to_vec()).to_vec();
                 qualified_path.push(key.clone());
                 qualified_paths.insert(qualified_path)
-
             }
             PathFixedSizeKeyRef((path, key)) => {
                 let mut qualified_path = path.map(|a| a.to_vec()).to_vec();
                 qualified_path.push(key.to_vec());
                 qualified_paths.insert(qualified_path)
             }
-            PathKeySize(_) => { true },
+            PathKeySize(_) => true,
         }
     }
 }
