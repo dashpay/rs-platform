@@ -25,10 +25,12 @@ pub struct BlockBeginResponse {}
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BlockEndRequest {
-    pub block_height: u64,
-    pub block_time: i64,
-    pub previous_block_time: Option<i64>,
-    pub proposer_pro_tx_hash: [u8; 32],
+    pub fees: Fees,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Fees {
     pub processing_fees: u64,
     pub storage_fees: i64,
     pub fee_multiplier: u64,

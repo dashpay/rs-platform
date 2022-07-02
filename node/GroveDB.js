@@ -222,6 +222,12 @@ class GroveDB {
 }
 
 /**
+ * @typedef Element
+ * @property {"item"|"reference"|"tree"} type - element type. Can be "item", "reference" or "tree"
+ * @property {Buffer|Buffer[]} value - element value
+ */
+
+/**
  * @typedef PathQuery
  * @property {Buffer[]} path
  * @property {SizedQuery} query

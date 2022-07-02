@@ -1,5 +1,4 @@
 use grovedb::{Element, TransactionArg};
-use rust_decimal::Decimal;
 
 use crate::drive::block::BlockInfo;
 use crate::drive::object_size_info::{KeyInfo, PathKeyElementInfo};
@@ -107,14 +106,14 @@ impl FeePools {
         current_epoch_pool: &EpochPool,
         start_block_height: u64,
         start_block_time: i64,
-        multiplier: u64,
+        fee_multiplier: u64,
     ) -> Result<(), Error> {
         // create and init next thousandth epoch
         let next_thousandth_epoch = EpochPool::new(current_epoch_pool.index + 1000, drive);
         next_thousandth_epoch.init_empty()?;
 
         // init first_proposer_block_height and processing_fee for an epoch
-        current_epoch_pool.init_current(multiplier, start_block_height, start_block_time)?;
+        current_epoch_pool.init_current(fee_multiplier, start_block_height, start_block_time)?;
 
         Ok(())
     }
@@ -125,6 +124,7 @@ impl FeePools {
         block_info: &BlockInfo,
         processing_fees: u64,
         storage_fees: i64,
+        fee_multiplier: u64,
         transaction: TransactionArg,
     ) -> Result<(), Error> {
         let epoch_info = drive.epoch_info.borrow();
@@ -139,7 +139,7 @@ impl FeePools {
                 &current_epoch_pool,
                 block_info.block_height,
                 block_info.block_time,
-                block_info.fee_multiplier,
+                fee_multiplier,
             )?;
 
             // distribute accumulated previous epoch storage fees
@@ -414,10 +414,7 @@ mod tests {
         }
     }
 
-    use crate::drive::{
-        object_size_info::{DocumentAndContractInfo, DocumentInfo::DocumentAndSerialization},
-        Drive,
-    };
+    use crate::drive::Drive;
     use crate::fee::pools::tests::helpers::fee_pools::create_mn_shares_contract;
     use chrono::Utc;
 
@@ -446,6 +443,7 @@ mod tests {
 
             let processing_fees = 100;
             let storage_fees = 2000;
+            let fee_multiplier = 2;
 
             let block_1_info = BlockInfo {
                 block_height: 1,
@@ -455,7 +453,6 @@ mod tests {
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0,
                 ],
-                fee_multiplier: 2,
             };
 
             fee_pools
@@ -464,6 +461,7 @@ mod tests {
                     &block_1_info,
                     processing_fees,
                     storage_fees,
+                    fee_multiplier,
                     Some(&transaction),
                 )
                 .expect("should process block 1");
@@ -516,7 +514,6 @@ mod tests {
                 block_time: block_time.timestamp_millis(),
                 previous_block_time: Some(block_1_info.block_time),
                 proposer_pro_tx_hash: block_1_info.proposer_pro_tx_hash,
-                fee_multiplier: 2,
             };
 
             fee_pools
@@ -525,6 +522,7 @@ mod tests {
                     &block_2_info,
                     processing_fees,
                     storage_fees,
+                    fee_multiplier,
                     Some(&transaction),
                 )
                 .expect("should process block 2");

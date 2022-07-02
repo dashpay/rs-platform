@@ -16,8 +16,9 @@ const {
   driveDeleteDocument,
   driveQueryDocuments,
   driveInsertIdentity,
-  driveInitFeePools,
-  driveFeePoolsProcessBlock,
+  abciInitChain,
+  abciBlockBegin,
+  abciBlockEnd,
 } = require('neon-load-or-build')({
   dir: pathJoin(__dirname, '..'),
 });
@@ -37,8 +38,9 @@ const driveUpdateDocumentAsync = appendStack(promisify(driveUpdateDocument));
 const driveDeleteDocumentAsync = appendStack(promisify(driveDeleteDocument));
 const driveQueryDocumentsAsync = appendStack(promisify(driveQueryDocuments));
 const driveInsertIdentityAsync = appendStack(promisify(driveInsertIdentity));
-const driveInitFeePoolsAsync = appendStack(promisify(driveInitFeePools));
-const driveFeePoolsProcessBlockAsync = appendStack(promisify(driveFeePoolsProcessBlock));
+const abciInitChainAsync = appendStack(promisify(abciInitChain));
+const abciBlockBeginAsync = appendStack(promisify(abciBlockBegin));
+const abciBlockEndAsync = appendStack(promisify(abciBlockEnd));
 
 // Wrapper class for the boxed `Drive` for idiomatic JavaScript usage
 class Drive {
@@ -214,74 +216,108 @@ class Drive {
       useTransaction,
     );
   }
+
+  getAbci() {
+    const { drive } = this;
+
+    return {
+      /**
+       * ABCI init chain
+       *
+       * @param {InitChainRequest} request
+       * @param {boolean} [useTransaction=false]
+       *
+       * @returns {Promise<InitChainResponse>}
+       */
+      async initChain(request, useTransaction = false) {
+        const requestBytes = cbor.encode(request);
+
+        const responseBytes = await abciInitChainAsync.call(
+          drive,
+          requestBytes,
+          useTransaction,
+        );
+
+        return cbor.decode(responseBytes);
+      },
+
+      /**
+       * ABCI init chain
+       *
+       * @param {BlockBeginRequest} request
+       * @param {boolean} [useTransaction=false]
+       *
+       * @returns {Promise<BlockBeginResponse>}
+       */
+      async blockBegin(request, useTransaction = false) {
+        const requestBytes = cbor.encode(request);
+
+        const responseBytes = await abciBlockBeginAsync.call(
+          drive,
+          requestBytes,
+          useTransaction,
+        );
+
+        return cbor.decode(responseBytes);
+      },
+
+      /**
+       * ABCI init chain
+       *
+       * @param {BlockEndRequest} request
+       * @param {boolean} [useTransaction=false]
+       *
+       * @returns {Promise<BlockEndResponse>}
+       */
+      async blockEnd(request, useTransaction = false) {
+        const requestBytes = cbor.encode(request);
+
+        const responseBytes = await abciBlockEndAsync.call(
+          drive,
+          requestBytes,
+          useTransaction,
+        );
+
+        return cbor.decode(responseBytes);
+      },
+    };
+  }
 }
 
-Drive.prototype.abci = {
-  /**
-   * ABCI init chain
-   *
-   * @param {InitChainRequest} request
-   * @param {boolean} [useTransaction=false]
-   *
-   * @returns {Promise<InitChainResponse>}
-   */
-  async initChain(request, useTransaction = false) {
-    const requestBytes = cbor.encode(request);
-
-    const responseBytes = await abciInitChainAsync.call(
-      this.drive,
-      requestBytes,
-      useTransaction,
-    );
-
-    return cbor.decode(responseBytes);
-  },
-
-  /**
-   * ABCI init chain
-   *
-   * @param {BlockBeginRequest} request
-   * @param {boolean} [useTransaction=false]
-   *
-   * @returns {Promise<BlockBeginResponse>}
-   */
-  async blockBegin(request, useTransaction = false) {
-    const requestBytes = cbor.encode(request);
-
-    const responseBytes = await abciBlockBeginAsync.call(
-      this.drive,
-      requestBytes,
-      useTransaction,
-    );
-
-    return cbor.decode(responseBytes);
-  },
-
-  /**
-   * ABCI init chain
-   *
-   * @param {BlockEndRequest} request
-   * @param {boolean} [useTransaction=false]
-   *
-   * @returns {Promise<BlockEndResponse>}
-   */
-  async blockEnd(request, useTransaction = false) {
-    const requestBytes = cbor.encode(request);
-
-    const responseBytes = await abciBlockEndAsync.call(
-      this.drive,
-      requestBytes,
-      useTransaction,
-    );
-
-    return cbor.decode(responseBytes);
-  },
-};
+/**
+ * @typedef InitChainRequest
+ */
 
 /**
- * @typedef Element
- * @property {string} type - element type. Can be "item", "reference" or "tree"
- * @property {Buffer|Buffer[]} value - element value
+ * @typedef InitChainResponse
+ */
+
+/**
+ * @typedef BlockBeginRequest
+ * @property {number} blockHeight
+ * @property {number} blockTime - timestamp in milliseconds
+ * @property {number} [previousBlockTime] - timestamp in milliseconds
+ * @property {Buffer} proposerProTxHash
+ */
+
+/**
+ * @typedef BlockBeginResponse
+ */
+
+/**
+ * @typedef BlockEndRequest
+ * @property {Fees} fees
+ */
+
+/**
+ * @typedef Fees
+ * @property {number} processingFees
+ * @property {number} storageFees
+ * @property {number} feeMultiplier
+ */
+
+/**
+ * @typedef BlockEndResponse
  */
 
 module.exports = Drive;

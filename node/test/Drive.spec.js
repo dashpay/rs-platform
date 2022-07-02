@@ -367,43 +367,71 @@ describe('Drive', () => {
     });
   });
 
-  describe('#initFeePools', () => {
-    beforeEach(async () => {
-      await drive.createRootTree();
+  describe('ABCI', () => {
+    describe('InitChain', () => {
+      it('should successfully init chain', async () => {
+        const request = {};
+
+        const response = await drive.getAbci().initChain(request);
+
+        expect(response).to.be.empty('object');
+      });
     });
 
-    it('should successfully init fee pools', async () => {
-      await drive.initFeePools();
+    describe('BlockBegin', () => {
+      beforeEach(async () => {
+        await drive.getAbci().initChain({});
+      });
+
+      it('should process a block without previous block time', async () => {
+        const request = {
+          blockHeight: 1,
+          blockTime: (new Date()).getTime(),
+          proposerProTxHash: Buffer.alloc(32, 1),
+        };
+
+        const response = await drive.getAbci().blockBegin(request);
+
+        expect(response).to.be.empty('object');
+      });
+
+      it('should process a block with previous block time', async () => {
+        const request = {
+          blockHeight: 2,
+          blockTime: (new Date()).getTime(),
+          proposerProTxHash: Buffer.alloc(32, 1),
+          previousBlockTime: (new Date()).getTime() - 100,
+        };
+
+        const response = await drive.getAbci().blockBegin(request);
+
+        expect(response).to.be.empty('object');
+      });
     });
-  });
 
-  describe('#feePoolsProcessBlock', () => {
-    beforeEach(async () => {
-      await drive.createRootTree();
+    describe('BlockEnd', () => {
+      beforeEach(async () => {
+        await drive.getAbci().initChain({});
+        await drive.getAbci().blockBegin({
+          blockHeight: 1,
+          blockTime: (new Date()).getTime(),
+          proposerProTxHash: Buffer.alloc(32, 1),
+        });
+      });
 
-      await drive.initFeePools();
+      it('should process a block', async () => {
+        const request = {
+          fees: {
+            storageFees: 100,
+            processingFees: 100,
+            feeMultiplier: 2,
+          },
+        };
 
-      // TODO: init contract, docs and identities
-    });
+        const response = await drive.getAbci().blockEnd(request);
 
-    it('should successfully process a block', async () => {
-      const blockHeight = 0;
-      blockTime = (new Date()).getTime();
-      const previousBlockTime = (new Date()).getTime();
-      const proposerTxHash = Buffer.alloc(32, 1);
-      const processingFees = 42;
-      const storageFees = 43;
-      const feeMultiplier = 10;
-
-      await drive.feePoolsProcessBlock(
-        blockHeight,
-        blockTime,
-        previousBlockTime,
-        proposerTxHash,
-        processingFees,
-        storageFees,
-        feeMultiplier,
-      );
+        expect(response).to.be.empty('object');
+      });
     });
   });
 });

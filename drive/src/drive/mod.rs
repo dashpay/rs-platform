@@ -9,6 +9,7 @@ use object_size_info::DocumentAndContractInfo;
 use object_size_info::DocumentInfo::DocumentSize;
 
 use crate::contract::Contract;
+use crate::drive::block::BlockExecutionContext;
 use crate::drive::config::DriveConfig;
 use crate::error::Error;
 use crate::fee::epoch::EpochInfo;
@@ -35,6 +36,7 @@ pub struct Drive {
     pub fee_pools: RefCell<FeePools>,
     pub cached_contracts: RefCell<Cache<[u8; 32], Arc<Contract>>>, //HashMap<[u8; 32], Rc<Contract>>>,
     pub current_batch: RefCell<Vec<DriveOperation>>,
+    pub block_execution_context: RefCell<Option<BlockExecutionContext>>,
 }
 
 #[repr(u8)]
@@ -91,6 +93,7 @@ impl Drive {
                 epoch_info: RefCell::new(EpochInfo::default()),
                 fee_pools: RefCell::new(FeePools::new()),
                 current_batch: RefCell::new(Vec::new()),
+                block_execution_context: RefCell::new(None),
             }),
             Err(e) => Err(Error::GroveDB(e)),
         }
