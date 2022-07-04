@@ -769,10 +769,10 @@ impl Drive {
         drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<(), Error> {
         if self.config.batching_enabled {
-            println!("batch {:#?}", ops);
+            //println!("batch {:#?}", ops);
             let consistency_results = GroveDbOp::verify_consistency_of_operations(&ops);
             if !consistency_results.is_empty() {
-                println!("results {:#?}", consistency_results);
+                //println!("results {:#?}", consistency_results);
                 return Err(Error::Drive(DriveError::GroveDBInsertion(
                     "insertion order error",
                 )));
