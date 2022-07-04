@@ -456,7 +456,7 @@ mod tests {
             super::populate_proposers(&unpaid_epoch_pool_1, 200, Some(&transaction));
 
             // Create masternode reward shares contract
-            super::create_mn_shares_contract(&drive);
+            super::create_mn_shares_contract(&drive, Some(&transaction));
 
             drive
                 .apply_current_batch(true, Some(&transaction))
@@ -503,7 +503,8 @@ mod tests {
             let pro_tx_hashes =
                 super::populate_proposers(&unpaid_epoch_pool, 60, Some(&transaction));
 
-            let contract = create_mn_shares_contract(&drive);
+            // Create masternode reward shares contract
+            let contract = create_mn_shares_contract(&drive, Some(&transaction));
 
             let _ = setup_identities_with_share_documents(
                 &drive,
@@ -511,9 +512,6 @@ mod tests {
                 &pro_tx_hashes,
                 Some(&transaction),
             );
-
-            // Create masternode reward shares contract
-            super::create_mn_shares_contract(&drive);
 
             drive
                 .apply_current_batch(true, Some(&transaction))
@@ -581,7 +579,7 @@ mod tests {
                 super::populate_proposers(&unpaid_epoch_pool, 10, Some(&transaction));
 
             // Create masternode reward shares contract
-            let contract = create_mn_shares_contract(&drive);
+            let contract = create_mn_shares_contract(&drive, Some(&transaction));
 
             let share_identities_and_documents = setup_identities_with_share_documents(
                 &drive,

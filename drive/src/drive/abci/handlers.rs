@@ -110,39 +110,41 @@ pub fn block_end(
 
 #[cfg(test)]
 mod tests {
-    use crate::drive::abci::{
-        handlers::{block_begin, block_end, init_chain},
-        messages::{BlockBeginRequest, BlockEndRequest, InitChainRequest},
-    };
-    use crate::fee::pools::tests::helpers::fee_pools::create_mn_shares_contract;
-    use crate::fee::pools::tests::helpers::setup::{setup_drive, setup_fee_pools};
-
     mod handlers {
         use chrono::{Duration, TimeZone, Utc};
+        use dpp::identity::Identity;
+        use rand::prelude::SliceRandom;
 
         use crate::{
-            drive::abci::messages::Fees,
+            drive::abci::{
+                handlers::{block_begin, block_end, init_chain},
+                messages::{BlockBeginRequest, BlockEndRequest, Fees, InitChainRequest},
+            },
             fee::pools::{
                 epoch::epoch_pool::EpochPool,
-                tests::helpers::fee_pools::{
-                    populate_proposers, setup_identities_with_share_documents,
+                tests::helpers::{
+                    fee_pools::{
+                        create_mn_shares_contract, fetch_identities_by_pro_tx_hashes,
+                        populate_proposers, refetch_identities,
+                        setup_identities_with_share_documents,
+                    },
+                    setup::{setup_drive, setup_fee_pools},
                 },
             },
         };
 
         #[test]
         fn test_abci_flow() {
-            let drive = super::setup_drive();
-            let (transaction, fee_pools) = super::setup_fee_pools(&drive, None);
-
-            // setup the contract
-            let contract = super::create_mn_shares_contract(&drive);
+            let drive = setup_drive();
+            let (transaction, fee_pools) = setup_fee_pools(&drive, None);
 
             // init chain
-            let init_chain_request = super::InitChainRequest {};
+            let init_chain_request = InitChainRequest {};
 
-            super::init_chain(&drive, init_chain_request, Some(&transaction))
-                .expect("to init chain");
+            init_chain(&drive, init_chain_request, Some(&transaction)).expect("to init chain");
+
+            // setup the contract
+            let contract = create_mn_shares_contract(&drive, Some(&transaction));
 
             // setup proposers and mn share documents
             let epoch_pool = EpochPool::new(0, &drive);
@@ -153,7 +155,7 @@ mod tests {
                 .apply_current_batch(false, Some(&transaction))
                 .expect("to apply a batch");
 
-            let proposer_tx_hashes = populate_proposers(&epoch_pool, 10, Some(&transaction));
+            let proposer_tx_hashes = populate_proposers(&epoch_pool, 2, Some(&transaction));
 
             let identity_and_document_pairs = setup_identities_with_share_documents(
                 &drive,
@@ -184,18 +186,20 @@ mod tests {
 
                 let block_height = day as u64;
 
-                // Processing block #1
-                let block_begin_request = super::BlockBeginRequest {
+                // Processing block
+                let block_begin_request = BlockBeginRequest {
                     block_height,
                     block_time: block_time.timestamp_millis(),
                     previous_block_time,
-                    proposer_pro_tx_hash: proposer_tx_hashes[0],
+                    proposer_pro_tx_hash: *proposer_tx_hashes
+                        .choose(&mut rand::thread_rng())
+                        .unwrap(),
                 };
 
-                super::block_begin(&drive, block_begin_request, Some(&transaction))
+                block_begin(&drive, block_begin_request, Some(&transaction))
                     .expect(format!("to begin process block #{}", day).as_str());
 
-                let block_end_request = super::BlockEndRequest {
+                let block_end_request = BlockEndRequest {
                     fees: Fees {
                         processing_fees: 1600,
                         storage_fees: 42000,
@@ -203,7 +207,7 @@ mod tests {
                     },
                 };
 
-                super::block_end(&drive, block_end_request, Some(&transaction))
+                block_end(&drive, block_end_request, Some(&transaction))
                     .expect(format!("to begin process block #{}", day).as_str());
             }
 
@@ -212,7 +216,10 @@ mod tests {
                 .value(&drive, Some(&transaction))
                 .expect("to get storage fee pool");
 
-            assert_eq!(storage_fee_pool_value, 0);
+            assert_eq!(
+                storage_fee_pool_value, 42000,
+                "should contain only storage fees from the last block"
+            );
         }
     }
 }
