@@ -1,6 +1,6 @@
 use DriveEncoding::DriveProtobuf;
 
-pub const DEFAULT_GROVE_BATCHING_ENABLED: bool = true;
+pub const DEFAULT_GROVE_BATCHING_ENABLED: bool = false;
 
 pub enum DriveEncoding {
     DriveCbor,
