@@ -1,5 +1,5 @@
-use byteorder::{BigEndian, WriteBytesExt};
 use crate::error::Error;
+use byteorder::{BigEndian, WriteBytesExt};
 
 pub fn encode_unsigned_integer(val: u64) -> Result<Vec<u8>, Error> {
     // Positive integers are represented in binary with the signed bit set to 0
