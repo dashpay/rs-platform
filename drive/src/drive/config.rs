@@ -23,14 +23,16 @@ impl Default for DriveConfig {
 
 impl DriveConfig {
     pub fn default_with_batches() -> Self {
-        let mut config = Self::default();
-        config.batching_enabled = true;
-        config
+        DriveConfig {
+            batching_enabled: true,
+            ..Default::default()
+        }
     }
 
     pub fn default_without_batches() -> Self {
-        let mut config = Self::default();
-        config.batching_enabled = false;
-        config
+        DriveConfig {
+            batching_enabled: false,
+            ..Default::default()
+        }
     }
 }

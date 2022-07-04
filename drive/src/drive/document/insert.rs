@@ -177,10 +177,8 @@ impl Drive {
                 DocumentWithoutSerialization((document, storage_flags)) => {
                     let serialized_document =
                         document.serialize(document_and_contract_info.document_type)?;
-                    let element = Element::Item(
-                        Vec::from(serialized_document),
-                        storage_flags.to_element_flags(),
-                    );
+                    let element =
+                        Element::Item(serialized_document, storage_flags.to_element_flags());
                     PathFixedSizeKeyElement((primary_key_path, document.id.as_slice(), element))
                 }
                 DocumentSize(max_size) => PathKeyElementSize((
@@ -202,10 +200,8 @@ impl Drive {
                 DocumentWithoutSerialization((document, storage_flags)) => {
                     let serialized_document =
                         document.serialize(document_and_contract_info.document_type)?;
-                    let element = Element::Item(
-                        Vec::from(serialized_document),
-                        storage_flags.to_element_flags(),
-                    );
+                    let element =
+                        Element::Item(serialized_document, storage_flags.to_element_flags());
                     PathFixedSizeKeyElement((primary_key_path, document.id.as_slice(), element))
                 }
                 DocumentSize(max_size) => PathKeyElementSize((

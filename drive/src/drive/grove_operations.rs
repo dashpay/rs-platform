@@ -1,8 +1,6 @@
 use costs::CostContext;
 use grovedb::batch::{BatchApplyOptions, GroveDbOp, Op};
 use grovedb::{Element, PathQuery, TransactionArg};
-use nohash_hasher::IntMap;
-use std::collections::HashMap;
 
 use crate::drive::flags::StorageFlags;
 use crate::drive::object_size_info::KeyInfo::{Key, KeyRef, KeySize};
@@ -537,7 +535,7 @@ impl Drive {
                     transaction,
                     drive_operations,
                 )?;
-                if has_raw == false {
+                if !has_raw {
                     drive_operations.push(DriveOperation::for_empty_tree(
                         path,
                         key.to_vec(),
@@ -567,7 +565,7 @@ impl Drive {
                     transaction,
                     drive_operations,
                 )?;
-                if has_raw == false {
+                if !has_raw {
                     drive_operations.push(DriveOperation::for_empty_tree(
                         path,
                         key.to_vec(),
@@ -584,7 +582,7 @@ impl Drive {
                     transaction,
                     drive_operations,
                 )?;
-                if has_raw == false {
+                if !has_raw {
                     let path_items: Vec<Vec<u8>> = path.into_iter().map(Vec::from).collect();
                     drive_operations.push(DriveOperation::for_empty_tree(
                         path_items,
@@ -597,7 +595,7 @@ impl Drive {
             PathFixedSizeKeyRef((path, key)) => {
                 let has_raw =
                     self.grove_has_raw(path.clone(), key, apply, transaction, drive_operations)?;
-                if has_raw == false {
+                if !has_raw {
                     let path_items: Vec<Vec<u8>> = path.into_iter().map(Vec::from).collect();
                     drive_operations.push(DriveOperation::for_empty_tree(
                         path_items,
@@ -661,7 +659,7 @@ impl Drive {
                     transaction,
                     drive_operations,
                 )?;
-                if has_raw == false {
+                if !has_raw {
                     drive_operations.push(DriveOperation::for_path_key_element(
                         path,
                         key.to_vec(),
@@ -673,7 +671,7 @@ impl Drive {
             PathFixedSizeKeyElement((path, key, element)) => {
                 let has_raw =
                     self.grove_has_raw(path, key, apply, transaction, drive_operations)?;
-                if has_raw == false {
+                if !has_raw {
                     let path_items: Vec<Vec<u8>> = path.into_iter().map(Vec::from).collect();
                     drive_operations.push(DriveOperation::for_path_key_element(
                         path_items,
