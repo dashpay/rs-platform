@@ -1221,6 +1221,7 @@ impl<'a> DriveQuery<'a> {
 #[cfg(test)]
 mod tests {
     use serde_json::json;
+    use std::option::Option::None;
     use tempfile::TempDir;
 
     use crate::common;
@@ -1234,7 +1235,7 @@ mod tests {
 
     fn setup_family_contract() -> (Drive, Contract) {
         let tmp_dir = TempDir::new().unwrap();
-        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+        let drive: Drive = Drive::open(tmp_dir, None).expect("expected to open Drive successfully");
 
         drive
             .create_root_tree(None)
@@ -1263,7 +1264,7 @@ mod tests {
 
     fn setup_family_birthday_contract() -> (Drive, Contract) {
         let tmp_dir = TempDir::new().unwrap();
-        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+        let drive: Drive = Drive::open(tmp_dir, None).expect("expected to open Drive successfully");
 
         drive
             .create_root_tree(None)

@@ -221,6 +221,7 @@ impl Drive {
 mod tests {
     use rand::Rng;
     use serde_json::json;
+    use std::option::Option::None;
     use tempfile::TempDir;
 
     use crate::common::{
@@ -238,7 +239,7 @@ mod tests {
     #[test]
     fn test_add_and_remove_family_one_document_no_transaction() {
         let tmp_dir = TempDir::new().unwrap();
-        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+        let drive: Drive = Drive::open(tmp_dir, None).expect("expected to open Drive successfully");
 
         drive
             .create_root_tree(None)
@@ -327,7 +328,7 @@ mod tests {
     #[test]
     fn test_add_and_remove_family_one_document() {
         let tmp_dir = TempDir::new().unwrap();
-        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+        let drive: Drive = Drive::open(tmp_dir, None).expect("expected to open Drive successfully");
 
         let db_transaction = drive.grove.start_transaction();
 
@@ -432,7 +433,7 @@ mod tests {
     #[test]
     fn test_add_and_remove_family_documents() {
         let tmp_dir = TempDir::new().unwrap();
-        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+        let drive: Drive = Drive::open(tmp_dir, None).expect("expected to open Drive successfully");
 
         let db_transaction = drive.grove.start_transaction();
 
@@ -602,7 +603,7 @@ mod tests {
     #[test]
     fn test_add_and_remove_family_documents_with_empty_fields() {
         let tmp_dir = TempDir::new().unwrap();
-        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+        let drive: Drive = Drive::open(tmp_dir, None).expect("expected to open Drive successfully");
 
         let db_transaction = drive.grove.start_transaction();
 
@@ -848,7 +849,7 @@ mod tests {
     #[test]
     fn test_delete_dashpay_documents() {
         let tmp_dir = TempDir::new().unwrap();
-        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+        let drive: Drive = Drive::open(tmp_dir, None).expect("expected to open Drive successfully");
 
         let db_transaction = drive.grove.start_transaction();
 
@@ -901,7 +902,7 @@ mod tests {
     #[test]
     fn test_deletion_real_data() {
         let tmp_dir = TempDir::new().unwrap();
-        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+        let drive: Drive = Drive::open(tmp_dir, None).expect("expected to open Drive successfully");
 
         let db_transaction = drive.grove.start_transaction();
 
