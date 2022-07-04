@@ -192,10 +192,6 @@ mod tests {
 
             let epoch = super::EpochPool::new(0, &drive);
 
-            drive
-                .start_current_batch()
-                .expect("should start current batch");
-
             epoch.init_proposers().expect("should init proposers");
 
             drive
@@ -258,10 +254,6 @@ mod tests {
 
             let epoch = super::EpochPool::new(0, &drive);
 
-            drive
-                .start_current_batch()
-                .expect("should start current batch");
-
             epoch.init_proposers().expect("should init proposers");
 
             epoch
@@ -290,20 +282,12 @@ mod tests {
 
             let epoch = super::EpochPool::new(0, &drive);
 
-            drive
-                .start_current_batch()
-                .expect("should start current batch");
-
             epoch.init_proposers().expect("should init proposers");
 
             // Apply proposers tree
             drive
                 .apply_current_batch(true, Some(&transaction))
                 .expect("should apply batch");
-
-            drive
-                .start_current_batch()
-                .expect("should start current batch");
 
             epoch
                 .increment_proposer_block_count(&pro_tx_hash, Some(&transaction))
@@ -329,20 +313,12 @@ mod tests {
 
             let epoch = super::EpochPool::new(0, &drive);
 
-            drive
-                .start_current_batch()
-                .expect("should start current batch");
-
             epoch.init_proposers().expect("should init proposers");
 
             // Apply proposers tree
             drive
                 .apply_current_batch(true, Some(&transaction))
                 .expect("should apply batch");
-
-            drive
-                .start_current_batch()
-                .expect("should start current batch");
 
             epoch
                 .update_proposer_block_count(&pro_tx_hash, 1)
@@ -352,10 +328,6 @@ mod tests {
             drive
                 .apply_current_batch(true, Some(&transaction))
                 .expect("should apply batch");
-
-            drive
-                .start_current_batch()
-                .expect("should start current batch");
 
             epoch
                 .increment_proposer_block_count(&pro_tx_hash, Some(&transaction))
@@ -400,10 +372,6 @@ mod tests {
 
             let epoch = super::EpochPool::new(0, &drive);
 
-            drive
-                .start_current_batch()
-                .expect("should start current batch");
-
             epoch.init_proposers().expect("should init proposers");
 
             epoch
@@ -433,20 +401,12 @@ mod tests {
 
             let epoch = super::EpochPool::new(0, &drive);
 
-            drive
-                .start_current_batch()
-                .expect("should start current batch");
-
             epoch.init_proposers().expect("should init proposers");
 
             // Apply proposers tree
             drive
                 .apply_current_batch(true, Some(&transaction))
                 .expect("should apply batch");
-
-            drive
-                .start_current_batch()
-                .expect("should start current batch");
 
             epoch
                 .delete_proposers_tree(Some(&transaction))
@@ -482,10 +442,6 @@ mod tests {
 
             let epoch = super::EpochPool::new(0, &drive);
 
-            drive
-                .start_current_batch()
-                .expect("should start current batch");
-
             epoch.init_proposers().expect("should init proposers");
 
             // Apply proposers tree
@@ -494,10 +450,6 @@ mod tests {
                 .expect("should apply batch");
 
             let pro_tx_hashes: Vec<[u8; 32]> = (0..10).map(|_| rand::random()).collect();
-
-            drive
-                .start_current_batch()
-                .expect("should start current batch");
 
             for pro_tx_hash in pro_tx_hashes.iter() {
                 epoch
@@ -524,10 +476,6 @@ mod tests {
             awaited_result.sort();
 
             assert_eq!(stored_proposers, awaited_result);
-
-            drive
-                .start_current_batch()
-                .expect("should start current batch");
 
             let deleted_pro_tx_hashes = vec![
                 awaited_result.get(0).unwrap().0.clone(),

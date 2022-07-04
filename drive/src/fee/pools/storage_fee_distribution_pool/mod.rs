@@ -130,7 +130,6 @@ mod tests {
     }
 
     mod distribute {
-        use crate::error;
         use rust_decimal::Decimal;
         use rust_decimal_macros::dec;
 
@@ -145,10 +144,6 @@ mod tests {
 
             let epoch_index = 0;
 
-            drive
-                .start_current_batch()
-                .expect("should start current batch");
-
             // Storage fee distribution pool is 0 after fee pools initialization
 
             fee_pools
@@ -156,15 +151,9 @@ mod tests {
                 .distribute(&drive, epoch_index, Some(&transaction))
                 .expect("should distribute storage fee pool");
 
-            match drive.apply_current_batch(true, Some(&transaction)) {
-                Ok(_) => assert!(false, "batch should be empty"),
-                Err(e) => match e {
-                    error::Error::Drive(error::drive::DriveError::CurrentBranchIsEmpty()) => {
-                        assert!(true)
-                    }
-                    _ => assert!(false, "expect DriveError::CurrentBranchIsEmpty error"),
-                },
-            }
+            drive
+                .apply_current_batch(false, Some(&transaction))
+                .expect("to apply the batch");
 
             let storage_fees =
                 helpers::get_storage_fees_from_epoch_pools(&drive, epoch_index, Some(&transaction));
@@ -182,10 +171,6 @@ mod tests {
             let storage_pool = i64::MAX;
             let epoch_index = 0;
 
-            drive
-                .start_current_batch()
-                .expect("should start current batch");
-
             fee_pools
                 .storage_fee_distribution_pool
                 .update(&drive, storage_pool)
@@ -195,10 +180,6 @@ mod tests {
             drive
                 .apply_current_batch(true, Some(&transaction))
                 .expect("should apply batch");
-
-            drive
-                .start_current_batch()
-                .expect("should start current batch");
 
             fee_pools
                 .storage_fee_distribution_pool
@@ -227,10 +208,6 @@ mod tests {
             let epoch_index = 42;
 
             // init additional epoch pools as it will be done in epoch_change
-            drive
-                .start_current_batch()
-                .expect("should start current batch");
-
             for i in 1000..=1000 + epoch_index {
                 let epoch = EpochPool::new(i, &drive);
                 epoch
@@ -247,10 +224,6 @@ mod tests {
             drive
                 .apply_current_batch(true, Some(&transaction))
                 .expect("should apply batch");
-
-            drive
-                .start_current_batch()
-                .expect("should start current batch");
 
             fee_pools
                 .storage_fee_distribution_pool
@@ -387,10 +360,6 @@ mod tests {
              */
 
             // refill storage fee pool once more
-            drive
-                .start_current_batch()
-                .expect("should start current batch");
-
             fee_pools
                 .storage_fee_distribution_pool
                 .update(&drive, storage_pool)
@@ -400,10 +369,6 @@ mod tests {
             drive
                 .apply_current_batch(true, Some(&transaction))
                 .expect("should apply batch");
-
-            drive
-                .start_current_batch()
-                .expect("should start current batch");
 
             // distribute fees once more
             fee_pools
@@ -465,10 +430,6 @@ mod tests {
             let drive = super::setup_drive();
             let (transaction, fee_pools) = super::setup_fee_pools(&drive, None);
 
-            drive
-                .start_current_batch()
-                .expect("should start current batch");
-
             let storage_fee = 42;
 
             fee_pools
@@ -519,10 +480,6 @@ mod tests {
         fn test_error_if_wrong_value_encoded() {
             let drive = super::setup_drive();
             let (transaction, fee_pools) = super::setup_fee_pools(&drive, None);
-
-            drive
-                .start_current_batch()
-                .expect("should start current batch");
 
             drive
                 .current_batch_insert(super::PathKeyElementInfo::PathFixedSizeKeyElement((

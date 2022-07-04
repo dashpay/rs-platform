@@ -162,10 +162,6 @@ mod tests {
 
         let start_time: i64 = Utc::now().timestamp_millis();
 
-        drive
-            .start_current_batch()
-            .expect("should start current batch");
-
         epoch_pool
             .update_start_time(start_time)
             .expect("should update start time");
@@ -289,10 +285,6 @@ mod tests {
         let epoch_pool = EpochPool::new(0, &drive);
 
         let start_block_height = 1;
-
-        drive
-            .start_current_batch()
-            .expect("should start current batch");
 
         epoch_pool
             .update_start_block_height(start_block_height)
@@ -427,10 +419,6 @@ mod tests {
 
             let epoch = super::EpochPool::new(1042, &drive);
 
-            drive
-                .start_current_batch()
-                .expect("should start current batch");
-
             epoch.init_empty().expect("should init empty pool");
 
             match drive.apply_current_batch(true, Some(&transaction)) {
@@ -448,10 +436,6 @@ mod tests {
             let (transaction, _) = super::setup_fee_pools(&drive, None);
 
             let epoch = super::EpochPool::new(1042, &drive);
-
-            drive
-                .start_current_batch()
-                .expect("should start current batch");
 
             epoch.init_empty().expect("should init an epoch pool");
 
@@ -478,10 +462,6 @@ mod tests {
             let multiplier = 42;
             let start_time = 1;
             let start_block_height = 2;
-
-            drive
-                .start_current_batch()
-                .expect("should start current batch");
 
             epoch.init_empty().expect("should init empty epoch pool");
 
@@ -533,10 +513,6 @@ mod tests {
 
             let epoch = super::EpochPool::new(0, &drive);
 
-            drive
-                .start_current_batch()
-                .expect("should start current batch");
-
             epoch
                 .init_current(1, 2, 3)
                 .expect("should init an epoch pool");
@@ -545,10 +521,6 @@ mod tests {
             drive
                 .apply_current_batch(true, Some(&transaction))
                 .expect("should apply batch");
-
-            drive
-                .start_current_batch()
-                .expect("should start current batch");
 
             epoch
                 .mark_as_paid(Some(&transaction))

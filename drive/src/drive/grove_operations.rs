@@ -824,16 +824,6 @@ impl Drive {
         push_drive_operation_result(cost_context, drive_operations)
     }
 
-    pub(crate) fn start_current_batch(&self) -> Result<(), Error> {
-        let current_batch = self.current_batch.borrow();
-
-        if current_batch.len() > 0 {
-            return Err(Error::Drive(DriveError::CurrentBranchIsAlreadyStarted()));
-        }
-
-        Ok(())
-    }
-
     pub(crate) fn current_batch_insert_empty_tree<'a, 'c, P>(
         &'a self,
         path: P,
@@ -887,14 +877,6 @@ impl Drive {
         validate: bool,
         transaction: TransactionArg,
     ) -> Result<(), Error> {
-        {
-            let current_batch = self.current_batch.borrow();
-
-            if current_batch.len() == 0 {
-                return Err(Error::Drive(DriveError::CurrentBranchIsEmpty()));
-            }
-        }
-
         let grovedb_operations = DriveOperation::grovedb_operations(&self.current_batch.borrow());
 
         self.grove_apply_batch(

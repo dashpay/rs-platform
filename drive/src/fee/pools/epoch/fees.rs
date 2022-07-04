@@ -172,10 +172,6 @@ mod tests {
 
             let epoch = super::EpochPool::new(7000, &drive);
 
-            drive
-                .start_current_batch()
-                .expect("should start current batch");
-
             epoch
                 .update_storage_fee(super::dec!(42.0))
                 .expect("should update storage fee");
@@ -200,10 +196,6 @@ mod tests {
             let epoch = super::EpochPool::new(0, &drive);
 
             let storage_fee = super::dec!(42.0);
-
-            drive
-                .start_current_batch()
-                .expect("should start current batch");
 
             epoch
                 .update_storage_fee(storage_fee)
@@ -281,10 +273,6 @@ mod tests {
 
             let epoch = super::EpochPool::new(7000, &drive);
 
-            drive
-                .start_current_batch()
-                .expect("should start current batch");
-
             epoch
                 .update_processing_fee(42)
                 .expect("should update processing fee");
@@ -309,10 +297,6 @@ mod tests {
             let epoch = super::EpochPool::new(0, &drive);
 
             let processing_fee: u64 = 42;
-
-            drive
-                .start_current_batch()
-                .expect("should start current batch");
 
             epoch
                 .update_processing_fee(processing_fee)
@@ -372,10 +356,6 @@ mod tests {
         let storage_fee = dec!(1000);
 
         let epoch = EpochPool::new(0, &drive);
-
-        drive
-            .start_current_batch()
-            .expect("should start current batch");
 
         epoch
             .update_processing_fee(processing_fee)
@@ -457,10 +437,6 @@ mod tests {
             let epoch = super::EpochPool::new(0, &drive);
 
             let multiplier = 42;
-
-            drive
-                .start_current_batch()
-                .expect("should start current batch");
 
             epoch.init_empty().expect("should init empty pool");
 

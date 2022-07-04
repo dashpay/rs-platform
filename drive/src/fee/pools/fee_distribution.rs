@@ -327,10 +327,6 @@ mod tests {
 
             let unpaid_epoch_pool_0 = super::EpochPool::new(0, &drive);
 
-            drive
-                .start_current_batch()
-                .expect("should start current batch");
-
             unpaid_epoch_pool_0
                 .init_proposers()
                 .expect("should create proposers tree");
@@ -339,10 +335,6 @@ mod tests {
             drive
                 .apply_current_batch(true, Some(&transaction))
                 .expect("should apply batch");
-
-            drive
-                .start_current_batch()
-                .expect("should start current batch");
 
             super::populate_proposers(&unpaid_epoch_pool_0, 2, Some(&transaction));
 
@@ -356,10 +348,6 @@ mod tests {
             drive
                 .apply_current_batch(true, Some(&transaction))
                 .expect("should apply batch");
-
-            drive
-                .start_current_batch()
-                .expect("should start current batch");
 
             super::populate_proposers(&unpaid_epoch_pool_1, 2, Some(&transaction));
 
@@ -435,10 +423,6 @@ mod tests {
             let unpaid_epoch_pool_0 = super::EpochPool::new(0, &drive);
             let unpaid_epoch_pool_1 = super::EpochPool::new(1, &drive);
 
-            drive
-                .start_current_batch()
-                .expect("should start current batch");
-
             unpaid_epoch_pool_0
                 .init_current(1, 1, 1)
                 .expect("should create proposers tree");
@@ -452,10 +436,6 @@ mod tests {
             drive
                 .apply_current_batch(true, Some(&transaction))
                 .expect("should apply batch");
-
-            drive
-                .start_current_batch()
-                .expect("should start current batch");
 
             fee_pools
                 .distribute_fees_into_pools(
@@ -497,10 +477,6 @@ mod tests {
             let unpaid_epoch_pool = super::EpochPool::new(0, &drive);
             let next_epoch_pool = super::EpochPool::new(1, &drive);
 
-            drive
-                .start_current_batch()
-                .expect("should start current batch");
-
             unpaid_epoch_pool
                 .init_current(1, 1, 1)
                 .expect("should create proposers tree");
@@ -513,10 +489,6 @@ mod tests {
             drive
                 .apply_current_batch(true, Some(&transaction))
                 .expect("should apply batch");
-
-            drive
-                .start_current_batch()
-                .expect("should start current batch");
 
             fee_pools
                 .distribute_fees_into_pools(
@@ -546,10 +518,6 @@ mod tests {
             drive
                 .apply_current_batch(true, Some(&transaction))
                 .expect("should apply batch");
-
-            drive
-                .start_current_batch()
-                .expect("should start current batch");
 
             let proposers_paid = fee_pools
                 .distribute_fees_from_unpaid_pools_to_proposers(&drive, 1, Some(&transaction))
@@ -586,10 +554,6 @@ mod tests {
             let unpaid_epoch_pool = super::EpochPool::new(0, &drive);
             let next_epoch_pool = super::EpochPool::new(1, &drive);
 
-            drive
-                .start_current_batch()
-                .expect("should start current batch");
-
             unpaid_epoch_pool
                 .init_current(1, 1, 1)
                 .expect("should create proposers tree");
@@ -602,10 +566,6 @@ mod tests {
             drive
                 .apply_current_batch(true, Some(&transaction))
                 .expect("should apply batch");
-
-            drive
-                .start_current_batch()
-                .expect("should start current batch");
 
             fee_pools
                 .distribute_fees_into_pools(
@@ -620,6 +580,7 @@ mod tests {
             let pro_tx_hashes =
                 super::populate_proposers(&unpaid_epoch_pool, 10, Some(&transaction));
 
+            // Create masternode reward shares contract
             let contract = create_mn_shares_contract(&drive);
 
             let share_identities_and_documents = setup_identities_with_share_documents(
@@ -629,16 +590,9 @@ mod tests {
                 Some(&transaction),
             );
 
-            // Create masternode reward shares contract
-            super::create_mn_shares_contract(&drive);
-
             drive
                 .apply_current_batch(true, Some(&transaction))
                 .expect("should apply batch");
-
-            drive
-                .start_current_batch()
-                .expect("should start current batch");
 
             let proposers_paid = fee_pools
                 .distribute_fees_from_unpaid_pools_to_proposers(&drive, 1, Some(&transaction))
@@ -696,10 +650,6 @@ mod tests {
 
         let current_epoch_pool = EpochPool::new(0, &drive);
 
-        drive
-            .start_current_batch()
-            .expect("should start current batch");
-
         current_epoch_pool
             .init_current(1, 1, 1)
             .expect("should init the epoch pool as current");
@@ -708,10 +658,6 @@ mod tests {
         drive
             .apply_current_batch(true, Some(&transaction))
             .expect("should apply batch");
-
-        drive
-            .start_current_batch()
-            .expect("should start current batch");
 
         let processing_fees = 1000000;
         let storage_fees = 2000000;

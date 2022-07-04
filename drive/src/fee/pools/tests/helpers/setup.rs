@@ -37,10 +37,6 @@ pub fn setup_fee_pools<'a>(
     let fee_pools = FeePools::new();
 
     if options.init_fee_pools {
-        drive
-            .start_current_batch()
-            .expect("should start current batch");
-
         fee_pools.init(&drive).expect("should init fee pools");
 
         drive
