@@ -387,7 +387,12 @@ describe('Drive', () => {
         const request = {
           blockHeight: 1,
           blockTime: (new Date()).getTime(),
-          proposerProTxHash: Buffer.alloc(32, 1),
+          proposerProTxHash: [
+            1, 1, 1, 1, 1, 1, 1, 1, 1,
+            1, 1, 1, 1, 1, 1, 1, 1, 1,
+            1, 1, 1, 1, 1, 1, 1, 1, 1,
+            1, 1, 1, 1, 1,
+          ],
         };
 
         const response = await drive.getAbci().blockBegin(request);
@@ -397,9 +402,14 @@ describe('Drive', () => {
 
       it('should process a block with previous block time', async () => {
         const request = {
-          blockHeight: 2,
+          blockHeight: 1,
           blockTime: (new Date()).getTime(),
-          proposerProTxHash: Buffer.alloc(32, 1),
+          proposerProTxHash: [
+            1, 1, 1, 1, 1, 1, 1, 1, 1,
+            1, 1, 1, 1, 1, 1, 1, 1, 1,
+            1, 1, 1, 1, 1, 1, 1, 1, 1,
+            1, 1, 1, 1, 1,
+          ],
           previousBlockTime: (new Date()).getTime() - 100,
         };
 
@@ -415,7 +425,12 @@ describe('Drive', () => {
         await drive.getAbci().blockBegin({
           blockHeight: 1,
           blockTime: (new Date()).getTime(),
-          proposerProTxHash: Buffer.alloc(32, 1),
+          proposerProTxHash: [
+            1, 1, 1, 1, 1, 1, 1, 1, 1,
+            1, 1, 1, 1, 1, 1, 1, 1, 1,
+            1, 1, 1, 1, 1, 1, 1, 1, 1,
+            1, 1, 1, 1, 1,
+          ],
         });
       });
 
