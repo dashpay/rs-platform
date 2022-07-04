@@ -473,7 +473,7 @@ fn test_family_basic_queries() {
     ];
 
     assert_eq!(
-        root_hash.expect("cannot get root hash").as_slice(),
+        root_hash.as_slice(),
         expected_app_hash
     );
 
@@ -531,7 +531,7 @@ fn test_family_basic_queries() {
     let (proof_root_hash, proof_results, _) = query
         .execute_with_proof_only_get_elements(&drive, None)
         .expect("we should be able to a proof");
-    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
 
     // A query getting all people who's first name is Adey (which should exist)
@@ -561,7 +561,7 @@ fn test_family_basic_queries() {
             None,
         )
         .expect("query should be executed");
-    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
 
     // A query getting all people who's first name is Adey and lastName Randolf
@@ -594,7 +594,7 @@ fn test_family_basic_queries() {
             None,
         )
         .expect("query should be executed");
-    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
 
     let document = Document::from_cbor(results.first().unwrap().as_slice(), None, None)
@@ -642,7 +642,7 @@ fn test_family_basic_queries() {
             None,
         )
         .expect("query should be executed");
-    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
 
     // A query getting all people who's first name is Adey, order by lastName (which should exist)
@@ -677,7 +677,7 @@ fn test_family_basic_queries() {
             None,
         )
         .expect("query should be executed");
-    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
 
     let document = Document::from_cbor(results.first().unwrap().as_slice(), None, None)
@@ -720,7 +720,7 @@ fn test_family_basic_queries() {
             None,
         )
         .expect("query should be executed");
-    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
 
     // A query getting a middle name
@@ -752,7 +752,7 @@ fn test_family_basic_queries() {
             None,
         )
         .expect("query should be executed");
-    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
 
     // A query getting all people who's first name is before Chris
@@ -803,7 +803,7 @@ fn test_family_basic_queries() {
     let (proof_root_hash, proof_results, _) = query
         .execute_with_proof_only_get_elements(&drive, None)
         .expect("we should be able to a proof");
-    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
 
     // A query getting all people who's first name starts with C
@@ -849,7 +849,7 @@ fn test_family_basic_queries() {
     let (proof_root_hash, proof_results, _) = query
         .execute_with_proof_only_get_elements(&drive, None)
         .expect("we should be able to a proof");
-    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
 
     // A query getting all people who's first name starts with C, but limit to 1 and be descending
@@ -895,7 +895,7 @@ fn test_family_basic_queries() {
     let (proof_root_hash, proof_results, _) = query
         .execute_with_proof_only_get_elements(&drive, None)
         .expect("we should be able to a proof");
-    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
 
     // A query getting all people who's first name is between Chris and Noellyn included
@@ -951,7 +951,7 @@ fn test_family_basic_queries() {
     let (proof_root_hash, proof_results, _) = query
         .execute_with_proof_only_get_elements(&drive, None)
         .expect("we should be able to a proof");
-    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
 
     // A query getting back elements having specific names
@@ -996,7 +996,7 @@ fn test_family_basic_queries() {
     let (proof_root_hash, proof_results, _) = query
         .execute_with_proof_only_get_elements(&drive, None)
         .expect("we should be able to a proof");
-    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
 
     let query_value = json!({
@@ -1047,7 +1047,7 @@ fn test_family_basic_queries() {
     let (proof_root_hash, proof_results, _) = query
         .execute_with_proof_only_get_elements(&drive, None)
         .expect("we should be able to a proof");
-    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
 
     // A query getting back elements having specific names and over a certain age
@@ -1101,7 +1101,7 @@ fn test_family_basic_queries() {
     let (proof_root_hash, proof_results, _) = query
         .execute_with_proof_only_get_elements(&drive, None)
         .expect("we should be able to a proof");
-    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
 
     // A query getting back elements having specific names and over a certain age
@@ -1156,7 +1156,7 @@ fn test_family_basic_queries() {
     let (proof_root_hash, proof_results, _) = query
         .execute_with_proof_only_get_elements(&drive, None)
         .expect("we should be able to a proof");
-    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
 
     let ages: HashMap<String, u8> = results
@@ -1312,7 +1312,7 @@ fn test_family_basic_queries() {
     //         None,
     //     )
     //     .expect("query should be executed");
-    // assert_eq!(root_hash, Some(proof_root_hash));
+    // assert_eq!(root_hash, proof_root_hash);
     // assert_eq!(results, proof_results);
     // let db_transaction = drive.grove.start_transaction();
 
@@ -1635,7 +1635,7 @@ fn test_family_basic_queries() {
         .unwrap()
         .expect("there is always a root hash");
     assert_eq!(
-        root_hash.expect("cannot get root hash").as_slice(),
+        root_hash.as_slice(),
         vec![
             168, 65, 55, 241, 30, 80, 135, 127, 237, 196, 63, 27, 80, 98, 211, 174, 194, 4, 5, 226,
             90, 172, 61, 207, 110, 133, 224, 35, 201, 167, 3, 121
@@ -1661,7 +1661,7 @@ fn test_family_starts_at_queries() {
     ];
 
     assert_eq!(
-        root_hash.expect("cannot get root hash").as_slice(),
+        root_hash.as_slice(),
         expected_app_hash
     );
 
@@ -1729,7 +1729,7 @@ fn test_family_starts_at_queries() {
     let (proof_root_hash, proof_results, _) = query
         .execute_with_proof_only_get_elements(&drive, None)
         .expect("we should be able to a proof");
-    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
 
     // Now lets try startsAfter
@@ -1779,7 +1779,7 @@ fn test_family_starts_at_queries() {
     let (proof_root_hash, proof_results, _) = query
         .execute_with_proof_only_get_elements(&drive, None)
         .expect("we should be able to a proof");
-    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
 
     let query_value = json!({
@@ -1831,7 +1831,7 @@ fn test_family_starts_at_queries() {
     let (proof_root_hash, proof_results, _) = query
         .execute_with_proof_only_get_elements(&drive, None)
         .expect("we should be able to a proof");
-    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
 
     // Now lets try startsAfter
@@ -1882,7 +1882,7 @@ fn test_family_starts_at_queries() {
     let (proof_root_hash, proof_results, _) = query
         .execute_with_proof_only_get_elements(&drive, None)
         .expect("we should be able to a proof");
-    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
 }
 
@@ -2041,7 +2041,7 @@ fn test_family_with_nulls_query() {
     ];
 
     assert_eq!(
-        root_hash.expect("cannot get root hash").as_slice(),
+        root_hash.as_slice(),
         expected_app_hash
     );
 
@@ -2104,7 +2104,7 @@ fn test_family_with_nulls_query() {
     let (proof_root_hash, proof_results, _) = query
         .execute_with_proof_only_get_elements(&drive, None)
         .expect("we should be able to a proof");
-    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
 
     let ids: Vec<String> = results
@@ -2155,7 +2155,7 @@ fn test_query_with_cached_contract() {
     ];
 
     assert_eq!(
-        root_hash.expect("cannot get root hash").as_slice(),
+        root_hash.as_slice(),
         expected_app_hash
     );
 
@@ -2196,7 +2196,7 @@ fn test_query_with_cached_contract() {
     let (proof_root_hash, proof_results, _) = query
         .execute_with_proof_only_get_elements(&drive, None)
         .expect("we should be able to a proof");
-    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
 
     let contract_ref = drive
@@ -2224,7 +2224,7 @@ fn test_dpns_query() {
     ];
 
     assert_eq!(
-        root_hash.expect("cannot get root hash").as_slice(),
+        root_hash.as_slice(),
         expected_app_hash
     );
 
@@ -2283,7 +2283,7 @@ fn test_dpns_query() {
     let (proof_root_hash, proof_results, _) = query
         .execute_with_proof_only_get_elements(&drive, None)
         .expect("we should be able to a proof");
-    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
 
     // A query getting all elements starting with a in dash parent domain
@@ -2335,7 +2335,7 @@ fn test_dpns_query() {
     let (proof_root_hash, proof_results, _) = query
         .execute_with_proof_only_get_elements(&drive, None)
         .expect("we should be able to a proof");
-    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
 
     let ids: Vec<String> = results
@@ -2405,7 +2405,7 @@ fn test_dpns_query() {
     let (proof_root_hash, proof_results, _) = query
         .execute_with_proof_only_get_elements(&drive, None)
         .expect("we should be able to a proof");
-    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
 
     // A query getting one element starting with a in dash parent domain desc
@@ -2458,7 +2458,7 @@ fn test_dpns_query() {
     let (proof_root_hash, proof_results, _) = query
         .execute_with_proof_only_get_elements(&drive, None)
         .expect("we should be able to a proof");
-    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
 
     let record_id_base64: Vec<String> = results
@@ -2531,7 +2531,7 @@ fn test_dpns_query() {
     let (proof_root_hash, proof_results, _) = query
         .execute_with_proof_only_get_elements(&drive, None)
         .expect("we should be able to a proof");
-    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
 
     // A query getting 2 elements asc by the dashUniqueIdentityId
@@ -2578,7 +2578,7 @@ fn test_dpns_query() {
     let (proof_root_hash, proof_results, _) = query
         .execute_with_proof_only_get_elements(&drive, None)
         .expect("we should be able to a proof");
-    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
 
     // A query getting all elements
@@ -2604,7 +2604,7 @@ fn test_dpns_query() {
     let (proof_root_hash, proof_results, _) = query
         .execute_with_proof_only_get_elements(&drive, None)
         .expect("we should be able to a proof");
-    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
 }
 
@@ -2652,7 +2652,7 @@ fn test_dpns_insertion_no_aliases() {
             .root_hash(None)
             .unwrap()
             .expect("should get root hash"),
-        Some(proof_root_hash)
+        proof_root_hash
     );
     assert_eq!(result.0, proof_results);
 }
@@ -2701,7 +2701,7 @@ fn test_dpns_insertion_with_aliases() {
             .root_hash(None)
             .unwrap()
             .expect("should get root hash"),
-        Some(proof_root_hash)
+        proof_root_hash
     );
     assert_eq!(result.0, proof_results);
 }
@@ -2725,7 +2725,7 @@ fn test_dpns_query_start_at() {
     ];
 
     assert_eq!(
-        root_hash.expect("cannot get root hash").as_slice(),
+        root_hash.as_slice(),
         expected_app_hash,
     );
 
@@ -2791,7 +2791,7 @@ fn test_dpns_query_start_at() {
     let (proof_root_hash, proof_results, _) = query
         .execute_with_proof_only_get_elements(&drive, None)
         .expect("we should be able to a proof");
-    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
 }
 
@@ -2814,7 +2814,7 @@ fn test_dpns_query_start_after() {
     ];
 
     assert_eq!(
-        root_hash.expect("cannot get root hash").as_slice(),
+        root_hash.as_slice(),
         expected_app_hash
     );
 
@@ -2880,7 +2880,7 @@ fn test_dpns_query_start_after() {
     let (proof_root_hash, proof_results, _) = query
         .execute_with_proof_only_get_elements(&drive, None)
         .expect("we should be able to a proof");
-    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
 }
 
@@ -2903,7 +2903,7 @@ fn test_dpns_query_start_at_desc() {
     ];
 
     assert_eq!(
-        root_hash.expect("cannot get root hash").as_slice(),
+        root_hash.as_slice(),
         expected_app_hash
     );
 
@@ -2969,7 +2969,7 @@ fn test_dpns_query_start_at_desc() {
     let (proof_root_hash, proof_results, _) = query
         .execute_with_proof_only_get_elements(&drive, None)
         .expect("we should be able to a proof");
-    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
 }
 
@@ -2992,7 +2992,7 @@ fn test_dpns_query_start_after_desc() {
     ];
 
     assert_eq!(
-        root_hash.expect("cannot get root hash").as_slice(),
+        root_hash.as_slice(),
         expected_app_hash
     );
 
@@ -3058,7 +3058,7 @@ fn test_dpns_query_start_after_desc() {
     let (proof_root_hash, proof_results, _) = query
         .execute_with_proof_only_get_elements(&drive, None)
         .expect("we should be able to a proof");
-    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
 }
 
@@ -3178,7 +3178,7 @@ fn test_dpns_query_start_at_with_null_id() {
     ];
 
     assert_eq!(
-        root_hash.expect("cannot get root hash").as_slice(),
+        root_hash.as_slice(),
         expected_app_hash
     );
 
@@ -3252,7 +3252,7 @@ fn test_dpns_query_start_at_with_null_id() {
     let (proof_root_hash, proof_results, _) = query
         .execute_with_proof_only_get_elements(&drive, None)
         .expect("we should be able to a proof");
-    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
 }
 
@@ -3373,7 +3373,7 @@ fn test_dpns_query_start_after_with_null_id() {
     ];
 
     assert_eq!(
-        root_hash.expect("cannot get root hash").as_slice(),
+        root_hash.as_slice(),
         expected_app_hash
     );
 
@@ -3449,7 +3449,7 @@ fn test_dpns_query_start_after_with_null_id() {
     let (proof_root_hash, proof_results, _) = query
         .execute_with_proof_only_get_elements(&drive, None)
         .expect("we should be able to a proof");
-    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
 }
 
@@ -3570,7 +3570,7 @@ fn test_dpns_query_start_after_with_null_id_desc() {
     ];
 
     assert_eq!(
-        root_hash.expect("cannot get root hash").as_slice(),
+        root_hash.as_slice(),
         expected_app_hash,
     );
 
@@ -3635,7 +3635,7 @@ fn test_dpns_query_start_after_with_null_id_desc() {
     let (proof_root_hash, proof_results, _) = query
         .execute_with_proof_only_get_elements(&drive, None)
         .expect("we should be able to a proof");
-    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
 
     // The explanation is a little interesting
@@ -3689,7 +3689,7 @@ fn test_dpns_query_start_after_with_null_id_desc() {
     let (proof_root_hash, proof_results, _) = query
         .execute_with_proof_only_get_elements(&drive, None)
         .expect("we should be able to a proof");
-    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
 
     // A query getting one element starting with a in dash parent domain asc
@@ -3745,6 +3745,6 @@ fn test_dpns_query_start_after_with_null_id_desc() {
     let (proof_root_hash, proof_results, _) = query
         .execute_with_proof_only_get_elements(&drive, None)
         .expect("we should be able to a proof");
-    assert_eq!(root_hash, Some(proof_root_hash));
+    assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
 }

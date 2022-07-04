@@ -205,7 +205,7 @@ fn test_query_historical() {
         .unwrap()
         .expect("there is always a root hash");
     assert_eq!(
-        root_hash.expect("cannot get root hash").as_slice(),
+        root_hash.as_slice(),
         vec![
             61, 186, 193, 171, 235, 220, 81, 55, 187, 86, 227, 222, 69, 202, 9, 12, 251, 109, 248,
             217, 108, 148, 71, 54, 227, 170, 213, 120, 21, 24, 12, 110
@@ -1426,7 +1426,7 @@ fn test_query_historical() {
         .unwrap()
         .expect("there is always a root hash");
     assert_eq!(
-        root_hash.expect("cannot get root hash").as_slice(),
+        root_hash.as_slice(),
         vec![
             160, 99, 252, 166, 225, 36, 68, 39, 181, 54, 116, 180, 29, 1, 16, 24, 65, 248, 9, 21,
             44, 228, 28, 146, 9, 45, 27, 233, 145, 87, 73, 220

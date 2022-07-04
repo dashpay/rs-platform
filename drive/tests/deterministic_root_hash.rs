@@ -138,13 +138,11 @@ fn test_root_hash(drive: &Drive, db_transaction: &Transaction) {
         .grove
         .root_hash(Some(db_transaction))
         .unwrap()
-        .ok()
-        .flatten()
         .expect("should return app hash");
 
     assert_eq!(
         hex::encode(app_hash),
-        "0000000000000000000000000000000000000000000000000000000000000000"
+        "293abd727a9b7e27e3b69462e2186f5ec1e298a2181d6f389fb101514fdebdeb"
     );
 
     //[1644293142181] INFO (35 on bf3bb2a2796a): createTree
@@ -173,8 +171,6 @@ fn test_root_hash(drive: &Drive, db_transaction: &Transaction) {
         .grove
         .root_hash(Some(db_transaction))
         .unwrap()
-        .ok()
-        .flatten()
         .expect("should return app hash");
 
     assert_eq!(
@@ -208,8 +204,6 @@ fn test_root_hash(drive: &Drive, db_transaction: &Transaction) {
         .grove
         .root_hash(Some(db_transaction))
         .unwrap()
-        .ok()
-        .flatten()
         .expect("should return app hash");
 
     assert_eq!(
@@ -243,8 +237,6 @@ fn test_root_hash(drive: &Drive, db_transaction: &Transaction) {
         .grove
         .root_hash(Some(db_transaction))
         .unwrap()
-        .ok()
-        .flatten()
         .expect("should return app hash");
 
     assert_eq!(
@@ -280,8 +272,6 @@ fn test_root_hash(drive: &Drive, db_transaction: &Transaction) {
         .grove
         .root_hash(Some(db_transaction))
         .unwrap()
-        .ok()
-        .flatten()
         .expect("should return app hash");
 
     assert_eq!(
@@ -313,8 +303,6 @@ fn test_root_hash(drive: &Drive, db_transaction: &Transaction) {
         .grove
         .root_hash(Some(db_transaction))
         .unwrap()
-        .ok()
-        .flatten()
         .expect("should return app hash");
 
     assert_eq!(
@@ -357,8 +345,6 @@ fn test_root_hash(drive: &Drive, db_transaction: &Transaction) {
         .grove
         .root_hash(Some(db_transaction))
         .unwrap()
-        .ok()
-        .flatten()
         .expect("should return app hash");
 
     assert_eq!(
@@ -382,8 +368,6 @@ fn test_root_hash(drive: &Drive, db_transaction: &Transaction) {
         .grove
         .root_hash(Some(db_transaction))
         .unwrap()
-        .ok()
-        .flatten()
         .expect("should return app hash");
 
     let expected_app_hash = "180efc3caf02fd8e367e7a7a779c97177c19bf1e02e2c424c83bc2b21da41f92";
@@ -449,13 +433,11 @@ fn test_root_hash_matches_with_batching_just_contract() {
         .grove
         .root_hash(Some(&db_transaction_with_batches))
         .unwrap()
-        .unwrap()
         .expect("there is always a root hash");
 
     let root_hash_without_batches = drive_without_batches
         .grove
         .root_hash(Some(&db_transaction_without_batches))
-        .unwrap()
         .unwrap()
         .expect("there is always a root hash");
 
@@ -518,13 +500,11 @@ fn test_root_hash_matches_with_batching_contract_and_one_document() {
         .grove
         .root_hash(Some(&db_transaction_with_batches))
         .unwrap()
-        .unwrap()
         .expect("there is always a root hash");
 
     let root_hash_without_batches = drive_without_batches
         .grove
         .root_hash(Some(&db_transaction_without_batches))
-        .unwrap()
         .unwrap()
         .expect("there is always a root hash");
 
