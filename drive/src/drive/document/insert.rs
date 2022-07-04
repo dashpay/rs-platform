@@ -884,8 +884,7 @@ mod tests {
             .grove
             .root_hash(Some(&db_transaction))
             .unwrap()
-            .expect("expected a root hash calculation to succeed")
-            .expect("expected a root hash");
+            .expect("expected a root hash calculation to succeed");
 
         drive
             .add_document_for_contract_operations(
@@ -907,8 +906,7 @@ mod tests {
             .grove
             .root_hash(Some(&db_transaction))
             .unwrap()
-            .expect("expected a root hash calculation to succeed")
-            .expect("expected a root hash");
+            .expect("expected a root hash calculation to succeed");
 
         assert_eq!(root_hash, root_hash_after_fee);
 
