@@ -175,7 +175,7 @@ fn test_root_hash(drive: &Drive, db_transaction: &Transaction) {
 
     assert_eq!(
         hex::encode(app_hash),
-        "f5a5fd42d16a20302798ef6ed309979b43003d2320d9f0e8ea9831a92759fb4b"
+        "0573eebc72d9cb9e20b301551c8f880605e577f0f7d8d99dd254bcae8918f8b9"
     );
 
     // [1644293142181] INFO (35 on bf3bb2a2796a): createTree
@@ -208,7 +208,7 @@ fn test_root_hash(drive: &Drive, db_transaction: &Transaction) {
 
     assert_eq!(
         hex::encode(app_hash),
-        "7a0501f5957bdf9cb3a8ff4966f02265f968658b7a9c62642cba1165e86642f5"
+        "06de7953e9a6fad167f3e7293d77de2172781306a8d2a679d7d5b252f5ed8b36"
     );
 
     // [1644293142182] INFO (35 on bf3bb2a2796a): createTree
