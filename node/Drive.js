@@ -26,7 +26,6 @@ const {
 const GroveDB = require('./GroveDB');
 
 const appendStack = require('./appendStack');
-const {expect} = require("chai");
 
 const decodeProtocolEntity = decodeProtocolEntityFactory();
 
