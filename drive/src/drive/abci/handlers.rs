@@ -40,8 +40,6 @@ pub fn block_begin(
     let genesis_time = if request.block_height == 1 {
         drive.update_genesis_time(request.block_time)?;
 
-        drive.apply_current_batch(false, transaction)?;
-
         request.block_time
     } else {
         drive.get_genesis_time(transaction)?
@@ -91,7 +89,7 @@ pub fn block_end(
 
     // Process fees
     let masternodes_paid_count = drive.fee_pools.borrow().process_block_fees(
-        &drive,
+        drive,
         &block_execution_context.block_info,
         &block_execution_context.epoch_info,
         &request.fees,
