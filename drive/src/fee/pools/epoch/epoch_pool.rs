@@ -140,6 +140,7 @@ mod tests {
     use crate::error;
     use crate::error::fee::FeeError;
     use crate::fee::pools::epoch::constants;
+    use crate::fee::pools::tests::helpers::setup::SetupFeePoolsOptions;
     use crate::fee::pools::tests::helpers::setup::{setup_drive, setup_fee_pools};
 
     use super::EpochPool;
@@ -397,15 +398,13 @@ mod tests {
     }
 
     mod init_empty {
-        use crate::fee::pools::tests::helpers::setup::SetupFeePoolsOptions;
-
         #[test]
         fn test_error_if_fee_pools_not_initialized() {
             let drive = super::setup_drive();
             let (transaction, _) = super::setup_fee_pools(
                 &drive,
-                Some(SetupFeePoolsOptions {
-                    init_fee_pools: false,
+                Some(super::SetupFeePoolsOptions {
+                    create_fee_pool_trees: false,
                 }),
             );
 

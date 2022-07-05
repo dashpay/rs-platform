@@ -445,7 +445,10 @@ describe('Drive', () => {
 
         const response = await drive.getAbci().blockEnd(request);
 
-        expect(response).to.be.empty('object');
+        expect(response).to.have.property('epochInfo');
+        expect(response.epochInfo).to.have.property('currentEpochIndex');
+        expect(response.epochInfo).to.have.property('isEpochChange');
+        expect(response).to.have.property('masternodesPaidCount');
       });
     });
   });

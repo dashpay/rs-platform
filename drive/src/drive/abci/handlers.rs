@@ -22,7 +22,7 @@ pub fn init_chain(
     drive.create_root_tree(transaction)?;
 
     // initialize the pools with epochs
-    drive.fee_pools.borrow().init(drive)?;
+    drive.fee_pools.borrow().create_fee_pool_trees(drive)?;
 
     drive.apply_current_batch(false, transaction)?;
 
@@ -88,7 +88,7 @@ pub fn block_end(
         }
     };
 
-    drive.fee_pools.borrow().process_block_fees(
+    let masternodes_paid_count = drive.fee_pools.borrow().process_block_fees(
         &drive,
         &block_execution_context.block_info,
         &block_execution_context.epoch_info,
@@ -98,7 +98,10 @@ pub fn block_end(
 
     drive.apply_current_batch(false, transaction)?;
 
-    let response = BlockEndResponse {};
+    let response = BlockEndResponse {
+        epoch_info: block_execution_context.epoch_info.clone(),
+        masternodes_paid_count,
+    };
 
     Ok(response)
 }
@@ -106,8 +109,7 @@ pub fn block_end(
 #[cfg(test)]
 mod tests {
     mod handlers {
-        use chrono::{Duration, TimeZone, Utc};
-        use dpp::identity::Identity;
+        use chrono::{Duration, Utc};
         use rand::prelude::SliceRandom;
 
         use crate::{

@@ -402,7 +402,7 @@ mod tests {
             let (transaction, fee_pools) = super::setup_fee_pools(
                 &drive,
                 Some(super::SetupFeePoolsOptions {
-                    init_fee_pools: false,
+                    create_fee_pool_trees: false,
                 }),
             );
 
@@ -457,7 +457,7 @@ mod tests {
             let (transaction, fee_pools) = super::setup_fee_pools(
                 &drive,
                 Some(super::SetupFeePoolsOptions {
-                    init_fee_pools: false,
+                    create_fee_pool_trees: false,
                 }),
             );
 

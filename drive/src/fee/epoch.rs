@@ -1,9 +1,12 @@
 use crate::error::fee::FeeError;
 use crate::error::Error;
 use rust_decimal::Decimal;
+use serde::{Deserialize, Serialize};
 
 pub const EPOCH_CHANGE_TIME: i64 = 1576800000;
 
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct EpochInfo {
     pub current_epoch_index: u16,
     pub is_epoch_change: bool,
@@ -55,15 +58,15 @@ impl EpochInfo {
 
 #[cfg(test)]
 mod test {
-    mod calculate {
-        use crate::fee::epoch::EpochInfo;
+    use crate::fee::epoch::EpochInfo;
 
+    mod calculate {
         #[test]
         fn test_epoch_change_to_0_epoch() {
             let genesis_time: i64 = 1655396517902;
             let block_time: i64 = 1655396517922;
 
-            let epoch_info = EpochInfo::calculate(genesis_time, block_time, None)
+            let epoch_info = super::EpochInfo::calculate(genesis_time, block_time, None)
                 .expect("should calculate epoch info");
 
             assert_eq!(epoch_info.current_epoch_index, 0);
@@ -76,8 +79,9 @@ mod test {
             let block_time: i64 = 1655396517922;
             let prev_block_time: i64 = 1655396517912;
 
-            let epoch_info = EpochInfo::calculate(genesis_time, block_time, Some(prev_block_time))
-                .expect("should calculate epoch info");
+            let epoch_info =
+                super::EpochInfo::calculate(genesis_time, block_time, Some(prev_block_time))
+                    .expect("should calculate epoch info");
 
             assert_eq!(epoch_info.current_epoch_index, 0);
             assert_eq!(epoch_info.is_epoch_change, false);
@@ -89,8 +93,9 @@ mod test {
             let prev_block_time: i64 = 1655396517912;
             let block_time: i64 = 1657125244561;
 
-            let epoch_info = EpochInfo::calculate(genesis_time, block_time, Some(prev_block_time))
-                .expect("should calculate epoch info");
+            let epoch_info =
+                super::EpochInfo::calculate(genesis_time, block_time, Some(prev_block_time))
+                    .expect("should calculate epoch info");
 
             assert_eq!(epoch_info.current_epoch_index, 1);
             assert_eq!(epoch_info.is_epoch_change, true);

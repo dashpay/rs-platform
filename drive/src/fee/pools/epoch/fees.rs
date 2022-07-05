@@ -1,6 +1,5 @@
 use grovedb::{Element, TransactionArg};
 use rust_decimal::Decimal;
-use std::str::FromStr;
 
 use crate::drive::object_size_info::PathKeyElementInfo;
 use crate::{
@@ -150,8 +149,6 @@ impl<'e> EpochPool<'e> {
 
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
-
     use grovedb::Element;
     use rust_decimal::Decimal;
     use rust_decimal_macros::dec;
@@ -459,13 +456,11 @@ mod tests {
     mod overflow {
         use std::str::FromStr;
 
-        use rust_decimal::Decimal;
-
         #[test]
         fn test_u64_fee_conversion() {
             let processing_fee = u64::MAX;
 
-            let decimal = Decimal::from_str(processing_fee.to_string().as_str())
+            let decimal = super::Decimal::from_str(processing_fee.to_string().as_str())
                 .expect("should convert u64::MAX to Decimal");
 
             let converted_to_u64: u64 = decimal

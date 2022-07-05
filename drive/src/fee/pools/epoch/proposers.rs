@@ -184,14 +184,15 @@ mod tests {
     use crate::{
         error::{self, fee::FeeError},
         fee::pools::{
-            epoch::epoch_pool::EpochPool,
+            epoch::{constants, epoch_pool::EpochPool},
             tests::helpers::setup::{setup_drive, setup_fee_pools},
         },
     };
 
-    mod get_proposer_block_count {
-        use crate::drive::object_size_info::PathKeyElementInfo;
+    use crate::drive::object_size_info::PathKeyElementInfo;
+    use grovedb::Error;
 
+    mod get_proposer_block_count {
         #[test]
         fn test_error_if_value_has_invalid_length() {
             let drive = super::setup_drive();
@@ -204,7 +205,7 @@ mod tests {
             epoch.init_proposers().expect("should init proposers");
 
             drive
-                .current_batch_insert(PathKeyElementInfo::PathFixedSizeKeyElement((
+                .current_batch_insert(super::PathKeyElementInfo::PathFixedSizeKeyElement((
                     epoch.get_proposers_path(),
                     &pro_tx_hash,
                     super::Element::Item(u128::MAX.to_le_bytes().to_vec(), None),
@@ -400,9 +401,6 @@ mod tests {
     }
 
     mod delete_proposers_tree {
-        use crate::fee::pools::epoch::constants;
-        use grovedb::Error;
-
         #[test]
         fn test_values_has_been_deleted() {
             let drive = super::setup_drive();
@@ -429,14 +427,14 @@ mod tests {
                 .grove
                 .get(
                     epoch.get_path(),
-                    constants::KEY_PROPOSERS.as_bytes(),
+                    super::constants::KEY_PROPOSERS.as_bytes(),
                     Some(&transaction),
                 )
                 .unwrap()
             {
                 Ok(_) => assert!(false, "expect tree not exists"),
                 Err(e) => match e {
-                    Error::PathKeyNotFound(_) => assert!(true),
+                    super::Error::PathKeyNotFound(_) => assert!(true),
                     _ => assert!(false, "invalid error type"),
                 },
             }

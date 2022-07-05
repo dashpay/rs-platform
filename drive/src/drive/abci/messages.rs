@@ -1,4 +1,5 @@
 use crate::error;
+use crate::fee::epoch::EpochInfo;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
@@ -37,7 +38,11 @@ pub struct Fees {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct BlockEndResponse {}
+#[serde(rename_all = "camelCase")]
+pub struct BlockEndResponse {
+    pub epoch_info: EpochInfo,
+    pub masternodes_paid_count: u16,
+}
 
 impl<'a> Serializable<'a> for InitChainRequest {}
 impl<'a> Serializable<'a> for InitChainResponse {}

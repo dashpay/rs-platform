@@ -26,7 +26,7 @@ impl FeePools {
         [Into::<&[u8; 1]>::into(RootTree::Pools)]
     }
 
-    pub fn init(&self, drive: &Drive) -> Result<(), Error> {
+    pub fn create_fee_pool_trees(&self, drive: &Drive) -> Result<(), Error> {
         // init fee pool subtree
         drive.current_batch_insert_empty_tree(
             [],
@@ -76,7 +76,7 @@ impl FeePools {
         epoch_info: &EpochInfo,
         fees: &Fees,
         transaction: TransactionArg,
-    ) -> Result<(), Error> {
+    ) -> Result<u16, Error> {
         let current_epoch_pool = EpochPool::new(epoch_info.current_epoch_index, drive);
 
         if epoch_info.is_epoch_change {
@@ -118,28 +118,22 @@ impl FeePools {
             drive,
             epoch_info.current_epoch_index,
             transaction,
-        )?;
-
-        Ok(())
+        )
     }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::{
-        error::{self, fee::FeeError},
-        fee::pools::constants,
-        fee::pools::tests::helpers::setup::{setup_drive, setup_fee_pools, SetupFeePoolsOptions},
+        error,
+        fee::pools::tests::helpers::setup::{setup_drive, setup_fee_pools},
     };
-    use grovedb::Element;
 
-    use super::FeePools;
+    use rust_decimal_macros::dec;
 
-    mod init {
-        use rust_decimal_macros::dec;
+    use crate::fee::pools::epoch::epoch_pool::EpochPool;
 
-        use crate::fee::pools::epoch::epoch_pool::EpochPool;
-
+    mod create_fee_pool_trees {
         #[test]
         fn test_values_are_set() {
             let drive = super::setup_drive();
@@ -154,21 +148,21 @@ mod tests {
         }
 
         #[test]
-        fn test_epoch_pools_are_init() {
+        fn test_epoch_pools_are_created() {
             let drive = super::setup_drive();
             let (transaction, _) = super::setup_fee_pools(&drive, None);
 
             for epoch_index in 0..1000 {
-                let epoch_pool = EpochPool::new(epoch_index, &drive);
+                let epoch_pool = super::EpochPool::new(epoch_index, &drive);
 
                 let storage_fee = epoch_pool
                     .get_storage_fee(Some(&transaction))
                     .expect("should get storage fee");
 
-                assert_eq!(storage_fee, dec!(0));
+                assert_eq!(storage_fee, super::dec!(0));
             }
 
-            let epoch_pool = EpochPool::new(1000, &drive); // 1001th epoch pool
+            let epoch_pool = super::EpochPool::new(1000, &drive); // 1001th epoch pool
 
             match epoch_pool.get_storage_fee(Some(&transaction)) {
                 Ok(_) => assert!(false, "must be an error"),
@@ -181,16 +175,12 @@ mod tests {
     }
 
     mod shift_current_epoch_pool {
-        use rust_decimal_macros::dec;
-
-        use crate::fee::pools::epoch::epoch_pool::EpochPool;
-
         #[test]
         fn test_values_are_set() {
             let drive = super::setup_drive();
             let (transaction, fee_pools) = super::setup_fee_pools(&drive, None);
 
-            let current_epoch_pool = EpochPool::new(0, &drive);
+            let current_epoch_pool = super::EpochPool::new(0, &drive);
 
             let start_block_height = 10;
             let start_block_time = 1655396517912;
@@ -210,13 +200,13 @@ mod tests {
                 .apply_current_batch(true, Some(&transaction))
                 .expect("should apply batch");
 
-            let next_thousandth_epoch = EpochPool::new(1000, &drive);
+            let next_thousandth_epoch = super::EpochPool::new(1000, &drive);
 
             let storage_fee_pool = next_thousandth_epoch
                 .get_storage_fee(Some(&transaction))
                 .expect("should get storage fee");
 
-            assert_eq!(storage_fee_pool, dec!(0));
+            assert_eq!(storage_fee_pool, super::dec!(0));
 
             let stored_start_block_height = current_epoch_pool
                 .get_start_block_height(Some(&transaction))
