@@ -463,7 +463,6 @@ impl Drive {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
     use std::option::Option::None;
     use grovedb::TransactionArg;
 
@@ -1224,5 +1223,35 @@ mod tests {
     #[test]
     fn test_update_complex_person_with_history_no_transaction_using_batches_and_get_raw() {
         test_update_complex_person_with_history(false, true, false)
+    }
+
+    #[test]
+    fn test_update_complex_person_with_history_with_transaction_using_batches_and_has_raw() {
+        test_update_complex_person_with_history(true, true, true)
+    }
+
+    #[test]
+    fn test_update_complex_person_with_history_with_transaction_using_batches_and_get_raw() {
+        test_update_complex_person_with_history(true, true, false)
+    }
+
+    #[test]
+    fn test_update_complex_person_with_history_no_transaction_no_batches_and_has_raw() {
+        test_update_complex_person_with_history(false, false, true)
+    }
+
+    #[test]
+    fn test_update_complex_person_with_history_no_transaction_no_batches_and_get_raw() {
+        test_update_complex_person_with_history(false, false, false)
+    }
+
+    #[test]
+    fn test_update_complex_person_with_history_with_transaction_no_batches_and_has_raw() {
+        test_update_complex_person_with_history(true, false, true)
+    }
+
+    #[test]
+    fn test_update_complex_person_with_history_with_transaction_no_batches_and_get_raw() {
+        test_update_complex_person_with_history(true, false, false)
     }
 }
