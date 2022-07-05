@@ -17,7 +17,7 @@ impl Default for SetupFeePoolsOptions {
 
 pub fn setup_drive() -> Drive {
     let tmp_dir = TempDir::new().unwrap();
-    let drive: Drive = Drive::open(tmp_dir).expect("should open Drive successfully");
+    let drive: Drive = Drive::open(tmp_dir, None).expect("should open Drive successfully");
 
     drive
 }

@@ -1,5 +1,7 @@
 use grovedb::{Element, TransactionArg};
+use std::collections::HashSet;
 use std::ops::Deref;
+use std::option::Option::None;
 
 use crate::contract::document::Document;
 use crate::contract::{Contract, DocumentType};
@@ -176,10 +178,8 @@ impl Drive {
                 DocumentWithoutSerialization((document, storage_flags)) => {
                     let serialized_document =
                         document.serialize(document_and_contract_info.document_type)?;
-                    let element = Element::Item(
-                        Vec::from(serialized_document),
-                        storage_flags.to_element_flags(),
-                    );
+                    let element =
+                        Element::Item(serialized_document, storage_flags.to_element_flags());
                     PathFixedSizeKeyElement((primary_key_path, document.id.as_slice(), element))
                 }
                 DocumentSize(max_size) => PathKeyElementSize((
@@ -201,10 +201,8 @@ impl Drive {
                 DocumentWithoutSerialization((document, storage_flags)) => {
                     let serialized_document =
                         document.serialize(document_and_contract_info.document_type)?;
-                    let element = Element::Item(
-                        Vec::from(serialized_document),
-                        storage_flags.to_element_flags(),
-                    );
+                    let element =
+                        Element::Item(serialized_document, storage_flags.to_element_flags());
                     PathFixedSizeKeyElement((primary_key_path, document.id.as_slice(), element))
                 }
                 DocumentSize(max_size) => PathKeyElementSize((
@@ -394,6 +392,8 @@ impl Drive {
 
         let storage_flags = document_and_contract_info.document_info.get_storage_flags();
 
+        let mut batch_insertion_cache: HashSet<Vec<Vec<u8>>> = HashSet::new();
+
         // fourth we need to store a reference to the document for each index
         for index in &document_and_contract_info.document_type.indices {
             // at this point the contract path is to the contract documents
@@ -424,14 +424,19 @@ impl Drive {
             // The zero will not matter here, because the PathKeyInfo is variable
             let path_key_info = document_top_field.clone().add_path::<0>(index_path.clone());
 
-            // here we are inserting an empty tree that will have a subtree of all other index properties
-            self.batch_insert_empty_tree_if_not_exists(
-                path_key_info,
-                &storage_flags,
-                apply,
-                transaction,
-                &mut batch_operations,
-            )?;
+            if !path_key_info.is_contained_in_cache(&batch_insertion_cache) {
+                // here we are inserting an empty tree that will have a subtree of all other index properties
+                let inserted = self.batch_insert_empty_tree_if_not_exists(
+                    path_key_info.clone(),
+                    &storage_flags,
+                    apply,
+                    transaction,
+                    &mut batch_operations,
+                )?;
+                if inserted {
+                    path_key_info.add_to_cache(&mut batch_insertion_cache);
+                }
+            }
 
             let mut any_fields_null = document_top_field.is_empty();
 
@@ -468,14 +473,19 @@ impl Drive {
                     .clone()
                     .add_path_info(index_path_info.clone());
 
-                // here we are inserting an empty tree that will have a subtree of all other index properties
-                self.batch_insert_empty_tree_if_not_exists(
-                    path_key_info,
-                    &storage_flags,
-                    apply,
-                    transaction,
-                    &mut batch_operations,
-                )?;
+                if !path_key_info.is_contained_in_cache(&batch_insertion_cache) {
+                    // here we are inserting an empty tree that will have a subtree of all other index properties
+                    let inserted = self.batch_insert_empty_tree_if_not_exists(
+                        path_key_info.clone(),
+                        &storage_flags,
+                        apply,
+                        transaction,
+                        &mut batch_operations,
+                    )?;
+                    if inserted {
+                        path_key_info.add_to_cache(&mut batch_insertion_cache);
+                    }
+                }
 
                 index_path_info.push(index_property_key)?;
 
@@ -486,14 +496,19 @@ impl Drive {
                     .clone()
                     .add_path_info(index_path_info.clone());
 
-                // here we are inserting an empty tree that will have a subtree of all other index properties
-                self.batch_insert_empty_tree_if_not_exists(
-                    path_key_info,
-                    &storage_flags,
-                    apply,
-                    transaction,
-                    &mut batch_operations,
-                )?;
+                if !path_key_info.is_contained_in_cache(&batch_insertion_cache) {
+                    // here we are inserting an empty tree that will have a subtree of all other index properties
+                    let inserted = self.batch_insert_empty_tree_if_not_exists(
+                        path_key_info.clone(),
+                        &storage_flags,
+                        apply,
+                        transaction,
+                        &mut batch_operations,
+                    )?;
+                    if inserted {
+                        path_key_info.add_to_cache(&mut batch_insertion_cache);
+                    }
+                }
 
                 any_fields_null |= document_index_field.is_empty();
 
@@ -672,7 +687,7 @@ mod tests {
     #[test]
     fn test_add_dashpay_documents() {
         let tmp_dir = TempDir::new().unwrap();
-        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+        let drive: Drive = Drive::open(tmp_dir, None).expect("expected to open Drive successfully");
 
         let db_transaction = drive.grove.start_transaction();
 
@@ -737,7 +752,7 @@ mod tests {
     #[test]
     fn test_add_dashpay_fee_for_documents() {
         let tmp_dir = TempDir::new().unwrap();
-        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+        let drive: Drive = Drive::open(tmp_dir, None).expect("expected to open Drive successfully");
 
         let db_transaction = drive.grove.start_transaction();
 
@@ -780,7 +795,7 @@ mod tests {
     #[test]
     fn test_unknown_state_cost_dashpay_fee_for_add_documents() {
         let tmp_dir = TempDir::new().unwrap();
-        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+        let drive: Drive = Drive::open(tmp_dir, None).expect("expected to open Drive successfully");
 
         let db_transaction = drive.grove.start_transaction();
 
@@ -835,7 +850,7 @@ mod tests {
     #[test]
     fn test_add_dashpay_fee_for_documents_detail() {
         let tmp_dir = TempDir::new().unwrap();
-        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+        let drive: Drive = Drive::open(tmp_dir, None).expect("expected to open Drive successfully");
 
         let db_transaction = drive.grove.start_transaction();
 
@@ -874,8 +889,7 @@ mod tests {
             .grove
             .root_hash(Some(&db_transaction))
             .unwrap()
-            .expect("expected a root hash calculation to succeed")
-            .expect("expected a root hash");
+            .expect("expected a root hash calculation to succeed");
 
         drive
             .add_document_for_contract_operations(
@@ -897,8 +911,7 @@ mod tests {
             .grove
             .root_hash(Some(&db_transaction))
             .unwrap()
-            .expect("expected a root hash calculation to succeed")
-            .expect("expected a root hash");
+            .expect("expected a root hash calculation to succeed");
 
         assert_eq!(root_hash, root_hash_after_fee);
 
@@ -924,7 +937,7 @@ mod tests {
     #[test]
     fn test_add_dpns_documents() {
         let tmp_dir = TempDir::new().unwrap();
-        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+        let drive: Drive = Drive::open(tmp_dir, None).expect("expected to open Drive successfully");
 
         let db_transaction = drive.grove.start_transaction();
 
@@ -979,6 +992,7 @@ mod tests {
         drive
             .grove
             .commit_transaction(db_transaction)
+            .unwrap()
             .expect("unable to commit transaction");
     }
 
@@ -1086,7 +1100,7 @@ mod tests {
     #[test]
     fn test_create_two_documents_with_the_same_index_in_different_transactions() {
         let tmp_dir = TempDir::new().unwrap();
-        let drive: Drive = Drive::open(tmp_dir).expect("expected to open Drive successfully");
+        let drive: Drive = Drive::open(tmp_dir, None).expect("expected to open Drive successfully");
 
         let db_transaction = drive.grove.start_transaction();
 
@@ -1126,6 +1140,7 @@ mod tests {
         drive
             .grove
             .commit_transaction(db_transaction)
+            .unwrap()
             .expect("should commit transaction");
 
         let db_transaction = drive.grove.start_transaction();

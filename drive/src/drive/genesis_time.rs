@@ -48,18 +48,16 @@ impl Drive {
 #[cfg(test)]
 mod tests {
     use crate::drive::genesis_time::KEY_GENESIS_TIME;
-    use crate::drive::Drive;
     use crate::drive::RootTree;
     use crate::error;
+    use crate::fee::pools::tests::helpers::setup::setup_drive;
     use grovedb::Element;
-    use tempfile::TempDir;
 
     mod get_genesis_time {
+
         #[test]
         fn test_error_if_fee_pools_is_not_initiated() {
-            let tmp_dir = super::TempDir::new().unwrap();
-            let drive: super::Drive =
-                super::Drive::open(tmp_dir).expect("expected to open Drive successfully");
+            let drive = super::setup_drive();
 
             match drive.get_genesis_time(None) {
                 Ok(_) => assert!(
@@ -75,9 +73,7 @@ mod tests {
 
         #[test]
         fn test_error_if_value_has_invalid_length() {
-            let tmp_dir = super::TempDir::new().unwrap();
-            let drive: super::Drive =
-                super::Drive::open(tmp_dir).expect("expected to open Drive successfully");
+            let drive = super::setup_drive();
 
             drive
                 .create_root_tree(None)
@@ -111,9 +107,7 @@ mod tests {
     mod update_genesis_time {
         #[test]
         fn test_error_if_fee_pools_is_not_initiated() {
-            let tmp_dir = super::TempDir::new().unwrap();
-            let drive: super::Drive =
-                super::Drive::open(tmp_dir).expect("expected to open Drive successfully");
+            let drive = super::setup_drive();
 
             let genesis_time: i64 = 1655396517902;
 
@@ -135,9 +129,7 @@ mod tests {
 
         #[test]
         fn test_value_is_set() {
-            let tmp_dir = super::TempDir::new().unwrap();
-            let drive: super::Drive =
-                super::Drive::open(tmp_dir).expect("expected to open Drive successfully");
+            let drive = super::setup_drive();
 
             drive
                 .create_root_tree(None)
