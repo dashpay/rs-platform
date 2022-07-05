@@ -1,3 +1,4 @@
+use std::ops::Deref;
 use std::sync::Arc;
 
 use costs::CostContext;
@@ -339,7 +340,11 @@ impl Drive {
         // first we need to deserialize the contract
         let contract = Contract::from_cbor(&contract_cbor, contract_id)?;
 
-        let epoch = self.epoch_info.borrow().current_epoch_index;
+        let block_execution_context = self.block_execution_context.borrow();
+        let epoch = match block_execution_context.deref() {
+            Some(block_execution_context) => block_execution_context.epoch_info.current_epoch_index,
+            None => 0,
+        };
 
         self.apply_contract(
             &contract,

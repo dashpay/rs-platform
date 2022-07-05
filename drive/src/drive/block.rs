@@ -1,4 +1,6 @@
 use crate::drive::abci::messages::BlockBeginRequest;
+use crate::fee::epoch::EpochInfo;
+use crate::fee::pools::epoch::epoch_pool::EpochPool;
 
 pub struct BlockInfo {
     pub block_height: u64,
@@ -20,4 +22,5 @@ impl BlockInfo {
 
 pub struct BlockExecutionContext {
     pub block_info: BlockInfo,
+    pub epoch_info: EpochInfo,
 }

@@ -32,7 +32,6 @@ pub mod query;
 pub struct Drive {
     pub grove: GroveDb,
     pub config: DriveConfig,
-    pub epoch_info: RefCell<EpochInfo>,
     pub fee_pools: RefCell<FeePools>,
     pub cached_contracts: RefCell<Cache<[u8; 32], Arc<Contract>>>, //HashMap<[u8; 32], Rc<Contract>>>,
     pub current_batch: RefCell<Vec<DriveOperation>>,
@@ -90,7 +89,6 @@ impl Drive {
                 grove,
                 config: DriveConfig::default(),
                 cached_contracts: RefCell::new(Cache::new(200)),
-                epoch_info: RefCell::new(EpochInfo::default()),
                 fee_pools: RefCell::new(FeePools::new()),
                 current_batch: RefCell::new(Vec::new()),
                 block_execution_context: RefCell::new(None),

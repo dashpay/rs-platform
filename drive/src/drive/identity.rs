@@ -1,5 +1,6 @@
 use dpp::identity::Identity;
 use grovedb::{Element, TransactionArg};
+use std::ops::Deref;
 
 use crate::drive::flags::StorageFlags;
 use crate::drive::object_size_info::KeyInfo;
@@ -19,7 +20,11 @@ impl Drive {
         identity: Identity,
         drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<(), Error> {
-        let epoch = self.epoch_info.borrow().current_epoch_index;
+        let block_execution_context = self.block_execution_context.borrow();
+        let epoch = match block_execution_context.deref() {
+            Some(block_execution_context) => block_execution_context.epoch_info.current_epoch_index,
+            None => 0,
+        };
 
         let storage_flags = StorageFlags { epoch };
 

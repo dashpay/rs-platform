@@ -36,15 +36,6 @@ pub fn block_begin(
     request: BlockBeginRequest,
     transaction: TransactionArg,
 ) -> Result<BlockBeginResponse, Error> {
-    // Init block execution context
-    let block_execution_context = BlockExecutionContext {
-        block_info: BlockInfo::from_block_begin_request(&request),
-    };
-
-    drive
-        .block_execution_context
-        .replace(Some(block_execution_context));
-
     // Set genesis time
     // TODO Move genesis time out of pools
     if request.block_height == 1 {
@@ -66,7 +57,15 @@ pub fn block_begin(
         request.previous_block_time,
     )?;
 
-    drive.epoch_info.replace(epoch_info);
+    // Init block execution context
+    let block_execution_context = BlockExecutionContext {
+        block_info: BlockInfo::from_block_begin_request(&request),
+        epoch_info,
+    };
+
+    drive
+        .block_execution_context
+        .replace(Some(block_execution_context));
 
     drive.apply_current_batch(false, transaction)?;
 
@@ -95,9 +94,8 @@ pub fn block_end(
     drive.fee_pools.borrow().process_block_fees(
         &drive,
         &block_execution_context.block_info,
-        request.fees.processing_fees,
-        request.fees.storage_fees,
-        request.fees.fee_multiplier,
+        &block_execution_context.epoch_info,
+        &request.fees,
         transaction,
     )?;
 

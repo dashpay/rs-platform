@@ -1,4 +1,5 @@
 use grovedb::{Element, TransactionArg};
+use std::ops::Deref;
 
 use crate::contract::document::Document;
 use crate::contract::Contract;
@@ -85,7 +86,11 @@ impl Drive {
 
         let document_type = contract.document_type_for_name(document_type_name)?;
 
-        let epoch = self.epoch_info.borrow().current_epoch_index;
+        let block_execution_context = self.block_execution_context.borrow();
+        let epoch = match block_execution_context.deref() {
+            Some(block_execution_context) => block_execution_context.epoch_info.current_epoch_index,
+            None => 0,
+        };
 
         let storage_flags = StorageFlags { epoch };
 

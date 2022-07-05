@@ -1,10 +1,14 @@
 use grovedb::{Element, TransactionArg};
+use std::ops::Deref;
 
+use crate::drive::abci::messages::Fees;
 use crate::drive::block::BlockInfo;
 use crate::drive::object_size_info::{KeyInfo, PathKeyElementInfo};
 use crate::drive::{Drive, RootTree};
+use crate::error;
 use crate::error::fee::FeeError;
 use crate::error::Error;
+use crate::fee::epoch::EpochInfo;
 use crate::fee::pools::storage_fee_distribution_pool::StorageFeeDistributionPool;
 
 use super::constants;
@@ -122,13 +126,10 @@ impl FeePools {
         &self,
         drive: &Drive,
         block_info: &BlockInfo,
-        processing_fees: u64,
-        storage_fees: i64,
-        fee_multiplier: u64,
+        epoch_info: &EpochInfo,
+        fees: &Fees,
         transaction: TransactionArg,
     ) -> Result<(), Error> {
-        let epoch_info = drive.epoch_info.borrow();
-
         let current_epoch_pool = EpochPool::new(epoch_info.current_epoch_index, drive);
 
         if epoch_info.is_epoch_change {
@@ -139,7 +140,7 @@ impl FeePools {
                 &current_epoch_pool,
                 block_info.block_height,
                 block_info.block_time,
-                fee_multiplier,
+                fees.fee_multiplier,
             )?;
 
             // distribute accumulated previous epoch storage fees
@@ -158,8 +159,8 @@ impl FeePools {
         self.distribute_fees_into_pools(
             drive,
             &current_epoch_pool,
-            processing_fees,
-            storage_fees,
+            fees.processing_fees,
+            fees.storage_fees,
             transaction,
         )?;
 
