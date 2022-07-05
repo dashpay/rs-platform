@@ -45,16 +45,16 @@ impl Drive {
     }
 }
 
+#[cfg(test)]
 mod tests {
     use crate::drive::genesis_time::KEY_GENESIS_TIME;
     use crate::drive::Drive;
     use crate::drive::RootTree;
     use crate::error;
-    use grovedb::{Element, TransactionArg};
+    use grovedb::Element;
     use tempfile::TempDir;
 
     mod get_genesis_time {
-
         #[test]
         fn test_error_if_fee_pools_is_not_initiated() {
             let tmp_dir = super::TempDir::new().unwrap();
