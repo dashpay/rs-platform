@@ -24,6 +24,7 @@ pub mod contract;
 pub mod defaults;
 pub mod document;
 pub mod flags;
+pub mod genesis_time;
 mod grove_operations;
 pub mod identity;
 pub mod object_size_info;

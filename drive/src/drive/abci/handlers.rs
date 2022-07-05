@@ -39,16 +39,12 @@ pub fn block_begin(
     // Set genesis time
     // TODO Move genesis time out of pools
     if request.block_height == 1 {
-        drive
-            .fee_pools
-            .borrow_mut()
-            .update_genesis_time(&drive, request.block_time)?;
+        drive.update_genesis_time(request.block_time)?;
+
+        drive.apply_current_batch(false, transaction)?;
     }
 
-    let genesis_time = drive
-        .fee_pools
-        .borrow_mut()
-        .get_genesis_time(&drive, transaction)?;
+    let genesis_time = drive.get_genesis_time(transaction)?;
 
     // Init epoch info
     let epoch_info = EpochInfo::calculate(
@@ -61,6 +57,7 @@ pub fn block_begin(
     let block_execution_context = BlockExecutionContext {
         block_info: BlockInfo::from_block_begin_request(&request),
         epoch_info,
+        genesis_time,
     };
 
     drive

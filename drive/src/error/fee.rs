@@ -23,10 +23,6 @@ pub enum FeeError {
     CorruptedProposerBlockCountNotItem(&'static str),
     #[error("corrupted proposer block count invalid item length error: {0}")]
     CorruptedProposerBlockCountItemLength(&'static str),
-    #[error("corrupted genesis time not an item error: {0}")]
-    CorruptedGenesisTimeNotItem(&'static str),
-    #[error("corrupted genesis time invalid item length error: {0}")]
-    CorruptedGenesisTimeInvalidItemLength(&'static str),
     #[error("corrupted storage fee pool not an item error: {0}")]
     CorruptedStorageFeePoolNotItem(&'static str),
     #[error("corrupted storage fee pool invalid item length error: {0}")]

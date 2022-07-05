@@ -53,6 +53,12 @@ pub enum DriveError {
     #[error("corrupted serialization error: {0}")]
     CorruptedSerialization(&'static str),
 
+    #[error("corrupted genesis time not an item error")]
+    CorruptedGenesisTimeNotItem(),
+
+    #[error("corrupted genesis time invalid item length error: {0}")]
+    CorruptedGenesisTimeInvalidItemLength(String),
+
     #[error("current batch is already started")]
     CurrentBranchIsAlreadyStarted(),
 

@@ -23,4 +23,5 @@ impl BlockInfo {
 pub struct BlockExecutionContext {
     pub block_info: BlockInfo,
     pub epoch_info: EpochInfo,
+    pub genesis_time: i64,
 }

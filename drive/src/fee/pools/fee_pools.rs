@@ -1,12 +1,9 @@
 use grovedb::{Element, TransactionArg};
-use std::ops::Deref;
 
 use crate::drive::abci::messages::Fees;
 use crate::drive::block::BlockInfo;
 use crate::drive::object_size_info::{KeyInfo, PathKeyElementInfo};
 use crate::drive::{Drive, RootTree};
-use crate::error;
-use crate::error::fee::FeeError;
 use crate::error::Error;
 use crate::fee::epoch::EpochInfo;
 use crate::fee::pools::storage_fee_distribution_pool::StorageFeeDistributionPool;
@@ -15,14 +12,12 @@ use super::constants;
 use super::epoch::epoch_pool::EpochPool;
 
 pub struct FeePools {
-    pub genesis_time: Option<i64>,
     pub storage_fee_distribution_pool: StorageFeeDistributionPool,
 }
 
 impl FeePools {
     pub fn new() -> FeePools {
         FeePools {
-            genesis_time: None,
             storage_fee_distribution_pool: StorageFeeDistributionPool {},
         }
     }
@@ -52,54 +47,6 @@ impl FeePools {
             let epoch = EpochPool::new(i, drive);
             epoch.init_empty()?;
         }
-
-        Ok(())
-    }
-
-    pub fn get_genesis_time(
-        &mut self,
-        drive: &Drive,
-        transaction: TransactionArg,
-    ) -> Result<i64, Error> {
-        if let Some(genesis_time) = self.genesis_time {
-            return Ok(genesis_time);
-        }
-
-        let element = drive
-            .grove
-            .get(
-                FeePools::get_path(),
-                constants::KEY_GENESIS_TIME.as_bytes(),
-                transaction,
-            )
-            .unwrap()
-            .map_err(Error::GroveDB)?;
-
-        if let Element::Item(item, _) = element {
-            let genesis_time = i64::from_le_bytes(item.as_slice().try_into().map_err(|_| {
-                Error::Fee(FeeError::CorruptedGenesisTimeInvalidItemLength(
-                    "genesis time item have an invalid length",
-                ))
-            })?);
-
-            self.genesis_time = Some(genesis_time);
-
-            Ok(genesis_time)
-        } else {
-            Err(Error::Fee(FeeError::CorruptedGenesisTimeNotItem(
-                "fee pool genesis time must be an item",
-            )))
-        }
-    }
-
-    pub fn update_genesis_time(&mut self, drive: &Drive, genesis_time: i64) -> Result<(), Error> {
-        drive.current_batch_insert(PathKeyElementInfo::PathFixedSizeKeyElement((
-            FeePools::get_path(),
-            constants::KEY_GENESIS_TIME.as_bytes(),
-            Element::Item(genesis_time.to_le_bytes().to_vec(), None),
-        )))?;
-
-        self.genesis_time = Some(genesis_time);
 
         Ok(())
     }
@@ -230,116 +177,6 @@ mod tests {
                     _ => assert!(false, "invalid error type"),
                 },
             }
-        }
-    }
-
-    mod get_genesis_time {
-        #[test]
-        fn test_error_if_fee_pools_is_not_initiated() {
-            let drive = super::setup_drive();
-            let (transaction, mut fee_pools) = super::setup_fee_pools(
-                &drive,
-                Some(super::SetupFeePoolsOptions {
-                    init_fee_pools: false,
-                }),
-            );
-
-            match fee_pools.get_genesis_time(&drive, Some(&transaction)) {
-                Ok(_) => assert!(
-                    false,
-                    "should not be able to get genesis time on uninit fee pools"
-                ),
-                Err(e) => match e {
-                    super::error::Error::GroveDB(grovedb::Error::PathNotFound(_)) => assert!(true),
-                    _ => assert!(false, "invalid error type"),
-                },
-            }
-        }
-
-        #[test]
-        fn test_error_if_value_has_invalid_length() {
-            let drive = super::setup_drive();
-            let (transaction, mut fee_pools) = super::setup_fee_pools(&drive, None);
-
-            drive
-                .grove
-                .insert(
-                    super::FeePools::get_path(),
-                    super::constants::KEY_GENESIS_TIME.as_bytes(),
-                    super::Element::Item(u128::MAX.to_le_bytes().to_vec(), None),
-                    Some(&transaction),
-                )
-                .unwrap()
-                .expect("should insert invalid data");
-
-            match fee_pools.get_genesis_time(&drive, Some(&transaction)) {
-                Ok(_) => assert!(false, "should not be able to decode stored value"),
-                Err(e) => match e {
-                    super::error::Error::Fee(
-                        super::FeeError::CorruptedGenesisTimeInvalidItemLength(_),
-                    ) => {
-                        assert!(true)
-                    }
-                    _ => assert!(false, "ivalid error type"),
-                },
-            }
-        }
-    }
-
-    mod update_genesis_time {
-        #[test]
-        fn test_error_if_fee_pools_is_not_initiated() {
-            let drive = super::setup_drive();
-            let (transaction, mut fee_pools) = super::setup_fee_pools(
-                &drive,
-                Some(super::SetupFeePoolsOptions {
-                    init_fee_pools: false,
-                }),
-            );
-
-            let genesis_time: i64 = 1655396517902;
-
-            fee_pools
-                .update_genesis_time(&drive, genesis_time)
-                .expect("should update genesis time");
-
-            match drive.apply_current_batch(true, Some(&transaction)) {
-                Ok(_) => assert!(
-                    false,
-                    "should not be able to update genesis time on uninit fee pools"
-                ),
-                Err(e) => match e {
-                    super::error::Error::GroveDB(grovedb::Error::InvalidPath(_)) => assert!(true),
-                    _ => assert!(false, "invalid error type"),
-                },
-            }
-        }
-
-        #[test]
-        fn test_value_is_set() {
-            let drive = super::setup_drive();
-            let (transaction, mut fee_pools) = super::setup_fee_pools(&drive, None);
-
-            let genesis_time: i64 = 1655396517902;
-
-            fee_pools
-                .update_genesis_time(&drive, genesis_time)
-                .expect("should update genesis time");
-
-            drive
-                .apply_current_batch(true, Some(&transaction))
-                .expect("should apply batch");
-
-            let stored_genesis_time = fee_pools
-                .get_genesis_time(&drive, Some(&transaction))
-                .expect("should get genesis time");
-
-            match fee_pools.genesis_time {
-                None => assert!(false, "genesis_time must be set to FeePools"),
-                Some(t) => assert_eq!(t, genesis_time),
-            }
-
-            assert_eq!(stored_genesis_time, genesis_time);
         }
     }
 
