@@ -37,23 +37,23 @@ pub fn block_begin(
     transaction: TransactionArg,
 ) -> Result<BlockBeginResponse, Error> {
     // Set genesis time
-    // TODO Move genesis time out of pools
-    if request.block_height == 1 {
+    let genesis_time = if request.block_height == 1 {
         drive.update_genesis_time(request.block_time)?;
 
         drive.apply_current_batch(false, transaction)?;
-    }
 
-    let genesis_time = drive.get_genesis_time(transaction)?;
+        request.block_time
+    } else {
+        drive.get_genesis_time(transaction)?
+    };
 
-    // Init epoch info
+    // Init block execution context
     let epoch_info = EpochInfo::calculate(
         genesis_time,
         request.block_time,
         request.previous_block_time,
     )?;
 
-    // Init block execution context
     let block_execution_context = BlockExecutionContext {
         block_info: BlockInfo::from_block_begin_request(&request),
         epoch_info,
@@ -76,6 +76,7 @@ pub fn block_end(
     request: BlockEndRequest,
     transaction: TransactionArg,
 ) -> Result<BlockEndResponse, Error> {
+    // Retrieve block execution context
     let block_execution_context = drive.block_execution_context.borrow();
     let block_execution_context = match block_execution_context.deref() {
         Some(block_execution_context) => block_execution_context,
@@ -88,6 +89,7 @@ pub fn block_end(
         }
     };
 
+    // Process fees
     let masternodes_paid_count = drive.fee_pools.borrow().process_block_fees(
         &drive,
         &block_execution_context.block_info,
@@ -204,8 +206,27 @@ mod tests {
                     },
                 };
 
-                block_end(&drive, block_end_request, Some(&transaction))
+                let block_end_response = block_end(&drive, block_end_request, Some(&transaction))
                     .expect(format!("to begin process block #{}", day).as_str());
+
+                let epoch_index = if day >= 20 { 1 } else { 0 };
+
+                assert_eq!(
+                    block_end_response.epoch_info.current_epoch_index,
+                    epoch_index
+                );
+
+                assert_eq!(
+                    block_end_response.epoch_info.is_epoch_change,
+                    previous_block_time.is_none() || day == 20
+                );
+
+                let masternodes_paid_count = if day == 20 { 2 } else { 0 };
+
+                assert_eq!(
+                    block_end_response.masternodes_paid_count,
+                    masternodes_paid_count
+                );
             }
 
             let storage_fee_pool_value = fee_pools
