@@ -70,14 +70,6 @@ impl<'e> EpochPool<'e> {
         [FeePools::get_path()[0], &self.key]
     }
 
-    pub fn get_proposers_path(&self) -> [&[u8]; 3] {
-        [
-            FeePools::get_path()[0],
-            &self.key,
-            constants::KEY_PROPOSERS.as_bytes(),
-        ]
-    }
-
     pub fn update_start_time(&self, time: i64) -> Result<(), Error> {
         self.drive
             .current_batch_insert(PathKeyElementInfo::PathFixedSizeKeyElement((

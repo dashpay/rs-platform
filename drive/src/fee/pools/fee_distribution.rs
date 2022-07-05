@@ -1,8 +1,9 @@
+use std::ops::DerefMut;
+
 use grovedb::TransactionArg;
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use serde_json::json;
-use std::ops::DerefMut;
 
 use crate::common::value_to_cbor;
 use crate::contract::document::Document;
@@ -10,10 +11,9 @@ use crate::drive::Drive;
 use crate::error::document::DocumentError;
 use crate::error::fee::FeeError;
 use crate::error::Error;
-use crate::fee::pools::fee_pools::FeePools;
-
 use crate::fee::pools::constants;
 use crate::fee::pools::epoch::epoch_pool::EpochPool;
+use crate::fee::pools::fee_pools::FeePools;
 
 impl FeePools {
     pub fn distribute_fees_from_unpaid_pools_to_proposers(
@@ -297,15 +297,19 @@ impl FeePools {
 
 #[cfg(test)]
 mod tests {
-    use crate::fee::pools::tests::helpers::fee_pools::create_mn_shares_contract;
-    use crate::fee::pools::tests::helpers::fee_pools::populate_proposers;
-    use crate::fee::pools::tests::helpers::setup::setup_drive;
-    use crate::fee::pools::tests::helpers::setup::setup_fee_pools;
-
-    use crate::fee::pools::epoch::epoch_pool::EpochPool;
+    use crate::fee::pools::{
+        epoch::constants,
+        epoch::epoch_pool::EpochPool,
+        tests::helpers::{
+            fee_pools::{
+                create_mn_shares_contract, fetch_identities_by_pro_tx_hashes, populate_proposers,
+                refetch_identities, setup_identities_with_share_documents,
+            },
+            setup::{setup_drive, setup_fee_pools},
+        },
+    };
 
     mod get_oldest_unpaid_epoch_pool {
-
         #[test]
         fn test_all_epochs_paid() {
             let drive = super::setup_drive();
@@ -366,17 +370,6 @@ mod tests {
     }
 
     mod distribute_fees_from_unpaid_pools_to_proposers {
-        use crate::{
-            error::Error,
-            fee::pools::{
-                epoch::constants,
-                tests::helpers::fee_pools::{
-                    create_mn_shares_contract, fetch_identities_by_pro_tx_hashes,
-                    refetch_identities, setup_identities_with_share_documents,
-                },
-            },
-        };
-
         #[test]
         fn test_no_distribution_on_epoch_0() {
             let drive = super::setup_drive();
@@ -504,9 +497,9 @@ mod tests {
                 super::populate_proposers(&unpaid_epoch_pool, 60, Some(&transaction));
 
             // Create masternode reward shares contract
-            let contract = create_mn_shares_contract(&drive, Some(&transaction));
+            let contract = super::create_mn_shares_contract(&drive, Some(&transaction));
 
-            let _ = setup_identities_with_share_documents(
+            let _ = super::setup_identities_with_share_documents(
                 &drive,
                 &contract,
                 &pro_tx_hashes,
@@ -527,17 +520,9 @@ mod tests {
 
             assert_eq!(proposers_paid, 50);
 
-            // check we've removed proposers tree
-            match drive
-                .grove
-                .get(
-                    unpaid_epoch_pool.get_path(),
-                    constants::KEY_PROPOSERS.as_bytes(),
-                    Some(&transaction),
-                )
-                .unwrap()
-            {
-                Ok(_) => assert!(true),
+            // expect unpaid proposers exist
+            match unpaid_epoch_pool.is_proposers_tree_empty(Some(&transaction)) {
+                Ok(is_empty) => assert!(!is_empty),
                 Err(e) => match e {
                     _ => assert!(false, "should be able to get proposers tree"),
                 },
@@ -579,9 +564,9 @@ mod tests {
                 super::populate_proposers(&unpaid_epoch_pool, 10, Some(&transaction));
 
             // Create masternode reward shares contract
-            let contract = create_mn_shares_contract(&drive, Some(&transaction));
+            let contract = super::create_mn_shares_contract(&drive, Some(&transaction));
 
-            let share_identities_and_documents = setup_identities_with_share_documents(
+            let share_identities_and_documents = super::setup_identities_with_share_documents(
                 &drive,
                 &contract,
                 &pro_tx_hashes,
@@ -603,8 +588,11 @@ mod tests {
             assert_eq!(proposers_paid, 10);
 
             // check we paid 500 to every mn identity
-            let paid_mn_identities =
-                fetch_identities_by_pro_tx_hashes(&drive, &pro_tx_hashes, Some(&transaction));
+            let paid_mn_identities = super::fetch_identities_by_pro_tx_hashes(
+                &drive,
+                &pro_tx_hashes,
+                Some(&transaction),
+            );
 
             for paid_mn_identity in paid_mn_identities {
                 assert_eq!(paid_mn_identity.balance, 500);
@@ -616,7 +604,7 @@ mod tests {
                 .collect();
 
             let refetched_share_identities =
-                refetch_identities(&drive, share_identities, Some(&transaction));
+                super::refetch_identities(&drive, share_identities, Some(&transaction));
 
             for identity in refetched_share_identities {
                 assert_eq!(identity.balance, 500);
@@ -627,7 +615,7 @@ mod tests {
                 .grove
                 .get(
                     unpaid_epoch_pool.get_path(),
-                    constants::KEY_PROPOSERS.as_bytes(),
+                    super::constants::KEY_PROPOSERS.as_bytes(),
                     Some(&transaction),
                 )
                 .unwrap()

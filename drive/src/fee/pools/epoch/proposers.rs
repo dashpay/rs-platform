@@ -1,6 +1,7 @@
 use grovedb::{Element, PathQuery, Query, SizedQuery, TransactionArg};
 
 use crate::drive::object_size_info::{KeyInfo, PathKeyElementInfo};
+use crate::fee::pools::fee_pools::FeePools;
 use crate::{
     error,
     error::{drive::DriveError, fee::FeeError, Error},
@@ -10,7 +11,15 @@ use crate::{
 use super::constants;
 
 impl<'e> EpochPool<'e> {
-    pub fn get_proposer_block_count(
+    fn get_proposers_path(&self) -> [&[u8]; 3] {
+        [
+            FeePools::get_path()[0],
+            &self.key,
+            constants::KEY_PROPOSERS.as_bytes(),
+        ]
+    }
+
+    fn get_proposer_block_count(
         &self,
         proposer_tx_hash: &[u8; 32],
         transaction: TransactionArg,
@@ -39,7 +48,7 @@ impl<'e> EpochPool<'e> {
         }
     }
 
-    pub fn update_proposer_block_count(
+    fn update_proposer_block_count(
         &self,
         proposer_pro_tx_hash: &[u8; 32],
         block_count: u64,
