@@ -1,3 +1,4 @@
+use crate::common::encode::encode_float;
 use grovedb::{Element, TransactionArg};
 use std::collections::HashSet;
 use std::ops::Deref;
@@ -75,7 +76,7 @@ impl Drive {
                 transaction,
                 drive_operations,
             )?;
-            let encoded_time = crate::contract::types::encode_float(block_time)?;
+            let encoded_time = encode_float(block_time)?;
             let path_key_element_info = match document_and_contract_info.document_info {
                 DocumentAndSerialization((document, serialized_document, storage_flags)) => {
                     let element = Element::Item(
