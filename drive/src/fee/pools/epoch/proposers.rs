@@ -74,7 +74,7 @@ impl<'e> EpochPool<'e> {
                 _ => Err(e),
             })?;
 
-        self.update_proposer_block_count(&proposer_pro_tx_hash, proposed_block_count + 1)?;
+        self.update_proposer_block_count(proposer_pro_tx_hash, proposed_block_count + 1)?;
 
         Ok(())
     }

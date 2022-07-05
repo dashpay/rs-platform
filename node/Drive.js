@@ -26,6 +26,7 @@ const {
 const GroveDB = require('./GroveDB');
 
 const appendStack = require('./appendStack');
+const {expect} = require("chai");
 
 const decodeProtocolEntity = decodeProtocolEntityFactory();
 
@@ -318,6 +319,14 @@ class Drive {
 
 /**
  * @typedef BlockEndResponse
+ * @property {EpochInfo} epochInfo
+ * @property {number} masternodesPaidCount
+ */
+
+/**
+ * @typedef EpochInfo
+ * @property {number} currentEpochIndex
+ * @property {boolean} isEpochChange
  */
 
 module.exports = Drive;

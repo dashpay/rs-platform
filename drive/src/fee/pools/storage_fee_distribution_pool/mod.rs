@@ -23,7 +23,7 @@ impl StorageFeeDistributionPool {
         let storage_distribution_fees = Decimal::new(self.value(drive, transaction)?, 0);
 
         // a separate buffer from which we withdraw to correctly calculate fee share
-        let mut storage_distribution_fees_buffer = storage_distribution_fees.clone();
+        let mut storage_distribution_fees_buffer = storage_distribution_fees;
 
         if storage_distribution_fees == dec!(0.0) {
             return Ok(());

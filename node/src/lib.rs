@@ -1397,7 +1397,7 @@ impl DriveWrapper {
             let result = InitChainRequest::from_bytes(&request_bytes)
                 .and_then(|request| {
                     handlers::init_chain(
-                        &drive,
+                        drive,
                         request,
                         using_transaction.then(|| transaction).flatten(),
                     )
@@ -1446,7 +1446,7 @@ impl DriveWrapper {
             let result = BlockBeginRequest::from_bytes(&request_bytes)
                 .and_then(|request| {
                     handlers::block_begin(
-                        &drive,
+                        drive,
                         request,
                         using_transaction.then(|| transaction).flatten(),
                     )
@@ -1495,7 +1495,7 @@ impl DriveWrapper {
             let result = BlockEndRequest::from_bytes(&request_bytes)
                 .and_then(|request| {
                     handlers::block_end(
-                        &drive,
+                        drive,
                         request,
                         using_transaction.then(|| transaction).flatten(),
                     )

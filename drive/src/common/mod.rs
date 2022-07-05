@@ -7,7 +7,7 @@ use std::io::{BufRead, BufReader};
 use std::option::Option::None;
 use std::path::Path;
 
-use byteorder::{BigEndian, LittleEndian, WriteBytesExt};
+use byteorder::{BigEndian, WriteBytesExt};
 use ciborium::value::Value;
 use grovedb::TransactionArg;
 

@@ -22,7 +22,7 @@ pub const MN_REWARD_SHARES_CONTRACT_ID: [u8; 32] = [
     0x7d, 0x2f, 0x22, 0x47, 0x93, 0x44, 0x63, 0xee, 0xb0, 0x1f, 0xf7, 0x21, 0x95, 0x90, 0x95, 0x8c,
 ];
 
-pub const MN_REWARD_SHARES_DOCUMENT_TYPE: &'static str = "rewardShare";
+pub const MN_REWARD_SHARES_DOCUMENT_TYPE: &str = "rewardShare";
 
 #[cfg(test)]
 mod tests {

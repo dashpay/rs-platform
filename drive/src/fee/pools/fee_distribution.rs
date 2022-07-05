@@ -28,14 +28,11 @@ impl FeePools {
 
         // For current epoch we pay for previous
         // Find oldest unpaid epoch since previous epoch
-        let unpaid_epoch_pool = match self.get_oldest_unpaid_epoch_pool(
-            &drive,
-            current_epoch_index - 1,
-            transaction,
-        )? {
-            Some(epoch_pool) => epoch_pool,
-            None => return Ok(0),
-        };
+        let unpaid_epoch_pool =
+            match self.get_oldest_unpaid_epoch_pool(drive, current_epoch_index - 1, transaction)? {
+                Some(epoch_pool) => epoch_pool,
+                None => return Ok(0),
+            };
 
         // Process more proposers at once if we have many unpaid epochs in past
         let proposers_limit: u16 = if unpaid_epoch_pool.index == current_epoch_index {
@@ -47,7 +44,7 @@ impl FeePools {
         let total_fees = unpaid_epoch_pool.get_total_fees(transaction)?;
 
         let unpaid_epoch_block_count =
-            Self::get_epoch_block_count(&drive, &unpaid_epoch_pool, transaction)?;
+            Self::get_epoch_block_count(drive, &unpaid_epoch_pool, transaction)?;
 
         let unpaid_epoch_block_count = Decimal::from(unpaid_epoch_block_count);
 
@@ -63,7 +60,7 @@ impl FeePools {
             let mut masternode_reward =
                 (total_fees * proposed_block_count) / unpaid_epoch_block_count;
 
-            let documents = Self::get_reward_shares(drive, &proposer_tx_hash, transaction)?;
+            let documents = Self::get_reward_shares(drive, proposer_tx_hash, transaction)?;
 
             for document in documents {
                 let pay_to_id = document
@@ -113,7 +110,7 @@ impl FeePools {
 
             Self::pay_reward_to_identity(
                 drive,
-                &proposer_tx_hash,
+                proposer_tx_hash,
                 masternode_reward_floored,
                 transaction,
             )?;
@@ -164,7 +161,7 @@ impl FeePools {
 
     fn pay_reward_to_identity(
         drive: &Drive,
-        id: &Vec<u8>,
+        id: &[u8],
         reward: Decimal,
         transaction: TransactionArg,
     ) -> Result<(), Error> {
@@ -208,7 +205,7 @@ impl FeePools {
 
         document_cbors
             .iter()
-            .map(|cbor| Ok(Document::from_cbor(cbor, None, None)?))
+            .map(|cbor| Document::from_cbor(cbor, None, None))
             .collect::<Result<Vec<Document>, Error>>()
     }
 
@@ -219,7 +216,7 @@ impl FeePools {
         transaction: TransactionArg,
     ) -> Result<Option<EpochPool>, Error> {
         self.get_oldest_unpaid_epoch_pool_recursive(
-            &drive,
+            drive,
             from_epoch_index,
             from_epoch_index,
             transaction,
@@ -250,7 +247,7 @@ impl FeePools {
         }
 
         self.get_oldest_unpaid_epoch_pool_recursive(
-            &drive,
+            drive,
             from_epoch_index,
             epoch_index - 1,
             transaction,
@@ -286,10 +283,10 @@ impl FeePools {
         // update storage fee pool
         let storage_fee_pool = self
             .storage_fee_distribution_pool
-            .value(&drive, transaction)?;
+            .value(drive, transaction)?;
 
         self.storage_fee_distribution_pool
-            .update(&drive, storage_fee_pool + storage_fees)?;
+            .update(drive, storage_fee_pool + storage_fees)?;
 
         Ok(())
     }

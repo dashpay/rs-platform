@@ -15,6 +15,12 @@ pub struct FeePools {
     pub storage_fee_distribution_pool: StorageFeeDistributionPool,
 }
 
+impl Default for FeePools {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FeePools {
     pub fn new() -> FeePools {
         FeePools {
