@@ -347,7 +347,7 @@ describe('Drive', () => {
     });
   });
 
-  describe('#proveQueryDocuments', () => {
+  describe('#proveDocumentsQuery', () => {
     beforeEach(async () => {
       await drive.createRootTree();
 
