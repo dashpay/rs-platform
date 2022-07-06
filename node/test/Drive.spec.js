@@ -349,7 +349,7 @@ describe('Drive', () => {
 
   describe('#proveDocumentsQuery', () => {
     beforeEach(async () => {
-      await drive.createRootTree();
+      await drive.createInitialStateStructure();
 
       await drive.applyContract(dataContract, blockTime);
     });
