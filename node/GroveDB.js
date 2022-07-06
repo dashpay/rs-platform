@@ -217,7 +217,7 @@ class GroveDB {
    *
    * @param {PathQuery[]} queries
    * @param {boolean} [useTransaction=false]
-   * @return {Promise<*>}
+   * @return {Promise<Buffer>}
    */
   async proveQueryMany(queries, useTransaction = false) {
     return groveDbProveQueryManyAsync.call(this.db, queries, useTransaction);
