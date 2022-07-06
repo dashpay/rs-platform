@@ -15,6 +15,7 @@ const {
   driveUpdateDocument,
   driveDeleteDocument,
   driveQueryDocuments,
+  driveProveDocumentsQuery,
   driveInsertIdentity,
   abciInitChain,
   abciBlockBegin,
@@ -37,6 +38,7 @@ const driveCreateDocumentAsync = appendStack(promisify(driveCreateDocument));
 const driveUpdateDocumentAsync = appendStack(promisify(driveUpdateDocument));
 const driveDeleteDocumentAsync = appendStack(promisify(driveDeleteDocument));
 const driveQueryDocumentsAsync = appendStack(promisify(driveQueryDocuments));
+const driveProveDocumentsQueryAsync = appendStack(promisify(driveProveDocumentsQuery));
 const driveInsertIdentityAsync = appendStack(promisify(driveInsertIdentity));
 const abciInitChainAsync = appendStack(promisify(abciInitChain));
 const abciBlockBeginAsync = appendStack(promisify(abciBlockBegin));
@@ -199,6 +201,33 @@ class Drive {
       documents,
       processingFee,
     ];
+  }
+
+  /**
+   *
+   * @param {DataContract} dataContract
+   * @param {string} documentType
+   * @param [query]
+   * @param [query.where]
+   * @param [query.limit]
+   * @param [query.startAt]
+   * @param [query.startAfter]
+   * @param [query.orderBy]
+   * @param {Boolean} [useTransaction=false]
+   *
+   * @returns {Promise<[Document[], number]>}
+   */
+  async proveDocumentsQuery(dataContract, documentType, query = {}, useTransaction = false) {
+    const encodedQuery = await cbor.encodeAsync(query);
+
+    // eslint-disable-next-line no-return-await
+    return await driveProveDocumentsQueryAsync.call(
+      this.drive,
+      encodedQuery,
+      dataContract.id.toBuffer(),
+      documentType,
+      useTransaction,
+    );
   }
 
   /**
