@@ -21,9 +21,9 @@ impl FeePools {
         drive: &Drive,
         current_epoch_index: u16,
         transaction: TransactionArg,
-    ) -> Result<u16, Error> {
+    ) -> Result<(u16, u16), Error> {
         if current_epoch_index == 0 {
-            return Ok(0);
+            return Ok((0, 0));
         }
 
         // For current epoch we pay for previous
@@ -31,7 +31,7 @@ impl FeePools {
         let unpaid_epoch_pool =
             match self.get_oldest_unpaid_epoch_pool(drive, current_epoch_index - 1, transaction)? {
                 Some(epoch_pool) => epoch_pool,
-                None => return Ok(0),
+                None => return Ok((0, 0)),
             };
 
         // Process more proposers at once if we have many unpaid epochs in past
@@ -133,7 +133,7 @@ impl FeePools {
             unpaid_epoch_pool.mark_as_paid(transaction)?;
         }
 
-        Ok(proposers_len)
+        Ok((proposers_len, unpaid_epoch_pool.index))
     }
 
     fn move_leftovers_to_the_next_epoch_pool(
@@ -374,7 +374,7 @@ mod tests {
 
             let current_epoch_index = 0;
 
-            let proposers_paid = fee_pools
+            let (proposers_paid, _) = fee_pools
                 .distribute_fees_from_unpaid_pools_to_proposers(
                     &drive,
                     current_epoch_index,
@@ -392,7 +392,7 @@ mod tests {
 
             let current_epoch_index = 1;
 
-            let proposers_paid = fee_pools
+            let (proposers_paid, _) = fee_pools
                 .distribute_fees_from_unpaid_pools_to_proposers(
                     &drive,
                     current_epoch_index,
@@ -452,7 +452,7 @@ mod tests {
                 .apply_current_batch(true, Some(&transaction))
                 .expect("should apply batch");
 
-            let proposers_paid = fee_pools
+            let (proposers_paid, _) = fee_pools
                 .distribute_fees_from_unpaid_pools_to_proposers(&drive, 2, Some(&transaction))
                 .expect("should distribute fees");
 
@@ -507,7 +507,7 @@ mod tests {
                 .apply_current_batch(true, Some(&transaction))
                 .expect("should apply batch");
 
-            let proposers_paid = fee_pools
+            let (proposers_paid, _) = fee_pools
                 .distribute_fees_from_unpaid_pools_to_proposers(&drive, 1, Some(&transaction))
                 .expect("should distribute fees");
 
@@ -574,7 +574,7 @@ mod tests {
                 .apply_current_batch(true, Some(&transaction))
                 .expect("should apply batch");
 
-            let proposers_paid = fee_pools
+            let (proposers_paid, _) = fee_pools
                 .distribute_fees_from_unpaid_pools_to_proposers(&drive, 1, Some(&transaction))
                 .expect("should distribute fees");
 

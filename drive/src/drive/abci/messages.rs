@@ -42,6 +42,7 @@ pub struct Fees {
 pub struct BlockEndResponse {
     pub epoch_info: EpochInfo,
     pub masternodes_paid_count: u16,
+    pub paid_epoch_index: u16,
 }
 
 impl<'a> Serializable<'a> for InitChainRequest {}

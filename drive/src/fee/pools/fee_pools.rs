@@ -82,7 +82,7 @@ impl FeePools {
         epoch_info: &EpochInfo,
         fees: &Fees,
         transaction: TransactionArg,
-    ) -> Result<u16, Error> {
+    ) -> Result<(u16, u16), Error> {
         let current_epoch_pool = EpochPool::new(epoch_info.current_epoch_index, drive);
 
         if epoch_info.is_epoch_change {

@@ -86,7 +86,7 @@ pub fn block_end(
     drive.ensure_current_batch_is_empty()?;
 
     // Process fees
-    let masternodes_paid_count = drive.fee_pools.borrow().process_block_fees(
+    let (masternodes_paid_count, paid_epoch_index) = drive.fee_pools.borrow().process_block_fees(
         drive,
         &block_execution_context.block_info,
         &block_execution_context.epoch_info,
@@ -99,6 +99,7 @@ pub fn block_end(
     let response = BlockEndResponse {
         epoch_info: block_execution_context.epoch_info.clone(),
         masternodes_paid_count,
+        paid_epoch_index,
     };
 
     Ok(response)
@@ -119,8 +120,7 @@ mod tests {
                 epoch::epoch_pool::EpochPool,
                 tests::helpers::{
                     fee_pools::{
-                        create_mn_shares_contract, fetch_identities_by_pro_tx_hashes,
-                        populate_proposers, refetch_identities,
+                        create_mn_shares_contract, populate_proposers,
                         setup_identities_with_share_documents,
                     },
                     setup::{setup_drive, setup_fee_pools},
