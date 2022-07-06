@@ -1,15 +1,20 @@
-use crate::contract::{Contract, Document, DocumentType};
-use crate::drive::defaults::DEFAULT_HASH_SIZE;
-use crate::drive::flags::StorageFlags;
-use crate::error::contract::ContractError;
-use crate::error::drive::DriveError;
-use crate::error::Error;
 use grovedb::Element;
+use std::collections::HashSet;
+use std::ops::AddAssign;
+
 use KeyInfo::{Key, KeyRef, KeySize};
 use KeyValueInfo::{KeyRefRequest, KeyValueMaxSize};
 use PathInfo::{PathFixedSizeIterator, PathIterator, PathSize};
 use PathKeyElementInfo::{PathFixedSizeKeyElement, PathKeyElement, PathKeyElementSize};
 use PathKeyInfo::{PathFixedSizeKey, PathFixedSizeKeyRef, PathKey, PathKeyRef, PathKeySize};
+
+use crate::contract::document::Document;
+use crate::contract::{Contract, DocumentType};
+use crate::drive::defaults::DEFAULT_HASH_SIZE;
+use crate::drive::flags::StorageFlags;
+use crate::error::contract::ContractError;
+use crate::error::drive::DriveError;
+use crate::error::Error;
 
 #[derive(Clone)]
 pub enum PathInfo<'a, const N: usize> {
@@ -61,9 +66,9 @@ impl<'a, const N: usize> PathInfo<'a, N> {
                 }
             },
             PathSize(mut path_size) => match key_info {
-                Key(key) => path_size += key.len(),
-                KeyRef(key_ref) => path_size += key_ref.len(),
-                KeySize(key_size) => path_size += key_size,
+                Key(key) => path_size.add_assign(key.len()),
+                KeyRef(key_ref) => path_size.add_assign(key_ref.len()),
+                KeySize(key_size) => path_size.add_assign(key_size),
             },
         }
         Ok(())
@@ -136,6 +141,7 @@ impl<'a> KeyInfo<'a> {
     }
 }
 
+#[derive(Clone)]
 pub enum PathKeyInfo<'a, const N: usize> {
     /// An into iter Path with a Key
     PathFixedSizeKey(([&'a [u8]; N], Vec<u8>)),
@@ -194,6 +200,58 @@ impl<'a, const N: usize> PathKeyInfo<'a, N> {
                 key.is_empty() && (*path_iterator).into_iter().all(|a| a.is_empty())
             }
             PathKeySize((path_size, key_size)) => (*path_size + *key_size) == 0,
+        }
+    }
+
+    pub fn is_contained_in_cache(&'a self, qualified_paths: &HashSet<Vec<Vec<u8>>>) -> bool {
+        match self {
+            PathKey((path, key)) => {
+                let mut qualified_path = path.clone();
+                qualified_path.push(key.clone());
+                qualified_paths.contains(&qualified_path)
+            }
+            PathKeyRef((path, key)) => {
+                let mut qualified_path = path.clone();
+                qualified_path.push(key.to_vec());
+                qualified_paths.contains(&qualified_path)
+            }
+            PathFixedSizeKey((path, key)) => {
+                let mut qualified_path = path.map(|a| a.to_vec()).to_vec();
+                qualified_path.push(key.clone());
+                qualified_paths.contains(&qualified_path)
+            }
+            PathFixedSizeKeyRef((path, key)) => {
+                let mut qualified_path = path.map(|a| a.to_vec()).to_vec();
+                qualified_path.push(key.to_vec());
+                qualified_paths.contains(&qualified_path)
+            }
+            PathKeySize(_) => false,
+        }
+    }
+
+    pub fn add_to_cache(&'a self, qualified_paths: &mut HashSet<Vec<Vec<u8>>>) -> bool {
+        match self {
+            PathKey((path, key)) => {
+                let mut qualified_path = path.clone();
+                qualified_path.push(key.clone());
+                qualified_paths.insert(qualified_path)
+            }
+            PathKeyRef((path, key)) => {
+                let mut qualified_path = path.clone();
+                qualified_path.push(key.to_vec());
+                qualified_paths.insert(qualified_path)
+            }
+            PathFixedSizeKey((path, key)) => {
+                let mut qualified_path = path.map(|a| a.to_vec()).to_vec();
+                qualified_path.push(key.clone());
+                qualified_paths.insert(qualified_path)
+            }
+            PathFixedSizeKeyRef((path, key)) => {
+                let mut qualified_path = path.map(|a| a.to_vec()).to_vec();
+                qualified_path.push(key.to_vec());
+                qualified_paths.insert(qualified_path)
+            }
+            PathKeySize(_) => true,
         }
     }
 }
@@ -303,6 +361,8 @@ pub struct DocumentAndContractInfo<'a> {
 pub enum DocumentInfo<'a> {
     /// The document and it's serialized form
     DocumentAndSerialization((&'a Document, &'a [u8], &'a StorageFlags)),
+    /// The document without it's serialized form
+    DocumentWithoutSerialization((&'a Document, &'a StorageFlags)),
     /// An element size
     DocumentSize(usize),
 }
@@ -311,13 +371,16 @@ impl<'a> DocumentInfo<'a> {
     pub fn is_document_and_serialization(&self) -> bool {
         match self {
             DocumentInfo::DocumentAndSerialization(_) => true,
-            DocumentInfo::DocumentSize(_) => false,
+            _ => false,
         }
     }
 
     pub fn id_key_value_info(&self) -> KeyValueInfo {
         match self {
             DocumentInfo::DocumentAndSerialization((document, _, _)) => {
+                KeyRefRequest(document.id.as_slice())
+            }
+            DocumentInfo::DocumentWithoutSerialization((document, _)) => {
                 KeyRefRequest(document.id.as_slice())
             }
             DocumentInfo::DocumentSize(document_max_size) => {
@@ -333,7 +396,8 @@ impl<'a> DocumentInfo<'a> {
         owner_id: Option<&[u8]>,
     ) -> Result<Option<KeyInfo>, Error> {
         match self {
-            DocumentInfo::DocumentAndSerialization((document, _, _)) => {
+            DocumentInfo::DocumentAndSerialization((document, _, _))
+            | DocumentInfo::DocumentWithoutSerialization((document, _)) => {
                 let raw_value =
                     document.get_raw_for_document_type(key_path, document_type, owner_id)?;
                 match raw_value {
@@ -349,7 +413,7 @@ impl<'a> DocumentInfo<'a> {
                             "incorrect key path for document type",
                         ))
                     })?;
-                    let max_size = document_field_type.max_byte_size().ok_or({
+                    let max_size = document_field_type.document_type.max_byte_size().ok_or({
                         Error::Drive(DriveError::CorruptedCodeExecution(
                             "document type must have a max size",
                         ))
@@ -362,7 +426,10 @@ impl<'a> DocumentInfo<'a> {
 
     pub fn get_storage_flags(&self) -> StorageFlags {
         match *self {
-            DocumentInfo::DocumentAndSerialization((_, _, storage_flags)) => storage_flags.clone(),
+            DocumentInfo::DocumentAndSerialization((_, _, storage_flags))
+            | DocumentInfo::DocumentWithoutSerialization((_, storage_flags)) => {
+                storage_flags.clone()
+            }
             DocumentInfo::DocumentSize(_) => StorageFlags::default(),
         }
     }
