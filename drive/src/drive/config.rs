@@ -1,6 +1,6 @@
 use DriveEncoding::DriveProtobuf;
 
-pub const DEFAULT_GROVE_BATCHING_ENABLED: bool = true;
+pub const DEFAULT_GROVE_BATCHING_ENABLED: bool = false;
 pub const DEFAULT_GROVE_HAS_RAW_ENABLED: bool = true;
 
 pub enum DriveEncoding {

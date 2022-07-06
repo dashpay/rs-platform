@@ -463,8 +463,8 @@ impl Drive {
 
 #[cfg(test)]
 mod tests {
-    use std::option::Option::None;
     use grovedb::TransactionArg;
+    use std::option::Option::None;
 
     use rand::Rng;
     use serde::{Deserialize, Serialize};
@@ -473,11 +473,11 @@ mod tests {
 
     use crate::common::{json_document_to_cbor, setup_contract, value_to_cbor};
     use crate::contract::{document::Document, Contract};
+    use crate::drive::config::{DriveConfig, DriveEncoding};
     use crate::drive::flags::StorageFlags;
     use crate::drive::object_size_info::DocumentAndContractInfo;
     use crate::drive::object_size_info::DocumentInfo::DocumentAndSerialization;
     use crate::drive::{defaults, Drive};
-    use crate::drive::config::{DriveConfig, DriveEncoding};
     use crate::query::DriveQuery;
 
     #[test]
@@ -1109,7 +1109,13 @@ mod tests {
         age: u8,
     }
 
-    fn apply_person(drive: &Drive, contract: &Contract, block_time: u64, person: &Person, transaction: TransactionArg) {
+    fn apply_person(
+        drive: &Drive,
+        contract: &Contract,
+        block_time: u64,
+        person: &Person,
+        transaction: TransactionArg,
+    ) {
         let value = serde_json::to_value(person).expect("serialized person");
         let document_cbor = value_to_cbor(value, Some(defaults::PROTOCOL_VERSION));
         let document = Document::from_cbor(document_cbor.as_slice(), None, None)
@@ -1140,11 +1146,15 @@ mod tests {
             .expect("expected to add document");
     }
 
-    fn test_update_complex_person_with_history(using_transaction: bool, using_batches: bool, using_has_raw: bool) {
-        let config = DriveConfig{
+    fn test_update_complex_person_with_history(
+        using_transaction: bool,
+        using_batches: bool,
+        using_has_raw: bool,
+    ) {
+        let config = DriveConfig {
             batching_enabled: using_batches,
             has_raw_enabled: using_has_raw,
-            encoding: DriveEncoding::DriveCbor
+            encoding: DriveEncoding::DriveCbor,
         };
         let tmp_dir = TempDir::new().unwrap();
 
@@ -1209,10 +1219,34 @@ mod tests {
             age: 22,
         };
 
-        apply_person(&drive, &contract, 0, &person_0_original, transaction.as_ref());
-        apply_person(&drive, &contract, 0, &person_1_original, transaction.as_ref());
-        apply_person(&drive, &contract, 100, &person_0_updated, transaction.as_ref());
-        apply_person(&drive, &contract, 100, &person_1_updated, transaction.as_ref());
+        apply_person(
+            &drive,
+            &contract,
+            0,
+            &person_0_original,
+            transaction.as_ref(),
+        );
+        apply_person(
+            &drive,
+            &contract,
+            0,
+            &person_1_original,
+            transaction.as_ref(),
+        );
+        apply_person(
+            &drive,
+            &contract,
+            100,
+            &person_0_updated,
+            transaction.as_ref(),
+        );
+        apply_person(
+            &drive,
+            &contract,
+            100,
+            &person_1_updated,
+            transaction.as_ref(),
+        );
     }
 
     #[test]

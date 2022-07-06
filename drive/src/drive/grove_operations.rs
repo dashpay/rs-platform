@@ -473,7 +473,9 @@ impl Drive {
             if self.config.has_raw_enabled {
                 self.grove.has_raw(path, key, transaction)
             } else {
-                self.grove.get_raw(path, key, transaction).map(|r| r.map(|e| true))
+                self.grove
+                    .get_raw(path, key, transaction)
+                    .map(|r| r.map(|e| true))
             }
         } else {
             self.grove.worst_case_for_has_raw(path, key)
