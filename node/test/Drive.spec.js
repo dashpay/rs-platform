@@ -360,7 +360,7 @@ describe('Drive', () => {
         documents.map((document) => drive.createDocument(document, blockTime)),
       );
 
-      const result = await drive.proveQueryDocuments(dataContract, 'indexedDocument', {
+      const result = await drive.proveDocumentsQuery(dataContract, 'indexedDocument', {
         where: [['lastName', '==', 'Kennedy']],
       });
 
