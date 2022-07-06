@@ -119,7 +119,7 @@ pub fn setup_family_tests(count: u32, seed: u64) -> (Drive, Contract, TempDir) {
     let db_transaction = drive.grove.start_transaction();
 
     drive
-        .create_root_tree(Some(&db_transaction))
+        .apply_initial_state_structure(Some(&db_transaction))
         .expect("expected to create root tree successfully");
 
     // setup code
@@ -178,7 +178,7 @@ pub fn setup_family_tests_with_nulls(count: u32, seed: u64) -> (Drive, Contract,
     let db_transaction = drive.grove.start_transaction();
 
     drive
-        .create_root_tree(Some(&db_transaction))
+        .apply_initial_state_structure(Some(&db_transaction))
         .expect("expected to create root tree successfully");
 
     // setup code
@@ -330,7 +330,7 @@ pub fn setup_dpns_tests(count: u32, seed: u64) -> (Drive, Contract, TempDir) {
     let db_transaction = drive.grove.start_transaction();
 
     drive
-        .create_root_tree(Some(&db_transaction))
+        .apply_initial_state_structure(Some(&db_transaction))
         .expect("expected to create root tree successfully");
 
     // setup code
@@ -357,7 +357,7 @@ pub fn setup_dpns_test_with_data(path: &str) -> (Drive, Contract, TempDir) {
     let db_transaction = drive.grove.start_transaction();
 
     drive
-        .create_root_tree(Some(&db_transaction))
+        .apply_initial_state_structure(Some(&db_transaction))
         .expect("expected to create root tree successfully");
 
     let contract = setup_contract(

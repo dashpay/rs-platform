@@ -14,6 +14,7 @@ use crate::drive::object_size_info::PathKeyInfo::{
 };
 use crate::drive::object_size_info::{KeyInfo, KeyValueInfo, PathKeyElementInfo, PathKeyInfo};
 use crate::drive::Drive;
+use crate::error;
 use crate::error::drive::DriveError;
 use crate::error::Error;
 use crate::fee::op::DriveOperation::{CalculatedCostOperation, CostCalculationQueryOperation};
@@ -879,6 +880,14 @@ impl Drive {
             transaction,
             self.current_batch.borrow_mut().deref_mut(),
         )
+    }
+
+    pub(crate) fn ensure_current_batch_is_empty(&self) -> Result<(), Error> {
+        if self.current_batch.borrow().len() != 0 {
+            return Err(Error::Drive(DriveError::CurrentBranchIsNotEmpty()));
+        }
+
+        Ok(())
     }
 
     pub(crate) fn apply_current_batch(

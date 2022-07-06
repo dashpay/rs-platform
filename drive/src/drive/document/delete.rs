@@ -228,7 +228,7 @@ mod tests {
         let drive: Drive = Drive::open(tmp_dir, None).expect("expected to open Drive successfully");
 
         drive
-            .create_root_tree(None)
+            .apply_initial_state_structure(None)
             .expect("expected to create root tree successfully");
 
         let contract = setup_contract(
@@ -319,7 +319,7 @@ mod tests {
         let db_transaction = drive.grove.start_transaction();
 
         drive
-            .create_root_tree(Some(&db_transaction))
+            .apply_initial_state_structure(Some(&db_transaction))
             .expect("expected to create root tree successfully");
 
         let contract = setup_contract(
@@ -426,7 +426,7 @@ mod tests {
         let db_transaction = drive.grove.start_transaction();
 
         drive
-            .create_root_tree(Some(&db_transaction))
+            .apply_initial_state_structure(Some(&db_transaction))
             .expect("expected to create root tree successfully");
 
         let contract = setup_contract(
@@ -599,7 +599,7 @@ mod tests {
         let db_transaction = drive.grove.start_transaction();
 
         drive
-            .create_root_tree(Some(&db_transaction))
+            .apply_initial_state_structure(Some(&db_transaction))
             .expect("expected to create root tree successfully");
 
         let contract = setup_contract(
@@ -849,7 +849,7 @@ mod tests {
         let db_transaction = drive.grove.start_transaction();
 
         drive
-            .create_root_tree(Some(&db_transaction))
+            .apply_initial_state_structure(Some(&db_transaction))
             .expect("expected to create root tree successfully");
 
         let contract = setup_contract(
@@ -902,7 +902,7 @@ mod tests {
         let db_transaction = drive.grove.start_transaction();
 
         drive
-            .create_root_tree(Some(&db_transaction))
+            .apply_initial_state_structure(Some(&db_transaction))
             .expect("expected to create root tree successfully");
 
         let contract = setup_contract_from_hex(

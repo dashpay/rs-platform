@@ -37,9 +37,9 @@ describe('Drive', () => {
     fs.rmSync(TEST_DATA_PATH, { recursive: true });
   });
 
-  describe('#createRootTree', () => {
+  describe('#createInitialStateStructure', () => {
     it('should create initial tree structure', async () => {
-      const result = await drive.createRootTree();
+      const result = await drive.createInitialStateStructure();
 
       // eslint-disable-next-line no-unused-expressions
       expect(result).to.be.undefined;
@@ -48,7 +48,7 @@ describe('Drive', () => {
 
   describe('#applyContract', () => {
     beforeEach(async () => {
-      await drive.createRootTree();
+      await drive.createInitialStateStructure();
 
       initialRootHash = await drive.getGroveDB().getRootHash();
     });
@@ -102,7 +102,7 @@ describe('Drive', () => {
 
   describe('#createDocument', () => {
     beforeEach(async () => {
-      await drive.createRootTree();
+      await drive.createInitialStateStructure();
 
       await drive.applyContract(dataContract, blockTime);
 
@@ -152,7 +152,7 @@ describe('Drive', () => {
 
   describe('#updateDocument', () => {
     beforeEach(async () => {
-      await drive.createRootTree();
+      await drive.createInitialStateStructure();
 
       await drive.applyContract(dataContract, blockTime);
 
@@ -216,7 +216,7 @@ describe('Drive', () => {
 
   describe('#deleteDocument', () => {
     beforeEach(async () => {
-      await drive.createRootTree();
+      await drive.createInitialStateStructure();
 
       await drive.applyContract(dataContract, blockTime);
 
@@ -295,7 +295,7 @@ describe('Drive', () => {
 
   describe('#queryDocuments', () => {
     beforeEach(async () => {
-      await drive.createRootTree();
+      await drive.createInitialStateStructure();
 
       await drive.applyContract(dataContract, blockTime);
     });
@@ -349,7 +349,7 @@ describe('Drive', () => {
 
   describe('#insertIdentity', () => {
     beforeEach(async () => {
-      await drive.createRootTree();
+      await drive.createInitialStateStructure();
 
       initialRootHash = await drive.getGroveDB().getRootHash();
     });

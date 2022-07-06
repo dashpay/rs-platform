@@ -12,7 +12,7 @@ impl Drive {
         let element = self
             .grove
             .get(
-                [Into::<&[u8; 1]>::into(RootTree::Misc).as_slice()],
+                [Into::<&[u8; 1]>::into(RootTree::SpentAssetLockTransactions).as_slice()],
                 KEY_GENESIS_TIME.as_bytes(),
                 transaction,
             )
@@ -36,7 +36,7 @@ impl Drive {
 
     pub fn update_genesis_time(&self, genesis_time: i64) -> Result<(), Error> {
         self.current_batch_insert(PathKeyElementInfo::PathFixedSizeKeyElement((
-            [Into::<&[u8; 1]>::into(RootTree::Misc)],
+            [Into::<&[u8; 1]>::into(RootTree::SpentAssetLockTransactions)],
             KEY_GENESIS_TIME.as_bytes(),
             Element::Item(genesis_time.to_le_bytes().to_vec(), None),
         )))?;
@@ -76,13 +76,16 @@ mod tests {
             let drive = super::setup_drive();
 
             drive
-                .create_root_tree(None)
+                .apply_initial_state_structure(None)
                 .expect("expected to create root tree successfully");
 
             drive
                 .grove
                 .insert(
-                    [Into::<&[u8; 1]>::into(super::RootTree::Misc).as_slice()],
+                    [
+                        Into::<&[u8; 1]>::into(super::RootTree::SpentAssetLockTransactions)
+                            .as_slice(),
+                    ],
                     super::KEY_GENESIS_TIME.as_bytes(),
                     super::Element::Item(u128::MAX.to_le_bytes().to_vec(), None),
                     None,
@@ -132,7 +135,7 @@ mod tests {
             let drive = super::setup_drive();
 
             drive
-                .create_root_tree(None)
+                .apply_initial_state_structure(None)
                 .expect("expected to create root tree successfully");
 
             let genesis_time: i64 = 1655396517902;

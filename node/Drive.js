@@ -9,7 +9,7 @@ const decodeProtocolEntityFactory = require('@dashevo/dpp/lib/decodeProtocolEnti
 const {
   driveOpen,
   driveClose,
-  driveCreateRootTree,
+  driveCreateInitialStateStructure,
   driveApplyContract,
   driveCreateDocument,
   driveUpdateDocument,
@@ -31,7 +31,7 @@ const decodeProtocolEntity = decodeProtocolEntityFactory();
 
 // Convert the Drive methods from using callbacks to returning promises
 const driveCloseAsync = appendStack(promisify(driveClose));
-const driveCreateRootTreeAsync = appendStack(promisify(driveCreateRootTree));
+const driveCreateInitialStateStructureAsync = appendStack(promisify(driveCreateInitialStateStructure));
 const driveApplyContractAsync = appendStack(promisify(driveApplyContract));
 const driveCreateDocumentAsync = appendStack(promisify(driveCreateDocument));
 const driveUpdateDocumentAsync = appendStack(promisify(driveUpdateDocument));
@@ -71,8 +71,8 @@ class Drive {
    *
    * @returns {Promise<[number, number]>}
    */
-  async createRootTree(useTransaction = false) {
-    return driveCreateRootTreeAsync.call(this.drive, useTransaction);
+  async createInitialStateStructure(useTransaction = false) {
+    return driveCreateInitialStateStructureAsync.call(this.drive, useTransaction);
   }
 
   /**

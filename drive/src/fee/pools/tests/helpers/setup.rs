@@ -4,13 +4,13 @@ use grovedb::Transaction;
 use tempfile::TempDir;
 
 pub struct SetupFeePoolsOptions {
-    pub create_fee_pool_trees: bool,
+    pub apply_fee_pool_structure: bool,
 }
 
 impl Default for SetupFeePoolsOptions {
     fn default() -> SetupFeePoolsOptions {
         SetupFeePoolsOptions {
-            create_fee_pool_trees: true,
+            apply_fee_pool_structure: true,
         }
     }
 }
@@ -28,22 +28,14 @@ pub fn setup_fee_pools<'a>(
 ) -> (Transaction<'a>, FeePools) {
     let options = options.unwrap_or(SetupFeePoolsOptions::default());
 
-    drive
-        .create_root_tree(None)
-        .expect("should create root tree successfully");
-
     let transaction = drive.grove.start_transaction();
 
     let fee_pools = FeePools::new();
 
-    if options.create_fee_pool_trees {
-        fee_pools
-            .create_fee_pool_trees(&drive)
-            .expect("should init fee pools");
-
+    if options.apply_fee_pool_structure {
         drive
-            .apply_current_batch(true, Some(&transaction))
-            .expect("should apply batch");
+            .apply_initial_state_structure(None)
+            .expect("should create root tree successfully");
     }
 
     (transaction, fee_pools)

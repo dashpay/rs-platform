@@ -226,7 +226,7 @@ fn test_root_hash(drive: &Drive, db_transaction: &Transaction) {
         .grove
         .insert(
             [],
-            Into::<&[u8; 1]>::into(RootTree::Misc),
+            Into::<&[u8; 1]>::into(RootTree::SpentAssetLockTransactions),
             Element::empty_tree(),
             Some(db_transaction),
         )
@@ -260,7 +260,7 @@ fn test_root_hash(drive: &Drive, db_transaction: &Transaction) {
     drive
         .grove
         .insert(
-            [Into::<&[u8; 1]>::into(RootTree::Misc).as_slice()],
+            [Into::<&[u8; 1]>::into(RootTree::SpentAssetLockTransactions).as_slice()],
             &[0],
             Element::empty_tree(),
             Some(db_transaction),
@@ -407,11 +407,11 @@ fn test_root_hash_matches_with_batching_just_contract() {
     let db_transaction_without_batches = drive_without_batches.grove.start_transaction();
 
     drive_with_batches
-        .create_root_tree(Some(&db_transaction_with_batches))
+        .apply_initial_state_structure(Some(&db_transaction_with_batches))
         .expect("expected to create root tree successfully");
 
     drive_without_batches
-        .create_root_tree(Some(&db_transaction_without_batches))
+        .apply_initial_state_structure(Some(&db_transaction_without_batches))
         .expect("expected to create root tree successfully");
 
     // setup code
@@ -459,11 +459,11 @@ fn test_root_hash_matches_with_batching_contract_and_one_document() {
     let db_transaction_without_batches = drive_without_batches.grove.start_transaction();
 
     drive_with_batches
-        .create_root_tree(Some(&db_transaction_with_batches))
+        .apply_initial_state_structure(Some(&db_transaction_with_batches))
         .expect("expected to create root tree successfully");
 
     drive_without_batches
-        .create_root_tree(Some(&db_transaction_without_batches))
+        .apply_initial_state_structure(Some(&db_transaction_without_batches))
         .expect("expected to create root tree successfully");
 
     // setup code

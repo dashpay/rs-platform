@@ -11,6 +11,7 @@ use object_size_info::DocumentInfo::DocumentSize;
 use crate::contract::Contract;
 use crate::drive::block::BlockExecutionContext;
 use crate::drive::config::DriveConfig;
+use crate::drive::object_size_info::KeyInfo;
 use crate::error::Error;
 use crate::fee::epoch::EpochInfo;
 use crate::fee::op::DriveOperation;
@@ -45,7 +46,7 @@ pub enum RootTree {
     Identities = 0,
     ContractDocuments = 1,
     PublicKeyHashesToIdentities = 2,
-    Misc = 3,
+    SpentAssetLockTransactions = 3,
     Pools = 4,
 }
 
@@ -69,7 +70,7 @@ impl From<RootTree> for &'static [u8; 1] {
             RootTree::Identities => &[0],
             RootTree::ContractDocuments => &[1],
             RootTree::PublicKeyHashesToIdentities => &[2],
-            RootTree::Misc => &[3],
+            RootTree::SpentAssetLockTransactions => &[3],
             RootTree::Pools => &[4],
         }
     }
@@ -129,39 +130,40 @@ impl Drive {
         }
     }
 
-    pub fn create_root_tree(&self, transaction: TransactionArg) -> Result<(), Error> {
-        self.grove
-            .insert(
-                [],
-                Into::<&[u8; 1]>::into(RootTree::Identities),
-                Element::empty_tree(),
-                transaction,
-            )
-            .unwrap()?;
-        self.grove
-            .insert(
-                [],
-                Into::<&[u8; 1]>::into(RootTree::ContractDocuments),
-                Element::empty_tree(),
-                transaction,
-            )
-            .unwrap()?;
-        self.grove
-            .insert(
-                [],
-                Into::<&[u8; 1]>::into(RootTree::PublicKeyHashesToIdentities),
-                Element::empty_tree(),
-                transaction,
-            )
-            .unwrap()?;
-        self.grove
-            .insert(
-                [],
-                Into::<&[u8; 1]>::into(RootTree::Misc),
-                Element::empty_tree(),
-                transaction,
-            )
-            .unwrap()?;
+    pub fn apply_initial_state_structure(&self, transaction: TransactionArg) -> Result<(), Error> {
+        self.ensure_current_batch_is_empty()?;
+
+        self.current_batch_insert_empty_tree(
+            [],
+            KeyInfo::KeyRef(Into::<&[u8; 1]>::into(RootTree::Identities)),
+            None,
+        )?;
+
+        self.current_batch_insert_empty_tree(
+            [],
+            KeyInfo::KeyRef(Into::<&[u8; 1]>::into(RootTree::ContractDocuments)),
+            None,
+        )?;
+
+        self.current_batch_insert_empty_tree(
+            [],
+            KeyInfo::KeyRef(Into::<&[u8; 1]>::into(
+                RootTree::PublicKeyHashesToIdentities,
+            )),
+            None,
+        )?;
+
+        self.current_batch_insert_empty_tree(
+            [],
+            KeyInfo::KeyRef(Into::<&[u8; 1]>::into(RootTree::SpentAssetLockTransactions)),
+            None,
+        )?;
+
+        // initialize the pools with epochs
+        self.fee_pools.borrow().create_fee_pool_trees(self)?;
+
+        self.apply_current_batch(false, transaction)?;
+
         Ok(())
     }
 

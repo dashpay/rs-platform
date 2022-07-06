@@ -121,7 +121,7 @@ pub fn setup(
     let db_transaction = drive.grove.start_transaction();
 
     drive
-        .create_root_tree(Some(&db_transaction))
+        .apply_initial_state_structure(Some(&db_transaction))
         .expect("expected to create root tree successfully");
 
     // setup code

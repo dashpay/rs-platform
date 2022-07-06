@@ -62,6 +62,6 @@ pub enum DriveError {
     #[error("current batch is already started")]
     CurrentBranchIsAlreadyStarted(),
 
-    #[error("current batch is empty")]
-    CurrentBranchIsEmpty(),
+    #[error("current batch is not empty. please make sure you apply it before starting a new one")]
+    CurrentBranchIsNotEmpty(),
 }

@@ -222,7 +222,7 @@ impl DriveWrapper {
         Ok(cx.undefined())
     }
 
-    fn js_create_root_tree(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+    fn js_create_initial_state_structure(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         let js_using_transaction = cx.argument::<JsBoolean>(0)?;
         let js_callback = cx.argument::<JsFunction>(1)?.root(&mut cx);
 
@@ -235,7 +235,7 @@ impl DriveWrapper {
         drive
             .send_to_drive_thread(move |drive: &Drive, transaction, channel| {
                 drive
-                    .create_root_tree(using_transaction.then(|| transaction).flatten())
+                    .apply_initial_state_structure(using_transaction.then(|| transaction).flatten())
                     .expect("create_root_tree should not fail");
 
                 channel.send(move |mut task_context| {
@@ -1533,7 +1533,10 @@ impl DriveWrapper {
 fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("driveOpen", DriveWrapper::js_open)?;
     cx.export_function("driveClose", DriveWrapper::js_close)?;
-    cx.export_function("driveCreateRootTree", DriveWrapper::js_create_root_tree)?;
+    cx.export_function(
+        "driveCreateInitialStateStructure",
+        DriveWrapper::js_create_initial_state_structure,
+    )?;
     cx.export_function("driveApplyContract", DriveWrapper::js_apply_contract)?;
     cx.export_function(
         "driveCreateDocument",

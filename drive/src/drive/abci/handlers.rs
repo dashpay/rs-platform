@@ -18,13 +18,7 @@ pub fn init_chain(
     _request: InitChainRequest,
     transaction: TransactionArg,
 ) -> Result<InitChainResponse, Error> {
-    // TODO: should use batches?
-    drive.create_root_tree(transaction)?;
-
-    // initialize the pools with epochs
-    drive.fee_pools.borrow().create_fee_pool_trees(drive)?;
-
-    drive.apply_current_batch(false, transaction)?;
+    drive.apply_initial_state_structure(transaction)?;
 
     let response = InitChainResponse {};
 
@@ -38,7 +32,11 @@ pub fn block_begin(
 ) -> Result<BlockBeginResponse, Error> {
     // Set genesis time
     let genesis_time = if request.block_height == 1 {
+        drive.ensure_current_batch_is_empty()?;
+
         drive.update_genesis_time(request.block_time)?;
+
+        drive.apply_current_batch(false, transaction)?;
 
         request.block_time
     } else {
@@ -62,8 +60,6 @@ pub fn block_begin(
         .block_execution_context
         .replace(Some(block_execution_context));
 
-    drive.apply_current_batch(false, transaction)?;
-
     let response = BlockBeginResponse {};
 
     Ok(response)
@@ -86,6 +82,8 @@ pub fn block_end(
             ))
         }
     };
+
+    drive.ensure_current_batch_is_empty()?;
 
     // Process fees
     let masternodes_paid_count = drive.fee_pools.borrow().process_block_fees(
