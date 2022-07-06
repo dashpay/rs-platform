@@ -360,12 +360,18 @@ describe('Drive', () => {
         documents.map((document) => drive.createDocument(document, blockTime)),
       );
 
-      const proofs = await drive.proveQueryDocuments(dataContract, 'indexedDocument', {
+      const result = await drive.proveQueryDocuments(dataContract, 'indexedDocument', {
         where: [['lastName', '==', 'Kennedy']],
       });
 
+      expect(result).to.have.lengthOf(2);
+
+      const [proofs, processingCost] = result;
+
       expect(proofs).to.be.an.instanceOf(Buffer);
       expect(proofs.length).to.be.greaterThan(0);
+
+      expect(processingCost).to.be.greaterThan(0);
     });
   });
 
