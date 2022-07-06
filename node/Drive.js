@@ -32,7 +32,9 @@ const decodeProtocolEntity = decodeProtocolEntityFactory();
 
 // Convert the Drive methods from using callbacks to returning promises
 const driveCloseAsync = appendStack(promisify(driveClose));
-const driveCreateInitialStateStructureAsync = appendStack(promisify(driveCreateInitialStateStructure));
+const driveCreateInitialStateStructureAsync = appendStack(
+  promisify(driveCreateInitialStateStructure),
+);
 const driveApplyContractAsync = appendStack(promisify(driveApplyContract));
 const driveCreateDocumentAsync = appendStack(promisify(driveCreateDocument));
 const driveUpdateDocumentAsync = appendStack(promisify(driveUpdateDocument));
@@ -246,9 +248,16 @@ class Drive {
     );
   }
 
+  /**
+   * Get the ABCI interface
+   * @returns {RSAbci}
+   */
   getAbci() {
     const { drive } = this;
 
+    /**
+     * @typedef RSAbci
+     */
     return {
       /**
        * ABCI init chain
