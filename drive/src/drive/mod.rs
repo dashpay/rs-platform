@@ -12,6 +12,7 @@ use crate::contract::Contract;
 use crate::drive::block::BlockExecutionContext;
 use crate::drive::config::DriveConfig;
 use crate::drive::object_size_info::KeyInfo;
+use crate::drive::storage::batch::Batch;
 use crate::error::Error;
 use crate::fee::epoch::EpochInfo;
 use crate::fee::op::DriveOperation;
@@ -30,6 +31,7 @@ mod grove_operations;
 pub mod identity;
 pub mod object_size_info;
 pub mod query;
+pub mod storage;
 
 pub struct Drive {
     pub grove: GroveDb,
@@ -131,21 +133,21 @@ impl Drive {
     }
 
     pub fn apply_initial_state_structure(&self, transaction: TransactionArg) -> Result<(), Error> {
-        self.ensure_current_batch_is_empty()?;
+        let mut batch = Batch::new(self);
 
-        self.current_batch_insert_empty_tree(
+        batch.insert_empty_tree(
             [],
             KeyInfo::KeyRef(Into::<&[u8; 1]>::into(RootTree::Identities)),
             None,
         )?;
 
-        self.current_batch_insert_empty_tree(
+        batch.insert_empty_tree(
             [],
             KeyInfo::KeyRef(Into::<&[u8; 1]>::into(RootTree::ContractDocuments)),
             None,
         )?;
 
-        self.current_batch_insert_empty_tree(
+        batch.insert_empty_tree(
             [],
             KeyInfo::KeyRef(Into::<&[u8; 1]>::into(
                 RootTree::PublicKeyHashesToIdentities,
@@ -153,16 +155,16 @@ impl Drive {
             None,
         )?;
 
-        self.current_batch_insert_empty_tree(
+        batch.insert_empty_tree(
             [],
             KeyInfo::KeyRef(Into::<&[u8; 1]>::into(RootTree::SpentAssetLockTransactions)),
             None,
         )?;
 
         // initialize the pools with epochs
-        self.fee_pools.borrow().create_fee_pool_trees(self)?;
+        self.fee_pools.borrow().create_fee_pool_trees(&mut batch)?;
 
-        self.apply_current_batch(false, transaction)?;
+        batch.apply(false, transaction)?;
 
         Ok(())
     }

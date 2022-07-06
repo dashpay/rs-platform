@@ -59,9 +59,6 @@ pub enum DriveError {
     #[error("corrupted genesis time invalid item length error: {0}")]
     CorruptedGenesisTimeInvalidItemLength(String),
 
-    #[error("current batch is already started")]
-    CurrentBranchIsAlreadyStarted(),
-
-    #[error("current batch is not empty. please make sure you apply it before starting a new one")]
-    CurrentBranchIsNotEmpty(),
+    #[error("batch is empty")]
+    BatchIsEmpty(),
 }

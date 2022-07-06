@@ -7,6 +7,7 @@ use serde_json::json;
 
 use crate::common::value_to_cbor;
 use crate::contract::document::Document;
+use crate::drive::storage::batch::Batch;
 use crate::drive::Drive;
 use crate::error::document::DocumentError;
 use crate::error::fee::FeeError;
@@ -18,7 +19,7 @@ use crate::fee::pools::fee_pools::FeePools;
 impl FeePools {
     pub fn distribute_fees_from_unpaid_pools_to_proposers(
         &self,
-        drive: &Drive,
+        batch: &mut Batch,
         current_epoch_index: u16,
         transaction: TransactionArg,
     ) -> Result<(u16, u16), Error> {
@@ -28,11 +29,14 @@ impl FeePools {
 
         // For current epoch we pay for previous
         // Find oldest unpaid epoch since previous epoch
-        let unpaid_epoch_pool =
-            match self.get_oldest_unpaid_epoch_pool(drive, current_epoch_index - 1, transaction)? {
-                Some(epoch_pool) => epoch_pool,
-                None => return Ok((0, 0)),
-            };
+        let unpaid_epoch_pool = match self.get_oldest_unpaid_epoch_pool(
+            batch.drive,
+            current_epoch_index - 1,
+            transaction,
+        )? {
+            Some(epoch_pool) => epoch_pool,
+            None => return Ok((0, 0)),
+        };
 
         // Process more proposers at once if we have many unpaid epochs in past
         let proposers_limit: u16 = if unpaid_epoch_pool.index == current_epoch_index {
@@ -44,7 +48,7 @@ impl FeePools {
         let total_fees = unpaid_epoch_pool.get_total_fees(transaction)?;
 
         let unpaid_epoch_block_count =
-            Self::get_epoch_block_count(drive, &unpaid_epoch_pool, transaction)?;
+            Self::get_epoch_block_count(batch.drive, &unpaid_epoch_pool, transaction)?;
 
         let unpaid_epoch_block_count = Decimal::from(unpaid_epoch_block_count);
 
@@ -60,7 +64,7 @@ impl FeePools {
             let mut masternode_reward =
                 (total_fees * proposed_block_count) / unpaid_epoch_block_count;
 
-            let documents = Self::get_reward_shares(drive, proposer_tx_hash, transaction)?;
+            let documents = Self::get_reward_shares(batch.drive, proposer_tx_hash, transaction)?;
 
             for document in documents {
                 let pay_to_id = document
@@ -100,7 +104,7 @@ impl FeePools {
                 // update masternode reward that would be paid later
                 masternode_reward -= reward_floored;
 
-                Self::pay_reward_to_identity(drive, pay_to_id, reward_floored, transaction)?;
+                Self::pay_reward_to_identity(batch.drive, pay_to_id, reward_floored, transaction)?;
             }
 
             // Since balance is an integer, we collect rewards remainder and distribute leftovers afterwards
@@ -109,7 +113,7 @@ impl FeePools {
             fee_leftovers += masternode_reward - masternode_reward_floored;
 
             Self::pay_reward_to_identity(
-                drive,
+                batch.drive,
                 proposer_tx_hash,
                 masternode_reward_floored,
                 transaction,
@@ -120,23 +124,29 @@ impl FeePools {
         let proposer_pro_tx_hashes: Vec<Vec<u8>> =
             proposers.iter().map(|(hash, _)| hash.clone()).collect();
 
-        unpaid_epoch_pool.delete_proposers(proposer_pro_tx_hashes, transaction)?;
+        unpaid_epoch_pool.delete_proposers(batch, proposer_pro_tx_hashes, transaction)?;
 
         // Move integer part of the leftovers to processing
         // and fractional part to storage fees for the next epoch
-        let next_epoch_pool = EpochPool::new(unpaid_epoch_pool.index + 1, drive);
+        let next_epoch_pool = EpochPool::new(unpaid_epoch_pool.index + 1, batch.drive);
 
-        Self::move_leftovers_to_the_next_epoch_pool(next_epoch_pool, fee_leftovers, transaction)?;
+        Self::move_leftovers_to_the_next_epoch_pool(
+            batch,
+            next_epoch_pool,
+            fee_leftovers,
+            transaction,
+        )?;
 
         // if less then a limit processed then mark the epoch pool as paid
         if proposers_len < proposers_limit {
-            unpaid_epoch_pool.mark_as_paid(transaction)?;
+            unpaid_epoch_pool.mark_as_paid(batch, transaction)?;
         }
 
         Ok((proposers_len, unpaid_epoch_pool.index))
     }
 
     fn move_leftovers_to_the_next_epoch_pool(
+        batch: &mut Batch,
         next_epoch_pool: EpochPool,
         fee_leftovers: Decimal,
         transaction: TransactionArg,
@@ -150,11 +160,11 @@ impl FeePools {
 
         let processing_fee = next_epoch_pool.get_processing_fee(transaction)?;
 
-        next_epoch_pool.update_processing_fee(processing_fee + processing_leftovers)?;
+        next_epoch_pool.update_processing_fee(batch, processing_fee + processing_leftovers)?;
 
         let storage_fee = next_epoch_pool.get_storage_fee(transaction)?;
 
-        next_epoch_pool.update_storage_fee(storage_fee + storage_leftovers)?;
+        next_epoch_pool.update_storage_fee(batch, storage_fee + storage_leftovers)?;
 
         Ok(())
     }
@@ -269,7 +279,7 @@ impl FeePools {
 
     pub fn distribute_fees_into_pools(
         &self,
-        drive: &Drive,
+        batch: &mut Batch,
         current_epoch_pool: &EpochPool,
         processing_fees: u64,
         storage_fees: i64,
@@ -278,15 +288,15 @@ impl FeePools {
         // update epoch pool processing fees
         let epoch_processing_fees = current_epoch_pool.get_processing_fee(transaction)?;
 
-        current_epoch_pool.update_processing_fee(epoch_processing_fees + processing_fees)?;
+        current_epoch_pool.update_processing_fee(batch, epoch_processing_fees + processing_fees)?;
 
         // update storage fee pool
         let storage_fee_pool = self
             .storage_fee_distribution_pool
-            .value(drive, transaction)?;
+            .value(batch.drive, transaction)?;
 
         self.storage_fee_distribution_pool
-            .update(drive, storage_fee_pool + storage_fees)?;
+            .update(batch, storage_fee_pool + storage_fees)?;
 
         Ok(())
     }

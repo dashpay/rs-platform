@@ -1,4 +1,5 @@
 use crate::drive::object_size_info::PathKeyElementInfo;
+use crate::drive::storage::batch::Batch;
 use crate::drive::{Drive, RootTree};
 use crate::error::drive::DriveError;
 use crate::error::Error;
@@ -34,8 +35,8 @@ impl Drive {
         }
     }
 
-    pub fn update_genesis_time(&self, genesis_time: i64) -> Result<(), Error> {
-        self.current_batch_insert(PathKeyElementInfo::PathFixedSizeKeyElement((
+    pub fn update_genesis_time(&self, batch: &mut Batch, genesis_time: i64) -> Result<(), Error> {
+        batch.insert(PathKeyElementInfo::PathFixedSizeKeyElement((
             [Into::<&[u8; 1]>::into(RootTree::SpentAssetLockTransactions)],
             KEY_GENESIS_TIME.as_bytes(),
             Element::Item(genesis_time.to_le_bytes().to_vec(), None),

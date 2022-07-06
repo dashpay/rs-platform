@@ -5,6 +5,7 @@ use std::ops::Deref;
 use crate::drive::flags::StorageFlags;
 use crate::drive::object_size_info::KeyInfo;
 use crate::drive::object_size_info::PathKeyElementInfo::PathFixedSizeKeyElement;
+use crate::drive::storage::batch::Batch;
 use crate::drive::{Drive, RootTree};
 use crate::error::drive::DriveError;
 use crate::error::identity::IdentityError;

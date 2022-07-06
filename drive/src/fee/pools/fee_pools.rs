@@ -3,6 +3,7 @@ use grovedb::{Element, TransactionArg};
 use crate::drive::abci::messages::Fees;
 use crate::drive::block::BlockInfo;
 use crate::drive::object_size_info::{KeyInfo, PathKeyElementInfo};
+use crate::drive::storage::batch::Batch;
 use crate::drive::{Drive, RootTree};
 use crate::error::Error;
 use crate::fee::epoch::EpochInfo;
@@ -32,16 +33,12 @@ impl FeePools {
         [Into::<&[u8; 1]>::into(RootTree::Pools)]
     }
 
-    pub fn create_fee_pool_trees(&self, drive: &Drive) -> Result<(), Error> {
+    pub fn create_fee_pool_trees(&self, batch: &mut Batch) -> Result<(), Error> {
         // init fee pool subtree
-        drive.current_batch_insert_empty_tree(
-            [],
-            KeyInfo::KeyRef(FeePools::get_path()[0]),
-            None,
-        )?;
+        batch.insert_empty_tree([], KeyInfo::KeyRef(FeePools::get_path()[0]), None)?;
 
         // Update storage credit pool
-        drive.current_batch_insert(PathKeyElementInfo::PathFixedSizeKeyElement((
+        batch.insert(PathKeyElementInfo::PathFixedSizeKeyElement((
             FeePools::get_path(),
             constants::KEY_STORAGE_FEE_POOL.as_bytes(),
             Element::Item(0i64.to_le_bytes().to_vec(), None),
@@ -50,8 +47,8 @@ impl FeePools {
         // We need to insert 50 years worth of epochs,
         // with 20 epochs per year that's 1000 epochs
         for i in 0..1000 {
-            let epoch = EpochPool::new(i, drive);
-            epoch.init_empty()?;
+            let epoch = EpochPool::new(i, batch.drive);
+            epoch.init_empty(batch)?;
         }
 
         Ok(())
@@ -59,18 +56,23 @@ impl FeePools {
 
     pub fn shift_current_epoch_pool(
         &self,
-        drive: &Drive,
+        batch: &mut Batch,
         current_epoch_pool: &EpochPool,
         start_block_height: u64,
         start_block_time: i64,
         fee_multiplier: u64,
     ) -> Result<(), Error> {
         // create and init next thousandth epoch
-        let next_thousandth_epoch = EpochPool::new(current_epoch_pool.index + 1000, drive);
-        next_thousandth_epoch.init_empty()?;
+        let next_thousandth_epoch = EpochPool::new(current_epoch_pool.index + 1000, batch.drive);
+        next_thousandth_epoch.init_empty(batch)?;
 
         // init first_proposer_block_height and processing_fee for an epoch
-        current_epoch_pool.init_current(fee_multiplier, start_block_height, start_block_time)?;
+        current_epoch_pool.init_current(
+            batch,
+            fee_multiplier,
+            start_block_height,
+            start_block_time,
+        )?;
 
         Ok(())
     }
@@ -86,10 +88,12 @@ impl FeePools {
         let current_epoch_pool = EpochPool::new(epoch_info.current_epoch_index, drive);
 
         if epoch_info.is_epoch_change {
+            let mut batch = Batch::new(drive);
+
             // make next epoch pool as a current
             // and create one more in future
             self.shift_current_epoch_pool(
-                drive,
+                &mut batch,
                 &current_epoch_pool,
                 block_info.block_height,
                 block_info.block_time,
@@ -99,32 +103,41 @@ impl FeePools {
             // distribute accumulated previous epoch storage fees
             if current_epoch_pool.index > 0 {
                 self.storage_fee_distribution_pool.distribute(
-                    drive,
+                    &mut batch,
                     current_epoch_pool.index - 1,
                     transaction,
                 )?;
             }
 
             // We need to apply new epoch tree structure and distributed storage fee
-            drive.apply_current_batch(false, transaction)?;
+            batch.apply(false, transaction)?;
         }
 
+        let mut batch = Batch::new(drive);
+
         self.distribute_fees_into_pools(
-            drive,
+            &mut batch,
             &current_epoch_pool,
             fees.processing_fees,
             fees.storage_fees,
             transaction,
         )?;
 
-        current_epoch_pool
-            .increment_proposer_block_count(&block_info.proposer_pro_tx_hash, transaction)?;
+        current_epoch_pool.increment_proposer_block_count(
+            &mut batch,
+            &block_info.proposer_pro_tx_hash,
+            transaction,
+        )?;
 
-        self.distribute_fees_from_unpaid_pools_to_proposers(
-            drive,
+        let distribution_info = self.distribute_fees_from_unpaid_pools_to_proposers(
+            &mut batch,
             epoch_info.current_epoch_index,
             transaction,
-        )
+        )?;
+
+        batch.apply_if_not_empty(false, transaction)?;
+
+        Ok(distribution_info)
     }
 }
 

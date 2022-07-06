@@ -9,6 +9,7 @@ use dpp::{
 };
 use grovedb::TransactionArg;
 
+use crate::drive::storage::batch::Batch;
 use crate::{
     contract::document::Document,
     contract::Contract,
@@ -130,17 +131,23 @@ pub fn populate_proposers(
 ) -> Vec<[u8; 32]> {
     let mut proposers: Vec<[u8; 32]> = Vec::with_capacity(count as usize);
 
+    let mut batch = Batch::new(epoch_pool.drive);
+
     for _ in 0..count {
         let proposer_pro_tx_hash: [u8; 32] = rand::random();
 
         create_identity(&epoch_pool.drive, proposer_pro_tx_hash, transaction);
 
         epoch_pool
-            .increment_proposer_block_count(&proposer_pro_tx_hash, transaction)
+            .increment_proposer_block_count(&mut batch, &proposer_pro_tx_hash, transaction)
             .expect("should increment proposer block count");
 
         proposers.push(proposer_pro_tx_hash);
     }
+
+    batch
+        .apply_if_not_empty(true, transaction)
+        .expect("should apply batch");
 
     proposers
 }
@@ -151,6 +158,8 @@ pub fn setup_identities_with_share_documents(
     pro_tx_hashes: &Vec<[u8; 32]>,
     transaction: TransactionArg,
 ) -> Vec<(Identity, Document)> {
+    let mut batch = Batch::new(drive);
+
     fetch_identities_by_pro_tx_hashes(drive, pro_tx_hashes, transaction)
         .iter()
         .map(|mn_identity| {

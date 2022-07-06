@@ -8,6 +8,7 @@ use crate::drive::block::BlockExecutionContext;
 use crate::drive::block::BlockInfo;
 use grovedb::TransactionArg;
 
+use crate::drive::storage::batch::Batch;
 use crate::drive::Drive;
 use crate::error;
 use crate::error::Error;
@@ -32,11 +33,11 @@ pub fn block_begin(
 ) -> Result<BlockBeginResponse, Error> {
     // Set genesis time
     let genesis_time = if request.block_height == 1 {
-        drive.ensure_current_batch_is_empty()?;
+        let mut batch = Batch::new(drive);
 
-        drive.update_genesis_time(request.block_time)?;
+        drive.update_genesis_time(&mut batch, request.block_time)?;
 
-        drive.apply_current_batch(false, transaction)?;
+        batch.apply(false, transaction)?;
 
         request.block_time
     } else {
@@ -83,8 +84,6 @@ pub fn block_end(
         }
     };
 
-    drive.ensure_current_batch_is_empty()?;
-
     // Process fees
     let (masternodes_paid_count, paid_epoch_index) = drive.fee_pools.borrow().process_block_fees(
         drive,
@@ -93,8 +92,6 @@ pub fn block_end(
         &request.fees,
         transaction,
     )?;
-
-    drive.apply_current_batch(false, transaction)?;
 
     let response = BlockEndResponse {
         epoch_info: block_execution_context.epoch_info.clone(),
@@ -111,6 +108,7 @@ mod tests {
         use chrono::{Duration, Utc};
         use rand::prelude::SliceRandom;
 
+        use crate::drive::storage::batch::Batch;
         use crate::{
             drive::abci::{
                 handlers::{block_begin, block_end, init_chain},
@@ -144,11 +142,15 @@ mod tests {
             // setup proposers and mn share documents
             let epoch_pool = EpochPool::new(0, &drive);
 
-            epoch_pool.init_proposers().expect("to init proposers");
+            let mut batch = Batch::new(&drive);
 
-            drive
-                .apply_current_batch(false, Some(&transaction))
-                .expect("to apply a batch");
+            epoch_pool
+                .init_proposers(&mut batch)
+                .expect("to init proposers");
+
+            batch
+                .apply(false, Some(&transaction))
+                .expect("should apply a batch");
 
             let proposer_tx_hashes = populate_proposers(&epoch_pool, 2, Some(&transaction));
 

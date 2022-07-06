@@ -1,4 +1,5 @@
 use crate::drive::object_size_info::PathKeyElementInfo;
+use crate::drive::storage::batch::Batch;
 use crate::drive::Drive;
 use grovedb::{Element, TransactionArg};
 use rust_decimal::Decimal;
@@ -16,11 +17,12 @@ pub struct StorageFeeDistributionPool {}
 impl StorageFeeDistributionPool {
     pub fn distribute(
         &self,
-        drive: &Drive,
+        batch: &mut Batch,
         epoch_index: u16,
         transaction: TransactionArg,
     ) -> Result<(), Error> {
-        let storage_distribution_fees = Decimal::new(self.value(drive, transaction)?, 0);
+        let storage_distribution_fees = self.value(batch.drive, transaction)?;
+        let storage_distribution_fees = Decimal::new(storage_distribution_fees, 0);
 
         // a separate buffer from which we withdraw to correctly calculate fee share
         let mut storage_distribution_fees_buffer = storage_distribution_fees;
@@ -38,11 +40,11 @@ impl StorageFeeDistributionPool {
             let starting_epoch_index = epoch_index + year * 20;
 
             for index in starting_epoch_index..starting_epoch_index + 20 {
-                let epoch_pool = EpochPool::new(index, drive);
+                let epoch_pool = EpochPool::new(index, batch.drive);
 
                 let storage_fee = epoch_pool.get_storage_fee(transaction)?;
 
-                epoch_pool.update_storage_fee(storage_fee + epoch_fee_share)?;
+                epoch_pool.update_storage_fee(batch, storage_fee + epoch_fee_share)?;
 
                 storage_distribution_fees_buffer -= epoch_fee_share;
             }
@@ -55,13 +57,13 @@ impl StorageFeeDistributionPool {
                 ))
             })?;
 
-        self.update(drive, storage_distribution_fees_buffer)?;
+        self.update(batch, storage_distribution_fees_buffer)?;
 
         Ok(())
     }
 
-    pub fn update(&self, drive: &Drive, storage_fee: i64) -> Result<(), Error> {
-        drive.current_batch_insert(PathKeyElementInfo::PathFixedSizeKeyElement((
+    pub fn update(&self, batch: &mut Batch, storage_fee: i64) -> Result<(), Error> {
+        batch.insert(PathKeyElementInfo::PathFixedSizeKeyElement((
             FeePools::get_path(),
             constants::KEY_STORAGE_FEE_POOL.as_bytes(),
             Element::Item(storage_fee.to_le_bytes().to_vec(), None),

@@ -2,6 +2,7 @@ use grovedb::{Element, TransactionArg};
 use rust_decimal_macros::dec;
 
 use crate::drive::object_size_info::{KeyInfo, PathKeyElementInfo};
+use crate::drive::storage::batch::Batch;
 use crate::drive::Drive;
 use crate::error::fee::FeeError;
 use crate::error::Error;
@@ -24,44 +25,45 @@ impl<'e> EpochPool<'e> {
         }
     }
 
-    pub fn init_empty(&self) -> Result<(), Error> {
-        self.drive.current_batch_insert_empty_tree(
-            FeePools::get_path(),
-            KeyInfo::KeyRef(&self.key),
-            None,
-        )?;
+    pub fn init_empty(&self, batch: &mut Batch) -> Result<(), Error> {
+        batch.insert_empty_tree(FeePools::get_path(), KeyInfo::KeyRef(&self.key), None)?;
 
         // init storage fee item to 0
-        self.update_storage_fee(dec!(0.0))?;
+        self.update_storage_fee(batch, dec!(0.0))?;
 
         Ok(())
     }
 
     pub fn init_current(
         &self,
+        batch: &mut Batch,
         multiplier: u64,
         start_block_height: u64,
         start_time: i64,
     ) -> Result<(), Error> {
-        self.update_start_block_height(start_block_height)?;
+        self.update_start_block_height(batch, start_block_height)?;
 
-        self.update_processing_fee(0u64)?;
+        self.update_processing_fee(batch, 0u64)?;
 
-        self.init_proposers()?;
+        self.init_proposers(batch)?;
 
-        self.update_fee_multiplier(multiplier)?;
+        self.update_fee_multiplier(batch, multiplier)?;
 
-        self.update_start_time(start_time)?;
+        self.update_start_time(batch, start_time)?;
 
         Ok(())
     }
 
-    pub fn mark_as_paid(&self, transaction: TransactionArg) -> Result<(), Error> {
-        self.delete_proposers_tree(transaction)?;
+    pub fn mark_as_paid(
+        &self,
+        batch: &mut Batch,
+        transaction: TransactionArg,
+    ) -> Result<(), Error> {
+        self.delete_proposers_tree(batch, transaction)?;
 
-        self.delete_storage_fee(transaction)?;
+        self.delete_storage_fee(batch, transaction)?;
 
-        self.delete_processing_fee(transaction)?;
+        self.delete_processing_fee(batch, transaction)?;
 
         Ok(())
     }
@@ -70,13 +72,12 @@ impl<'e> EpochPool<'e> {
         [FeePools::get_path()[0], &self.key]
     }
 
-    pub fn update_start_time(&self, time: i64) -> Result<(), Error> {
-        self.drive
-            .current_batch_insert(PathKeyElementInfo::PathFixedSizeKeyElement((
-                self.get_path(),
-                constants::KEY_START_TIME.as_bytes(),
-                Element::Item(time.to_le_bytes().to_vec(), None),
-            )))
+    pub fn update_start_time(&self, batch: &mut Batch, time: i64) -> Result<(), Error> {
+        batch.insert(PathKeyElementInfo::PathFixedSizeKeyElement((
+            self.get_path(),
+            constants::KEY_START_TIME.as_bytes(),
+            Element::Item(time.to_le_bytes().to_vec(), None),
+        )))
     }
 
     pub fn get_start_time(&self, transaction: TransactionArg) -> Result<i64, Error> {
@@ -121,13 +122,16 @@ impl<'e> EpochPool<'e> {
         }
     }
 
-    pub fn update_start_block_height(&self, start_block_height: u64) -> Result<(), Error> {
-        self.drive
-            .current_batch_insert(PathKeyElementInfo::PathFixedSizeKeyElement((
-                self.get_path(),
-                constants::KEY_START_BLOCK_HEIGHT.as_bytes(),
-                Element::Item(start_block_height.to_le_bytes().to_vec(), None),
-            )))
+    pub fn update_start_block_height(
+        &self,
+        batch: &mut Batch,
+        start_block_height: u64,
+    ) -> Result<(), Error> {
+        batch.insert(PathKeyElementInfo::PathFixedSizeKeyElement((
+            self.get_path(),
+            constants::KEY_START_BLOCK_HEIGHT.as_bytes(),
+            Element::Item(start_block_height.to_le_bytes().to_vec(), None),
+        )))
     }
 }
 

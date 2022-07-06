@@ -2,6 +2,7 @@ use grovedb::{Element, TransactionArg};
 use rust_decimal::Decimal;
 
 use crate::drive::object_size_info::PathKeyElementInfo;
+use crate::drive::storage::batch::Batch;
 use crate::{
     error::{fee::FeeError, Error},
     fee::pools::epoch::epoch_pool::EpochPool,
@@ -89,26 +90,32 @@ impl<'e> EpochPool<'e> {
         }
     }
 
-    pub fn update_fee_multiplier(&self, multiplier: u64) -> Result<(), Error> {
-        self.drive
-            .current_batch_insert(PathKeyElementInfo::PathFixedSizeKeyElement((
-                self.get_path(),
-                constants::KEY_FEE_MULTIPLIER.as_bytes(),
-                Element::Item(multiplier.to_le_bytes().to_vec(), None),
-            )))
+    pub fn update_fee_multiplier(&self, batch: &mut Batch, multiplier: u64) -> Result<(), Error> {
+        batch.insert(PathKeyElementInfo::PathFixedSizeKeyElement((
+            self.get_path(),
+            constants::KEY_FEE_MULTIPLIER.as_bytes(),
+            Element::Item(multiplier.to_le_bytes().to_vec(), None),
+        )))
     }
 
-    pub fn update_processing_fee(&self, processing_fee: u64) -> Result<(), Error> {
-        self.drive
-            .current_batch_insert(PathKeyElementInfo::PathFixedSizeKeyElement((
-                self.get_path(),
-                constants::KEY_PROCESSING_FEE.as_bytes(),
-                Element::Item(processing_fee.to_le_bytes().to_vec(), None),
-            )))
+    pub fn update_processing_fee(
+        &self,
+        batch: &mut Batch,
+        processing_fee: u64,
+    ) -> Result<(), Error> {
+        batch.insert(PathKeyElementInfo::PathFixedSizeKeyElement((
+            self.get_path(),
+            constants::KEY_PROCESSING_FEE.as_bytes(),
+            Element::Item(processing_fee.to_le_bytes().to_vec(), None),
+        )))
     }
 
-    pub fn delete_processing_fee(&self, transaction: TransactionArg) -> Result<(), Error> {
-        self.drive.current_batch_delete(
+    pub fn delete_processing_fee(
+        &self,
+        batch: &mut Batch,
+        transaction: TransactionArg,
+    ) -> Result<(), Error> {
+        batch.delete(
             self.get_path(),
             constants::KEY_PROCESSING_FEE.as_bytes(),
             false,
@@ -116,19 +123,22 @@ impl<'e> EpochPool<'e> {
         )
     }
 
-    pub fn update_storage_fee(&self, storage_fee: Decimal) -> Result<(), Error> {
-        self.drive
-            .current_batch_insert(PathKeyElementInfo::PathFixedSizeKeyElement((
-                self.get_path(),
-                constants::KEY_STORAGE_FEE.as_bytes(),
-                Element::Item(storage_fee.serialize().to_vec(), None),
-            )))?;
+    pub fn update_storage_fee(&self, batch: &mut Batch, storage_fee: Decimal) -> Result<(), Error> {
+        batch.insert(PathKeyElementInfo::PathFixedSizeKeyElement((
+            self.get_path(),
+            constants::KEY_STORAGE_FEE.as_bytes(),
+            Element::Item(storage_fee.serialize().to_vec(), None),
+        )))?;
 
         Ok(())
     }
 
-    pub fn delete_storage_fee(&self, transaction: TransactionArg) -> Result<(), Error> {
-        self.drive.current_batch_delete(
+    pub fn delete_storage_fee(
+        &self,
+        batch: &mut Batch,
+        transaction: TransactionArg,
+    ) -> Result<(), Error> {
+        batch.delete(
             self.get_path(),
             constants::KEY_STORAGE_FEE.as_bytes(),
             false,

@@ -1,6 +1,7 @@
 use grovedb::{Element, PathQuery, Query, SizedQuery, TransactionArg};
 
 use crate::drive::object_size_info::{KeyInfo, PathKeyElementInfo};
+use crate::drive::storage::batch::Batch;
 use crate::fee::pools::fee_pools::FeePools;
 use crate::{
     error,
@@ -50,19 +51,20 @@ impl<'e> EpochPool<'e> {
 
     fn update_proposer_block_count(
         &self,
+        batch: &mut Batch,
         proposer_pro_tx_hash: &[u8; 32],
         block_count: u64,
     ) -> Result<(), Error> {
-        self.drive
-            .current_batch_insert(PathKeyElementInfo::PathFixedSizeKeyElement((
-                self.get_proposers_path(),
-                proposer_pro_tx_hash,
-                Element::Item(block_count.to_le_bytes().to_vec(), None),
-            )))
+        batch.insert(PathKeyElementInfo::PathFixedSizeKeyElement((
+            self.get_proposers_path(),
+            proposer_pro_tx_hash,
+            Element::Item(block_count.to_le_bytes().to_vec(), None),
+        )))
     }
 
     pub fn increment_proposer_block_count(
         &self,
+        batch: &mut Batch,
         proposer_pro_tx_hash: &[u8; 32],
         transaction: TransactionArg,
     ) -> Result<(), Error> {
@@ -74,7 +76,7 @@ impl<'e> EpochPool<'e> {
                 _ => Err(e),
             })?;
 
-        self.update_proposer_block_count(proposer_pro_tx_hash, proposed_block_count + 1)?;
+        self.update_proposer_block_count(batch, proposer_pro_tx_hash, proposed_block_count + 1)?;
 
         Ok(())
     }
@@ -96,8 +98,8 @@ impl<'e> EpochPool<'e> {
         }
     }
 
-    pub fn init_proposers(&self) -> Result<(), Error> {
-        self.drive.current_batch_insert_empty_tree(
+    pub fn init_proposers(&self, batch: &mut Batch) -> Result<(), Error> {
+        batch.insert_empty_tree(
             self.get_path(),
             KeyInfo::KeyRef(constants::KEY_PROPOSERS.as_bytes()),
             None,
@@ -150,8 +152,12 @@ impl<'e> EpochPool<'e> {
         Ok(result)
     }
 
-    pub fn delete_proposers_tree(&self, transaction: TransactionArg) -> Result<(), Error> {
-        self.drive.current_batch_delete(
+    pub fn delete_proposers_tree(
+        &self,
+        batch: &mut Batch,
+        transaction: TransactionArg,
+    ) -> Result<(), Error> {
+        batch.delete(
             self.get_path(),
             constants::KEY_PROPOSERS.as_bytes(),
             true,
@@ -161,16 +167,12 @@ impl<'e> EpochPool<'e> {
 
     pub fn delete_proposers(
         &self,
+        batch: &mut Batch,
         pro_tx_hashes: Vec<Vec<u8>>,
         transaction: TransactionArg,
     ) -> Result<(), Error> {
         for pro_tx_hash in pro_tx_hashes {
-            self.drive.current_batch_delete(
-                self.get_proposers_path(),
-                &pro_tx_hash,
-                true,
-                transaction,
-            )?;
+            batch.delete(self.get_proposers_path(), &pro_tx_hash, true, transaction)?;
         }
 
         Ok(())
