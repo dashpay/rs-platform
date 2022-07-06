@@ -477,6 +477,7 @@ describe('Drive', () => {
         expect(response.epochInfo).to.have.property('currentEpochIndex');
         expect(response.epochInfo).to.have.property('isEpochChange');
         expect(response).to.have.property('masternodesPaidCount');
+        expect(response).to.have.property('paidEpochIndex');
       });
     });
   });

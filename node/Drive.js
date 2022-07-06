@@ -358,6 +358,7 @@ class Drive {
  * @typedef BlockEndResponse
  * @property {EpochInfo} epochInfo
  * @property {number} masternodesPaidCount
+ * @property {number} paidEpochIndex
  */
 
 /**
