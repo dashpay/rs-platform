@@ -235,7 +235,9 @@ impl DriveWrapper {
         drive
             .send_to_drive_thread(move |drive: &Drive, transaction, channel| {
                 drive
-                    .apply_initial_state_structure(using_transaction.then(|| transaction).flatten())
+                    .create_initial_state_structure(
+                        using_transaction.then(|| transaction).flatten(),
+                    )
                     .expect("create_root_tree should not fail");
 
                 channel.send(move |mut task_context| {

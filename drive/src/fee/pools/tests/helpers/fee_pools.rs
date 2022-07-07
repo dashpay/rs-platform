@@ -65,7 +65,7 @@ fn create_identity(drive: &Drive, id: [u8; 32], transaction: TransactionArg) -> 
 
     drive
         .insert_identity(identity.clone(), true, transaction)
-        .expect("to insert identity");
+        .expect("should insert identity");
 
     identity
 }
@@ -124,42 +124,66 @@ fn create_mn_share_document(
     document
 }
 
-pub fn populate_proposers(
+pub fn create_masternode_identities_and_increment_proposers(
+    drive: &Drive,
     epoch_pool: &EpochPool,
+    count: u8,
+    transaction: TransactionArg,
+) -> Vec<[u8; 32]> {
+    let proposers = create_masternode_identities(drive, count, transaction);
+
+    increment_proposers_block_count(drive, &proposers, epoch_pool, transaction);
+
+    proposers
+}
+
+pub fn create_masternode_identities(
+    drive: &Drive,
     count: u8,
     transaction: TransactionArg,
 ) -> Vec<[u8; 32]> {
     let mut proposers: Vec<[u8; 32]> = Vec::with_capacity(count as usize);
 
-    let mut batch = Batch::new(epoch_pool.drive);
-
     for _ in 0..count {
         let proposer_pro_tx_hash: [u8; 32] = rand::random();
 
-        create_identity(&epoch_pool.drive, proposer_pro_tx_hash, transaction);
-
-        epoch_pool
-            .increment_proposer_block_count(&mut batch, &proposer_pro_tx_hash, transaction)
-            .expect("should increment proposer block count");
+        create_identity(drive, proposer_pro_tx_hash, transaction);
 
         proposers.push(proposer_pro_tx_hash);
     }
 
-    batch
-        .apply_if_not_empty(true, transaction)
-        .expect("should apply batch");
-
     proposers
 }
 
-pub fn setup_identities_with_share_documents(
+pub fn increment_proposers_block_count(
+    drive: &Drive,
+    proposers: &Vec<[u8; 32]>,
+    epoch_pool: &EpochPool,
+    transaction: TransactionArg,
+) {
+    let mut batch = Batch::new(drive);
+
+    for proposer_pro_tx_hash in proposers {
+        epoch_pool
+            .add_increment_proposer_block_count_operations(
+                &mut batch,
+                &proposer_pro_tx_hash,
+                transaction,
+            )
+            .expect("should increment proposer block count");
+    }
+
+    drive
+        .apply_if_not_empty(batch, true, transaction)
+        .expect("should apply batch");
+}
+
+pub fn create_masternode_share_identities_and_documents(
     drive: &Drive,
     contract: &Contract,
     pro_tx_hashes: &Vec<[u8; 32]>,
     transaction: TransactionArg,
 ) -> Vec<(Identity, Document)> {
-    let mut batch = Batch::new(drive);
-
     fetch_identities_by_pro_tx_hashes(drive, pro_tx_hashes, transaction)
         .iter()
         .map(|mn_identity| {

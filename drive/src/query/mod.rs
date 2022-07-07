@@ -1234,7 +1234,7 @@ mod tests {
         let drive: Drive = Drive::open(tmp_dir, None).expect("expected to open Drive successfully");
 
         drive
-            .apply_initial_state_structure(None)
+            .create_initial_state_structure(None)
             .expect("expected to create root tree successfully");
 
         let contract_path = "tests/supporting_files/contract/family/family-contract.json";
@@ -1263,7 +1263,7 @@ mod tests {
         let drive: Drive = Drive::open(tmp_dir, None).expect("expected to open Drive successfully");
 
         drive
-            .apply_initial_state_structure(None)
+            .create_initial_state_structure(None)
             .expect("expected to create root tree successfully");
 
         let contract_path =

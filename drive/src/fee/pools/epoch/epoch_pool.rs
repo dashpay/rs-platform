@@ -25,45 +25,45 @@ impl<'e> EpochPool<'e> {
         }
     }
 
-    pub fn init_empty(&self, batch: &mut Batch) -> Result<(), Error> {
+    pub fn add_init_empty_operations(&self, batch: &mut Batch) -> Result<(), Error> {
         batch.insert_empty_tree(FeePools::get_path(), KeyInfo::KeyRef(&self.key), None)?;
 
         // init storage fee item to 0
-        self.update_storage_fee(batch, dec!(0.0))?;
+        self.add_update_storage_fee_operations(batch, dec!(0.0))?;
 
         Ok(())
     }
 
-    pub fn init_current(
+    pub fn add_init_current_operations(
         &self,
         batch: &mut Batch,
         multiplier: u64,
         start_block_height: u64,
         start_time: i64,
     ) -> Result<(), Error> {
-        self.update_start_block_height(batch, start_block_height)?;
+        self.add_update_start_block_height_operations(batch, start_block_height)?;
 
-        self.update_processing_fee(batch, 0u64)?;
+        self.add_update_processing_fee_operations(batch, 0u64)?;
 
-        self.init_proposers(batch)?;
+        self.add_init_proposers_operations(batch)?;
 
-        self.update_fee_multiplier(batch, multiplier)?;
+        self.add_update_fee_multiplier_operations(batch, multiplier)?;
 
-        self.update_start_time(batch, start_time)?;
+        self.add_update_start_time_operations(batch, start_time)?;
 
         Ok(())
     }
 
-    pub fn mark_as_paid(
+    pub fn add_mark_as_paid_operations(
         &self,
         batch: &mut Batch,
         transaction: TransactionArg,
     ) -> Result<(), Error> {
-        self.delete_proposers_tree(batch, transaction)?;
+        self.add_delete_proposers_tree_operations(batch, transaction)?;
 
-        self.delete_storage_fee(batch, transaction)?;
+        self.add_delete_storage_fee_operations(batch, transaction)?;
 
-        self.delete_processing_fee(batch, transaction)?;
+        self.add_delete_processing_fee_operations(batch, transaction)?;
 
         Ok(())
     }
@@ -72,10 +72,14 @@ impl<'e> EpochPool<'e> {
         [FeePools::get_path()[0], &self.key]
     }
 
-    pub fn update_start_time(&self, batch: &mut Batch, time: i64) -> Result<(), Error> {
+    pub fn add_update_start_time_operations(
+        &self,
+        batch: &mut Batch,
+        time: i64,
+    ) -> Result<(), Error> {
         batch.insert(PathKeyElementInfo::PathFixedSizeKeyElement((
             self.get_path(),
-            constants::KEY_START_TIME.as_bytes(),
+            constants::KEY_START_TIME.as_slice(),
             Element::Item(time.to_le_bytes().to_vec(), None),
         )))
     }
@@ -86,7 +90,7 @@ impl<'e> EpochPool<'e> {
             .grove
             .get(
                 self.get_path(),
-                constants::KEY_START_TIME.as_bytes(),
+                constants::KEY_START_TIME.as_slice(),
                 transaction,
             )
             .unwrap()
@@ -107,7 +111,7 @@ impl<'e> EpochPool<'e> {
             .grove
             .get(
                 self.get_path(),
-                constants::KEY_START_BLOCK_HEIGHT.as_bytes(),
+                constants::KEY_START_BLOCK_HEIGHT.as_slice(),
                 transaction,
             )
             .unwrap()
@@ -122,14 +126,14 @@ impl<'e> EpochPool<'e> {
         }
     }
 
-    pub fn update_start_block_height(
+    pub fn add_update_start_block_height_operations(
         &self,
         batch: &mut Batch,
         start_block_height: u64,
     ) -> Result<(), Error> {
         batch.insert(PathKeyElementInfo::PathFixedSizeKeyElement((
             self.get_path(),
-            constants::KEY_START_BLOCK_HEIGHT.as_bytes(),
+            constants::KEY_START_BLOCK_HEIGHT.as_slice(),
             Element::Item(start_block_height.to_le_bytes().to_vec(), None),
         )))
     }
@@ -137,6 +141,7 @@ impl<'e> EpochPool<'e> {
 
 #[cfg(test)]
 mod tests {
+    use crate::drive::storage::batch::Batch;
     use chrono::Utc;
     use grovedb::Element;
     use rust_decimal_macros::dec;
@@ -159,12 +164,14 @@ mod tests {
 
         let start_time: i64 = Utc::now().timestamp_millis();
 
+        let mut batch = Batch::new(&drive);
+
         epoch_pool
-            .update_start_time(start_time)
+            .add_update_start_time_operations(&mut batch, start_time)
             .expect("should update start time");
 
         drive
-            .apply_current_batch(true, Some(&transaction))
+            .apply_batch(batch, false, Some(&transaction))
             .expect("should apply batch");
 
         let actual_start_time = epoch_pool
@@ -224,7 +231,7 @@ mod tests {
                 .grove
                 .insert(
                     epoch_pool.get_path(),
-                    super::constants::KEY_START_TIME.as_bytes(),
+                    super::constants::KEY_START_TIME.as_slice(),
                     super::Element::empty_tree(),
                     Some(&transaction),
                 )
@@ -254,7 +261,7 @@ mod tests {
                 .grove
                 .insert(
                     epoch_pool.get_path(),
-                    super::constants::KEY_START_TIME.as_bytes(),
+                    super::constants::KEY_START_TIME.as_slice(),
                     super::Element::Item(u128::MAX.to_le_bytes().to_vec(), None),
                     Some(&transaction),
                 )
@@ -283,12 +290,14 @@ mod tests {
 
         let start_block_height = 1;
 
+        let mut batch = Batch::new(&drive);
+
         epoch_pool
-            .update_start_block_height(start_block_height)
+            .add_update_start_block_height_operations(&mut batch, start_block_height)
             .expect("should update start block height");
 
         drive
-            .apply_current_batch(true, Some(&transaction))
+            .apply_batch(batch, false, Some(&transaction))
             .expect("should apply batch");
 
         let actual_start_block_height = epoch_pool
@@ -348,7 +357,7 @@ mod tests {
                 .grove
                 .insert(
                     epoch_pool.get_path(),
-                    super::constants::KEY_START_BLOCK_HEIGHT.as_bytes(),
+                    super::constants::KEY_START_BLOCK_HEIGHT.as_slice(),
                     super::Element::Item(u128::MAX.to_le_bytes().to_vec(), None),
                     Some(&transaction),
                 )
@@ -380,7 +389,7 @@ mod tests {
                 .grove
                 .insert(
                     epoch_pool.get_path(),
-                    super::constants::KEY_START_BLOCK_HEIGHT.as_bytes(),
+                    super::constants::KEY_START_BLOCK_HEIGHT.as_slice(),
                     super::Element::empty_tree(),
                     Some(&transaction),
                 )
@@ -402,6 +411,8 @@ mod tests {
     }
 
     mod init_empty {
+        use crate::drive::storage::batch::Batch;
+
         #[test]
         fn test_error_if_fee_pools_not_initialized() {
             let drive = super::setup_drive();
@@ -414,12 +425,18 @@ mod tests {
 
             let epoch = super::EpochPool::new(1042, &drive);
 
-            epoch.init_empty().expect("should init empty pool");
+            let mut batch = Batch::new(&drive);
 
-            match drive.apply_current_batch(true, Some(&transaction)) {
+            epoch
+                .add_init_empty_operations(&mut batch)
+                .expect("should init empty pool");
+
+            match drive.apply_batch(batch, false, Some(&transaction)) {
                 Ok(_) => assert!(false, "should not be able to init epoch without FeePools"),
                 Err(e) => match e {
-                    super::error::Error::GroveDB(grovedb::Error::InvalidPath(_)) => assert!(true),
+                    super::error::Error::GroveDB(grovedb::Error::PathKeyNotFound(_)) => {
+                        assert!(true)
+                    }
                     _ => assert!(false, "invalid error type"),
                 },
             }
@@ -432,10 +449,14 @@ mod tests {
 
             let epoch = super::EpochPool::new(1042, &drive);
 
-            epoch.init_empty().expect("should init an epoch pool");
+            let mut batch = Batch::new(&drive);
+
+            epoch
+                .add_init_empty_operations(&mut batch)
+                .expect("should init an epoch pool");
 
             drive
-                .apply_current_batch(true, Some(&transaction))
+                .apply_batch(batch, false, Some(&transaction))
                 .expect("should apply batch");
 
             let storage_fee = epoch
@@ -447,6 +468,8 @@ mod tests {
     }
 
     mod init_current {
+        use crate::drive::storage::batch::Batch;
+
         #[test]
         fn test_values_are_set() {
             let drive = super::setup_drive();
@@ -458,14 +481,18 @@ mod tests {
             let start_time = 1;
             let start_block_height = 2;
 
-            epoch.init_empty().expect("should init empty epoch pool");
+            let mut batch = Batch::new(&drive);
 
             epoch
-                .init_current(multiplier, start_block_height, start_time)
+                .add_init_empty_operations(&mut batch)
+                .expect("should init empty epoch pool");
+
+            epoch
+                .add_init_current_operations(&mut batch, multiplier, start_block_height, start_time)
                 .expect("should init an epoch pool");
 
             drive
-                .apply_current_batch(true, Some(&transaction))
+                .apply_batch(batch, false, Some(&transaction))
                 .expect("should apply batch");
 
             let stored_multiplier = epoch
@@ -501,6 +528,8 @@ mod tests {
     }
 
     mod mark_as_paid {
+        use crate::drive::storage::batch::Batch;
+
         #[test]
         fn test_values_are_deleted() {
             let drive = super::setup_drive();
@@ -508,28 +537,32 @@ mod tests {
 
             let epoch = super::EpochPool::new(0, &drive);
 
+            let mut batch = Batch::new(&drive);
+
             epoch
-                .init_current(1, 2, 3)
+                .add_init_current_operations(&mut batch, 1, 2, 3)
                 .expect("should init an epoch pool");
 
             // Apply init current
             drive
-                .apply_current_batch(true, Some(&transaction))
+                .apply_batch(batch, false, Some(&transaction))
                 .expect("should apply batch");
 
+            let mut batch = Batch::new(&drive);
+
             epoch
-                .mark_as_paid(Some(&transaction))
+                .add_mark_as_paid_operations(&mut batch, Some(&transaction))
                 .expect("should mark epoch as paid");
 
             drive
-                .apply_current_batch(true, Some(&transaction))
+                .apply_batch(batch, false, Some(&transaction))
                 .expect("should apply batch");
 
             match drive
                 .grove
                 .get(
                     epoch.get_path(),
-                    super::constants::KEY_PROPOSERS.as_bytes(),
+                    super::constants::KEY_PROPOSERS.as_slice(),
                     Some(&transaction),
                 )
                 .unwrap()

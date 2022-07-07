@@ -34,7 +34,7 @@ pub fn setup_fee_pools<'a>(
 
     if options.apply_fee_pool_structure {
         drive
-            .apply_initial_state_structure(None)
+            .create_initial_state_structure(None)
             .expect("should create root tree successfully");
     }
 

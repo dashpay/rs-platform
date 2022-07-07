@@ -16,7 +16,7 @@ impl<'e> EpochPool<'e> {
         [
             FeePools::get_path()[0],
             &self.key,
-            constants::KEY_PROPOSERS.as_bytes(),
+            constants::KEY_PROPOSERS.as_slice(),
         ]
     }
 
@@ -49,7 +49,7 @@ impl<'e> EpochPool<'e> {
         }
     }
 
-    fn update_proposer_block_count(
+    fn add_update_proposer_block_count_operations(
         &self,
         batch: &mut Batch,
         proposer_pro_tx_hash: &[u8; 32],
@@ -62,7 +62,7 @@ impl<'e> EpochPool<'e> {
         )))
     }
 
-    pub fn increment_proposer_block_count(
+    pub fn add_increment_proposer_block_count_operations(
         &self,
         batch: &mut Batch,
         proposer_pro_tx_hash: &[u8; 32],
@@ -76,7 +76,11 @@ impl<'e> EpochPool<'e> {
                 _ => Err(e),
             })?;
 
-        self.update_proposer_block_count(batch, proposer_pro_tx_hash, proposed_block_count + 1)?;
+        self.add_update_proposer_block_count_operations(
+            batch,
+            proposer_pro_tx_hash,
+            proposed_block_count + 1,
+        )?;
 
         Ok(())
     }
@@ -98,10 +102,10 @@ impl<'e> EpochPool<'e> {
         }
     }
 
-    pub fn init_proposers(&self, batch: &mut Batch) -> Result<(), Error> {
+    pub fn add_init_proposers_operations(&self, batch: &mut Batch) -> Result<(), Error> {
         batch.insert_empty_tree(
             self.get_path(),
-            KeyInfo::KeyRef(constants::KEY_PROPOSERS.as_bytes()),
+            KeyInfo::KeyRef(constants::KEY_PROPOSERS.as_slice()),
             None,
         )
     }
@@ -152,20 +156,20 @@ impl<'e> EpochPool<'e> {
         Ok(result)
     }
 
-    pub fn delete_proposers_tree(
+    pub fn add_delete_proposers_tree_operations(
         &self,
         batch: &mut Batch,
         transaction: TransactionArg,
     ) -> Result<(), Error> {
         batch.delete(
             self.get_path(),
-            constants::KEY_PROPOSERS.as_bytes(),
+            constants::KEY_PROPOSERS.as_slice(),
             true,
             transaction,
         )
     }
 
-    pub fn delete_proposers(
+    pub fn add_delete_proposers_operations(
         &self,
         batch: &mut Batch,
         pro_tx_hashes: Vec<Vec<u8>>,
@@ -181,20 +185,21 @@ impl<'e> EpochPool<'e> {
 
 #[cfg(test)]
 mod tests {
+    use crate::drive::storage::batch::Batch;
     use grovedb::Element;
 
     use crate::{
         error::{self, fee::FeeError},
         fee::pools::{
-            epoch::{constants, epoch_pool::EpochPool},
+            epoch::epoch_pool::EpochPool,
             tests::helpers::setup::{setup_drive, setup_fee_pools},
         },
     };
 
     use crate::drive::object_size_info::PathKeyElementInfo;
-    use grovedb::Error;
 
     mod get_proposer_block_count {
+
         #[test]
         fn test_error_if_value_has_invalid_length() {
             let drive = super::setup_drive();
@@ -204,10 +209,14 @@ mod tests {
 
             let epoch = super::EpochPool::new(0, &drive);
 
-            epoch.init_proposers().expect("should init proposers");
+            let mut batch = super::Batch::new(&drive);
 
-            drive
-                .current_batch_insert(super::PathKeyElementInfo::PathFixedSizeKeyElement((
+            epoch
+                .add_init_proposers_operations(&mut batch)
+                .expect("should init proposers");
+
+            batch
+                .insert(super::PathKeyElementInfo::PathFixedSizeKeyElement((
                     epoch.get_proposers_path(),
                     &pro_tx_hash,
                     super::Element::Item(u128::MAX.to_le_bytes().to_vec(), None),
@@ -215,7 +224,7 @@ mod tests {
                 .expect("should insert invalid value");
 
             drive
-                .apply_current_batch(true, Some(&transaction))
+                .apply_batch(batch, false, Some(&transaction))
                 .expect("should apply batch");
 
             match epoch.get_proposer_block_count(&pro_tx_hash, Some(&transaction)) {
@@ -266,14 +275,18 @@ mod tests {
 
             let epoch = super::EpochPool::new(0, &drive);
 
-            epoch.init_proposers().expect("should init proposers");
+            let mut batch = super::Batch::new(&drive);
 
             epoch
-                .update_proposer_block_count(&pro_tx_hash, block_count)
+                .add_init_proposers_operations(&mut batch)
+                .expect("should init proposers");
+
+            epoch
+                .add_update_proposer_block_count_operations(&mut batch, &pro_tx_hash, block_count)
                 .expect("should update proposer block count");
 
             drive
-                .apply_current_batch(true, Some(&transaction))
+                .apply_batch(batch, false, Some(&transaction))
                 .expect("should apply batch");
 
             let stored_block_count = epoch
@@ -294,19 +307,29 @@ mod tests {
 
             let epoch = super::EpochPool::new(0, &drive);
 
-            epoch.init_proposers().expect("should init proposers");
+            let mut batch = super::Batch::new(&drive);
+
+            epoch
+                .add_init_proposers_operations(&mut batch)
+                .expect("should init proposers");
 
             // Apply proposers tree
             drive
-                .apply_current_batch(true, Some(&transaction))
+                .apply_batch(batch, false, Some(&transaction))
                 .expect("should apply batch");
 
+            let mut batch = super::Batch::new(&drive);
+
             epoch
-                .increment_proposer_block_count(&pro_tx_hash, Some(&transaction))
+                .add_increment_proposer_block_count_operations(
+                    &mut batch,
+                    &pro_tx_hash,
+                    Some(&transaction),
+                )
                 .expect("should update proposer block count");
 
             drive
-                .apply_current_batch(true, Some(&transaction))
+                .apply_batch(batch, false, Some(&transaction))
                 .expect("should apply batch");
 
             let stored_block_count = epoch
@@ -325,28 +348,40 @@ mod tests {
 
             let epoch = super::EpochPool::new(0, &drive);
 
-            epoch.init_proposers().expect("should init proposers");
+            let mut batch = super::Batch::new(&drive);
+
+            epoch
+                .add_init_proposers_operations(&mut batch)
+                .expect("should init proposers");
 
             // Apply proposers tree
             drive
-                .apply_current_batch(true, Some(&transaction))
+                .apply_batch(batch, false, Some(&transaction))
                 .expect("should apply batch");
 
+            let mut batch = super::Batch::new(&drive);
+
             epoch
-                .update_proposer_block_count(&pro_tx_hash, 1)
+                .add_update_proposer_block_count_operations(&mut batch, &pro_tx_hash, 1)
                 .expect("should update proposer block count");
 
             // Apply proposer block count
             drive
-                .apply_current_batch(true, Some(&transaction))
+                .apply_batch(batch, false, Some(&transaction))
                 .expect("should apply batch");
 
+            let mut batch = super::Batch::new(&drive);
+
             epoch
-                .increment_proposer_block_count(&pro_tx_hash, Some(&transaction))
+                .add_increment_proposer_block_count_operations(
+                    &mut batch,
+                    &pro_tx_hash,
+                    Some(&transaction),
+                )
                 .expect("should update proposer block count");
 
             drive
-                .apply_current_batch(true, Some(&transaction))
+                .apply_batch(batch, false, Some(&transaction))
                 .expect("should apply batch");
 
             let stored_block_count = epoch
@@ -384,14 +419,18 @@ mod tests {
 
             let epoch = super::EpochPool::new(0, &drive);
 
-            epoch.init_proposers().expect("should init proposers");
+            let mut batch = super::Batch::new(&drive);
 
             epoch
-                .update_proposer_block_count(&pro_tx_hash, block_count)
+                .add_init_proposers_operations(&mut batch)
+                .expect("should init proposers");
+
+            epoch
+                .add_update_proposer_block_count_operations(&mut batch, &pro_tx_hash, block_count)
                 .expect("should update proposer block count");
 
             drive
-                .apply_current_batch(true, Some(&transaction))
+                .apply_batch(batch, false, Some(&transaction))
                 .expect("should apply batch");
 
             let result = epoch
@@ -403,6 +442,8 @@ mod tests {
     }
 
     mod delete_proposers_tree {
+        use crate::fee::pools::epoch::constants;
+
         #[test]
         fn test_values_has_been_deleted() {
             let drive = super::setup_drive();
@@ -410,33 +451,39 @@ mod tests {
 
             let epoch = super::EpochPool::new(0, &drive);
 
-            epoch.init_proposers().expect("should init proposers");
+            let mut batch = super::Batch::new(&drive);
+
+            epoch
+                .add_init_proposers_operations(&mut batch)
+                .expect("should init proposers");
 
             // Apply proposers tree
             drive
-                .apply_current_batch(true, Some(&transaction))
+                .apply_batch(batch, false, Some(&transaction))
                 .expect("should apply batch");
 
+            let mut batch = super::Batch::new(&drive);
+
             epoch
-                .delete_proposers_tree(Some(&transaction))
+                .add_delete_proposers_tree_operations(&mut batch, Some(&transaction))
                 .expect("should delete proposers");
 
             drive
-                .apply_current_batch(true, Some(&transaction))
+                .apply_batch(batch, false, Some(&transaction))
                 .expect("should apply batch");
 
             match drive
                 .grove
                 .get(
                     epoch.get_path(),
-                    super::constants::KEY_PROPOSERS.as_bytes(),
+                    constants::KEY_PROPOSERS.as_slice(),
                     Some(&transaction),
                 )
                 .unwrap()
             {
                 Ok(_) => assert!(false, "expect tree not exists"),
                 Err(e) => match e {
-                    super::Error::PathKeyNotFound(_) => assert!(true),
+                    grovedb::Error::PathKeyNotFound(_) => assert!(true),
                     _ => assert!(false, "invalid error type"),
                 },
             }
@@ -451,29 +498,35 @@ mod tests {
 
             let epoch = super::EpochPool::new(0, &drive);
 
-            epoch.init_proposers().expect("should init proposers");
+            let mut batch = super::Batch::new(&drive);
+
+            epoch
+                .add_init_proposers_operations(&mut batch)
+                .expect("should init proposers");
 
             // Apply proposers tree
             drive
-                .apply_current_batch(true, Some(&transaction))
+                .apply_batch(batch, false, Some(&transaction))
                 .expect("should apply batch");
 
             let pro_tx_hashes: Vec<[u8; 32]> = (0..10).map(|_| rand::random()).collect();
 
+            let mut batch = super::Batch::new(&drive);
+
             for pro_tx_hash in pro_tx_hashes.iter() {
                 epoch
-                    .update_proposer_block_count(pro_tx_hash, 1)
-                    .expect("to update block count");
+                    .add_update_proposer_block_count_operations(&mut batch, pro_tx_hash, 1)
+                    .expect("should update block count");
             }
 
             // Apply proposers block count updates
             drive
-                .apply_current_batch(true, Some(&transaction))
+                .apply_batch(batch, false, Some(&transaction))
                 .expect("should apply batch");
 
             let mut stored_proposers = epoch
                 .get_proposers(20, Some(&transaction))
-                .expect("to get proposers");
+                .expect("should get proposers");
 
             let mut awaited_result = pro_tx_hashes
                 .iter()
@@ -495,18 +548,24 @@ mod tests {
             awaited_result.remove(0);
             awaited_result.remove(1);
 
+            let mut batch = super::Batch::new(&drive);
+
             epoch
-                .delete_proposers(deleted_pro_tx_hashes, Some(&transaction))
-                .expect("to delete several proposers");
+                .add_delete_proposers_operations(
+                    &mut batch,
+                    deleted_pro_tx_hashes,
+                    Some(&transaction),
+                )
+                .expect("should delete several proposers");
 
             // Apply proposers deletion
             drive
-                .apply_current_batch(true, Some(&transaction))
+                .apply_batch(batch, false, Some(&transaction))
                 .expect("should apply batch");
 
             let stored_proposers = epoch
                 .get_proposers(20, Some(&transaction))
-                .expect("to get proposers");
+                .expect("should get proposers");
 
             let mut stored_hexes: Vec<String> = stored_proposers
                 .iter()

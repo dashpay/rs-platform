@@ -1,7 +1,7 @@
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 
-pub const KEY_STORAGE_FEE_POOL: &str = "s";
+pub const KEY_STORAGE_FEE_POOL: &[u8; 1] = b"s";
 
 #[rustfmt::skip]
 pub const FEE_DISTRIBUTION_TABLE: [Decimal; 50] = [

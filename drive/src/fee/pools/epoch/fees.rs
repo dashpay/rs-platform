@@ -17,7 +17,7 @@ impl<'e> EpochPool<'e> {
             .grove
             .get(
                 self.get_path(),
-                constants::KEY_STORAGE_FEE.as_bytes(),
+                constants::KEY_STORAGE_FEE.as_slice(),
                 transaction,
             )
             .unwrap()
@@ -42,7 +42,7 @@ impl<'e> EpochPool<'e> {
             .grove
             .get(
                 self.get_path(),
-                constants::KEY_PROCESSING_FEE.as_bytes(),
+                constants::KEY_PROCESSING_FEE.as_slice(),
                 transaction,
             )
             .unwrap()
@@ -69,7 +69,7 @@ impl<'e> EpochPool<'e> {
             .grove
             .get(
                 self.get_path(),
-                constants::KEY_FEE_MULTIPLIER.as_bytes(),
+                constants::KEY_FEE_MULTIPLIER.as_slice(),
                 transaction,
             )
             .unwrap()
@@ -90,57 +90,65 @@ impl<'e> EpochPool<'e> {
         }
     }
 
-    pub fn update_fee_multiplier(&self, batch: &mut Batch, multiplier: u64) -> Result<(), Error> {
+    pub fn add_update_fee_multiplier_operations(
+        &self,
+        batch: &mut Batch,
+        multiplier: u64,
+    ) -> Result<(), Error> {
         batch.insert(PathKeyElementInfo::PathFixedSizeKeyElement((
             self.get_path(),
-            constants::KEY_FEE_MULTIPLIER.as_bytes(),
+            constants::KEY_FEE_MULTIPLIER.as_slice(),
             Element::Item(multiplier.to_le_bytes().to_vec(), None),
         )))
     }
 
-    pub fn update_processing_fee(
+    pub fn add_update_processing_fee_operations(
         &self,
         batch: &mut Batch,
         processing_fee: u64,
     ) -> Result<(), Error> {
         batch.insert(PathKeyElementInfo::PathFixedSizeKeyElement((
             self.get_path(),
-            constants::KEY_PROCESSING_FEE.as_bytes(),
+            constants::KEY_PROCESSING_FEE.as_slice(),
             Element::Item(processing_fee.to_le_bytes().to_vec(), None),
         )))
     }
 
-    pub fn delete_processing_fee(
+    pub fn add_delete_processing_fee_operations(
         &self,
         batch: &mut Batch,
         transaction: TransactionArg,
     ) -> Result<(), Error> {
         batch.delete(
             self.get_path(),
-            constants::KEY_PROCESSING_FEE.as_bytes(),
+            constants::KEY_PROCESSING_FEE.as_slice(),
             false,
             transaction,
         )
     }
 
-    pub fn update_storage_fee(&self, batch: &mut Batch, storage_fee: Decimal) -> Result<(), Error> {
+    pub fn add_update_storage_fee_operations(
+        &self,
+        batch: &mut Batch,
+        storage_fee: Decimal,
+    ) -> Result<(), Error> {
         batch.insert(PathKeyElementInfo::PathFixedSizeKeyElement((
             self.get_path(),
-            constants::KEY_STORAGE_FEE.as_bytes(),
+            constants::KEY_STORAGE_FEE.as_slice(),
             Element::Item(storage_fee.serialize().to_vec(), None),
         )))?;
 
         Ok(())
     }
 
-    pub fn delete_storage_fee(
+    pub fn add_delete_storage_fee_operations(
         &self,
         batch: &mut Batch,
         transaction: TransactionArg,
     ) -> Result<(), Error> {
         batch.delete(
             self.get_path(),
-            constants::KEY_STORAGE_FEE.as_bytes(),
+            constants::KEY_STORAGE_FEE.as_slice(),
             false,
             transaction,
         )
@@ -159,6 +167,7 @@ impl<'e> EpochPool<'e> {
 
 #[cfg(test)]
 mod tests {
+    use crate::drive::storage::batch::Batch;
     use grovedb::Element;
     use rust_decimal::Decimal;
     use rust_decimal_macros::dec;
@@ -179,17 +188,21 @@ mod tests {
 
             let epoch = super::EpochPool::new(7000, &drive);
 
+            let mut batch = super::Batch::new(&drive);
+
             epoch
-                .update_storage_fee(super::dec!(42.0))
+                .add_update_storage_fee_operations(&mut batch, super::dec!(42.0))
                 .expect("should update storage fee");
 
-            match drive.apply_current_batch(true, Some(&transaction)) {
+            match drive.apply_batch(batch, false, Some(&transaction)) {
                 Ok(_) => assert!(
                     false,
                     "should not be able to update storage fee on uninit epoch pool"
                 ),
                 Err(e) => match e {
-                    super::error::Error::GroveDB(grovedb::Error::InvalidPath(_)) => assert!(true),
+                    super::error::Error::GroveDB(grovedb::Error::PathKeyNotFound(_)) => {
+                        assert!(true)
+                    }
                     _ => assert!(false, "invalid error type"),
                 },
             }
@@ -204,12 +217,14 @@ mod tests {
 
             let storage_fee = super::dec!(42.0);
 
+            let mut batch = super::Batch::new(&drive);
+
             epoch
-                .update_storage_fee(storage_fee)
+                .add_update_storage_fee_operations(&mut batch, storage_fee)
                 .expect("should update storage fee");
 
             drive
-                .apply_current_batch(true, Some(&transaction))
+                .apply_batch(batch, false, Some(&transaction))
                 .expect("should apply batch");
 
             let stored_storage_fee = epoch
@@ -251,7 +266,7 @@ mod tests {
                 .grove
                 .insert(
                     epoch.get_path(),
-                    super::constants::KEY_STORAGE_FEE.as_bytes(),
+                    super::constants::KEY_STORAGE_FEE.as_slice(),
                     super::Element::Item(f64::MAX.to_le_bytes().to_vec(), None),
                     Some(&transaction),
                 )
@@ -280,17 +295,21 @@ mod tests {
 
             let epoch = super::EpochPool::new(7000, &drive);
 
+            let mut batch = super::Batch::new(&drive);
+
             epoch
-                .update_processing_fee(42)
+                .add_update_processing_fee_operations(&mut batch, 42)
                 .expect("should update processing fee");
 
-            match drive.apply_current_batch(true, Some(&transaction)) {
+            match drive.apply_batch(batch, false, Some(&transaction)) {
                 Ok(_) => assert!(
                     false,
                     "should not be able to update processing fee on uninit epoch pool"
                 ),
                 Err(e) => match e {
-                    super::error::Error::GroveDB(grovedb::Error::InvalidPath(_)) => assert!(true),
+                    super::error::Error::GroveDB(grovedb::Error::PathKeyNotFound(_)) => {
+                        assert!(true)
+                    }
                     _ => assert!(false, "invalid error type"),
                 },
             }
@@ -305,12 +324,14 @@ mod tests {
 
             let processing_fee: u64 = 42;
 
+            let mut batch = super::Batch::new(&drive);
+
             epoch
-                .update_processing_fee(processing_fee)
+                .add_update_processing_fee_operations(&mut batch, processing_fee)
                 .expect("should update processing fee");
 
             drive
-                .apply_current_batch(true, Some(&transaction))
+                .apply_batch(batch, false, Some(&transaction))
                 .expect("should apply batch");
 
             let stored_processing_fee = epoch
@@ -333,7 +354,7 @@ mod tests {
                 .grove
                 .insert(
                     epoch.get_path(),
-                    super::constants::KEY_PROCESSING_FEE.as_bytes(),
+                    super::constants::KEY_PROCESSING_FEE.as_slice(),
                     super::Element::Item(u128::MAX.to_le_bytes().to_vec(), None),
                     Some(&transaction),
                 )
@@ -364,16 +385,18 @@ mod tests {
 
         let epoch = EpochPool::new(0, &drive);
 
+        let mut batch = super::Batch::new(&drive);
+
         epoch
-            .update_processing_fee(processing_fee)
+            .add_update_processing_fee_operations(&mut batch, processing_fee)
             .expect("should update processing fee");
 
         epoch
-            .update_storage_fee(storage_fee)
+            .add_update_storage_fee_operations(&mut batch, storage_fee)
             .expect("should update storage fee");
 
         drive
-            .apply_current_batch(true, Some(&transaction))
+            .apply_batch(batch, false, Some(&transaction))
             .expect("should apply batch");
 
         let combined_fee = epoch
@@ -416,7 +439,7 @@ mod tests {
                 .grove
                 .insert(
                     epoch.get_path(),
-                    super::constants::KEY_FEE_MULTIPLIER.as_bytes(),
+                    super::constants::KEY_FEE_MULTIPLIER.as_slice(),
                     super::Element::Item(u128::MAX.to_le_bytes().to_vec(), None),
                     Some(&transaction),
                 )
@@ -445,14 +468,18 @@ mod tests {
 
             let multiplier = 42;
 
-            epoch.init_empty().expect("should init empty pool");
+            let mut batch = super::Batch::new(&drive);
 
             epoch
-                .init_current(multiplier, 1, 1)
+                .add_init_empty_operations(&mut batch)
+                .expect("should init empty pool");
+
+            epoch
+                .add_init_current_operations(&mut batch, multiplier, 1, 1)
                 .expect("should init current");
 
             drive
-                .apply_current_batch(true, Some(&transaction))
+                .apply_batch(batch, false, Some(&transaction))
                 .expect("should apply batch");
 
             let stored_multiplier = epoch

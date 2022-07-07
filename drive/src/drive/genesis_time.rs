@@ -6,7 +6,7 @@ use crate::error::Error;
 use grovedb::{Element, TransactionArg};
 use std::array::TryFromSliceError;
 
-pub const KEY_GENESIS_TIME: &str = "g";
+const KEY_GENESIS_TIME: &[u8; 1] = b"g";
 
 impl Drive {
     pub fn get_genesis_time(&self, transaction: TransactionArg) -> Result<i64, Error> {
@@ -14,7 +14,7 @@ impl Drive {
             .grove
             .get(
                 [Into::<&[u8; 1]>::into(RootTree::SpentAssetLockTransactions).as_slice()],
-                KEY_GENESIS_TIME.as_bytes(),
+                KEY_GENESIS_TIME.as_slice(),
                 transaction,
             )
             .unwrap()
@@ -38,7 +38,7 @@ impl Drive {
     pub fn update_genesis_time(&self, batch: &mut Batch, genesis_time: i64) -> Result<(), Error> {
         batch.insert(PathKeyElementInfo::PathFixedSizeKeyElement((
             [Into::<&[u8; 1]>::into(RootTree::SpentAssetLockTransactions)],
-            KEY_GENESIS_TIME.as_bytes(),
+            KEY_GENESIS_TIME.as_slice(),
             Element::Item(genesis_time.to_le_bytes().to_vec(), None),
         )))?;
 
@@ -77,7 +77,7 @@ mod tests {
             let drive = super::setup_drive();
 
             drive
-                .apply_initial_state_structure(None)
+                .create_initial_state_structure(None)
                 .expect("expected to create root tree successfully");
 
             drive
@@ -87,7 +87,7 @@ mod tests {
                         Into::<&[u8; 1]>::into(super::RootTree::SpentAssetLockTransactions)
                             .as_slice(),
                     ],
-                    super::KEY_GENESIS_TIME.as_bytes(),
+                    super::KEY_GENESIS_TIME.as_slice(),
                     super::Element::Item(u128::MAX.to_le_bytes().to_vec(), None),
                     None,
                 )
@@ -109,23 +109,29 @@ mod tests {
     }
 
     mod update_genesis_time {
+        use crate::drive::storage::batch::Batch;
+
         #[test]
         fn test_error_if_fee_pools_is_not_initiated() {
             let drive = super::setup_drive();
 
             let genesis_time: i64 = 1655396517902;
 
+            let mut batch = Batch::new(&drive);
+
             drive
-                .update_genesis_time(genesis_time)
+                .update_genesis_time(&mut batch, genesis_time)
                 .expect("should update genesis time");
 
-            match drive.apply_current_batch(true, None) {
+            match drive.apply_batch(batch, false, None) {
                 Ok(_) => assert!(
                     false,
                     "should not be able to update genesis time on uninit fee pools"
                 ),
                 Err(e) => match e {
-                    super::error::Error::GroveDB(grovedb::Error::InvalidPath(_)) => assert!(true),
+                    super::error::Error::GroveDB(grovedb::Error::PathKeyNotFound(_)) => {
+                        assert!(true)
+                    }
                     _ => assert!(false, "invalid error type"),
                 },
             }
@@ -136,17 +142,19 @@ mod tests {
             let drive = super::setup_drive();
 
             drive
-                .apply_initial_state_structure(None)
+                .create_initial_state_structure(None)
                 .expect("expected to create root tree successfully");
 
             let genesis_time: i64 = 1655396517902;
 
+            let mut batch = Batch::new(&drive);
+
             drive
-                .update_genesis_time(genesis_time)
+                .update_genesis_time(&mut batch, genesis_time)
                 .expect("should update genesis time");
 
             drive
-                .apply_current_batch(true, None)
+                .apply_batch(batch, false, None)
                 .expect("should apply batch");
 
             let stored_genesis_time = drive

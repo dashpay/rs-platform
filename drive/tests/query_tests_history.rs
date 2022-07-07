@@ -128,7 +128,7 @@ pub fn setup(
     let db_transaction = drive.grove.start_transaction();
 
     drive
-        .apply_initial_state_structure(Some(&db_transaction))
+        .create_initial_state_structure(Some(&db_transaction))
         .expect("expected to create root tree successfully");
 
     // setup code
@@ -215,8 +215,8 @@ fn test_query_historical() {
     assert_eq!(
         root_hash.as_slice(),
         vec![
-            177, 211, 204, 211, 169, 28, 235, 135, 192, 9, 153, 66, 58, 244, 126, 185, 247, 63,
-            224, 247, 166, 94, 178, 232, 247, 228, 50, 66, 132, 179, 225, 177
+            198, 127, 183, 74, 176, 217, 222, 195, 173, 96, 175, 255, 88, 23, 232, 144, 44, 133,
+            244, 196, 76, 123, 1, 183, 59, 204, 153, 167, 41, 254, 136, 111
         ]
     );
 
@@ -1436,8 +1436,8 @@ fn test_query_historical() {
     assert_eq!(
         root_hash.as_slice(),
         vec![
-            253, 230, 214, 51, 247, 235, 33, 188, 192, 110, 182, 77, 221, 137, 89, 213, 97, 129,
-            201, 32, 1, 38, 236, 211, 228, 247, 168, 232, 171, 13, 161, 60
+            253, 153, 107, 249, 234, 110, 220, 116, 66, 199, 218, 86, 233, 173, 10, 81, 173, 227,
+            127, 228, 196, 233, 207, 149, 39, 223, 33, 119, 35, 14, 128, 163
         ]
     );
 }

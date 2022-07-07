@@ -1,18 +1,18 @@
 use crate::drive::flags::StorageFlags;
 use crate::drive::object_size_info::{KeyInfo, PathKeyElementInfo};
 use crate::drive::Drive;
-use crate::error::drive::DriveError;
 use crate::error::Error;
 use crate::fee::op::DriveOperation;
 use grovedb::TransactionArg;
 
 pub struct Batch<'d> {
-    pub drive: &'d Drive,
-    operations: Vec<DriveOperation>,
+    drive: &'d Drive,
+    pub operations: Vec<DriveOperation>,
 }
 
+// TODO: Move batch_* methods from grove operations to this structure so we can get rid of drive here
 impl<'d> Batch<'d> {
-    pub fn new(drive: &Drive) -> Self {
+    pub fn new(drive: &'d Drive) -> Self {
         Batch {
             drive,
             operations: Vec::new(),
@@ -43,6 +43,7 @@ impl<'d> Batch<'d> {
 
     pub fn delete<'c, P>(
         &mut self,
+        // TODO: Pass drive (storage eventually) here when we remove drive from the struct
         path: P,
         key: &'c [u8],
         only_delete_tree_if_empty: bool,
@@ -59,34 +60,5 @@ impl<'d> Batch<'d> {
             transaction,
             &mut self.operations,
         )
-    }
-
-    pub fn apply(mut self, validate: bool, transaction: TransactionArg) -> Result<(), Error> {
-        if self.operations.len() == 0 {
-            return Err(Error::Drive(DriveError::BatchIsEmpty()));
-        }
-
-        self.apply_if_not_empty(validate, transaction)
-    }
-
-    pub fn apply_if_not_empty(
-        mut self,
-        validate: bool,
-        transaction: TransactionArg,
-    ) -> Result<(), Error> {
-        if self.operations.len() == 0 {
-            return Err(Error::Drive(DriveError::BatchIsEmpty()));
-        }
-
-        let grovedb_operations = DriveOperation::grovedb_operations(&self.operations);
-
-        self.drive.grove_apply_batch(
-            grovedb_operations,
-            validate,
-            transaction,
-            &mut self.operations,
-        )?;
-
-        Ok(())
     }
 }

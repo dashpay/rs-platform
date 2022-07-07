@@ -19,7 +19,7 @@ pub fn init_chain(
     _request: InitChainRequest,
     transaction: TransactionArg,
 ) -> Result<InitChainResponse, Error> {
-    drive.apply_initial_state_structure(transaction)?;
+    drive.create_initial_state_structure(transaction)?;
 
     let response = InitChainResponse {};
 
@@ -37,7 +37,7 @@ pub fn block_begin(
 
         drive.update_genesis_time(&mut batch, request.block_time)?;
 
-        batch.apply(false, transaction)?;
+        drive.apply_batch(batch, false, transaction)?;
 
         request.block_time
     } else {
@@ -85,7 +85,7 @@ pub fn block_end(
     };
 
     // Process fees
-    let (masternodes_paid_count, paid_epoch_index) = drive.fee_pools.borrow().process_block_fees(
+    let distribution_info = drive.fee_pools.process_block_fees(
         drive,
         &block_execution_context.block_info,
         &block_execution_context.epoch_info,
@@ -94,9 +94,10 @@ pub fn block_end(
     )?;
 
     let response = BlockEndResponse {
-        epoch_info: block_execution_context.epoch_info.clone(),
-        masternodes_paid_count,
-        paid_epoch_index,
+        current_epoch_index: block_execution_context.epoch_info.current_epoch_index,
+        is_epoch_change: block_execution_context.epoch_info.is_epoch_change,
+        masternodes_paid_count: distribution_info.masternodes_paid_count,
+        paid_epoch_index: distribution_info.paid_epoch_index,
     };
 
     Ok(response)
@@ -106,23 +107,18 @@ pub fn block_end(
 mod tests {
     mod handlers {
         use chrono::{Duration, Utc};
-        use rand::prelude::SliceRandom;
 
-        use crate::drive::storage::batch::Batch;
+        use crate::fee::pools::tests::helpers::fee_pools::create_masternode_identities;
         use crate::{
             drive::abci::{
                 handlers::{block_begin, block_end, init_chain},
                 messages::{BlockBeginRequest, BlockEndRequest, Fees, InitChainRequest},
             },
-            fee::pools::{
-                epoch::epoch_pool::EpochPool,
-                tests::helpers::{
-                    fee_pools::{
-                        create_mn_shares_contract, populate_proposers,
-                        setup_identities_with_share_documents,
-                    },
-                    setup::{setup_drive, setup_fee_pools},
+            fee::pools::tests::helpers::{
+                fee_pools::{
+                    create_masternode_share_identities_and_documents, create_mn_shares_contract,
                 },
+                setup::{setup_drive, setup_fee_pools},
             },
         };
 
@@ -134,51 +130,44 @@ mod tests {
             // init chain
             let init_chain_request = InitChainRequest {};
 
-            init_chain(&drive, init_chain_request, Some(&transaction)).expect("to init chain");
+            init_chain(&drive, init_chain_request, Some(&transaction)).expect("should init chain");
 
             // setup the contract
             let contract = create_mn_shares_contract(&drive, Some(&transaction));
 
-            // setup proposers and mn share documents
-            let epoch_pool = EpochPool::new(0, &drive);
+            let genesis_time = Utc::now();
 
-            let mut batch = Batch::new(&drive);
+            let total_days = 22;
 
-            epoch_pool
-                .init_proposers(&mut batch)
-                .expect("to init proposers");
+            let epoch_1_start_day = 20;
 
-            batch
-                .apply(false, Some(&transaction))
-                .expect("should apply a batch");
+            let proposers_count = total_days;
 
-            let proposer_tx_hashes = populate_proposers(&epoch_pool, 2, Some(&transaction));
+            let storage_fees_per_block = 42000;
 
-            let identity_and_document_pairs = setup_identities_with_share_documents(
+            // and create masternode identities
+            let proposers =
+                create_masternode_identities(&drive, proposers_count, Some(&transaction));
+
+            create_masternode_share_identities_and_documents(
                 &drive,
                 &contract,
-                &proposer_tx_hashes,
+                &proposers,
                 Some(&transaction),
             );
 
-            drive
-                .apply_current_batch(false, Some(&transaction))
-                .expect("to apply a batch");
-
-            let genesis_time = Utc::now();
-
             // process blocks
-            for day in 1..=20 {
+            for day in 1..=total_days {
                 let block_time = if day == 1 {
                     genesis_time
                 } else {
-                    genesis_time + Duration::days(day - 1)
+                    genesis_time + Duration::days(day as i64 - 1)
                 };
 
                 let previous_block_time = if day == 1 {
                     None
                 } else {
-                    Some((genesis_time + Duration::days(day - 2)).timestamp_millis())
+                    Some((genesis_time + Duration::days(day as i64 - 2)).timestamp_millis())
                 };
 
                 let block_height = day as u64;
@@ -188,52 +177,65 @@ mod tests {
                     block_height,
                     block_time: block_time.timestamp_millis(),
                     previous_block_time,
-                    proposer_pro_tx_hash: *proposer_tx_hashes
-                        .choose(&mut rand::thread_rng())
-                        .unwrap(),
+                    proposer_pro_tx_hash: proposers[day as usize - 1],
                 };
 
                 block_begin(&drive, block_begin_request, Some(&transaction))
-                    .expect(format!("to begin process block #{}", day).as_str());
+                    .expect(format!("should begin process block #{}", day).as_str());
 
                 let block_end_request = BlockEndRequest {
                     fees: Fees {
                         processing_fees: 1600,
-                        storage_fees: 42000,
-                        fee_multiplier: 1,
+                        storage_fees: storage_fees_per_block,
+                        fee_multiplier: 2,
                     },
                 };
 
                 let block_end_response = block_end(&drive, block_end_request, Some(&transaction))
-                    .expect(format!("to begin process block #{}", day).as_str());
+                    .expect(format!("should end process block #{}", day).as_str());
 
-                let epoch_index = if day >= 20 { 1 } else { 0 };
+                // Should calculate correct current epoch
+                let epoch_index = if day >= epoch_1_start_day { 1 } else { 0 };
 
-                assert_eq!(
-                    block_end_response.epoch_info.current_epoch_index,
-                    epoch_index
-                );
+                assert_eq!(block_end_response.current_epoch_index, epoch_index);
 
                 assert_eq!(
-                    block_end_response.epoch_info.is_epoch_change,
-                    previous_block_time.is_none() || day == 20
+                    block_end_response.is_epoch_change,
+                    previous_block_time.is_none() || day == epoch_1_start_day
                 );
 
-                let masternodes_paid_count = if day == 20 { 2 } else { 0 };
+                // Should pay to 19 masternodes, when epoch 1 started
+                let masternodes_paid_count = if day == epoch_1_start_day {
+                    day as u16 - 1
+                } else {
+                    0
+                };
 
                 assert_eq!(
                     block_end_response.masternodes_paid_count,
                     masternodes_paid_count
                 );
+
+                // Should pay for the epoch 0, when epoch 1 started
+                match block_end_response.paid_epoch_index {
+                    Some(index) => assert_eq!(
+                        index, 0,
+                        "should pay to masternodes only when epoch 1 started"
+                    ),
+                    None => assert_ne!(
+                        day, epoch_1_start_day,
+                        "should pay to masternodes only when epoch 1 started"
+                    ),
+                }
             }
 
             let storage_fee_pool_value = fee_pools
-                .storage_fee_distribution_pool
-                .value(&drive, Some(&transaction))
-                .expect("to get storage fee pool");
+                .get_storage_fee_distribution_pool_fees(&drive, Some(&transaction))
+                .expect("should get storage fee pool");
 
             assert_eq!(
-                storage_fee_pool_value, 42000,
+                storage_fee_pool_value,
+                storage_fees_per_block * (total_days - epoch_1_start_day + 1) as i64,
                 "should contain only storage fees from the last block"
             );
         }

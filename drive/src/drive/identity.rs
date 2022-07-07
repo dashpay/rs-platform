@@ -16,10 +16,10 @@ use crate::fee::op::DriveOperation;
 const IDENTITY_KEY: [u8; 1] = [0];
 
 impl Drive {
-    pub fn insert_identity_operations(
+    pub fn add_insert_identity_operations(
         &self,
+        batch: &mut Batch,
         identity: Identity,
-        drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<(), Error> {
         let block_execution_context = self.block_execution_context.borrow();
         let epoch = match block_execution_context.deref() {
@@ -37,21 +37,17 @@ impl Drive {
 
         let identities_tree_key = Into::<&[u8; 1]>::into(RootTree::Identities).as_slice();
 
-        self.batch_insert_empty_tree(
+        batch.insert_empty_tree(
             [identities_tree_key],
             KeyInfo::KeyRef(&identity.id.buffer),
             Some(&storage_flags),
-            drive_operations,
         )?;
 
-        self.batch_insert(
-            PathFixedSizeKeyElement((
-                [identities_tree_key, &identity.id.buffer],
-                &IDENTITY_KEY,
-                Element::Item(identity_bytes, storage_flags.to_element_flags()),
-            )),
-            drive_operations,
-        )
+        batch.insert(PathFixedSizeKeyElement((
+            [identities_tree_key, &identity.id.buffer],
+            &IDENTITY_KEY,
+            Element::Item(identity_bytes, storage_flags.to_element_flags()),
+        )))
     }
 
     pub fn insert_identity(
@@ -60,13 +56,13 @@ impl Drive {
         apply: bool,
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
-        let mut operations_batch: Vec<DriveOperation> = vec![];
+        let mut batch = Batch::new(self);
 
-        self.insert_identity_operations(identity, &mut operations_batch)?;
+        self.add_insert_identity_operations(&mut batch, identity)?;
 
         let mut drive_operations: Vec<DriveOperation> = vec![];
 
-        self.apply_batch(apply, transaction, operations_batch, &mut drive_operations)?;
+        self.apply_batch_operations(apply, transaction, batch.operations, &mut drive_operations)?;
 
         calculate_fee(None, Some(drive_operations))
     }
@@ -115,7 +111,7 @@ mod tests {
         let transaction = drive.grove.start_transaction();
 
         drive
-            .apply_initial_state_structure(Some(&transaction))
+            .create_initial_state_structure(Some(&transaction))
             .expect("expected to create root tree successfully");
 
         let identity_bytes = hex::decode("01000000a462696458203012c19b98ec0033addb36cd64b7f510670f2a351a4304b5f6994144286efdac6762616c616e636500687265766973696f6e006a7075626c69634b65797381a6626964006464617461582102abb64674c5df796559eb3cf92a84525cc1a6068e7ad9d4ff48a1f0b179ae29e164747970650067707572706f73650068726561644f6e6c79f46d73656375726974794c6576656c00").expect("expected to decode identity hex");

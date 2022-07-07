@@ -12,16 +12,16 @@ use crate::fee::pools::fee_pools::FeePools;
 
 use super::constants;
 
-pub struct StorageFeeDistributionPool {}
-
-impl StorageFeeDistributionPool {
-    pub fn distribute(
+impl FeePools {
+    pub fn distribute_storage_fee_distribution_pool(
         &self,
+        drive: &Drive,
         batch: &mut Batch,
         epoch_index: u16,
         transaction: TransactionArg,
     ) -> Result<(), Error> {
-        let storage_distribution_fees = self.value(batch.drive, transaction)?;
+        let storage_distribution_fees =
+            self.get_storage_fee_distribution_pool_fees(drive, transaction)?;
         let storage_distribution_fees = Decimal::new(storage_distribution_fees, 0);
 
         // a separate buffer from which we withdraw to correctly calculate fee share
@@ -40,11 +40,12 @@ impl StorageFeeDistributionPool {
             let starting_epoch_index = epoch_index + year * 20;
 
             for index in starting_epoch_index..starting_epoch_index + 20 {
-                let epoch_pool = EpochPool::new(index, batch.drive);
+                let epoch_pool = EpochPool::new(index, drive);
 
                 let storage_fee = epoch_pool.get_storage_fee(transaction)?;
 
-                epoch_pool.update_storage_fee(batch, storage_fee + epoch_fee_share)?;
+                epoch_pool
+                    .add_update_storage_fee_operations(batch, storage_fee + epoch_fee_share)?;
 
                 storage_distribution_fees_buffer -= epoch_fee_share;
             }
@@ -57,25 +58,36 @@ impl StorageFeeDistributionPool {
                 ))
             })?;
 
-        self.update(batch, storage_distribution_fees_buffer)?;
+        self.add_update_storage_fee_distribution_pool_operations(
+            batch,
+            storage_distribution_fees_buffer,
+        )?;
 
         Ok(())
     }
 
-    pub fn update(&self, batch: &mut Batch, storage_fee: i64) -> Result<(), Error> {
+    pub fn add_update_storage_fee_distribution_pool_operations(
+        &self,
+        batch: &mut Batch,
+        storage_fee: i64,
+    ) -> Result<(), Error> {
         batch.insert(PathKeyElementInfo::PathFixedSizeKeyElement((
             FeePools::get_path(),
-            constants::KEY_STORAGE_FEE_POOL.as_bytes(),
+            constants::KEY_STORAGE_FEE_POOL.as_slice(),
             Element::Item(storage_fee.to_le_bytes().to_vec(), None),
         )))
     }
 
-    pub fn value(&self, drive: &Drive, transaction: TransactionArg) -> Result<i64, Error> {
+    pub fn get_storage_fee_distribution_pool_fees(
+        &self,
+        drive: &Drive,
+        transaction: TransactionArg,
+    ) -> Result<i64, Error> {
         let element = drive
             .grove
             .get(
                 FeePools::get_path(),
-                constants::KEY_STORAGE_FEE_POOL.as_bytes(),
+                constants::KEY_STORAGE_FEE_POOL.as_slice(),
                 transaction,
             )
             .unwrap()
@@ -109,6 +121,8 @@ mod tests {
     };
     use grovedb::Element;
 
+    use crate::drive::storage::batch::Batch;
+
     mod helpers {
         use crate::drive::Drive;
         use crate::fee::pools::epoch::epoch_pool::EpochPool;
@@ -131,7 +145,9 @@ mod tests {
         }
     }
 
-    mod distribute {
+    mod distribute_storage_fee_distribution_pool {
+        use crate::error::drive::DriveError;
+        use crate::error::Error;
         use rust_decimal::Decimal;
         use rust_decimal_macros::dec;
 
@@ -148,14 +164,24 @@ mod tests {
 
             // Storage fee distribution pool is 0 after fee pools initialization
 
+            let mut batch = super::Batch::new(&drive);
+
             fee_pools
-                .storage_fee_distribution_pool
-                .distribute(&drive, epoch_index, Some(&transaction))
+                .distribute_storage_fee_distribution_pool(
+                    &drive,
+                    &mut batch,
+                    epoch_index,
+                    Some(&transaction),
+                )
                 .expect("should distribute storage fee pool");
 
-            drive
-                .apply_current_batch(false, Some(&transaction))
-                .expect("to apply the batch");
+            match drive.apply_batch(batch, false, Some(&transaction)) {
+                Ok(()) => assert!(false, "should return BatchIsEmpty error"),
+                Err(e) => match e {
+                    Error::Drive(DriveError::BatchIsEmpty()) => assert!(true),
+                    _ => assert!(false, "invalid error type"),
+                },
+            }
 
             let storage_fees =
                 helpers::get_storage_fees_from_epoch_pools(&drive, epoch_index, Some(&transaction));
@@ -173,29 +199,35 @@ mod tests {
             let storage_pool = i64::MAX;
             let epoch_index = 0;
 
+            let mut batch = super::Batch::new(&drive);
+
             fee_pools
-                .storage_fee_distribution_pool
-                .update(&drive, storage_pool)
+                .add_update_storage_fee_distribution_pool_operations(&mut batch, storage_pool)
                 .expect("should update storage fee pool");
 
             // Apply storage fee distribution pool update
             drive
-                .apply_current_batch(true, Some(&transaction))
+                .apply_batch(batch, false, Some(&transaction))
                 .expect("should apply batch");
 
+            let mut batch = super::Batch::new(&drive);
+
             fee_pools
-                .storage_fee_distribution_pool
-                .distribute(&drive, epoch_index, Some(&transaction))
+                .distribute_storage_fee_distribution_pool(
+                    &drive,
+                    &mut batch,
+                    epoch_index,
+                    Some(&transaction),
+                )
                 .expect("should distribute storage fee pool");
 
             drive
-                .apply_current_batch(true, Some(&transaction))
+                .apply_batch(batch, false, Some(&transaction))
                 .expect("should apply batch");
 
             // check leftover
             let storage_fee_pool_leftover = fee_pools
-                .storage_fee_distribution_pool
-                .value(&drive, Some(&transaction))
+                .get_storage_fee_distribution_pool_fees(&drive, Some(&transaction))
                 .expect("should get storage fee pool");
 
             assert_eq!(storage_fee_pool_leftover, 0);
@@ -209,37 +241,43 @@ mod tests {
             let storage_pool = 1000;
             let epoch_index = 42;
 
+            let mut batch = super::Batch::new(&drive);
+
             // init additional epoch pools as it will be done in epoch_change
             for i in 1000..=1000 + epoch_index {
                 let epoch = EpochPool::new(i, &drive);
                 epoch
-                    .init_empty()
+                    .add_init_empty_operations(&mut batch)
                     .expect("should init additional epoch pool");
             }
 
             fee_pools
-                .storage_fee_distribution_pool
-                .update(&drive, storage_pool)
+                .add_update_storage_fee_distribution_pool_operations(&mut batch, storage_pool)
                 .expect("should update storage fee pool");
 
             // Apply storage fee distribution pool update
             drive
-                .apply_current_batch(true, Some(&transaction))
+                .apply_batch(batch, false, Some(&transaction))
                 .expect("should apply batch");
 
+            let mut batch = super::Batch::new(&drive);
+
             fee_pools
-                .storage_fee_distribution_pool
-                .distribute(&drive, epoch_index, Some(&transaction))
+                .distribute_storage_fee_distribution_pool(
+                    &drive,
+                    &mut batch,
+                    epoch_index,
+                    Some(&transaction),
+                )
                 .expect("should distribute storage fee pool");
 
             drive
-                .apply_current_batch(true, Some(&transaction))
+                .apply_batch(batch, false, Some(&transaction))
                 .expect("should apply batch");
 
             // check leftover
             let storage_fee_pool_leftover = fee_pools
-                .storage_fee_distribution_pool
-                .value(&drive, Some(&transaction))
+                .get_storage_fee_distribution_pool_fees(&drive, Some(&transaction))
                 .expect("should get storage fee pool");
 
             assert_eq!(storage_fee_pool_leftover, 0);
@@ -361,25 +399,32 @@ mod tests {
 
              */
 
+            let mut batch = super::Batch::new(&drive);
+
             // refill storage fee pool once more
             fee_pools
-                .storage_fee_distribution_pool
-                .update(&drive, storage_pool)
+                .add_update_storage_fee_distribution_pool_operations(&mut batch, storage_pool)
                 .expect("should update storage fee pool");
 
             // Apply storage fee distribution pool update
             drive
-                .apply_current_batch(true, Some(&transaction))
+                .apply_batch(batch, false, Some(&transaction))
                 .expect("should apply batch");
+
+            let mut batch = super::Batch::new(&drive);
 
             // distribute fees once more
             fee_pools
-                .storage_fee_distribution_pool
-                .distribute(&drive, epoch_index, Some(&transaction))
+                .distribute_storage_fee_distribution_pool(
+                    &drive,
+                    &mut batch,
+                    epoch_index,
+                    Some(&transaction),
+                )
                 .expect("should distribute storage fee pool");
 
             drive
-                .apply_current_batch(true, Some(&transaction))
+                .apply_batch(batch, false, Some(&transaction))
                 .expect("should apply batch");
 
             // collect all the storage fee values of the 1000 epoch pools again
@@ -397,7 +442,7 @@ mod tests {
         }
     }
 
-    mod update {
+    mod update_storage_fee_distribution_pool {
         #[test]
         fn test_error_if_pool_is_not_initiated() {
             let drive = super::setup_drive();
@@ -410,18 +455,21 @@ mod tests {
 
             let storage_fee = 42;
 
+            let mut batch = super::Batch::new(&drive);
+
             fee_pools
-                .storage_fee_distribution_pool
-                .update(&drive, storage_fee)
+                .add_update_storage_fee_distribution_pool_operations(&mut batch, storage_fee)
                 .expect("should update storage fee distribution pool");
 
-            match drive.apply_current_batch(true, Some(&transaction)) {
+            match drive.apply_batch(batch, false, Some(&transaction)) {
                 Ok(_) => assert!(
                     false,
                     "should not be able to update genesis time on uninit fee pools"
                 ),
                 Err(e) => match e {
-                    super::error::Error::GroveDB(grovedb::Error::InvalidPath(_)) => assert!(true),
+                    super::error::Error::GroveDB(grovedb::Error::PathKeyNotFound(_)) => {
+                        assert!(true)
+                    }
                     _ => assert!(false, "invalid error type"),
                 },
             }
@@ -434,25 +482,25 @@ mod tests {
 
             let storage_fee = 42;
 
+            let mut batch = super::Batch::new(&drive);
+
             fee_pools
-                .storage_fee_distribution_pool
-                .update(&drive, storage_fee)
+                .add_update_storage_fee_distribution_pool_operations(&mut batch, storage_fee)
                 .expect("should update storage fee pool");
 
             drive
-                .apply_current_batch(true, Some(&transaction))
+                .apply_batch(batch, false, Some(&transaction))
                 .expect("should apply batch");
 
             let stored_storage_fee = fee_pools
-                .storage_fee_distribution_pool
-                .value(&drive, Some(&transaction))
+                .get_storage_fee_distribution_pool_fees(&drive, Some(&transaction))
                 .expect("should get storage fee pool");
 
             assert_eq!(storage_fee, stored_storage_fee);
         }
     }
 
-    mod value {
+    mod get_storage_fee_distribution_pool_fees {
         #[test]
         fn test_error_if_pool_is_not_initiated() {
             let drive = super::setup_drive();
@@ -463,10 +511,7 @@ mod tests {
                 }),
             );
 
-            match fee_pools
-                .storage_fee_distribution_pool
-                .value(&drive, Some(&transaction))
-            {
+            match fee_pools.get_storage_fee_distribution_pool_fees(&drive, Some(&transaction)) {
                 Ok(_) => assert!(
                     false,
                     "should not be able to get genesis time on uninit fee pools"
@@ -483,22 +528,21 @@ mod tests {
             let drive = super::setup_drive();
             let (transaction, fee_pools) = super::setup_fee_pools(&drive, None);
 
-            drive
-                .current_batch_insert(super::PathKeyElementInfo::PathFixedSizeKeyElement((
+            let mut batch = super::Batch::new(&drive);
+
+            batch
+                .insert(super::PathKeyElementInfo::PathFixedSizeKeyElement((
                     super::FeePools::get_path(),
-                    super::constants::KEY_STORAGE_FEE_POOL.as_bytes(),
+                    super::constants::KEY_STORAGE_FEE_POOL.as_slice(),
                     super::Element::Item(u128::MAX.to_le_bytes().to_vec(), None),
                 )))
                 .expect("should insert invalid data");
 
             drive
-                .apply_current_batch(true, Some(&transaction))
+                .apply_batch(batch, false, Some(&transaction))
                 .expect("should apply batch");
 
-            match fee_pools
-                .storage_fee_distribution_pool
-                .value(&drive, Some(&transaction))
-            {
+            match fee_pools.get_storage_fee_distribution_pool_fees(&drive, Some(&transaction)) {
                 Ok(_) => assert!(false, "should not be able to decode stored value"),
                 Err(e) => match e {
                     super::error::Error::Fee(

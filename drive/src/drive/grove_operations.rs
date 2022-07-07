@@ -13,6 +13,7 @@ use crate::drive::object_size_info::PathKeyInfo::{
     PathFixedSizeKey, PathFixedSizeKeyRef, PathKey, PathKeyRef, PathKeySize,
 };
 use crate::drive::object_size_info::{KeyInfo, KeyValueInfo, PathKeyElementInfo, PathKeyInfo};
+use crate::drive::storage::batch::Batch;
 use crate::drive::Drive;
 use crate::error;
 use crate::error::drive::DriveError;
@@ -775,10 +776,10 @@ impl Drive {
         drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<(), Error> {
         if self.config.batching_enabled {
-            //println!("batch {:#?}", ops);
+            // println!("batch {:#?}", ops);
             let consistency_results = GroveDbOp::verify_consistency_of_operations(&ops);
             if !consistency_results.is_empty() {
-                //println!("results {:#?}", consistency_results);
+                // println!("results {:#?}", consistency_results);
                 return Err(Error::Drive(DriveError::GroveDBInsertion(
                     "insertion order error",
                 )));
@@ -838,5 +839,36 @@ impl Drive {
             }),
         );
         push_drive_operation_result(cost_context, drive_operations)
+    }
+
+    pub fn apply_batch(
+        &self,
+        mut batch: Batch,
+        validate: bool,
+        transaction: TransactionArg,
+    ) -> Result<(), Error> {
+        if batch.operations.len() == 0 {
+            return Err(Error::Drive(DriveError::BatchIsEmpty()));
+        }
+
+        self.apply_if_not_empty(batch, validate, transaction)
+    }
+
+    pub fn apply_if_not_empty(
+        &self,
+        mut batch: Batch,
+        validate: bool,
+        transaction: TransactionArg,
+    ) -> Result<(), Error> {
+        let grovedb_operations = DriveOperation::grovedb_operations(&batch.operations);
+
+        self.grove_apply_batch(
+            grovedb_operations,
+            validate,
+            transaction,
+            &mut batch.operations,
+        )?;
+
+        Ok(())
     }
 }

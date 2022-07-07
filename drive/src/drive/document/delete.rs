@@ -199,7 +199,7 @@ impl Drive {
                 )?;
             }
         }
-        self.apply_batch(apply, transaction, batch_operations, drive_operations)
+        self.apply_batch_operations(apply, transaction, batch_operations, drive_operations)
     }
 }
 
@@ -228,7 +228,7 @@ mod tests {
         let drive: Drive = Drive::open(tmp_dir, None).expect("expected to open Drive successfully");
 
         drive
-            .apply_initial_state_structure(None)
+            .create_initial_state_structure(None)
             .expect("expected to create root tree successfully");
 
         let contract = setup_contract(
@@ -319,7 +319,7 @@ mod tests {
         let db_transaction = drive.grove.start_transaction();
 
         drive
-            .apply_initial_state_structure(Some(&db_transaction))
+            .create_initial_state_structure(Some(&db_transaction))
             .expect("expected to create root tree successfully");
 
         let contract = setup_contract(
@@ -426,7 +426,7 @@ mod tests {
         let db_transaction = drive.grove.start_transaction();
 
         drive
-            .apply_initial_state_structure(Some(&db_transaction))
+            .create_initial_state_structure(Some(&db_transaction))
             .expect("expected to create root tree successfully");
 
         let contract = setup_contract(
@@ -599,7 +599,7 @@ mod tests {
         let db_transaction = drive.grove.start_transaction();
 
         drive
-            .apply_initial_state_structure(Some(&db_transaction))
+            .create_initial_state_structure(Some(&db_transaction))
             .expect("expected to create root tree successfully");
 
         let contract = setup_contract(
@@ -849,7 +849,7 @@ mod tests {
         let db_transaction = drive.grove.start_transaction();
 
         drive
-            .apply_initial_state_structure(Some(&db_transaction))
+            .create_initial_state_structure(Some(&db_transaction))
             .expect("expected to create root tree successfully");
 
         let contract = setup_contract(
@@ -902,7 +902,7 @@ mod tests {
         let db_transaction = drive.grove.start_transaction();
 
         drive
-            .apply_initial_state_structure(Some(&db_transaction))
+            .create_initial_state_structure(Some(&db_transaction))
             .expect("expected to create root tree successfully");
 
         let contract = setup_contract_from_hex(

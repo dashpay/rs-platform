@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::path::Path;
 use std::sync::Arc;
 
-use grovedb::{Element, GroveDb, Transaction, TransactionArg};
+use grovedb::{GroveDb, Transaction, TransactionArg};
 use moka::sync::Cache;
 
 use object_size_info::DocumentAndContractInfo;
@@ -14,7 +14,6 @@ use crate::drive::config::DriveConfig;
 use crate::drive::object_size_info::KeyInfo;
 use crate::drive::storage::batch::Batch;
 use crate::error::Error;
-use crate::fee::epoch::EpochInfo;
 use crate::fee::op::DriveOperation;
 use crate::fee::op::DriveOperation::GroveOperation;
 use crate::fee::pools::fee_pools::FeePools;
@@ -36,9 +35,8 @@ pub mod storage;
 pub struct Drive {
     pub grove: GroveDb,
     pub config: DriveConfig,
-    pub fee_pools: RefCell<FeePools>,
+    pub fee_pools: FeePools,
     pub cached_contracts: RefCell<Cache<[u8; 32], Arc<Contract>>>, //HashMap<[u8; 32], Rc<Contract>>>,
-    pub current_batch: RefCell<Vec<DriveOperation>>,
     pub block_execution_context: RefCell<Option<BlockExecutionContext>>,
 }
 
@@ -93,8 +91,7 @@ impl Drive {
                 grove,
                 config: config.unwrap_or_default(),
                 cached_contracts: RefCell::new(Cache::new(200)),
-                fee_pools: RefCell::new(FeePools::new()),
-                current_batch: RefCell::new(Vec::new()),
+                fee_pools: FeePools::new(),
                 block_execution_context: RefCell::new(None),
             }),
             Err(e) => Err(Error::GroveDB(e)),
@@ -132,7 +129,7 @@ impl Drive {
         }
     }
 
-    pub fn apply_initial_state_structure(&self, transaction: TransactionArg) -> Result<(), Error> {
+    pub fn create_initial_state_structure(&self, transaction: TransactionArg) -> Result<(), Error> {
         let mut batch = Batch::new(self);
 
         batch.insert_empty_tree(
@@ -162,14 +159,15 @@ impl Drive {
         )?;
 
         // initialize the pools with epochs
-        self.fee_pools.borrow().create_fee_pool_trees(&mut batch)?;
+        self.fee_pools
+            .add_create_fee_pool_trees_operations(self, &mut batch)?;
 
-        batch.apply(false, transaction)?;
+        self.apply_batch(batch, false, transaction)?;
 
         Ok(())
     }
 
-    fn apply_batch(
+    fn apply_batch_operations(
         &self,
         apply: bool,
         transaction: TransactionArg,

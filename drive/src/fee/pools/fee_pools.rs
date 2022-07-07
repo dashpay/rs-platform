@@ -5,15 +5,17 @@ use crate::drive::block::BlockInfo;
 use crate::drive::object_size_info::{KeyInfo, PathKeyElementInfo};
 use crate::drive::storage::batch::Batch;
 use crate::drive::{Drive, RootTree};
+use crate::error::fee::FeeError;
 use crate::error::Error;
 use crate::fee::epoch::EpochInfo;
-use crate::fee::pools::storage_fee_distribution_pool::StorageFeeDistributionPool;
+use crate::fee::pools::fee_distribution::DistributionInfo;
 
 use super::constants;
 use super::epoch::epoch_pool::EpochPool;
 
 pub struct FeePools {
-    pub storage_fee_distribution_pool: StorageFeeDistributionPool,
+    // TODO: Accept storage (which incapsulates grove_operations) to share it with all methods
+    // TODO: Accept identities struct to use in specific methods
 }
 
 impl Default for FeePools {
@@ -24,38 +26,41 @@ impl Default for FeePools {
 
 impl FeePools {
     pub fn new() -> FeePools {
-        FeePools {
-            storage_fee_distribution_pool: StorageFeeDistributionPool {},
-        }
+        FeePools {}
     }
 
     pub fn get_path<'a>() -> [&'a [u8]; 1] {
         [Into::<&[u8; 1]>::into(RootTree::Pools)]
     }
 
-    pub fn create_fee_pool_trees(&self, batch: &mut Batch) -> Result<(), Error> {
+    pub fn add_create_fee_pool_trees_operations(
+        &self,
+        drive: &Drive,
+        batch: &mut Batch,
+    ) -> Result<(), Error> {
         // init fee pool subtree
         batch.insert_empty_tree([], KeyInfo::KeyRef(FeePools::get_path()[0]), None)?;
 
         // Update storage credit pool
         batch.insert(PathKeyElementInfo::PathFixedSizeKeyElement((
             FeePools::get_path(),
-            constants::KEY_STORAGE_FEE_POOL.as_bytes(),
+            constants::KEY_STORAGE_FEE_POOL.as_slice(),
             Element::Item(0i64.to_le_bytes().to_vec(), None),
         )))?;
 
         // We need to insert 50 years worth of epochs,
         // with 20 epochs per year that's 1000 epochs
         for i in 0..1000 {
-            let epoch = EpochPool::new(i, batch.drive);
-            epoch.init_empty(batch)?;
+            let epoch = EpochPool::new(i, drive);
+            epoch.add_init_empty_operations(batch)?;
         }
 
         Ok(())
     }
 
-    pub fn shift_current_epoch_pool(
+    pub fn add_shift_current_epoch_pool_operations(
         &self,
+        drive: &Drive,
         batch: &mut Batch,
         current_epoch_pool: &EpochPool,
         start_block_height: u64,
@@ -63,11 +68,11 @@ impl FeePools {
         fee_multiplier: u64,
     ) -> Result<(), Error> {
         // create and init next thousandth epoch
-        let next_thousandth_epoch = EpochPool::new(current_epoch_pool.index + 1000, batch.drive);
-        next_thousandth_epoch.init_empty(batch)?;
+        let next_thousandth_epoch = EpochPool::new(current_epoch_pool.index + 1000, drive);
+        next_thousandth_epoch.add_init_empty_operations(batch)?;
 
         // init first_proposer_block_height and processing_fee for an epoch
-        current_epoch_pool.init_current(
+        current_epoch_pool.add_init_current_operations(
             batch,
             fee_multiplier,
             start_block_height,
@@ -84,7 +89,7 @@ impl FeePools {
         epoch_info: &EpochInfo,
         fees: &Fees,
         transaction: TransactionArg,
-    ) -> Result<(u16, u16), Error> {
+    ) -> Result<DistributionInfo, Error> {
         let current_epoch_pool = EpochPool::new(epoch_info.current_epoch_index, drive);
 
         if epoch_info.is_epoch_change {
@@ -92,7 +97,8 @@ impl FeePools {
 
             // make next epoch pool as a current
             // and create one more in future
-            self.shift_current_epoch_pool(
+            self.add_shift_current_epoch_pool_operations(
+                drive,
                 &mut batch,
                 &current_epoch_pool,
                 block_info.block_height,
@@ -102,7 +108,8 @@ impl FeePools {
 
             // distribute accumulated previous epoch storage fees
             if current_epoch_pool.index > 0 {
-                self.storage_fee_distribution_pool.distribute(
+                self.distribute_storage_fee_distribution_pool(
+                    drive,
                     &mut batch,
                     current_epoch_pool.index - 1,
                     transaction,
@@ -110,32 +117,52 @@ impl FeePools {
             }
 
             // We need to apply new epoch tree structure and distributed storage fee
-            batch.apply(false, transaction)?;
+            drive.apply_batch(batch, false, transaction)?;
         }
 
         let mut batch = Batch::new(drive);
 
-        self.distribute_fees_into_pools(
-            &mut batch,
-            &current_epoch_pool,
-            fees.processing_fees,
-            fees.storage_fees,
-            transaction,
-        )?;
-
-        current_epoch_pool.increment_proposer_block_count(
+        current_epoch_pool.add_increment_proposer_block_count_operations(
             &mut batch,
             &block_info.proposer_pro_tx_hash,
             transaction,
         )?;
 
-        let distribution_info = self.distribute_fees_from_unpaid_pools_to_proposers(
+        let distribution_info = self
+            .add_distribute_fees_from_unpaid_pools_to_proposers_operations(
+                drive,
+                &mut batch,
+                epoch_info.current_epoch_index,
+                transaction,
+            )?;
+
+        // Move integer part of the leftovers to processing
+        // and fractional part to storage fees for the upcoming epoch
+        let storage_fees_leftovers: i64 = (distribution_info.fee_leftovers.fract())
+            .try_into()
+            .map_err(|_| {
+                Error::Fee(FeeError::DecimalConversion(
+                    "can't convert storage fees leftovers from Decimal to i64",
+                ))
+            })?;
+        let processing_fees_leftovers: u64 = (distribution_info.fee_leftovers.floor())
+            .try_into()
+            .map_err(|_| {
+            Error::Fee(FeeError::DecimalConversion(
+                "can't convert processing fees leftover from Decimal to u64",
+            ))
+        })?;
+
+        self.add_distribute_fees_into_pools_operations(
+            drive,
             &mut batch,
-            epoch_info.current_epoch_index,
+            &current_epoch_pool,
+            fees.processing_fees + processing_fees_leftovers,
+            fees.storage_fees + storage_fees_leftovers,
             transaction,
         )?;
 
-        batch.apply_if_not_empty(false, transaction)?;
+        drive.apply_if_not_empty(batch, false, transaction)?;
 
         Ok(distribution_info)
     }
@@ -150,6 +177,7 @@ mod tests {
 
     use rust_decimal_macros::dec;
 
+    use crate::drive::storage::batch::Batch;
     use crate::fee::pools::epoch::epoch_pool::EpochPool;
 
     mod create_fee_pool_trees {
@@ -159,8 +187,7 @@ mod tests {
             let (transaction, fee_pools) = super::setup_fee_pools(&drive, None);
 
             let storage_fee_pool = fee_pools
-                .storage_fee_distribution_pool
-                .value(&drive, Some(&transaction))
+                .get_storage_fee_distribution_pool_fees(&drive, Some(&transaction))
                 .expect("should get storage fee pool");
 
             assert_eq!(storage_fee_pool, 0i64);
@@ -205,9 +232,12 @@ mod tests {
             let start_block_time = 1655396517912;
             let multiplier = 42;
 
+            let mut batch = super::Batch::new(&drive);
+
             fee_pools
-                .shift_current_epoch_pool(
+                .add_shift_current_epoch_pool_operations(
                     &drive,
+                    &mut batch,
                     &current_epoch_pool,
                     start_block_height,
                     start_block_time,
@@ -216,7 +246,7 @@ mod tests {
                 .expect("should shift epoch pool");
 
             drive
-                .apply_current_batch(true, Some(&transaction))
+                .apply_batch(batch, false, Some(&transaction))
                 .expect("should apply batch");
 
             let next_thousandth_epoch = super::EpochPool::new(1000, &drive);
