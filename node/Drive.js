@@ -288,7 +288,11 @@ class Drive {
        * @returns {Promise<BlockBeginResponse>}
        */
       async blockBegin(request, useTransaction = false) {
-        const requestBytes = cbor.encode(request);
+        const requestBytes = cbor.encode({
+          ...request,
+          // cborium doesn't eat Buffers
+          proposerProTxHash: Array.from(request.proposerProTxHash),
+        });
 
         const responseBytes = await abciBlockBeginAsync.call(
           drive,
@@ -356,13 +360,8 @@ class Drive {
 
 /**
  * @typedef BlockEndResponse
- * @property {EpochInfo} epochInfo
  * @property {number} masternodesPaidCount
- * @property {number} paidEpochIndex
- */
-
-/**
- * @typedef EpochInfo
+ * @property {number} [paidEpochIndex]
  * @property {number} currentEpochIndex
  * @property {boolean} isEpochChange
  */

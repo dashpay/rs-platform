@@ -415,12 +415,7 @@ describe('Drive', () => {
         const request = {
           blockHeight: 1,
           blockTime: (new Date()).getTime(),
-          proposerProTxHash: [
-            1, 1, 1, 1, 1, 1, 1, 1, 1,
-            1, 1, 1, 1, 1, 1, 1, 1, 1,
-            1, 1, 1, 1, 1, 1, 1, 1, 1,
-            1, 1, 1, 1, 1,
-          ],
+          proposerProTxHash: Buffer.alloc(32, 1),
         };
 
         const response = await drive.getAbci().blockBegin(request);
@@ -432,12 +427,7 @@ describe('Drive', () => {
         const request = {
           blockHeight: 1,
           blockTime: (new Date()).getTime(),
-          proposerProTxHash: [
-            1, 1, 1, 1, 1, 1, 1, 1, 1,
-            1, 1, 1, 1, 1, 1, 1, 1, 1,
-            1, 1, 1, 1, 1, 1, 1, 1, 1,
-            1, 1, 1, 1, 1,
-          ],
+          proposerProTxHash: Buffer.alloc(32, 1),
           previousBlockTime: (new Date()).getTime() - 100,
         };
 
@@ -453,12 +443,7 @@ describe('Drive', () => {
         await drive.getAbci().blockBegin({
           blockHeight: 1,
           blockTime: (new Date()).getTime(),
-          proposerProTxHash: [
-            1, 1, 1, 1, 1, 1, 1, 1, 1,
-            1, 1, 1, 1, 1, 1, 1, 1, 1,
-            1, 1, 1, 1, 1, 1, 1, 1, 1,
-            1, 1, 1, 1, 1,
-          ],
+          proposerProTxHash: Buffer.alloc(32, 1),
         });
       });
 
@@ -473,9 +458,8 @@ describe('Drive', () => {
 
         const response = await drive.getAbci().blockEnd(request);
 
-        expect(response).to.have.property('epochInfo');
-        expect(response.epochInfo).to.have.property('currentEpochIndex');
-        expect(response.epochInfo).to.have.property('isEpochChange');
+        expect(response).to.have.property('currentEpochIndex');
+        expect(response).to.have.property('isEpochChange');
         expect(response).to.have.property('masternodesPaidCount');
         expect(response).to.have.property('paidEpochIndex');
       });
