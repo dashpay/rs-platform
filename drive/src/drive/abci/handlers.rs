@@ -35,7 +35,7 @@ pub fn block_begin(
     let genesis_time = if request.block_height == 1 {
         let mut batch = Batch::new(drive);
 
-        drive.update_genesis_time(&mut batch, request.block_time)?;
+        drive.add_update_genesis_time_operations(&mut batch, request.block_time)?;
 
         drive.apply_batch(batch, false, transaction)?;
 

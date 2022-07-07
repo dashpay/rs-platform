@@ -35,7 +35,11 @@ impl Drive {
         }
     }
 
-    pub fn update_genesis_time(&self, batch: &mut Batch, genesis_time: i64) -> Result<(), Error> {
+    pub fn add_update_genesis_time_operations(
+        &self,
+        batch: &mut Batch,
+        genesis_time: i64,
+    ) -> Result<(), Error> {
         batch.insert(PathKeyElementInfo::PathFixedSizeKeyElement((
             [Into::<&[u8; 1]>::into(RootTree::SpentAssetLockTransactions)],
             KEY_GENESIS_TIME.as_slice(),
@@ -120,7 +124,7 @@ mod tests {
             let mut batch = Batch::new(&drive);
 
             drive
-                .update_genesis_time(&mut batch, genesis_time)
+                .add_update_genesis_time_operations(&mut batch, genesis_time)
                 .expect("should update genesis time");
 
             match drive.apply_batch(batch, false, None) {
@@ -150,7 +154,7 @@ mod tests {
             let mut batch = Batch::new(&drive);
 
             drive
-                .update_genesis_time(&mut batch, genesis_time)
+                .add_update_genesis_time_operations(&mut batch, genesis_time)
                 .expect("should update genesis time");
 
             drive
