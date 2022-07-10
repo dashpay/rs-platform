@@ -13,9 +13,7 @@ use crate::drive::object_size_info::PathKeyInfo::{
     PathFixedSizeKey, PathFixedSizeKeyRef, PathKey, PathKeyRef, PathKeySize,
 };
 use crate::drive::object_size_info::{KeyInfo, KeyValueInfo, PathKeyElementInfo, PathKeyInfo};
-use crate::drive::storage::batch::Batch;
 use crate::drive::Drive;
-use crate::error;
 use crate::error::drive::DriveError;
 use crate::error::Error;
 use crate::fee::op::DriveOperation::{CalculatedCostOperation, CostCalculationQueryOperation};
@@ -773,7 +771,7 @@ impl Drive {
         ops: Vec<GroveDbOp>,
         validate: bool,
         transaction: TransactionArg,
-        drive_operations: &mut Vec<DriveOperation>,
+        drive_operations: Option<&mut Vec<DriveOperation>>,
     ) -> Result<(), Error> {
         if self.config.batching_enabled {
             // println!("batch {:#?}", ops);
@@ -792,7 +790,7 @@ impl Drive {
                 }),
                 transaction,
             );
-            push_drive_operation_result(cost_context, drive_operations)
+            push_drive_operation_result_optional(cost_context, drive_operations)
         } else {
             //println!("changes {} {:#?}", ops.len(), ops);
             for op in ops.into_iter() {
@@ -806,14 +804,14 @@ impl Drive {
                         )),
                         transaction,
                         true,
-                        Some(drive_operations),
+                        drive_operations,
                     )?,
                     Op::Delete => self.grove_delete(
                         op.path,
                         op.key.as_slice(),
                         true,
                         transaction,
-                        Some(drive_operations),
+                        drive_operations,
                     )?,
                     _ => {
                         return Err(Error::Drive(DriveError::UnsupportedPrivate(
@@ -843,7 +841,7 @@ impl Drive {
 
     pub fn apply_batch(
         &self,
-        mut batch: Batch,
+        mut batch: GroveDbOpBatch,
         validate: bool,
         transaction: TransactionArg,
     ) -> Result<(), Error> {
@@ -856,7 +854,7 @@ impl Drive {
 
     pub fn apply_if_not_empty(
         &self,
-        mut batch: Batch,
+        mut batch: GroveDbOpBatch,
         validate: bool,
         transaction: TransactionArg,
     ) -> Result<(), Error> {

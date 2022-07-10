@@ -380,8 +380,7 @@ impl Drive {
     ) -> Result<Option<Arc<Contract>>, Error> {
         // We always charge for a contract fetch in order to remove non determinism issues
         drive_operations.push(ContractFetch);
-        let cached_contracts = self.cached_contracts.borrow();
-        match cached_contracts.get(&contract_id) {
+        match self.cache.borrow().cached_contracts.get(&contract_id) {
             None => self
                 .fetch_contract(contract_id, transaction)
                 .map(|(c, _)| c),
@@ -396,8 +395,7 @@ impl Drive {
         &self,
         contract_id: [u8; 32],
     ) -> Result<Option<Arc<Contract>>, Error> {
-        let cached_contracts = self.cached_contracts.borrow();
-        match cached_contracts.get(&contract_id) {
+        match self.cache.borrow().cached_contracts.get(&contract_id) {
             None => Ok(None),
             Some(contract) => {
                 let contract_ref = Arc::clone(&contract);
@@ -417,8 +415,8 @@ impl Drive {
         let stored_element = value.map_err(Error::GroveDB)?;
         if let Element::Item(stored_contract_bytes, element_flag) = stored_element {
             let contract = Arc::new(Contract::from_cbor(&stored_contract_bytes, None)?);
-            let cached_contracts = self.cached_contracts.borrow();
-            cached_contracts.insert(contract_id, Arc::clone(&contract));
+            let mut drive_cache = self.cache.borrow_mut().deref();
+            drive_cache.cached_contracts.insert(contract_id, Arc::clone(&contract));
             let flags = StorageFlags::from_element_flags(element_flag)?;
             Ok((Some(Arc::clone(&contract)), flags))
         } else {

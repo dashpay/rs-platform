@@ -1,111 +1,127 @@
-use crate::drive::abci::messages::{
-    BlockBeginRequest, BlockBeginResponse, BlockEndRequest, BlockEndResponse, InitChainRequest,
-    InitChainResponse,
-};
 use std::ops::Deref;
 
-use crate::drive::block::BlockExecutionContext;
-use crate::drive::block::BlockInfo;
 use grovedb::TransactionArg;
+use rs_drive::drive::Drive;
+use rs_drive::fee::epoch::EpochInfo;
+use rs_drive::query::GroveError::StorageError;
+use rs_drive::query::TransactionArg;
+use crate::abci::messages::{BlockBeginRequest, BlockBeginResponse, BlockEndRequest, BlockEndResponse, InitChainRequest, InitChainResponse};
+use crate::block::{BlockExecutionContext, BlockInfo};
 
 use crate::drive::storage::batch::Batch;
 use crate::drive::Drive;
 use crate::error;
 use crate::error::Error;
 use crate::fee::epoch::EpochInfo;
+use crate::platform::Platform;
 
-pub fn init_chain(
-    drive: &Drive,
-    _request: InitChainRequest,
-    transaction: TransactionArg,
-) -> Result<InitChainResponse, Error> {
-    drive.create_initial_state_structure(transaction)?;
+pub trait TenderdashAbci {
+    fn init_chain(
+        drive: &Drive,
+        request: InitChainRequest,
+        transaction: TransactionArg,
+    ) -> Result<InitChainResponse, Error>;
 
-    let response = InitChainResponse {};
+    fn block_begin(
+        drive: &Drive,
+        request: BlockBeginRequest,
+        transaction: TransactionArg,
+    ) -> Result<BlockBeginResponse, Error>;
 
-    Ok(response)
+    fn block_end(
+        drive: &Drive,
+        request: BlockEndRequest,
+        transaction: TransactionArg,
+    ) -> Result<BlockEndResponse, Error>;
 }
 
-pub fn block_begin(
-    drive: &Drive,
-    request: BlockBeginRequest,
-    transaction: TransactionArg,
-) -> Result<BlockBeginResponse, Error> {
-    // Set genesis time
-    let genesis_time = if request.block_height == 1 {
-        let mut batch = Batch::new(drive);
+impl TenderdashAbci for Platform {
+    fn init_chain(
+        &self,
+        _request: InitChainRequest,
+        transaction: TransactionArg,
+    ) -> Result<InitChainResponse, Error> {
+        self.drive.create_initial_state_structure(transaction).map_err(StorageError)?;
 
-        drive.add_update_genesis_time_operations(&mut batch, request.block_time)?;
+        let response = InitChainResponse {};
 
-        drive.apply_batch(batch, false, transaction)?;
+        Ok(response)
+    }
 
-        request.block_time
-    } else {
-        drive.get_genesis_time(transaction)?
-    };
+    fn block_begin(
+        &self,
+        request: BlockBeginRequest,
+        transaction: TransactionArg,
+    ) -> Result<BlockBeginResponse, Error> {
+        // Set genesis time
+        let genesis_time = if request.block_height == 1 {
+            self.init_genesis(request.block_time_ms)
+        } else {
+            drive.get_genesis_time(transaction)?
+        };
 
-    // Init block execution context
-    let epoch_info = EpochInfo::calculate(
-        genesis_time,
-        request.block_time,
-        request.previous_block_time,
-    )?;
+        // Init block execution context
+        let epoch_info = EpochInfo::calculate(
+            genesis_time,
+            request.block_time_ms,
+            request.previous_block_time_ms,
+        )?;
 
-    let block_execution_context = BlockExecutionContext {
-        block_info: BlockInfo::from_block_begin_request(&request),
-        epoch_info,
-        genesis_time,
-    };
+        let block_execution_context = BlockExecutionContext {
+            block_info: BlockInfo::from_block_begin_request(&request),
+            epoch_info,
+        };
 
-    drive
-        .block_execution_context
-        .replace(Some(block_execution_context));
+        self
+            .block_execution_context
+            .replace(Some(block_execution_context));
 
-    let response = BlockBeginResponse {};
+        let response = BlockBeginResponse {};
 
-    Ok(response)
-}
+        Ok(response)
+    }
 
-pub fn block_end(
-    drive: &Drive,
-    request: BlockEndRequest,
-    transaction: TransactionArg,
-) -> Result<BlockEndResponse, Error> {
-    // Retrieve block execution context
-    let block_execution_context = drive.block_execution_context.borrow();
-    let block_execution_context = match block_execution_context.deref() {
-        Some(block_execution_context) => block_execution_context,
-        None => {
-            return Err(Error::Drive(
-                error::drive::DriveError::CorruptedCodeExecution(
-                    "block execution context must be set in block begin handler",
-                ),
-            ))
-        }
-    };
+    fn block_end(
+        &self,
+        request: BlockEndRequest,
+        transaction: TransactionArg,
+    ) -> Result<BlockEndResponse, Error> {
+        // Retrieve block execution context
+        let block_execution_context = drive.block_execution_context.borrow();
+        let block_execution_context = match block_execution_context.deref() {
+            Some(block_execution_context) => block_execution_context,
+            None => {
+                return Err(Error::Drive(
+                    error::drive::DriveError::CorruptedCodeExecution(
+                        "block execution context must be set in block begin handler",
+                    ),
+                ))
+            }
+        };
 
-    // Process fees
-    let distribution_info = drive.fee_pools.process_block_fees(
-        drive,
-        &block_execution_context.block_info,
-        &block_execution_context.epoch_info,
-        &request.fees,
-        transaction,
-    )?;
+        // Process fees
+        let distribution_info = self.drive.process_block_fees(
+            &block_execution_context.block_info,
+            &block_execution_context.epoch_info,
+            &request.fees,
+            transaction,
+        )?;
 
-    let response = BlockEndResponse {
-        current_epoch_index: block_execution_context.epoch_info.current_epoch_index,
-        is_epoch_change: block_execution_context.epoch_info.is_epoch_change,
-        masternodes_paid_count: distribution_info.masternodes_paid_count,
-        paid_epoch_index: distribution_info.paid_epoch_index,
-    };
+        let response = BlockEndResponse {
+            current_epoch_index: block_execution_context.epoch_info.current_epoch_index,
+            is_epoch_change: block_execution_context.epoch_info.is_epoch_change,
+            masternodes_paid_count: distribution_info.masternodes_paid_count,
+            paid_epoch_index: distribution_info.paid_epoch_index,
+        };
 
-    Ok(response)
+        Ok(response)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     mod handlers {
+        use std::time::Duration;
         use chrono::{Duration, Utc};
 
         use crate::fee::pools::tests::helpers::fee_pools::create_masternode_identities;
@@ -121,6 +137,8 @@ mod tests {
                 setup::{setup_drive, setup_fee_pools},
             },
         };
+        use crate::abci::handlers::{block_begin, block_end, init_chain};
+        use crate::abci::messages::{BlockBeginRequest, BlockEndRequest, InitChainRequest};
 
         #[test]
         fn test_abci_flow() {
@@ -175,8 +193,8 @@ mod tests {
                 // Processing block
                 let block_begin_request = BlockBeginRequest {
                     block_height,
-                    block_time: block_time.timestamp_millis(),
-                    previous_block_time,
+                    block_time_ms: block_time.timestamp_millis(),
+                    previous_block_time_ms: previous_block_time,
                     proposer_pro_tx_hash: proposers[day as usize - 1],
                 };
 

@@ -1,15 +1,14 @@
-use crate::drive::object_size_info::PathKeyElementInfo;
-use crate::drive::storage::batch::Batch;
 use crate::drive::{Drive, RootTree};
 use crate::error::drive::DriveError;
 use crate::error::Error;
 use grovedb::{Element, TransactionArg};
 use std::array::TryFromSliceError;
+use grovedb::batch::{GroveDbOp, Op};
 
 const KEY_GENESIS_TIME: &[u8; 1] = b"g";
 
 impl Drive {
-    pub fn get_genesis_time(&self, transaction: TransactionArg) -> Result<i64, Error> {
+    pub fn get_genesis_time(&self, transaction: TransactionArg) -> Result<Option<u64>, Error> {
         let element = self
             .grove
             .get(
@@ -18,10 +17,14 @@ impl Drive {
                 transaction,
             )
             .unwrap()
-            .map_err(Error::GroveDB)?;
+            .map(Some)
+            .or_else(|e| match e {
+                Error::GroveDB(grovedb::Error::PathKeyNotFound(_)) => Ok(None),
+                _ => Err(e),
+            })?;
 
         if let Element::Item(item, _) = element {
-            let genesis_time = i64::from_le_bytes(item.as_slice().try_into().map_err(
+            let genesis_time = u64::from_be_bytes(item.as_slice().try_into().map_err(
                 |e: TryFromSliceError| {
                     Error::Drive(DriveError::CorruptedGenesisTimeInvalidItemLength(
                         e.to_string(),
@@ -29,24 +32,34 @@ impl Drive {
                 },
             )?);
 
-            Ok(genesis_time)
+            Ok(Some(genesis_time))
         } else {
             Err(Error::Drive(DriveError::CorruptedGenesisTimeNotItem()))
         }
     }
 
-    pub fn add_update_genesis_time_operations(
-        &self,
-        batch: &mut Batch,
-        genesis_time: i64,
-    ) -> Result<(), Error> {
-        batch.insert(PathKeyElementInfo::PathFixedSizeKeyElement((
-            [Into::<&[u8; 1]>::into(RootTree::SpentAssetLockTransactions)],
-            KEY_GENESIS_TIME.as_slice(),
-            Element::Item(genesis_time.to_le_bytes().to_vec(), None),
-        )))?;
+    pub fn init_genesis(&self,
+                        genesis_time: u64,
+                        transaction: TransactionArg,
+    ) {
+        let op = self.update_genesis_time_operation(genesis_time)?;
 
-        Ok(())
+        self.grove_apply_batch(vec![op], false, transaction)?;
+
+        request.block_time
+    }
+
+    pub fn update_genesis_time_operation(
+        genesis_time: u64,
+    ) -> GroveDbOp {
+        GroveDbOp {
+            path: vec![vec![RootTree::SpentAssetLockTransactions as u8]],
+            key: KEY_GENESIS_TIME.to_vec(),
+            //todo make this into a Op::Replace
+            op: Op::Insert {
+                element: Element::Item(genesis_time.to_be_bytes().to_vec(), None)
+            }
+        }
     }
 }
 
@@ -113,15 +126,15 @@ mod tests {
     }
 
     mod update_genesis_time {
-        use crate::drive::storage::batch::Batch;
+        use crate::drive::storage::batch::GroveDbOpBatch;
 
         #[test]
         fn test_error_if_fee_pools_is_not_initiated() {
             let drive = super::setup_drive();
 
-            let genesis_time: i64 = 1655396517902;
+            let genesis_time: u64 = 1655396517902;
 
-            let mut batch = Batch::new(&drive);
+            let mut batch = GroveDbOpBatch::new(&drive);
 
             drive
                 .add_update_genesis_time_operations(&mut batch, genesis_time)
@@ -149,9 +162,9 @@ mod tests {
                 .create_initial_state_structure(None)
                 .expect("expected to create root tree successfully");
 
-            let genesis_time: i64 = 1655396517902;
+            let genesis_time: u64 = 1655396517902;
 
-            let mut batch = Batch::new(&drive);
+            let mut batch = GroveDbOpBatch::new(&drive);
 
             drive
                 .add_update_genesis_time_operations(&mut batch, genesis_time)

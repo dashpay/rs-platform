@@ -9,7 +9,7 @@ use dpp::{
 };
 use grovedb::TransactionArg;
 
-use crate::drive::storage::batch::Batch;
+use crate::drive::storage::batch::GroveDbOpBatch;
 use crate::{
     contract::document::Document,
     contract::Contract,
@@ -161,7 +161,7 @@ pub fn increment_proposers_block_count(
     epoch_pool: &EpochPool,
     transaction: TransactionArg,
 ) {
-    let mut batch = Batch::new(drive);
+    let mut batch = GroveDbOpBatch::new(drive);
 
     for proposer_pro_tx_hash in proposers {
         epoch_pool

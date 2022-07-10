@@ -5,7 +5,6 @@ use std::ops::Deref;
 use crate::drive::flags::StorageFlags;
 use crate::drive::object_size_info::KeyInfo;
 use crate::drive::object_size_info::PathKeyElementInfo::PathFixedSizeKeyElement;
-use crate::drive::storage::batch::Batch;
 use crate::drive::{Drive, RootTree};
 use crate::error::drive::DriveError;
 use crate::error::identity::IdentityError;
@@ -18,7 +17,7 @@ const IDENTITY_KEY: [u8; 1] = [0];
 impl Drive {
     pub fn add_insert_identity_operations(
         &self,
-        batch: &mut Batch,
+        batch: &mut GroveDbOpBatch,
         identity: Identity,
     ) -> Result<(), Error> {
         let block_execution_context = self.block_execution_context.borrow();
@@ -56,7 +55,7 @@ impl Drive {
         apply: bool,
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
-        let mut batch = Batch::new(self);
+        let mut batch = GroveDbOpBatch::new(self);
 
         self.add_insert_identity_operations(&mut batch, identity)?;
 

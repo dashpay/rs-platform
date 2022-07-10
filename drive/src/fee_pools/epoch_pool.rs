@@ -1,63 +1,78 @@
+use std::borrow::Cow;
+use grovedb::batch::{GroveDbOp, Op};
 use grovedb::{Element, TransactionArg};
-use rust_decimal_macros::dec;
-
-use crate::drive::object_size_info::{KeyInfo, PathKeyElementInfo};
-use crate::drive::storage::batch::Batch;
-use crate::drive::Drive;
-use crate::error::fee::FeeError;
+use grovedb::batch::Op::Insert;
+use crate::drive::batch::GroveDbOpBatch;
+use crate::drive::fee_pools::epoch::tree_key_constants;
+use crate::drive::fee_pools::epoch::tree_key_constants::{KEY_FEE_MULTIPLIER, KEY_POOL_PROCESSING_FEES, KEY_POOL_STORAGE_FEES, KEY_START_BLOCK_HEIGHT, KEY_START_TIME};
 use crate::error::Error;
-use crate::fee::pools::fee_pools::FeePools;
 
-use super::constants;
-
-pub struct EpochPool<'e> {
+pub struct EpochPool {
     pub index: u16,
     pub key: [u8; 2],
-    pub drive: &'e Drive,
 }
 
-impl<'e> EpochPool<'e> {
-    pub fn new(index: u16, drive: &Drive) -> EpochPool {
+impl EpochPool {
+    pub fn new(index: u16) -> EpochPool {
         EpochPool {
             index,
-            key: index.to_le_bytes(),
-            drive,
+            key: index.to_be_bytes(),
         }
     }
+}
 
-    pub fn add_init_empty_operations(&self, batch: &mut Batch) -> Result<(), Error> {
-        batch.insert_empty_tree(FeePools::get_path(), KeyInfo::KeyRef(&self.key), None)?;
+impl EpochPool {
+    pub fn add_shift_current_epoch_pool_operations(
+        &self,
+        current_epoch_pool: &EpochPool,
+        start_block_height: u64,
+        start_block_time_ms: u64,
+        fee_multiplier: u64,
+        batch: &mut GroveDbOpBatch,
+    ) {
+        // create and init next thousandth epoch
+        let next_thousandth_epoch = EpochPool::new(current_epoch_pool.index + 1000);
+        next_thousandth_epoch.add_init_empty_operations(batch);
+
+        // init first_proposer_block_height and processing_fee for an epoch
+        current_epoch_pool.add_init_current_operations(
+            fee_multiplier,
+            start_block_height,
+            start_block_time_ms,
+            batch,
+        );
+    }
+
+
+    pub fn add_init_empty_operations(&self, batch: &mut GroveDbOpBatch) {
+        batch.insert_empty_tree(FeePools::get_path(), self.key.to_vec());
 
         // init storage fee item to 0
-        self.add_update_storage_fee_operations(batch, dec!(0.0))?;
-
-        Ok(())
+        batch.push(self.update_storage_fee_operation( 0));
     }
 
     pub fn add_init_current_operations(
         &self,
-        batch: &mut Batch,
         multiplier: u64,
         start_block_height: u64,
-        start_time: i64,
-    ) -> Result<(), Error> {
-        self.add_update_start_block_height_operations(batch, start_block_height)?;
+        start_time_ms: u64,
+        batch: &mut GroveDbOpBatch,
+    ) {
+        batch.push(self.update_start_block_height_operation(start_block_height));
 
-        self.add_update_processing_fee_operations(batch, 0u64)?;
+        batch.push(self.update_processing_fee_operation(0u64));
 
-        self.add_init_proposers_operations(batch)?;
+        batch.push(self.init_proposers_operation());
 
-        self.add_update_fee_multiplier_operations(batch, multiplier)?;
+        batch.push(self.update_fee_multiplier_operation(multiplier));
 
-        self.add_update_start_time_operations(batch, start_time)?;
-
-        Ok(())
+        batch.push(self.update_start_time_operation(start_time_ms));
     }
 
     pub fn add_mark_as_paid_operations(
         &self,
-        batch: &mut Batch,
         transaction: TransactionArg,
+        batch: &mut GroveDbOpBatch,
     ) -> Result<(), Error> {
         self.add_delete_proposers_tree_operations(batch, transaction)?;
 
@@ -72,76 +87,158 @@ impl<'e> EpochPool<'e> {
         [FeePools::get_path()[0], &self.key]
     }
 
-    pub fn add_update_start_time_operations(
-        &self,
-        batch: &mut Batch,
-        time: i64,
-    ) -> Result<(), Error> {
-        batch.insert(PathKeyElementInfo::PathFixedSizeKeyElement((
-            self.get_path(),
-            constants::KEY_START_TIME.as_slice(),
-            Element::Item(time.to_le_bytes().to_vec(), None),
-        )))
+    pub fn get_vec_path(&self) -> Vec<Vec<u8>> {
+        vec![ FEE, self.key.to_vec()]
     }
 
-    pub fn get_start_time(&self, transaction: TransactionArg) -> Result<i64, Error> {
-        let element = self
-            .drive
-            .grove
-            .get(
-                self.get_path(),
-                constants::KEY_START_TIME.as_slice(),
-                transaction,
-            )
-            .unwrap()
-            .map_err(Error::GroveDB)?;
-
-        if let Element::Item(item, _) = element {
-            Ok(i64::from_le_bytes(item.as_slice().try_into().map_err(
-                |_| Error::Fee(FeeError::CorruptedStartTimeLength()),
-            )?))
-        } else {
-            Err(Error::Fee(FeeError::CorruptedStartTimeNotItem()))
+    pub fn update_start_time_operation(
+        &self,
+        time_ms: u64,
+    ) -> GroveDbOp {
+        GroveDbOp {
+            path: self.get_vec_path(),
+            key: KEY_START_TIME.to_vec(),
+            op: Insert {
+                element : Element::Item(time_ms.to_be_bytes().to_vec(), None)
+            }
         }
     }
 
-    pub fn get_start_block_height(&self, transaction: TransactionArg) -> Result<u64, Error> {
-        let element = self
-            .drive
-            .grove
-            .get(
-                self.get_path(),
-                constants::KEY_START_BLOCK_HEIGHT.as_slice(),
-                transaction,
-            )
-            .unwrap()
-            .map_err(Error::GroveDB)?;
-
-        if let Element::Item(item, _) = element {
-            Ok(u64::from_le_bytes(item.as_slice().try_into().map_err(
-                |_| Error::Fee(FeeError::CorruptedStartBlockHeightItemLength()),
-            )?))
-        } else {
-            Err(Error::Fee(FeeError::CorruptedStartBlockHeightNotItem()))
-        }
-    }
-
-    pub fn add_update_start_block_height_operations(
+    pub fn update_start_block_height_operation(
         &self,
-        batch: &mut Batch,
         start_block_height: u64,
+    ) -> GroveDbOp {
+        GroveDbOp {
+            path: self.get_vec_path(),
+            key: KEY_START_BLOCK_HEIGHT.to_vec(),
+            op: Insert {
+                element : Element::Item(start_block_height.to_be_bytes().to_vec(), None)
+            }
+        }
+    }
+
+    pub fn update_fee_multiplier_operation(
+        &self,
+        multiplier: u64,
+    ) -> GroveDbOp {
+        GroveDbOp {
+            path: self.get_vec_path,
+            key: KEY_FEE_MULTIPLIER.to_vec(),
+            op: Insert { element: Element::Item(multiplier.to_be_bytes().to_vec(), None)}
+        }
+    }
+
+    pub fn update_processing_fee_operation(
+        &self,
+        processing_fee: u64,
+    ) -> GroveDbOp {
+        GroveDbOp {
+            path: self.get_vec_path(),
+            key: KEY_POOL_PROCESSING_FEES.to_vec(),
+            op: Insert { element: Element::new_item(processing_fee.to_be_bytes().to_vec())}
+        }
+    }
+
+    pub fn delete_processing_fee_operation(
+        &self,
+    ) -> GroveDbOp {
+        GroveDbOp {
+            path: self.get_vec_path(),
+            key: KEY_POOL_PROCESSING_FEES.to_vec(),
+            op: Op::Delete
+        }
+    }
+
+    pub fn update_storage_fee_operation(
+        &self,
+        storage_fee: u64,
+    ) -> GroveDbOp {
+        GroveDbOp {
+            path: self.get_vec_path(),
+            key: KEY_POOL_STORAGE_FEES.to_vec(),
+            op: Insert { element: Element::new_item(storage_fee.to_be_bytes().to_vec())}
+        }
+    }
+
+    pub fn delete_storage_fee_operation(
+        &self
+    ) -> GroveDbOp {
+        GroveDbOp {
+            path: self.get_vec_path(),
+            key: KEY_POOL_STORAGE_FEES.to_vec(),
+            op: Op::Delete
+        }
+    }
+
+    fn update_proposer_block_count_operation(
+        &self,
+        proposer_pro_tx_hash: &[u8; 32],
+        block_count: u64,
+    ) -> GroveDbOp {
+        GroveDbOp {
+            path: self.get_proposers_path(),
+            key: proposer_pro_tx_hash.to_vec(),
+            op: Insert { element : Element::Item(block_count.to_be_bytes().to_vec(), None)}
+        }
+    }
+
+    pub fn add_increment_proposer_block_count_operations(
+        &self,
+        proposer_pro_tx_hash: &[u8; 32],
+        transaction: TransactionArg,
+        batch: &mut GroveDbOpBatch,
     ) -> Result<(), Error> {
-        batch.insert(PathKeyElementInfo::PathFixedSizeKeyElement((
-            self.get_path(),
-            constants::KEY_START_BLOCK_HEIGHT.as_slice(),
-            Element::Item(start_block_height.to_le_bytes().to_vec(), None),
-        )))
+        // update proposer's block count
+        let proposed_block_count = self
+            .get_proposer_block_count(proposer_pro_tx_hash, transaction)
+            .or_else(|e| match e {
+                Error::GroveDB(grovedb::Error::PathKeyNotFound(_)) => Ok(0u64),
+                _ => Err(e),
+            })?;
+
+        let op = self.update_proposer_block_count_operation(
+            proposer_pro_tx_hash,
+            proposed_block_count + 1,
+        );
+
+        batch.push(op);
+
+        Ok(())
+    }
+
+    pub fn init_proposers_operation(&self) -> GroveDbOp {
+        GroveDbOp {
+            path: self.get_vec_path(),
+            key: tree_key_constants::KEY_PROPOSERS.to_vec(),
+            op: Op::Insert { element: Element::empty_tree()}
+        }
+    }
+
+    pub fn delete_proposers_tree_operation(
+        &self,
+    ) -> GroveDbOp {
+        GroveDbOp {
+            path: self.get_vec_path(),
+            key: tree_key_constants::KEY_PROPOSERS.to_vec(),
+            op: Op::Delete
+        }
+    }
+
+    pub fn add_delete_proposers_operations(
+        &self,
+        pro_tx_hashes: Vec<Vec<u8>>,
+        batch: &mut GroveDbOpBatch,
+    ) -> Result<(), Error> {
+        for pro_tx_hash in pro_tx_hashes.into_iter() {
+            batch.delete(self.get_proposers_path(), Cow::from(pro_tx_hash))?;
+        }
+        Ok(())
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::drive::storage::batch::Batch;
+    use crate::drive::storage::batch::GroveDbOpBatch;
     use chrono::Utc;
     use grovedb::Element;
     use rust_decimal_macros::dec;
@@ -164,7 +261,7 @@ mod tests {
 
         let start_time: i64 = Utc::now().timestamp_millis();
 
-        let mut batch = Batch::new(&drive);
+        let mut batch = GroveDbOpBatch::new(&drive);
 
         epoch_pool
             .add_update_start_time_operations(&mut batch, start_time)
@@ -262,7 +359,7 @@ mod tests {
                 .insert(
                     epoch_pool.get_path(),
                     super::constants::KEY_START_TIME.as_slice(),
-                    super::Element::Item(u128::MAX.to_le_bytes().to_vec(), None),
+                    super::Element::Item(u128::MAX.to_be_bytes().to_vec(), None),
                     Some(&transaction),
                 )
                 .unwrap()
@@ -290,7 +387,7 @@ mod tests {
 
         let start_block_height = 1;
 
-        let mut batch = Batch::new(&drive);
+        let mut batch = GroveDbOpBatch::new(&drive);
 
         epoch_pool
             .add_update_start_block_height_operations(&mut batch, start_block_height)
@@ -358,7 +455,7 @@ mod tests {
                 .insert(
                     epoch_pool.get_path(),
                     super::constants::KEY_START_BLOCK_HEIGHT.as_slice(),
-                    super::Element::Item(u128::MAX.to_le_bytes().to_vec(), None),
+                    super::Element::Item(u128::MAX.to_be_bytes().to_vec(), None),
                     Some(&transaction),
                 )
                 .unwrap()
@@ -411,7 +508,7 @@ mod tests {
     }
 
     mod init_empty {
-        use crate::drive::storage::batch::Batch;
+        use crate::drive::storage::batch::GroveDbOpBatch;
 
         #[test]
         fn test_error_if_fee_pools_not_initialized() {
@@ -425,7 +522,7 @@ mod tests {
 
             let epoch = super::EpochPool::new(1042, &drive);
 
-            let mut batch = Batch::new(&drive);
+            let mut batch = GroveDbOpBatch::new(&drive);
 
             epoch
                 .add_init_empty_operations(&mut batch)
@@ -449,7 +546,7 @@ mod tests {
 
             let epoch = super::EpochPool::new(1042, &drive);
 
-            let mut batch = Batch::new(&drive);
+            let mut batch = GroveDbOpBatch::new(&drive);
 
             epoch
                 .add_init_empty_operations(&mut batch)
@@ -468,7 +565,7 @@ mod tests {
     }
 
     mod init_current {
-        use crate::drive::storage::batch::Batch;
+        use crate::drive::storage::batch::GroveDbOpBatch;
 
         #[test]
         fn test_values_are_set() {
@@ -481,14 +578,14 @@ mod tests {
             let start_time = 1;
             let start_block_height = 2;
 
-            let mut batch = Batch::new(&drive);
+            let mut batch = GroveDbOpBatch::new(&drive);
 
             epoch
                 .add_init_empty_operations(&mut batch)
                 .expect("should init empty epoch pool");
 
             epoch
-                .add_init_current_operations(&mut batch, multiplier, start_block_height, start_time)
+                .add_init_current_operations(multiplier, start_block_height, start_time, &mut batch)
                 .expect("should init an epoch pool");
 
             drive
@@ -528,7 +625,7 @@ mod tests {
     }
 
     mod mark_as_paid {
-        use crate::drive::storage::batch::Batch;
+        use crate::drive::storage::batch::GroveDbOpBatch;
 
         #[test]
         fn test_values_are_deleted() {
@@ -537,10 +634,10 @@ mod tests {
 
             let epoch = super::EpochPool::new(0, &drive);
 
-            let mut batch = Batch::new(&drive);
+            let mut batch = GroveDbOpBatch::new(&drive);
 
             epoch
-                .add_init_current_operations(&mut batch, 1, 2, 3)
+                .add_init_current_operations(1, 2, 3, &mut batch)
                 .expect("should init an epoch pool");
 
             // Apply init current
@@ -548,7 +645,7 @@ mod tests {
                 .apply_batch(batch, false, Some(&transaction))
                 .expect("should apply batch");
 
-            let mut batch = Batch::new(&drive);
+            let mut batch = GroveDbOpBatch::new(&drive);
 
             epoch
                 .add_mark_as_paid_operations(&mut batch, Some(&transaction))

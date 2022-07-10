@@ -1,34 +1,31 @@
 use grovedb::{Element, PathQuery, Query, SizedQuery, TransactionArg};
 
-use crate::drive::object_size_info::{KeyInfo, PathKeyElementInfo};
-use crate::drive::storage::batch::Batch;
-use crate::fee::pools::fee_pools::FeePools;
-use crate::{
-    error,
-    error::{drive::DriveError, fee::FeeError, Error},
-    fee::pools::epoch::epoch_pool::EpochPool,
-};
+use crate::drive::Drive;
+use crate::error::drive::DriveError;
+use crate::error::Error;
+use crate::error::fee::FeeError;
+use crate::fee_pools::epoch_pool::EpochPool;
 
-use super::constants;
+use super::tree_key_constants;
 
-impl<'e> EpochPool<'e> {
+impl Drive {
     fn get_proposers_path(&self) -> [&[u8]; 3] {
         [
             FeePools::get_path()[0],
             &self.key,
-            constants::KEY_PROPOSERS.as_slice(),
+            tree_key_constants::KEY_PROPOSERS.as_slice(),
         ]
     }
 
     fn get_proposer_block_count(
         &self,
+        epoch_pool: &EpochPool,
         proposer_tx_hash: &[u8; 32],
         transaction: TransactionArg,
     ) -> Result<u64, Error> {
         let element = self
-            .drive
             .grove
-            .get(self.get_proposers_path(), proposer_tx_hash, transaction)
+            .get(epoch_pool.get_proposers_path(), proposer_tx_hash, transaction)
             // TODO: Shouldn't we wrap all errors to Fee Pool errors?
             //  in this case we know the source of error
             .unwrap()
@@ -49,47 +46,10 @@ impl<'e> EpochPool<'e> {
         }
     }
 
-    fn add_update_proposer_block_count_operations(
-        &self,
-        batch: &mut Batch,
-        proposer_pro_tx_hash: &[u8; 32],
-        block_count: u64,
-    ) -> Result<(), Error> {
-        batch.insert(PathKeyElementInfo::PathFixedSizeKeyElement((
-            self.get_proposers_path(),
-            proposer_pro_tx_hash,
-            Element::Item(block_count.to_le_bytes().to_vec(), None),
-        )))
-    }
-
-    pub fn add_increment_proposer_block_count_operations(
-        &self,
-        batch: &mut Batch,
-        proposer_pro_tx_hash: &[u8; 32],
-        transaction: TransactionArg,
-    ) -> Result<(), Error> {
-        // update proposer's block count
-        let proposed_block_count = self
-            .get_proposer_block_count(proposer_pro_tx_hash, transaction)
-            .or_else(|e| match e {
-                error::Error::GroveDB(grovedb::Error::PathKeyNotFound(_)) => Ok(0u64),
-                _ => Err(e),
-            })?;
-
-        self.add_update_proposer_block_count_operations(
-            batch,
-            proposer_pro_tx_hash,
-            proposed_block_count + 1,
-        )?;
-
-        Ok(())
-    }
-
-    pub fn is_proposers_tree_empty(&self, transaction: TransactionArg) -> Result<bool, Error> {
+    pub fn is_proposers_tree_empty(&self, epoch_pool: &EpochPool, transaction: TransactionArg) -> Result<bool, Error> {
         match self
             .drive
-            .grove
-            .is_empty_tree(self.get_proposers_path(), transaction)
+            .is_empty_tree(epoch_pool.get_proposers_path(), transaction)
             .unwrap()
         {
             Ok(result) => Ok(result),
@@ -102,20 +62,13 @@ impl<'e> EpochPool<'e> {
         }
     }
 
-    pub fn add_init_proposers_operations(&self, batch: &mut Batch) -> Result<(), Error> {
-        batch.insert_empty_tree(
-            self.get_path(),
-            KeyInfo::KeyRef(constants::KEY_PROPOSERS.as_slice()),
-            None,
-        )
-    }
-
     pub fn get_proposers(
         &self,
+        epoch_pool: &EpochPool,
         limit: u16,
         transaction: TransactionArg,
     ) -> Result<Vec<(Vec<u8>, u64)>, Error> {
-        let path_as_vec: Vec<Vec<u8>> = self
+        let path_as_vec: Vec<Vec<u8>> = epoch_pool
             .get_proposers_path()
             .iter()
             .map(|slice| slice.to_vec())
@@ -128,7 +81,6 @@ impl<'e> EpochPool<'e> {
 
         let (elements, _) = self
             .drive
-            .grove
             .query_raw(&path_query, transaction)
             .unwrap()
             .map_err(Error::GroveDB)?;
@@ -155,37 +107,11 @@ impl<'e> EpochPool<'e> {
 
         Ok(result)
     }
-
-    pub fn add_delete_proposers_tree_operations(
-        &self,
-        batch: &mut Batch,
-        transaction: TransactionArg,
-    ) -> Result<(), Error> {
-        batch.delete(
-            self.get_path(),
-            constants::KEY_PROPOSERS.as_slice(),
-            true,
-            transaction,
-        )
-    }
-
-    pub fn add_delete_proposers_operations(
-        &self,
-        batch: &mut Batch,
-        pro_tx_hashes: Vec<Vec<u8>>,
-        transaction: TransactionArg,
-    ) -> Result<(), Error> {
-        for pro_tx_hash in pro_tx_hashes {
-            batch.delete(self.get_proposers_path(), &pro_tx_hash, true, transaction)?;
-        }
-
-        Ok(())
-    }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::drive::storage::batch::Batch;
+    use crate::drive::storage::batch::GroveDbOpBatch;
     use grovedb::Element;
 
     use crate::{
@@ -209,7 +135,7 @@ mod tests {
 
             let epoch = super::EpochPool::new(0, &drive);
 
-            let mut batch = super::Batch::new(&drive);
+            let mut batch = super::GroveDbOpBatch::new(&drive);
 
             epoch
                 .add_init_proposers_operations(&mut batch)
@@ -275,7 +201,7 @@ mod tests {
 
             let epoch = super::EpochPool::new(0, &drive);
 
-            let mut batch = super::Batch::new(&drive);
+            let mut batch = super::GroveDbOpBatch::new(&drive);
 
             epoch
                 .add_init_proposers_operations(&mut batch)
@@ -307,7 +233,7 @@ mod tests {
 
             let epoch = super::EpochPool::new(0, &drive);
 
-            let mut batch = super::Batch::new(&drive);
+            let mut batch = super::GroveDbOpBatch::new(&drive);
 
             epoch
                 .add_init_proposers_operations(&mut batch)
@@ -318,7 +244,7 @@ mod tests {
                 .apply_batch(batch, false, Some(&transaction))
                 .expect("should apply batch");
 
-            let mut batch = super::Batch::new(&drive);
+            let mut batch = super::GroveDbOpBatch::new(&drive);
 
             epoch
                 .add_increment_proposer_block_count_operations(
@@ -348,7 +274,7 @@ mod tests {
 
             let epoch = super::EpochPool::new(0, &drive);
 
-            let mut batch = super::Batch::new(&drive);
+            let mut batch = super::GroveDbOpBatch::new(&drive);
 
             epoch
                 .add_init_proposers_operations(&mut batch)
@@ -359,7 +285,7 @@ mod tests {
                 .apply_batch(batch, false, Some(&transaction))
                 .expect("should apply batch");
 
-            let mut batch = super::Batch::new(&drive);
+            let mut batch = super::GroveDbOpBatch::new(&drive);
 
             epoch
                 .add_update_proposer_block_count_operations(&mut batch, &pro_tx_hash, 1)
@@ -370,7 +296,7 @@ mod tests {
                 .apply_batch(batch, false, Some(&transaction))
                 .expect("should apply batch");
 
-            let mut batch = super::Batch::new(&drive);
+            let mut batch = super::GroveDbOpBatch::new(&drive);
 
             epoch
                 .add_increment_proposer_block_count_operations(
@@ -419,7 +345,7 @@ mod tests {
 
             let epoch = super::EpochPool::new(0, &drive);
 
-            let mut batch = super::Batch::new(&drive);
+            let mut batch = super::GroveDbOpBatch::new(&drive);
 
             epoch
                 .add_init_proposers_operations(&mut batch)
@@ -451,7 +377,7 @@ mod tests {
 
             let epoch = super::EpochPool::new(0, &drive);
 
-            let mut batch = super::Batch::new(&drive);
+            let mut batch = super::GroveDbOpBatch::new(&drive);
 
             epoch
                 .add_init_proposers_operations(&mut batch)
@@ -462,7 +388,7 @@ mod tests {
                 .apply_batch(batch, false, Some(&transaction))
                 .expect("should apply batch");
 
-            let mut batch = super::Batch::new(&drive);
+            let mut batch = super::GroveDbOpBatch::new(&drive);
 
             epoch
                 .add_delete_proposers_tree_operations(&mut batch, Some(&transaction))
@@ -498,7 +424,7 @@ mod tests {
 
             let epoch = super::EpochPool::new(0, &drive);
 
-            let mut batch = super::Batch::new(&drive);
+            let mut batch = super::GroveDbOpBatch::new(&drive);
 
             epoch
                 .add_init_proposers_operations(&mut batch)
@@ -511,7 +437,7 @@ mod tests {
 
             let pro_tx_hashes: Vec<[u8; 32]> = (0..10).map(|_| rand::random()).collect();
 
-            let mut batch = super::Batch::new(&drive);
+            let mut batch = super::GroveDbOpBatch::new(&drive);
 
             for pro_tx_hash in pro_tx_hashes.iter() {
                 epoch
@@ -548,7 +474,7 @@ mod tests {
             awaited_result.remove(0);
             awaited_result.remove(1);
 
-            let mut batch = super::Batch::new(&drive);
+            let mut batch = super::GroveDbOpBatch::new(&drive);
 
             epoch
                 .add_delete_proposers_operations(

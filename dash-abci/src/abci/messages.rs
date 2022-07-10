@@ -1,3 +1,4 @@
+use rs_drive::fee::fees_aggregate::FeesAggregate;
 use crate::error;
 use serde::{Deserialize, Serialize};
 
@@ -13,8 +14,8 @@ pub struct InitChainResponse {}
 #[serde(rename_all = "camelCase")]
 pub struct BlockBeginRequest {
     pub block_height: u64,
-    pub block_time: i64,
-    pub previous_block_time: Option<i64>,
+    pub block_time_ms: u64,
+    pub previous_block_time_ms: Option<u64>,
     pub proposer_pro_tx_hash: [u8; 32],
 }
 
@@ -25,15 +26,7 @@ pub struct BlockBeginResponse {}
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BlockEndRequest {
-    pub fees: Fees,
-}
-
-#[derive(Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Fees {
-    pub processing_fees: u64,
-    pub storage_fees: i64,
-    pub fee_multiplier: u64,
+    pub fees: FeesAggregate,
 }
 
 #[derive(Serialize, Deserialize)]

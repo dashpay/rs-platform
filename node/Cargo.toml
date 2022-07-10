@@ -11,6 +11,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 rs-drive = { path = "../drive" }
+dash-abci = { path = "../dash-abci" }
 
 [dependencies.grovedb]
 git = "https://github.com/dashevo/grovedb"

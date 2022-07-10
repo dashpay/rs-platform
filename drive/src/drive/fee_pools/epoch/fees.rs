@@ -1,23 +1,20 @@
 use grovedb::{Element, TransactionArg};
 use rust_decimal::Decimal;
 
-use crate::drive::object_size_info::PathKeyElementInfo;
-use crate::drive::storage::batch::Batch;
-use crate::{
-    error::{fee::FeeError, Error},
-    fee::pools::epoch::epoch_pool::EpochPool,
-};
+use crate::drive::Drive;
+use crate::error::Error;
+use crate::error::fee::FeeError;
+use crate::fee_pools::epoch_pool::EpochPool;
 
-use super::constants;
+use super::tree_key_constants;
 
-impl<'e> EpochPool<'e> {
-    pub fn get_storage_fee(&self, transaction: TransactionArg) -> Result<Decimal, Error> {
+impl Drive {
+    pub(crate) fn get_storage_fee(&self, epoch_pool: &EpochPool, transaction: TransactionArg) -> Result<Decimal, Error> {
         let element = self
-            .drive
             .grove
             .get(
-                self.get_path(),
-                constants::KEY_STORAGE_FEE.as_slice(),
+                epoch_pool.get_path(),
+                tree_key_constants::KEY_POOL_STORAGE_FEES.as_slice(),
                 transaction,
             )
             .unwrap()
@@ -36,13 +33,12 @@ impl<'e> EpochPool<'e> {
         }
     }
 
-    pub fn get_processing_fee(&self, transaction: TransactionArg) -> Result<u64, Error> {
+    pub(crate) fn get_processing_fee(&self, epoch_pool: &EpochPool, transaction: TransactionArg) -> Result<u64, Error> {
         let element = self
-            .drive
             .grove
             .get(
-                self.get_path(),
-                constants::KEY_PROCESSING_FEE.as_slice(),
+                epoch_pool.get_path(),
+                tree_key_constants::KEY_POOL_PROCESSING_FEES.as_slice(),
                 transaction,
             )
             .unwrap()
@@ -63,13 +59,12 @@ impl<'e> EpochPool<'e> {
         }
     }
 
-    pub fn get_fee_multiplier(&self, transaction: TransactionArg) -> Result<u64, Error> {
+    pub(crate) fn get_fee_multiplier(&self, epoch_pool: &EpochPool, transaction: TransactionArg) -> Result<u64, Error> {
         let element = self
-            .drive
             .grove
             .get(
-                self.get_path(),
-                constants::KEY_FEE_MULTIPLIER.as_slice(),
+                epoch_pool.get_path(),
+                tree_key_constants::KEY_FEE_MULTIPLIER.as_slice(),
                 transaction,
             )
             .unwrap()
@@ -90,74 +85,10 @@ impl<'e> EpochPool<'e> {
         }
     }
 
-    pub fn add_update_fee_multiplier_operations(
-        &self,
-        batch: &mut Batch,
-        multiplier: u64,
-    ) -> Result<(), Error> {
-        batch.insert(PathKeyElementInfo::PathFixedSizeKeyElement((
-            self.get_path(),
-            constants::KEY_FEE_MULTIPLIER.as_slice(),
-            Element::Item(multiplier.to_le_bytes().to_vec(), None),
-        )))
-    }
+    pub fn get_total_fees(&self, epoch_pool: &EpochPool, transaction: TransactionArg) -> Result<Decimal, Error> {
+        let storage_fee = self.get_storage_fee(epoch_pool, transaction)?;
 
-    pub fn add_update_processing_fee_operations(
-        &self,
-        batch: &mut Batch,
-        processing_fee: u64,
-    ) -> Result<(), Error> {
-        batch.insert(PathKeyElementInfo::PathFixedSizeKeyElement((
-            self.get_path(),
-            constants::KEY_PROCESSING_FEE.as_slice(),
-            Element::Item(processing_fee.to_le_bytes().to_vec(), None),
-        )))
-    }
-
-    pub fn add_delete_processing_fee_operations(
-        &self,
-        batch: &mut Batch,
-        transaction: TransactionArg,
-    ) -> Result<(), Error> {
-        batch.delete(
-            self.get_path(),
-            constants::KEY_PROCESSING_FEE.as_slice(),
-            false,
-            transaction,
-        )
-    }
-
-    pub fn add_update_storage_fee_operations(
-        &self,
-        batch: &mut Batch,
-        storage_fee: Decimal,
-    ) -> Result<(), Error> {
-        batch.insert(PathKeyElementInfo::PathFixedSizeKeyElement((
-            self.get_path(),
-            constants::KEY_STORAGE_FEE.as_slice(),
-            Element::Item(storage_fee.serialize().to_vec(), None),
-        )))?;
-
-        Ok(())
-    }
-
-    pub fn add_delete_storage_fee_operations(
-        &self,
-        batch: &mut Batch,
-        transaction: TransactionArg,
-    ) -> Result<(), Error> {
-        batch.delete(
-            self.get_path(),
-            constants::KEY_STORAGE_FEE.as_slice(),
-            false,
-            transaction,
-        )
-    }
-
-    pub fn get_total_fees(&self, transaction: TransactionArg) -> Result<Decimal, Error> {
-        let storage_fee = self.get_storage_fee(transaction)?;
-
-        let processing_fee = self.get_processing_fee(transaction)?;
+        let processing_fee = self.get_processing_fee(epoch_pool, transaction)?;
 
         let processing_fee = Decimal::from(processing_fee);
 
@@ -167,18 +98,9 @@ impl<'e> EpochPool<'e> {
 
 #[cfg(test)]
 mod tests {
-    use crate::drive::storage::batch::Batch;
     use grovedb::Element;
     use rust_decimal::Decimal;
     use rust_decimal_macros::dec;
-
-    use crate::{
-        error::{self, fee::FeeError},
-        fee::pools::{
-            epoch::{constants, epoch_pool::EpochPool},
-            tests::helpers::setup::{setup_drive, setup_fee_pools},
-        },
-    };
 
     mod update_storage_fee {
         #[test]
@@ -188,7 +110,7 @@ mod tests {
 
             let epoch = super::EpochPool::new(7000, &drive);
 
-            let mut batch = super::Batch::new(&drive);
+            let mut batch = super::GroveDbOpBatch::new(&drive);
 
             epoch
                 .add_update_storage_fee_operations(&mut batch, super::dec!(42.0))
@@ -217,7 +139,7 @@ mod tests {
 
             let storage_fee = super::dec!(42.0);
 
-            let mut batch = super::Batch::new(&drive);
+            let mut batch = super::GroveDbOpBatch::new(&drive);
 
             epoch
                 .add_update_storage_fee_operations(&mut batch, storage_fee)
@@ -295,7 +217,7 @@ mod tests {
 
             let epoch = super::EpochPool::new(7000, &drive);
 
-            let mut batch = super::Batch::new(&drive);
+            let mut batch = super::GroveDbOpBatch::new(&drive);
 
             epoch
                 .add_update_processing_fee_operations(&mut batch, 42)
@@ -324,7 +246,7 @@ mod tests {
 
             let processing_fee: u64 = 42;
 
-            let mut batch = super::Batch::new(&drive);
+            let mut batch = super::GroveDbOpBatch::new(&drive);
 
             epoch
                 .add_update_processing_fee_operations(&mut batch, processing_fee)
@@ -385,7 +307,7 @@ mod tests {
 
         let epoch = EpochPool::new(0, &drive);
 
-        let mut batch = super::Batch::new(&drive);
+        let mut batch = super::GroveDbOpBatch::new(&drive);
 
         epoch
             .add_update_processing_fee_operations(&mut batch, processing_fee)
@@ -468,7 +390,7 @@ mod tests {
 
             let multiplier = 42;
 
-            let mut batch = super::Batch::new(&drive);
+            let mut batch = super::GroveDbOpBatch::new(&drive);
 
             epoch
                 .add_init_empty_operations(&mut batch)

@@ -6,6 +6,7 @@ use dpp::identity::Identity;
 use grovedb::{PathQuery, Transaction, TransactionArg};
 use neon::prelude::*;
 use neon::types::JsDate;
+use dash_abci::abci::messages::InitChainRequest;
 use rs_drive::drive::abci::handlers;
 use rs_drive::drive::abci::messages::{
     BlockBeginRequest, BlockEndRequest, InitChainRequest, Serializable,

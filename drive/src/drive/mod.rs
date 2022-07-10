@@ -9,17 +9,13 @@ use object_size_info::DocumentAndContractInfo;
 use object_size_info::DocumentInfo::DocumentSize;
 
 use crate::contract::Contract;
-use crate::drive::block::BlockExecutionContext;
+use crate::drive::batch::GroveDbOpBatch;
 use crate::drive::config::DriveConfig;
 use crate::drive::object_size_info::KeyInfo;
-use crate::drive::storage::batch::Batch;
 use crate::error::Error;
 use crate::fee::op::DriveOperation;
 use crate::fee::op::DriveOperation::GroveOperation;
-use crate::fee::pools::fee_pools::FeePools;
 
-pub mod abci;
-pub mod block;
 pub mod config;
 pub mod contract;
 pub mod defaults;
@@ -30,14 +26,19 @@ mod grove_operations;
 pub mod identity;
 pub mod object_size_info;
 pub mod query;
-pub mod storage;
+pub mod fee_pools;
+pub mod batch;
+
+pub struct DriveCache {
+    pub cached_contracts: Cache<[u8; 32], Arc<Contract>>,
+    pub genesis_time_ms: Option<u64>,
+}
 
 pub struct Drive {
     pub grove: GroveDb,
     pub config: DriveConfig,
     pub fee_pools: FeePools,
-    pub cached_contracts: RefCell<Cache<[u8; 32], Arc<Contract>>>, //HashMap<[u8; 32], Rc<Contract>>>,
-    pub block_execution_context: RefCell<Option<BlockExecutionContext>>,
+    pub cache: RefCell<DriveCache>,
 }
 
 #[repr(u8)]
@@ -90,9 +91,11 @@ impl Drive {
             Ok(grove) => Ok(Drive {
                 grove,
                 config: config.unwrap_or_default(),
-                cached_contracts: RefCell::new(Cache::new(200)),
                 fee_pools: FeePools::new(),
-                block_execution_context: RefCell::new(None),
+                cache: RefCell::new(DriveCache {
+                    cached_contracts: Cache::new(200),
+                    genesis_time_ms: config.map( |c| c.default_genesis_time)
+                })
             }),
             Err(e) => Err(Error::GroveDB(e)),
         }
@@ -130,7 +133,7 @@ impl Drive {
     }
 
     pub fn create_initial_state_structure(&self, transaction: TransactionArg) -> Result<(), Error> {
-        let mut batch = Batch::new(self);
+        let mut batch = GroveDbOpBatch::new();
 
         batch.insert_empty_tree(
             [],

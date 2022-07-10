@@ -3,7 +3,7 @@ use crate::error::Error;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
-pub const EPOCH_CHANGE_TIME: i64 = 1576800000;
+pub const EPOCH_CHANGE_TIME: u64 = 1576800000;
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -21,18 +21,18 @@ impl EpochInfo {
     }
 
     pub fn calculate(
-        genesis_time: i64,
-        block_time: i64,
-        previous_block_time: Option<i64>,
+        genesis_time_ms: u64,
+        block_time_ms: u64,
+        previous_block_time_ms: Option<u64>,
     ) -> Result<EpochInfo, Error> {
-        let previous_block_time = match previous_block_time {
+        let previous_block_time = match previous_block_time_ms {
             Some(block_time) => block_time,
             None => return Ok(EpochInfo::default()),
         };
 
         let epoch_change_time = Decimal::from(EPOCH_CHANGE_TIME);
-        let block_time = Decimal::from(block_time);
-        let genesis_time = Decimal::from(genesis_time);
+        let block_time = Decimal::from(block_time_ms);
+        let genesis_time = Decimal::from(genesis_time_ms);
         let previous_block_time = Decimal::from(previous_block_time);
 
         let prev_epoch_index = (previous_block_time - genesis_time) / epoch_change_time;
@@ -58,15 +58,16 @@ impl EpochInfo {
 
 #[cfg(test)]
 mod test {
-    use crate::fee::epoch::EpochInfo;
 
     mod calculate {
+        use crate::fee::epoch::EpochInfo;
+
         #[test]
         fn test_epoch_change_to_0_epoch() {
-            let genesis_time: i64 = 1655396517902;
-            let block_time: i64 = 1655396517922;
+            let genesis_time_ms: u64 = 1655396517902;
+            let block_time_ms: u64 = 1655396517922;
 
-            let epoch_info = super::EpochInfo::calculate(genesis_time, block_time, None)
+            let epoch_info = EpochInfo::calculate(genesis_time_ms, block_time_ms, None)
                 .expect("should calculate epoch info");
 
             assert_eq!(epoch_info.current_epoch_index, 0);
@@ -75,12 +76,12 @@ mod test {
 
         #[test]
         fn test_no_epoch_change() {
-            let genesis_time: i64 = 1655396517902;
-            let block_time: i64 = 1655396517922;
-            let prev_block_time: i64 = 1655396517912;
+            let genesis_time_ms: u64 = 1655396517902;
+            let block_time_ms: u64 = 1655396517922;
+            let prev_block_time_ms: u64 = 1655396517912;
 
             let epoch_info =
-                super::EpochInfo::calculate(genesis_time, block_time, Some(prev_block_time))
+                EpochInfo::calculate(genesis_time_ms, block_time_ms, Some(prev_block_time_ms))
                     .expect("should calculate epoch info");
 
             assert_eq!(epoch_info.current_epoch_index, 0);
@@ -89,12 +90,12 @@ mod test {
 
         #[test]
         fn test_epoch_change_to_epoch_1() {
-            let genesis_time: i64 = 1655396517902;
-            let prev_block_time: i64 = 1655396517912;
-            let block_time: i64 = 1657125244561;
+            let genesis_time_ms: u64 = 1655396517902;
+            let prev_block_time_ms: u64 = 1655396517912;
+            let block_time_ms: u64 = 1657125244561;
 
             let epoch_info =
-                super::EpochInfo::calculate(genesis_time, block_time, Some(prev_block_time))
+                EpochInfo::calculate(genesis_time_ms, block_time_ms, Some(prev_block_time_ms))
                     .expect("should calculate epoch info");
 
             assert_eq!(epoch_info.current_epoch_index, 1);

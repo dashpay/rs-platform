@@ -1,27 +1,25 @@
 use crate::drive::object_size_info::PathKeyElementInfo;
-use crate::drive::storage::batch::Batch;
 use crate::drive::Drive;
 use grovedb::{Element, TransactionArg};
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
+use crate::drive::batch::GroveDbOpBatch;
 
 use crate::error::fee::FeeError;
 use crate::error::Error;
-use crate::fee::pools::epoch::epoch_pool::EpochPool;
-use crate::fee::pools::fee_pools::FeePools;
+use crate::fee_pools::epoch_pool::EpochPool;
 
 use super::constants;
 
-impl FeePools {
+impl Drive {
     pub fn distribute_storage_fee_distribution_pool(
         &self,
-        drive: &Drive,
-        batch: &mut Batch,
         epoch_index: u16,
         transaction: TransactionArg,
+        batch: &mut GroveDbOpBatch,
     ) -> Result<(), Error> {
         let storage_distribution_fees =
-            self.get_storage_fee_distribution_pool_fees(drive, transaction)?;
+            self.get_storage_fee_distribution_pool_fees(transaction)?;
         let storage_distribution_fees = Decimal::new(storage_distribution_fees, 0);
 
         // a separate buffer from which we withdraw to correctly calculate fee share
@@ -40,7 +38,7 @@ impl FeePools {
             let starting_epoch_index = epoch_index + year * 20;
 
             for index in starting_epoch_index..starting_epoch_index + 20 {
-                let epoch_pool = EpochPool::new(index, drive);
+                let epoch_pool = EpochPool::new(index);
 
                 let storage_fee = epoch_pool.get_storage_fee(transaction)?;
 
@@ -66,24 +64,11 @@ impl FeePools {
         Ok(())
     }
 
-    pub fn add_update_storage_fee_distribution_pool_operations(
-        &self,
-        batch: &mut Batch,
-        storage_fee: i64,
-    ) -> Result<(), Error> {
-        batch.insert(PathKeyElementInfo::PathFixedSizeKeyElement((
-            FeePools::get_path(),
-            constants::KEY_STORAGE_FEE_POOL.as_slice(),
-            Element::Item(storage_fee.to_le_bytes().to_vec(), None),
-        )))
-    }
-
     pub fn get_storage_fee_distribution_pool_fees(
         &self,
-        drive: &Drive,
         transaction: TransactionArg,
     ) -> Result<i64, Error> {
-        let element = drive
+        let element = self
             .grove
             .get(
                 FeePools::get_path(),
@@ -121,7 +106,7 @@ mod tests {
     };
     use grovedb::Element;
 
-    use crate::drive::storage::batch::Batch;
+    use crate::drive::storage::batch::GroveDbOpBatch;
 
     mod helpers {
         use crate::drive::Drive;
@@ -136,7 +121,7 @@ mod tests {
         ) -> Vec<Decimal> {
             (epoch_index..epoch_index + 1000)
                 .map(|index| {
-                    let epoch_pool = EpochPool::new(index, &drive);
+                    let epoch_pool = EpochPool::new(index);
                     epoch_pool
                         .get_storage_fee(transaction)
                         .expect("should get storage fee")
@@ -164,7 +149,7 @@ mod tests {
 
             // Storage fee distribution pool is 0 after fee pools initialization
 
-            let mut batch = super::Batch::new(&drive);
+            let mut batch = super::GroveDbOpBatch::new();
 
             fee_pools
                 .distribute_storage_fee_distribution_pool(
@@ -199,7 +184,7 @@ mod tests {
             let storage_pool = i64::MAX;
             let epoch_index = 0;
 
-            let mut batch = super::Batch::new(&drive);
+            let mut batch = super::GroveDbOpBatch::new();
 
             fee_pools
                 .add_update_storage_fee_distribution_pool_operations(&mut batch, storage_pool)
@@ -210,7 +195,7 @@ mod tests {
                 .apply_batch(batch, false, Some(&transaction))
                 .expect("should apply batch");
 
-            let mut batch = super::Batch::new(&drive);
+            let mut batch = super::GroveDbOpBatch::new(&drive);
 
             fee_pools
                 .distribute_storage_fee_distribution_pool(
@@ -241,7 +226,7 @@ mod tests {
             let storage_pool = 1000;
             let epoch_index = 42;
 
-            let mut batch = super::Batch::new(&drive);
+            let mut batch = super::GroveDbOpBatch::new(&drive);
 
             // init additional epoch pools as it will be done in epoch_change
             for i in 1000..=1000 + epoch_index {
@@ -260,7 +245,7 @@ mod tests {
                 .apply_batch(batch, false, Some(&transaction))
                 .expect("should apply batch");
 
-            let mut batch = super::Batch::new(&drive);
+            let mut batch = super::GroveDbOpBatch::new(&drive);
 
             fee_pools
                 .distribute_storage_fee_distribution_pool(
@@ -399,7 +384,7 @@ mod tests {
 
              */
 
-            let mut batch = super::Batch::new(&drive);
+            let mut batch = super::GroveDbOpBatch::new(&drive);
 
             // refill storage fee pool once more
             fee_pools
@@ -411,7 +396,7 @@ mod tests {
                 .apply_batch(batch, false, Some(&transaction))
                 .expect("should apply batch");
 
-            let mut batch = super::Batch::new(&drive);
+            let mut batch = super::GroveDbOpBatch::new(&drive);
 
             // distribute fees once more
             fee_pools
@@ -455,7 +440,7 @@ mod tests {
 
             let storage_fee = 42;
 
-            let mut batch = super::Batch::new(&drive);
+            let mut batch = super::GroveDbOpBatch::new(&drive);
 
             fee_pools
                 .add_update_storage_fee_distribution_pool_operations(&mut batch, storage_fee)
@@ -482,7 +467,7 @@ mod tests {
 
             let storage_fee = 42;
 
-            let mut batch = super::Batch::new(&drive);
+            let mut batch = super::GroveDbOpBatch::new(&drive);
 
             fee_pools
                 .add_update_storage_fee_distribution_pool_operations(&mut batch, storage_fee)
@@ -528,7 +513,7 @@ mod tests {
             let drive = super::setup_drive();
             let (transaction, fee_pools) = super::setup_fee_pools(&drive, None);
 
-            let mut batch = super::Batch::new(&drive);
+            let mut batch = super::GroveDbOpBatch::new(&drive);
 
             batch
                 .insert(super::PathKeyElementInfo::PathFixedSizeKeyElement((

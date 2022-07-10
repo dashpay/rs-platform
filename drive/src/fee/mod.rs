@@ -7,7 +7,7 @@ use crate::fee::op::{BaseOp, DriveCost, DriveOperation};
 pub mod default_costs;
 pub mod epoch;
 pub mod op;
-pub(crate) mod pools;
+pub mod fees_aggregate;
 
 pub fn calculate_fee(
     base_operations: Option<EnumMap<BaseOp, u64>>,
