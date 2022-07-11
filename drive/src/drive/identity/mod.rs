@@ -1,11 +1,9 @@
 use dpp::identity::Identity;
 use grovedb::{Element, TransactionArg};
-use std::ops::Deref;
 
 use crate::drive::flags::StorageFlags;
-use crate::drive::object_size_info::KeyInfo;
-use crate::drive::object_size_info::PathKeyElementInfo::PathFixedSizeKeyElement;
 use crate::drive::{Drive, RootTree};
+use crate::drive::batch::GroveDbOpBatch;
 use crate::error::drive::DriveError;
 use crate::error::identity::IdentityError;
 use crate::error::Error;
@@ -17,51 +15,44 @@ const IDENTITY_KEY: [u8; 1] = [0];
 impl Drive {
     pub fn add_insert_identity_operations(
         &self,
-        batch: &mut GroveDbOpBatch,
         identity: Identity,
+        storage_flags: StorageFlags,
+        batch: &mut GroveDbOpBatch,
     ) -> Result<(), Error> {
-        let block_execution_context = self.block_execution_context.borrow();
-        let epoch = match block_execution_context.deref() {
-            Some(block_execution_context) => block_execution_context.epoch_info.current_epoch_index,
-            None => 0,
-        };
-
-        let storage_flags = StorageFlags { epoch };
-
         let identity_bytes = identity.to_buffer().map_err(|_| {
             Error::Identity(IdentityError::IdentitySerialization(
                 "failed to serialize identity to CBOR",
             ))
         })?;
 
-        let identities_tree_key = Into::<&[u8; 1]>::into(RootTree::Identities).as_slice();
+        batch.add_insert_empty_tree_with_flags(
+            vec![vec![RootTree::Identities as u8]],
+            identity.id.buffer.to_vec(),
+            &storage_flags,
+        );
 
-        batch.insert_empty_tree(
-            [identities_tree_key],
-            KeyInfo::KeyRef(&identity.id.buffer),
-            Some(&storage_flags),
-        )?;
-
-        batch.insert(PathFixedSizeKeyElement((
-            [identities_tree_key, &identity.id.buffer],
-            &IDENTITY_KEY,
+        batch.add_insert(vec![vec![RootTree::Identities as u8], identity.id.buffer.to_vec()],
+            IDENTITY_KEY.to_vec(),
             Element::Item(identity_bytes, storage_flags.to_element_flags()),
-        )))
+        );
+
+        Ok(())
     }
 
     pub fn insert_identity(
         &self,
         identity: Identity,
         apply: bool,
+        storage_flags: StorageFlags,
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
-        let mut batch = GroveDbOpBatch::new(self);
+        let mut batch = GroveDbOpBatch::new();
 
-        self.add_insert_identity_operations(&mut batch, identity)?;
+        self.add_insert_identity_operations(identity, storage_flags, &mut batch)?;
 
         let mut drive_operations: Vec<DriveOperation> = vec![];
 
-        self.apply_batch_operations(apply, transaction, batch.operations, &mut drive_operations)?;
+        self.apply_batch_grovedb_operations(apply, transaction, batch, &mut drive_operations)?;
 
         calculate_fee(None, Some(drive_operations))
     }
@@ -70,7 +61,7 @@ impl Drive {
         &self,
         id: &[u8],
         transaction: TransactionArg,
-    ) -> Result<Identity, Error> {
+    ) -> Result<(Identity, StorageFlags), Error> {
         let element = self
             .grove
             .get(
@@ -81,14 +72,14 @@ impl Drive {
             .unwrap()
             .map_err(Error::GroveDB)?;
 
-        if let Element::Item(identity_cbor, _) = element {
+        if let Element::Item(identity_cbor, element_flags) = element {
             let identity = Identity::from_buffer(identity_cbor.as_slice()).map_err(|_| {
                 Error::Identity(IdentityError::IdentitySerialization(
                     "failed to de-serialize identity from CBOR",
                 ))
             })?;
 
-            Ok(identity)
+            Ok((identity, StorageFlags::from_element_flags(element_flags)?))
         } else {
             Err(Error::Drive(DriveError::CorruptedIdentityNotItem(
                 "identity must be an item",
@@ -100,8 +91,9 @@ impl Drive {
 #[cfg(test)]
 mod tests {
     use dpp::identity::Identity;
+    use crate::common::tests::helpers::setup::setup_drive;
+    use crate::drive::flags::StorageFlags;
 
-    use crate::fee::pools::tests::helpers::setup::setup_drive;
 
     #[test]
     fn test_insert_and_fetch_identity() {
@@ -119,10 +111,10 @@ mod tests {
             .expect("expected to deserialize an identity");
 
         drive
-            .insert_identity(identity.clone(), true, Some(&transaction))
+            .insert_identity(identity.clone(), true, StorageFlags::default(), Some(&transaction))
             .expect("expected to insert identity");
 
-        let fetched_identity = drive
+        let (fetched_identity, _) = drive
             .fetch_identity(&identity.id.buffer, Some(&transaction))
             .expect("should fetch an identity");
 

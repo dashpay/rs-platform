@@ -1,9 +1,11 @@
+pub mod operations;
+
 use crate::drive::{Drive, RootTree};
 use crate::error::drive::DriveError;
 use crate::error::Error;
 use grovedb::{Element, TransactionArg};
 use std::array::TryFromSliceError;
-use grovedb::batch::{GroveDbOp, Op};
+use crate::drive::genesis_time::operations::update_genesis_time_operation;
 
 const KEY_GENESIS_TIME: &[u8; 1] = b"g";
 
@@ -19,11 +21,11 @@ impl Drive {
             .unwrap()
             .map(Some)
             .or_else(|e| match e {
-                Error::GroveDB(grovedb::Error::PathKeyNotFound(_)) => Ok(None),
+                grovedb::Error::PathKeyNotFound(_) => Ok(None),
                 _ => Err(e),
             })?;
 
-        if let Element::Item(item, _) = element {
+        if let Some(Element::Item(item, _)) = element {
             let genesis_time = u64::from_be_bytes(item.as_slice().try_into().map_err(
                 |e: TryFromSliceError| {
                     Error::Drive(DriveError::CorruptedGenesisTimeInvalidItemLength(
@@ -41,25 +43,10 @@ impl Drive {
     pub fn init_genesis(&self,
                         genesis_time: u64,
                         transaction: TransactionArg,
-    ) {
-        let op = self.update_genesis_time_operation(genesis_time)?;
+    ) -> Result<(), Error> {
+        let op = update_genesis_time_operation(genesis_time);
 
-        self.grove_apply_batch_with_add_costs(vec![op], false, transaction)?;
-
-        request.block_time
-    }
-
-    pub fn update_genesis_time_operation(
-        genesis_time: u64,
-    ) -> GroveDbOp {
-        GroveDbOp {
-            path: vec![vec![RootTree::SpentAssetLockTransactions as u8]],
-            key: KEY_GENESIS_TIME.to_vec(),
-            //todo make this into a Op::Replace
-            op: Op::Insert {
-                element: Element::Item(genesis_time.to_be_bytes().to_vec(), None)
-            }
-        }
+        self.grove_apply_operation(op, false, transaction)
     }
 }
 
@@ -68,11 +55,10 @@ mod tests {
     use crate::drive::genesis_time::KEY_GENESIS_TIME;
     use crate::drive::RootTree;
     use crate::error;
-    use crate::fee::pools::tests::helpers::setup::setup_drive;
     use grovedb::Element;
+    use crate::common::tests::helpers::setup::setup_drive;
 
     mod get_genesis_time {
-
         #[test]
         fn test_error_if_fee_pools_is_not_initiated() {
             let drive = super::setup_drive();
@@ -105,7 +91,7 @@ mod tests {
                             .as_slice(),
                     ],
                     super::KEY_GENESIS_TIME.as_slice(),
-                    super::Element::Item(u128::MAX.to_le_bytes().to_vec(), None),
+                    super::Element::Item(u128::MAX.to_be_bytes().to_vec(), None),
                     None,
                 )
                 .unwrap()
@@ -126,21 +112,21 @@ mod tests {
     }
 
     mod update_genesis_time {
-        use crate::drive::storage::batch::GroveDbOpBatch;
+        use crate::common::tests::helpers::setup::setup_drive;
+        use crate::drive::batch::GroveDbOpBatch;
+        use crate::drive::genesis_time::operations::update_genesis_time_operation;
 
         #[test]
         fn test_error_if_fee_pools_is_not_initiated() {
-            let drive = super::setup_drive();
+            let drive = setup_drive();
 
             let genesis_time: u64 = 1655396517902;
 
-            let mut batch = GroveDbOpBatch::new(&drive);
+            let mut batch = GroveDbOpBatch::new();
 
-            drive
-                .add_update_genesis_time_operations(&mut batch, genesis_time)
-                .expect("should update genesis time");
+            batch.push(update_genesis_time_operation(genesis_time));
 
-            match drive.apply_batch(batch, false, None) {
+            match drive.grove_apply_batch(batch, false, None) {
                 Ok(_) => assert!(
                     false,
                     "should not be able to update genesis time on uninit fee pools"
@@ -156,7 +142,7 @@ mod tests {
 
         #[test]
         fn test_value_is_set() {
-            let drive = super::setup_drive();
+            let drive = setup_drive();
 
             drive
                 .create_initial_state_structure(None)
@@ -164,19 +150,16 @@ mod tests {
 
             let genesis_time: u64 = 1655396517902;
 
-            let mut batch = GroveDbOpBatch::new(&drive);
+            let op = update_genesis_time_operation(genesis_time);
 
             drive
-                .add_update_genesis_time_operations(&mut batch, genesis_time)
-                .expect("should update genesis time");
-
-            drive
-                .apply_batch(batch, false, None)
+                .grove_apply_operation(op, false, None)
                 .expect("should apply batch");
 
             let stored_genesis_time = drive
                 .get_genesis_time(None)
-                .expect("should get genesis time");
+                .expect("should not have an error getting genesis time")
+                .expect("should have a genesis time");
 
             assert_eq!(stored_genesis_time, genesis_time);
         }

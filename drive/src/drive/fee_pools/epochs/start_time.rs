@@ -1,33 +1,43 @@
-pub mod paths;
-pub mod operations_factory;
-pub mod tree_key_constants;
+use grovedb::{Element, TransactionArg};
+use crate::drive::Drive;
+use crate::error::fee::FeeError;
+use crate::error::Error;
+use crate::fee_pools::epochs::EpochPool;
 
-pub struct EpochPool {
-    pub index: u16,
-    pub key: [u8; 2],
-}
+use crate::fee_pools::epochs::tree_key_constants;
 
-impl EpochPool {
-    pub fn new(index: u16) -> EpochPool {
-        EpochPool {
-            index,
-            key: index.to_be_bytes(),
+impl Drive {
+    pub fn get_epoch_pool_start_time(&self, epoch_pool: &EpochPool, transaction: TransactionArg) -> Result<u64, Error> {
+        let element = self
+            .grove
+            .get(
+                epoch_pool.get_path(),
+                tree_key_constants::KEY_START_TIME.as_slice(),
+                transaction,
+            )
+            .unwrap()
+            .map_err(Error::GroveDB)?;
+
+        if let Element::Item(item, _) = element {
+            Ok(u64::from_be_bytes(item.as_slice().try_into().map_err(
+                |_| Error::Fee(FeeError::CorruptedStartTimeLength()),
+            )?))
+        } else {
+            Err(Error::Fee(FeeError::CorruptedStartTimeNotItem()))
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::drive::storage::batch::GroveDbOpBatch;
     use chrono::Utc;
     use grovedb::Element;
     use rust_decimal_macros::dec;
+    use crate::drive::batch::GroveDbOpBatch;
+    use crate::common::tests::helpers::setup::{setup_drive, setup_fee_pools};
 
     use crate::error;
     use crate::error::fee::FeeError;
-    use crate::fee::pools::epoch::constants;
-    use crate::fee::pools::tests::helpers::setup::SetupFeePoolsOptions;
-    use crate::fee::pools::tests::helpers::setup::{setup_drive, setup_fee_pools};
 
     use super::EpochPool;
 
@@ -37,40 +47,41 @@ mod tests {
 
         let (transaction, _) = setup_fee_pools(&drive, None);
 
-        let epoch_pool = super::EpochPool::new(0, &drive);
+        let epoch_pool = super::EpochPool::new(0);
 
-        let start_time: i64 = Utc::now().timestamp_millis();
+        let start_time_ms: u64 = Utc::now().timestamp_millis() as u64;
 
-        let mut batch = GroveDbOpBatch::new(&drive);
+        let mut batch = GroveDbOpBatch::new();
 
-        epoch_pool
-            .add_update_start_time_operations(&mut batch, start_time)
-            .expect("should update start time");
+        batch.push(epoch_pool
+            .update_start_time_operation(start_time_ms));
 
         drive
-            .apply_batch(batch, false, Some(&transaction))
+            .grove_apply_batch(batch, false, Some(&transaction))
             .expect("should apply batch");
 
-        let actual_start_time = epoch_pool
-            .get_start_time(Some(&transaction))
+        let actual_start_time_ms = drive
+            .get_epoch_pool_start_time(&epoch_pool,Some(&transaction))
             .expect("should get start time");
 
-        assert_eq!(start_time, actual_start_time);
+        assert_eq!(start_time_ms, actual_start_time_ms);
     }
 
     mod get_start_time {
+        use crate::fee_pools::epochs::tree_key_constants::KEY_START_TIME;
+
         #[test]
         fn test_error_if_epoch_pool_is_not_initiated() {
             let drive = super::setup_drive();
 
             let (transaction, _) = super::setup_fee_pools(&drive, None);
 
-            let non_initiated_epoch_pool = super::EpochPool::new(7000, &drive);
+            let non_initiated_epoch_pool = super::EpochPool::new(7000);
 
-            match non_initiated_epoch_pool.get_start_time(Some(&transaction)) {
+            match drive.get_epoch_pool_start_time(&non_initiated_epoch_pool, Some(&transaction)) {
                 Ok(_) => assert!(
                     false,
-                    "should not be able to get start time on uninit epoch pool"
+                    "should not be able to get start time on uninit epochs pool"
                 ),
                 Err(e) => match e {
                     super::error::Error::GroveDB(grovedb::Error::PathNotFound(_)) => assert!(true),
@@ -85,9 +96,9 @@ mod tests {
 
             let (transaction, _) = super::setup_fee_pools(&drive, None);
 
-            let epoch_pool = super::EpochPool::new(0, &drive);
+            let epoch_pool = super::EpochPool::new(0);
 
-            match epoch_pool.get_start_time(Some(&transaction)) {
+            match drive.get_epoch_pool_start_time(&epoch_pool, Some(&transaction)) {
                 Ok(_) => assert!(false, "must be an error"),
                 Err(e) => match e {
                     super::error::Error::GroveDB(_) => assert!(true),
@@ -102,13 +113,13 @@ mod tests {
 
             let (transaction, _) = super::setup_fee_pools(&drive, None);
 
-            let epoch_pool = super::EpochPool::new(0, &drive);
+            let epoch_pool = super::EpochPool::new(0);
 
             drive
                 .grove
                 .insert(
                     epoch_pool.get_path(),
-                    super::constants::KEY_START_TIME.as_slice(),
+                    KEY_START_TIME.as_slice(),
                     super::Element::empty_tree(),
                     Some(&transaction),
                 )
@@ -132,153 +143,23 @@ mod tests {
 
             let (transaction, _) = super::setup_fee_pools(&drive, None);
 
-            let epoch_pool = super::EpochPool::new(0, &drive);
+            let epoch_pool = super::EpochPool::new(0);
 
             drive
                 .grove
                 .insert(
                     epoch_pool.get_path(),
-                    super::constants::KEY_START_TIME.as_slice(),
+                    KEY_START_TIME.as_slice(),
                     super::Element::Item(u128::MAX.to_be_bytes().to_vec(), None),
                     Some(&transaction),
                 )
                 .unwrap()
                 .expect("should insert invalid data");
 
-            match epoch_pool.get_start_time(Some(&transaction)) {
+            match drive.get_epoch_pool_start_time(&epoch_pool, Some(&transaction)) {
                 Ok(_) => assert!(false, "must be an error"),
                 Err(e) => match e {
                     super::error::Error::Fee(super::FeeError::CorruptedStartTimeLength()) => {
-                        assert!(true)
-                    }
-                    _ => assert!(false, "invalid error type"),
-                },
-            }
-        }
-    }
-
-    #[test]
-    fn test_update_start_block_height() {
-        let drive = setup_drive();
-
-        let (transaction, _) = setup_fee_pools(&drive, None);
-
-        let epoch_pool = EpochPool::new(0, &drive);
-
-        let start_block_height = 1;
-
-        let mut batch = GroveDbOpBatch::new(&drive);
-
-        epoch_pool
-            .add_update_start_block_height_operations(&mut batch, start_block_height)
-            .expect("should update start block height");
-
-        drive
-            .apply_batch(batch, false, Some(&transaction))
-            .expect("should apply batch");
-
-        let actual_start_block_height = epoch_pool
-            .get_start_block_height(Some(&transaction))
-            .expect("should get start block height");
-
-        assert_eq!(start_block_height, actual_start_block_height);
-    }
-
-    mod get_start_block_height {
-        #[test]
-        fn test_error_if_epoch_pool_is_not_initiated() {
-            let drive = super::setup_drive();
-
-            let (transaction, _) = super::setup_fee_pools(&drive, None);
-
-            let non_initiated_epoch_pool = super::EpochPool::new(7000, &drive);
-
-            match non_initiated_epoch_pool.get_start_block_height(Some(&transaction)) {
-                Ok(_) => assert!(
-                    false,
-                    "should not be able to get start block height on uninit epoch pool"
-                ),
-                Err(e) => match e {
-                    super::error::Error::GroveDB(grovedb::Error::PathNotFound(_)) => assert!(true),
-                    _ => assert!(false, "invalid error type"),
-                },
-            }
-        }
-
-        #[test]
-        fn test_error_if_value_is_not_set() {
-            let drive = super::setup_drive();
-
-            let (transaction, _) = super::setup_fee_pools(&drive, None);
-
-            let epoch_pool = super::EpochPool::new(0, &drive);
-
-            match epoch_pool.get_start_block_height(Some(&transaction)) {
-                Ok(_) => assert!(false, "must be an error"),
-                Err(e) => match e {
-                    super::error::Error::GroveDB(_) => assert!(true),
-                    _ => assert!(false, "invalid error type"),
-                },
-            }
-        }
-
-        #[test]
-        fn test_error_if_value_has_invalid_length() {
-            let drive = super::setup_drive();
-
-            let (transaction, _) = super::setup_fee_pools(&drive, None);
-
-            let epoch_pool = super::EpochPool::new(0, &drive);
-
-            drive
-                .grove
-                .insert(
-                    epoch_pool.get_path(),
-                    super::constants::KEY_START_BLOCK_HEIGHT.as_slice(),
-                    super::Element::Item(u128::MAX.to_be_bytes().to_vec(), None),
-                    Some(&transaction),
-                )
-                .unwrap()
-                .expect("should insert invalid data");
-
-            match epoch_pool.get_start_block_height(Some(&transaction)) {
-                Ok(_) => assert!(false, "should not be able to decode stored value"),
-                Err(e) => match e {
-                    super::error::Error::Fee(
-                        super::FeeError::CorruptedStartBlockHeightItemLength(),
-                    ) => {
-                        assert!(true)
-                    }
-                    _ => assert!(false, "invalid error type"),
-                },
-            }
-        }
-
-        #[test]
-        fn test_error_if_element_has_invalid_type() {
-            let drive = super::setup_drive();
-
-            let (transaction, _) = super::setup_fee_pools(&drive, None);
-
-            let epoch_pool = super::EpochPool::new(0, &drive);
-
-            drive
-                .grove
-                .insert(
-                    epoch_pool.get_path(),
-                    super::constants::KEY_START_BLOCK_HEIGHT.as_slice(),
-                    super::Element::empty_tree(),
-                    Some(&transaction),
-                )
-                .unwrap()
-                .expect("should insert invalid data");
-
-            match epoch_pool.get_start_block_height(Some(&transaction)) {
-                Ok(_) => assert!(false, "should not be able to decode stored value"),
-                Err(e) => match e {
-                    super::error::Error::Fee(
-                        super::FeeError::CorruptedStartBlockHeightNotItem(),
-                    ) => {
                         assert!(true)
                     }
                     _ => assert!(false, "invalid error type"),
@@ -308,8 +189,8 @@ mod tests {
                 .add_init_empty_operations(&mut batch)
                 .expect("should init empty pool");
 
-            match drive.apply_batch(batch, false, Some(&transaction)) {
-                Ok(_) => assert!(false, "should not be able to init epoch without FeePools"),
+            match drive.grove_apply_batch(batch, false, Some(&transaction)) {
+                Ok(_) => assert!(false, "should not be able to init epochs without FeePools"),
                 Err(e) => match e {
                     super::error::Error::GroveDB(grovedb::Error::PathKeyNotFound(_)) => {
                         assert!(true)
@@ -330,10 +211,10 @@ mod tests {
 
             epoch
                 .add_init_empty_operations(&mut batch)
-                .expect("should init an epoch pool");
+                .expect("should init an epochs pool");
 
             drive
-                .apply_batch(batch, false, Some(&transaction))
+                .grove_apply_batch(batch, false, Some(&transaction))
                 .expect("should apply batch");
 
             let storage_fee = epoch
@@ -362,14 +243,14 @@ mod tests {
 
             epoch
                 .add_init_empty_operations(&mut batch)
-                .expect("should init empty epoch pool");
+                .expect("should init empty epochs pool");
 
             epoch
                 .add_init_current_operations(multiplier, start_block_height, start_time, &mut batch)
-                .expect("should init an epoch pool");
+                .expect("should init an epochs pool");
 
             drive
-                .apply_batch(batch, false, Some(&transaction))
+                .grove_apply_batch(batch, false, Some(&transaction))
                 .expect("should apply batch");
 
             let stored_multiplier = epoch
@@ -418,21 +299,21 @@ mod tests {
 
             epoch
                 .add_init_current_operations(1, 2, 3, &mut batch)
-                .expect("should init an epoch pool");
+                .expect("should init an epochs pool");
 
             // Apply init current
             drive
-                .apply_batch(batch, false, Some(&transaction))
+                .grove_apply_batch(batch, false, Some(&transaction))
                 .expect("should apply batch");
 
             let mut batch = GroveDbOpBatch::new(&drive);
 
             epoch
                 .add_mark_as_paid_operations(&mut batch, Some(&transaction))
-                .expect("should mark epoch as paid");
+                .expect("should mark epochs as paid");
 
             drive
-                .apply_batch(batch, false, Some(&transaction))
+                .grove_apply_batch(batch, false, Some(&transaction))
                 .expect("should apply batch");
 
             match drive

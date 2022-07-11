@@ -213,7 +213,7 @@ mod tests {
                 let block_end_response = block_end(&drive, block_end_request, Some(&transaction))
                     .expect(format!("should end process block #{}", day).as_str());
 
-                // Should calculate correct current epoch
+                // Should calculate correct current epochs
                 let epoch_index = if day >= epoch_1_start_day { 1 } else { 0 };
 
                 assert_eq!(block_end_response.current_epoch_index, epoch_index);
@@ -223,7 +223,7 @@ mod tests {
                     previous_block_time.is_none() || day == epoch_1_start_day
                 );
 
-                // Should pay to 19 masternodes, when epoch 1 started
+                // Should pay to 19 masternodes, when epochs 1 started
                 let masternodes_paid_count = if day == epoch_1_start_day {
                     day as u16 - 1
                 } else {
@@ -235,15 +235,15 @@ mod tests {
                     masternodes_paid_count
                 );
 
-                // Should pay for the epoch 0, when epoch 1 started
+                // Should pay for the epochs 0, when epochs 1 started
                 match block_end_response.paid_epoch_index {
                     Some(index) => assert_eq!(
                         index, 0,
-                        "should pay to masternodes only when epoch 1 started"
+                        "should pay to masternodes only when epochs 1 started"
                     ),
                     None => assert_ne!(
                         day, epoch_1_start_day,
-                        "should pay to masternodes only when epoch 1 started"
+                        "should pay to masternodes only when epochs 1 started"
                     ),
                 }
             }

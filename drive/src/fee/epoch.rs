@@ -45,7 +45,7 @@ impl EpochInfo {
 
         let current_epoch_index: u16 = epoch_index_floored.try_into().map_err(|_| {
             Error::Fee(FeeError::DecimalConversion(
-                "can't convert epoch index from Decimal to u16",
+                "can't convert epochs index from Decimal to u16",
             ))
         })?;
 
@@ -68,7 +68,7 @@ mod test {
             let block_time_ms: u64 = 1655396517922;
 
             let epoch_info = EpochInfo::calculate(genesis_time_ms, block_time_ms, None)
-                .expect("should calculate epoch info");
+                .expect("should calculate epochs info");
 
             assert_eq!(epoch_info.current_epoch_index, 0);
             assert_eq!(epoch_info.is_epoch_change, true);
@@ -82,7 +82,7 @@ mod test {
 
             let epoch_info =
                 EpochInfo::calculate(genesis_time_ms, block_time_ms, Some(prev_block_time_ms))
-                    .expect("should calculate epoch info");
+                    .expect("should calculate epochs info");
 
             assert_eq!(epoch_info.current_epoch_index, 0);
             assert_eq!(epoch_info.is_epoch_change, false);
@@ -96,7 +96,7 @@ mod test {
 
             let epoch_info =
                 EpochInfo::calculate(genesis_time_ms, block_time_ms, Some(prev_block_time_ms))
-                    .expect("should calculate epoch info");
+                    .expect("should calculate epochs info");
 
             assert_eq!(epoch_info.current_epoch_index, 1);
             assert_eq!(epoch_info.is_epoch_change, true);

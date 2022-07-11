@@ -3,7 +3,7 @@ use rs_drive::drive::fee_pools::fee_distribution::DistributionInfo;
 use rs_drive::error::fee::FeeError;
 use rs_drive::fee::epoch::EpochInfo;
 use rs_drive::fee::fees_aggregate::FeesAggregate;
-use rs_drive::fee_pools::epoch_pool::EpochPool;
+use rs_drive::fee_pools::epochs::EpochPool;
 use rs_drive::query::GroveError::StorageError;
 use rs_drive::query::TransactionArg;
 use crate::block::BlockInfo;
@@ -23,7 +23,7 @@ impl Platform {
         if epoch_info.is_epoch_change {
             let mut batch = GroveDbOpBatch::new();
 
-            // make next epoch pool as a current
+            // make next epochs pool as a current
             // and create one more in future
             current_epoch_pool.add_shift_current_epoch_pool_operations(
                 &current_epoch_pool,
@@ -33,7 +33,7 @@ impl Platform {
                 &mut batch,
             );
 
-            // distribute accumulated previous epoch storage fees
+            // distribute accumulated previous epochs storage fees
             if current_epoch_pool.index > 0 {
                 self.distribute_storage_fee_distribution_pool(
 
@@ -43,7 +43,7 @@ impl Platform {
                 )?;
             }
 
-            // We need to apply new epoch tree structure and distributed storage fee
+            // We need to apply new epochs tree structure and distributed storage fee
             self.drive.grove_apply_batch(batch, false, transaction).map_err(StorageError)?;
         }
 
@@ -62,7 +62,7 @@ impl Platform {
         )?;
 
         // Move integer part of the leftovers to processing
-        // and fractional part to storage fees for the upcoming epoch
+        // and fractional part to storage fees for the upcoming epochs
         let storage_fees_leftovers: u64 = (distribution_info.fee_leftovers.fract())
             .try_into()
             .map_err(|_| {

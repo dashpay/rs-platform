@@ -3,9 +3,9 @@ use grovedb::batch::Op::Insert;
 use grovedb::{Element, TransactionArg};
 use crate::drive::batch::GroveDbOpBatch;
 use crate::drive::fee_pools::fee_pool_vec_path;
-use crate::fee_pools::epoch_pool::tree_key_constants::{KEY_FEE_MULTIPLIER, KEY_POOL_PROCESSING_FEES, KEY_POOL_STORAGE_FEES, KEY_START_BLOCK_HEIGHT, KEY_START_TIME};
+use crate::fee_pools::epochs::tree_key_constants::{KEY_FEE_MULTIPLIER, KEY_POOL_PROCESSING_FEES, KEY_POOL_STORAGE_FEES, KEY_START_BLOCK_HEIGHT, KEY_START_TIME};
 use crate::error::Error;
-use crate::fee_pools::epoch_pool::{EpochPool, tree_key_constants};
+use crate::fee_pools::epochs::{EpochPool, tree_key_constants};
 
 impl EpochPool {
     pub fn add_shift_current_epoch_pool_operations(
@@ -16,11 +16,11 @@ impl EpochPool {
         fee_multiplier: u64,
         batch: &mut GroveDbOpBatch,
     ) {
-        // create and init next thousandth epoch
+        // create and init next thousandth epochs
         let next_thousandth_epoch = EpochPool::new(current_epoch_pool.index + 1000);
         next_thousandth_epoch.add_init_empty_operations(batch);
 
-        // init first_proposer_block_height and processing_fee for an epoch
+        // init first_proposer_block_height and processing_fee for an epochs
         current_epoch_pool.add_init_current_operations(
             fee_multiplier,
             start_block_height,
@@ -34,7 +34,7 @@ impl EpochPool {
         batch.add_insert_empty_tree(fee_pool_vec_path(), self.key.to_vec());
 
         // init storage fee item to 0
-        batch.push(self.update_storage_fee_operation( 0));
+        batch.push(self.update_storage_credits_for_distribution_operation( 0));
     }
 
     pub fn add_init_current_operations(
@@ -124,7 +124,7 @@ impl EpochPool {
         }
     }
 
-    pub fn update_storage_fee_operation(
+    pub fn update_storage_credits_for_distribution_operation(
         &self,
         storage_fee: u64,
     ) -> GroveDbOp {

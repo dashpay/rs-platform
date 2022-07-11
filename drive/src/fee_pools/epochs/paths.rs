@@ -1,6 +1,6 @@
 use crate::drive::RootTree;
-use crate::fee_pools::epoch_pool::tree_key_constants;
-use crate::fee_pools::epoch_pool::EpochPool;
+use crate::fee_pools::epochs::tree_key_constants;
+use crate::fee_pools::epochs::EpochPool;
 
 impl EpochPool {
     pub fn get_proposers_path(&self) -> [&[u8]; 3] {

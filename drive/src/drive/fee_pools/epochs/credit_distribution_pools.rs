@@ -1,15 +1,14 @@
 use grovedb::{Element, TransactionArg};
-use rust_decimal::Decimal;
 
 use crate::drive::Drive;
 use crate::error::Error;
 use crate::error::fee::FeeError;
-use crate::fee_pools::epoch_pool::EpochPool;
+use crate::fee_pools::epochs::EpochPool;
 
-use crate::fee_pools::epoch_pool::tree_key_constants;
+use crate::fee_pools::epochs::tree_key_constants;
 
 impl Drive {
-    pub(crate) fn get_epoch_pool_storage_credits_for_distribution(&self, epoch_pool: &EpochPool, transaction: TransactionArg) -> Result<Decimal, Error> {
+    pub(crate) fn get_epoch_storage_credits_for_distribution(&self, epoch_pool: &EpochPool, transaction: TransactionArg) -> Result<u64, Error> {
         let element = self
             .grove
             .get(
@@ -21,14 +20,16 @@ impl Drive {
             .map_err(Error::GroveDB)?;
 
         if let Element::Item(item, _) = element {
-            Ok(Decimal::deserialize(item.try_into().map_err(|_| {
-                Error::Fee(FeeError::CorruptedStorageFeeInvalidItemLength(
-                    "epoch storage fee item have an invalid length",
-                ))
-            })?))
+            Ok(u64::from_be_bytes(item.as_slice().try_into().map_err(
+                |_| {
+                    Error::Fee(FeeError::CorruptedProcessingFeeInvalidItemLength(
+                        "epochs processing fee is not u64",
+                    ))
+                },
+            )?))
         } else {
             Err(Error::Fee(FeeError::CorruptedStorageFeeNotItem(
-                "epoch storage fee must be an item",
+                "epochs storage fee must be an item",
             )))
         }
     }
@@ -45,16 +46,16 @@ impl Drive {
             .map_err(Error::GroveDB)?;
 
         if let Element::Item(item, _) = element {
-            Ok(u64::from_le_bytes(item.as_slice().try_into().map_err(
+            Ok(u64::from_be_bytes(item.as_slice().try_into().map_err(
                 |_| {
                     Error::Fee(FeeError::CorruptedProcessingFeeInvalidItemLength(
-                        "epoch processing fee is not u64",
+                        "epochs processing fee is not u64",
                     ))
                 },
             )?))
         } else {
             Err(Error::Fee(FeeError::CorruptedProcessingFeeNotItem(
-                "epoch processing fee must be an item",
+                "epochs processing fee must be an item",
             )))
         }
     }
@@ -71,28 +72,26 @@ impl Drive {
             .map_err(Error::GroveDB)?;
 
         if let Element::Item(item, _) = element {
-            Ok(u64::from_le_bytes(item.as_slice().try_into().map_err(
+            Ok(u64::from_be_bytes(item.as_slice().try_into().map_err(
                 |_| {
                     Error::Fee(FeeError::CorruptedMultiplierInvalidItemLength(
-                        "epoch multiplier item have an invalid length",
+                        "epochs multiplier item have an invalid length",
                     ))
                 },
             )?))
         } else {
             Err(Error::Fee(FeeError::CorruptedMultiplierNotItem(
-                "epoch multiplier must be an item",
+                "epochs multiplier must be an item",
             )))
         }
     }
 
-    pub fn get_epoch_pool_total_credits_for_distribution(&self, epoch_pool: &EpochPool, transaction: TransactionArg) -> Result<Decimal, Error> {
-        let storage_pool_credits = self.get_epoch_pool_storage_credits_for_distribution(epoch_pool, transaction)?;
+    pub fn get_epoch_total_credits_for_distribution(&self, epoch_pool: &EpochPool, transaction: TransactionArg) -> Result<u64, Error> {
+        let storage_pool_credits = self.get_epoch_storage_credits_for_distribution(epoch_pool, transaction)?;
 
         let processing_pool_credits = self.get_epoch_pool_processing_credits_for_distribution(epoch_pool, transaction)?;
 
-        let processing_fee = Decimal::from(processing_pool_credits);
-
-        Ok(storage_pool_credits + processing_fee)
+        storage_pool_credits.checked_add(processing_pool_credits).ok_or(Error::Fee(FeeError::Overflow("overflow getting total credits for distribution")))
     }
 }
 
@@ -101,27 +100,30 @@ mod tests {
     use grovedb::Element;
     use rust_decimal::Decimal;
     use rust_decimal_macros::dec;
+    use crate::common::tests::helpers::setup::setup_drive;
+    use crate::common::tests::helpers::setup::setup_fee_pools;
+    use crate::drive::batch::GroveDbOpBatch;
+    use crate::fee_pools::epochs::EpochPool;
+    use crate::error;
+    use crate::drive::fee_pools::constants;
+    use crate::error::fee::FeeError;
 
     mod update_storage_fee {
-        use crate::common::tests::helpers::setup::setup_drive;
 
         #[test]
         fn test_error_if_epoch_pool_is_not_initiated() {
-            let drive = setup_drive();
+            let drive = super::setup_drive();
             let (transaction, _) = super::setup_fee_pools(&drive, None);
 
-            let epoch = super::EpochPool::new(7000, &drive);
+            let epoch = super::EpochPool::new(7000);
 
-            let mut batch = super::GroveDbOpBatch::new(&drive);
+            let op = epoch
+                .update_storage_credits_for_distribution_operation(42);
 
-            epoch
-                .add_update_storage_fee_operations(&mut batch, super::dec!(42.0))
-                .expect("should update storage fee");
-
-            match drive.apply_batch(batch, false, Some(&transaction)) {
+            match drive.grove_apply_operation(op, false, Some(&transaction)) {
                 Ok(_) => assert!(
                     false,
-                    "should not be able to update storage fee on uninit epoch pool"
+                    "should not be able to update storage fee on uninit epochs pool"
                 ),
                 Err(e) => match e {
                     super::error::Error::GroveDB(grovedb::Error::PathKeyNotFound(_)) => {
@@ -137,22 +139,19 @@ mod tests {
             let drive = super::setup_drive();
             let (transaction, _) = super::setup_fee_pools(&drive, None);
 
-            let epoch = super::EpochPool::new(0, &drive);
+            let epoch = super::EpochPool::new(0);
 
-            let storage_fee = super::dec!(42.0);
+            let storage_fee = 42;
 
-            let mut batch = super::GroveDbOpBatch::new(&drive);
-
-            epoch
-                .add_update_storage_fee_operations(&mut batch, storage_fee)
-                .expect("should update storage fee");
+            let op = epoch
+                .update_storage_credits_for_distribution_operation(storage_fee);
 
             drive
-                .apply_batch(batch, false, Some(&transaction))
+                .grove_apply_operation(op, false, Some(&transaction))
                 .expect("should apply batch");
 
-            let stored_storage_fee = epoch
-                .get_storage_fee(Some(&transaction))
+            let stored_storage_fee = drive
+                .get_epoch_storage_credits_for_distribution(&epoch, Some(&transaction))
                 .expect("should get storage fee");
 
             assert_eq!(stored_storage_fee, storage_fee);
@@ -160,17 +159,19 @@ mod tests {
     }
 
     mod get_storage_fee {
+
+
         #[test]
         fn test_error_if_epoch_pool_is_not_initiated() {
             let drive = super::setup_drive();
             let (transaction, _) = super::setup_fee_pools(&drive, None);
 
-            let epoch = super::EpochPool::new(7000, &drive);
+            let epoch = super::EpochPool::new(7000);
 
-            match epoch.get_storage_fee(Some(&transaction)) {
+            match drive.get_epoch_storage_credits_for_distribution(&epoch, Some(&transaction)) {
                 Ok(_) => assert!(
                     false,
-                    "should not be able to get storage fee on uninit epoch pool"
+                    "should not be able to get storage fee on uninit epochs pool"
                 ),
                 Err(e) => match e {
                     super::error::Error::GroveDB(grovedb::Error::PathNotFound(_)) => assert!(true),
@@ -184,20 +185,20 @@ mod tests {
             let drive = super::setup_drive();
             let (transaction, _) = super::setup_fee_pools(&drive, None);
 
-            let epoch = super::EpochPool::new(0, &drive);
+            let epoch = super::EpochPool::new(0);
 
             drive
                 .grove
                 .insert(
                     epoch.get_path(),
-                    super::constants::KEY_STORAGE_FEE.as_slice(),
-                    super::Element::Item(f64::MAX.to_le_bytes().to_vec(), None),
+                    super::constants::KEY_STORAGE_FEE_POOL.as_slice(),
+                    super::Element::Item(u64::MAX.to_be_bytes().to_vec(), None),
                     Some(&transaction),
                 )
                 .unwrap()
                 .expect("should insert invalid data");
 
-            match epoch.get_storage_fee(Some(&transaction)) {
+            match drive.get_epoch_storage_credits_for_distribution(&epoch, Some(&transaction)) {
                 Ok(_) => assert!(false, "should not be able to decode stored value"),
                 Err(e) => match e {
                     super::error::Error::Fee(
@@ -228,7 +229,7 @@ mod tests {
             match drive.apply_batch(batch, false, Some(&transaction)) {
                 Ok(_) => assert!(
                     false,
-                    "should not be able to update processing fee on uninit epoch pool"
+                    "should not be able to update processing fee on uninit epochs pool"
                 ),
                 Err(e) => match e {
                     super::error::Error::GroveDB(grovedb::Error::PathKeyNotFound(_)) => {
@@ -279,7 +280,7 @@ mod tests {
                 .insert(
                     epoch.get_path(),
                     super::constants::KEY_PROCESSING_FEE.as_slice(),
-                    super::Element::Item(u128::MAX.to_le_bytes().to_vec(), None),
+                    super::Element::Item(u128::MAX.to_be_bytes().to_vec(), None),
                     Some(&transaction),
                 )
                 .unwrap()
@@ -343,7 +344,7 @@ mod tests {
             match epoch.get_fee_multiplier(Some(&transaction)) {
                 Ok(_) => assert!(
                     false,
-                    "should not be able to get multiplier on uninit epoch pool"
+                    "should not be able to get multiplier on uninit epochs pool"
                 ),
                 Err(e) => match e {
                     super::error::Error::GroveDB(grovedb::Error::PathNotFound(_)) => assert!(true),
@@ -364,7 +365,7 @@ mod tests {
                 .insert(
                     epoch.get_path(),
                     super::constants::KEY_FEE_MULTIPLIER.as_slice(),
-                    super::Element::Item(u128::MAX.to_le_bytes().to_vec(), None),
+                    super::Element::Item(u128::MAX.to_be_bytes().to_vec(), None),
                     Some(&transaction),
                 )
                 .unwrap()

@@ -5,7 +5,7 @@ use crate::drive::Drive;
 use crate::error::drive::DriveError;
 use crate::error::Error;
 use crate::error::fee::FeeError;
-use crate::fee_pools::epoch_pool::EpochPool;
+use crate::fee_pools::epochs::EpochPool;
 
 impl Drive {
     pub fn increment_proposer_block_count_operations(
@@ -48,16 +48,16 @@ impl Drive {
             .map_err(Error::GroveDB)?;
 
         if let Element::Item(item, _) = element {
-            Ok(u64::from_le_bytes(item.as_slice().try_into().map_err(
+            Ok(u64::from_be_bytes(item.as_slice().try_into().map_err(
                 |_| {
                     Error::Fee(FeeError::CorruptedProposerBlockCountItemLength(
-                        "epoch proposer block count item have an invalid length",
+                        "epochs proposer block count item have an invalid length",
                     ))
                 },
             )?))
         } else {
             Err(Error::Fee(FeeError::CorruptedProposerBlockCountNotItem(
-                "epoch proposer block count must be an item",
+                "epochs proposer block count must be an item",
             )))
         }
     }
@@ -104,16 +104,16 @@ impl Drive {
             .map(|(pro_tx_hash, element)| {
                 if let Element::Item(item, _) = element {
                     let block_count =
-                        u64::from_le_bytes(item.as_slice().try_into().map_err(|_| {
+                        u64::from_be_bytes(item.as_slice().try_into().map_err(|_| {
                             Error::Fee(FeeError::CorruptedProposerBlockCountItemLength(
-                                "epoch proposer block count item have an invalid length",
+                                "epochs proposer block count item have an invalid length",
                             ))
                         })?);
 
                     Ok((pro_tx_hash, block_count))
                 } else {
                     Err(Error::Fee(FeeError::CorruptedProposerBlockCountNotItem(
-                        "epoch proposer block count must be an item",
+                        "epochs proposer block count must be an item",
                     )))
                 }
             })
@@ -134,7 +134,7 @@ mod tests {
     use crate::common::tests::helpers::setup::setup_drive;
     use crate::common::tests::helpers::setup::setup_fee_pools;
     use crate::drive::batch::GroveDbOpBatch;
-    use crate::fee_pools::epoch_pool::EpochPool;
+    use crate::fee_pools::epochs::EpochPool;
 
     mod get_proposer_block_count {
 
@@ -155,7 +155,7 @@ mod tests {
             batch
                 .add_insert(epoch.get_proposers_vec_path(),
                     pro_tx_hash.to_vec(),
-                    super::Element::Item(u128::MAX.to_le_bytes().to_vec(), None),
+                    super::Element::Item(u128::MAX.to_be_bytes().to_vec(), None),
                 );
 
             drive
@@ -187,7 +187,7 @@ mod tests {
             match drive.get_epochs_proposer_block_count(&epoch, &pro_tx_hash, Some(&transaction)) {
                 Ok(_) => assert!(
                     false,
-                    "should not be able to get proposer block count on uninit epoch pool"
+                    "should not be able to get proposer block count on uninit epochs pool"
                 ),
                 Err(e) => match e {
                     super::error::Error::GroveDB(grovedb::Error::PathNotFound(_)) => {
@@ -367,7 +367,7 @@ mod tests {
 
     mod delete_proposers_tree {
         use crate::drive::fee_pools::constants;
-        use crate::fee_pools::epoch_pool::tree_key_constants::KEY_PROPOSERS;
+        use crate::fee_pools::epochs::tree_key_constants::KEY_PROPOSERS;
 
         #[test]
         fn test_values_has_been_deleted() {

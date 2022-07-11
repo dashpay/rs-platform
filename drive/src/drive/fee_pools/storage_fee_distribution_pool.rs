@@ -10,7 +10,7 @@ impl Drive {
     pub fn get_aggregate_storage_fees_in_current_distribution_pool (
         &self,
         transaction: TransactionArg,
-    ) -> Result<i64, Error> {
+    ) -> Result<u64, Error> {
         let element = self
             .grove
             .get(
@@ -22,7 +22,7 @@ impl Drive {
             .map_err(Error::GroveDB)?;
 
         if let Element::Item(item, _) = element {
-            let fee = i64::from_le_bytes(item.as_slice().try_into().map_err(|_| {
+            let fee = u64::from_be_bytes(item.as_slice().try_into().map_err(|_| {
                 Error::Fee(FeeError::CorruptedStorageFeePoolInvalidItemLength(
                     "fee pools storage fee pool is not i64",
                 ))
@@ -44,7 +44,7 @@ mod tests {
         use grovedb::TransactionArg;
         use rust_decimal::Decimal;
         use crate::drive::Drive;
-        use crate::fee_pools::epoch_pool::EpochPool;
+        use crate::fee_pools::epochs::EpochPool;
 
         pub fn get_storage_fees_from_epoch_pools(
             drive: &Drive,

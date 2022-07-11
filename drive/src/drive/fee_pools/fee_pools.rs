@@ -1,20 +1,4 @@
-use grovedb::{Element, TransactionArg};
 
-use crate::drive::{Drive, RootTree};
-use crate::drive::batch::GroveDbOpBatch;
-use crate::error::fee::FeeError;
-use crate::error::Error;
-use crate::fee::epoch::EpochInfo;
-use crate::fee::fees_aggregate::FeesAggregate;
-
-impl Drive {
-
-    pub fn get_path<'a>() -> [&'a [u8]; 1] {
-        [Into::<&[u8; 1]>::into(RootTree::Pools)]
-    }
-
-
-}
 
 #[cfg(test)]
 mod tests {
@@ -56,7 +40,7 @@ mod tests {
                 assert_eq!(storage_fee, super::dec!(0));
             }
 
-            let epoch_pool = super::EpochPool::new(1000, &drive); // 1001th epoch pool
+            let epoch_pool = super::EpochPool::new(1000, &drive); // 1001th epochs pool
 
             match epoch_pool.get_storage_fee(Some(&transaction)) {
                 Ok(_) => assert!(false, "must be an error"),

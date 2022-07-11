@@ -1,5 +1,6 @@
 use grovedb::batch::{GroveDbOp, Op};
-use grovedb::Element;
+use grovedb::{Element, ElementFlags};
+use crate::drive::flags::StorageFlags;
 
 #[derive(Debug)]
 pub struct GroveDbOpBatch {
@@ -29,6 +30,14 @@ impl GroveDbOpBatch {
             path,
             key,
             op: Op::Insert { element: Element::empty_tree()}
+        })
+    }
+
+    pub fn add_insert_empty_tree_with_flags(&mut self, path: Vec<Vec<u8>>, key: Vec<u8>, storage_flags : &StorageFlags) {
+        self.operations.push( GroveDbOp{
+            path,
+            key,
+            op: Op::Insert { element: Element::empty_tree_with_flags(storage_flags.to_element_flags())}
         })
     }
 

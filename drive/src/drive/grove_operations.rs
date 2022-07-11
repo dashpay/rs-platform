@@ -767,6 +767,16 @@ impl Drive {
         Ok(())
     }
 
+    pub fn grove_apply_operation(
+        &self,
+        operation: GroveDbOp,
+        validate: bool,
+        transaction: TransactionArg,
+    ) -> Result<(), Error> {
+
+        self.grove_apply_batch_with_add_costs(GroveDbOpBatch { operations: vec![operation] }, validate, transaction, None)
+    }
+
     pub fn grove_apply_batch(
         &self,
         ops: GroveDbOpBatch,

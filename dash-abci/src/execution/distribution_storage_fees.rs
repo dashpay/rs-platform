@@ -1,7 +1,7 @@
 use rs_drive::drive::batch::GroveDbOpBatch;
 use rs_drive::drive::fee_pools::constants;
 use rs_drive::error::fee::FeeError;
-use rs_drive::fee_pools::epoch_pool::EpochPool;
+use rs_drive::fee_pools::epochs::EpochPool;
 use rs_drive::query::TransactionArg;
 use crate::error::Error;
 use crate::platform::Platform;
@@ -68,7 +68,7 @@ mod tests {
         use rs_drive::common::tests::helpers;
         use rs_drive::common::tests::helpers::setup::{setup_drive, setup_fee_pools};
         use rs_drive::error::drive::DriveError;
-        use rs_drive::fee_pools::epoch_pool::EpochPool;
+        use rs_drive::fee_pools::epochs::EpochPool;
         use crate::error::drive::DriveError;
         use crate::error::Error;
         use rust_decimal::Decimal;
@@ -166,12 +166,12 @@ mod tests {
 
             let mut batch = super::GroveDbOpBatch::new(&drive);
 
-            // init additional epoch pools as it will be done in epoch_change
+            // init additional epochs pools as it will be done in epoch_change
             for i in 1000..=1000 + epoch_index {
                 let epoch = EpochPool::new(i);
                 epoch
                     .add_init_empty_operations(&mut batch)
-                    .expect("should init additional epoch pool");
+                    .expect("should init additional epochs pool");
             }
 
             fee_pools
@@ -205,7 +205,7 @@ mod tests {
 
             assert_eq!(storage_fee_pool_leftover, 0);
 
-            // collect all the storage fee values of the 1000 epoch pools
+            // collect all the storage fee values of the 1000 epochs pools
             let storage_fees =
                 helpers::get_storage_fees_from_epoch_pools(&drive, epoch_index, Some(&transaction));
 
@@ -350,7 +350,7 @@ mod tests {
                 .grove_apply_batch(batch, false, Some(&transaction))
                 .expect("should apply batch");
 
-            // collect all the storage fee values of the 1000 epoch pools again
+            // collect all the storage fee values of the 1000 epochs pools again
             let storage_fees =
                 helpers::get_storage_fees_from_epoch_pools(&drive, epoch_index, Some(&transaction));
 
@@ -408,7 +408,7 @@ mod tests {
             let mut batch = super::GroveDbOpBatch::new(&drive);
 
             fee_pools
-                .add_update_storage_fee_distribution_pool_operations(&mut batch, storage_fee)
+                .update_storage_fee_distribution_pool_operation(&mut batch, storage_fee)
                 .expect("should update storage fee pool");
 
             drive
@@ -457,7 +457,7 @@ mod tests {
                 .insert(super::PathKeyElementInfo::PathFixedSizeKeyElement((
                     super::FeePools::get_path(),
                     super::constants::KEY_STORAGE_FEE_POOL.as_slice(),
-                    super::Element::Item(u128::MAX.to_le_bytes().to_vec(), None),
+                    super::Element::Item(u128::MAX.to_be_bytes().to_vec(), None),
                 )))
                 .expect("should insert invalid data");
 

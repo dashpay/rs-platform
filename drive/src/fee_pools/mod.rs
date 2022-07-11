@@ -4,9 +4,9 @@ use grovedb::Element;
 use crate::drive::batch::{GroveDbOpBatch};
 use crate::drive::fee_pools::constants::KEY_STORAGE_FEE_POOL;
 use crate::drive::fee_pools::fee_pool_vec_path;
-use crate::fee_pools::epoch_pool::EpochPool;
+use crate::fee_pools::epochs::EpochPool;
 
-pub mod epoch_pool;
+pub mod epochs;
 
 pub fn add_create_fee_pool_trees_operations(
     batch: &mut GroveDbOpBatch,
@@ -26,11 +26,11 @@ pub fn add_create_fee_pool_trees_operations(
 }
 
 pub fn update_storage_fee_distribution_pool_operation(
-    storage_fee: i64,
+    storage_fee: u64,
 ) -> GroveDbOp {
     GroveDbOp {
         path: fee_pool_vec_path(),
         key: KEY_STORAGE_FEE_POOL.to_vec(),
-        op: Insert { element: Element::new_item(storage_fee.to_le_bytes().to_vec())}
+        op: Insert { element: Element::new_item(storage_fee.to_be_bytes().to_vec())}
     }
 }

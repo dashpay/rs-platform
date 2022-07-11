@@ -166,34 +166,42 @@ impl Drive {
         Ok(())
     }
 
-    fn apply_batch_operations(
+    fn apply_batch_drive_operations(
         &self,
         apply: bool,
         transaction: TransactionArg,
         batch_operations: Vec<DriveOperation>,
         drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<(), Error> {
+        let grove_db_operations = DriveOperation::grovedb_operations_batch(&batch_operations);
+        self.apply_batch_grovedb_operations(apply, transaction,grove_db_operations, drive_operations)?;
+        batch_operations.into_iter().for_each(|op| match op {
+            GroveOperation(_) => (),
+            _ => drive_operations.push(op),
+        });
+        Ok(())
+    }
+
+    fn apply_batch_grovedb_operations(
+        &self,
+        apply: bool,
+        transaction: TransactionArg,
+        batch_operations: GroveDbOpBatch,
+        drive_operations: &mut Vec<DriveOperation>,
+    ) -> Result<(), Error> {
         if apply {
             self.grove_apply_batch_with_add_costs(
-                DriveOperation::grovedb_operations_batch(&batch_operations),
+                batch_operations,
                 false,
                 transaction,
                 Some(drive_operations),
             )?;
-            batch_operations.into_iter().for_each(|op| match op {
-                GroveOperation(_) => (),
-                _ => drive_operations.push(op),
-            });
         } else {
             self.grove_batch_operations_costs(
-                DriveOperation::grovedb_operations_batch(&batch_operations),
+                batch_operations,
                 false,
                 drive_operations,
             )?;
-            batch_operations.into_iter().for_each(|op| match op {
-                GroveOperation(_) => (),
-                _ => drive_operations.push(op),
-            });
         }
         Ok(())
     }

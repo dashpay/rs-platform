@@ -195,7 +195,7 @@ impl Drive {
                 }
             }
         }
-        self.apply_batch_operations(apply, transaction, batch_operations, drive_operations)
+        self.apply_batch_drive_operations(apply, transaction, batch_operations, drive_operations)
     }
 
     fn update_contract(
@@ -342,7 +342,7 @@ impl Drive {
             }
         }
 
-        self.apply_batch_operations(apply, transaction, batch_operations, drive_operations)
+        self.apply_batch_drive_operations(apply, transaction, batch_operations, drive_operations)
     }
 
     pub fn apply_contract_cbor(
