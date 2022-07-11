@@ -44,7 +44,7 @@ impl Drive {
     ) {
         let op = self.update_genesis_time_operation(genesis_time)?;
 
-        self.grove_apply_batch(vec![op], false, transaction)?;
+        self.grove_apply_batch_with_add_costs(vec![op], false, transaction)?;
 
         request.block_time
     }

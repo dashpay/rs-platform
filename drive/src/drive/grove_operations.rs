@@ -2,6 +2,7 @@ use costs::CostContext;
 use grovedb::batch::{BatchApplyOptions, GroveDbOp, Op};
 use grovedb::{Element, PathQuery, TransactionArg};
 use std::ops::DerefMut;
+use crate::drive::batch::GroveDbOpBatch;
 
 use crate::drive::flags::StorageFlags;
 use crate::drive::object_size_info::KeyInfo::{Key, KeyRef, KeySize};
@@ -717,7 +718,7 @@ impl Drive {
         P: IntoIterator<Item = &'c [u8]>,
         <P as IntoIterator>::IntoIter: ExactSizeIterator + DoubleEndedIterator + Clone,
     {
-        let current_batch_operations = DriveOperation::grovedb_operations(drive_operations);
+        let current_batch_operations = DriveOperation::grovedb_operations_batch(drive_operations);
         let cost_context = self.grove.delete_operation_for_delete_internal(
             path,
             key,
@@ -747,7 +748,7 @@ impl Drive {
         P: IntoIterator<Item = &'c [u8]>,
         <P as IntoIterator>::IntoIter: ExactSizeIterator + DoubleEndedIterator + Clone,
     {
-        let current_batch_operations = DriveOperation::grovedb_operations(drive_operations);
+        let current_batch_operations = DriveOperation::grovedb_operations_batch(drive_operations);
         let cost_context = self.grove.delete_operations_for_delete_up_tree_while_empty(
             path,
             key,
@@ -766,13 +767,25 @@ impl Drive {
         Ok(())
     }
 
-    pub(crate) fn grove_apply_batch(
+    pub fn grove_apply_batch(
         &self,
-        ops: Vec<GroveDbOp>,
+        ops: GroveDbOpBatch,
+        validate: bool,
+        transaction: TransactionArg,
+    ) -> Result<(), Error> {
+        self.grove_apply_batch_with_add_costs(ops, validate, transaction, None)
+    }
+
+    pub(crate) fn grove_apply_batch_with_add_costs(
+        &self,
+        ops: GroveDbOpBatch,
         validate: bool,
         transaction: TransactionArg,
         drive_operations: Option<&mut Vec<DriveOperation>>,
     ) -> Result<(), Error> {
+        if ops.len() == 0 {
+            return Err(Error::Drive(DriveError::BatchIsEmpty()));
+        }
         if self.config.batching_enabled {
             // println!("batch {:#?}", ops);
             let consistency_results = GroveDbOp::verify_consistency_of_operations(&ops);
@@ -804,14 +817,14 @@ impl Drive {
                         )),
                         transaction,
                         true,
-                        drive_operations,
+                        drive_operations.map(|op| op),
                     )?,
                     Op::Delete => self.grove_delete(
                         op.path,
                         op.key.as_slice(),
                         true,
                         transaction,
-                        drive_operations,
+                        drive_operations.map(|op| op),
                     )?,
                     _ => {
                         return Err(Error::Drive(DriveError::UnsupportedPrivate(
@@ -826,47 +839,16 @@ impl Drive {
 
     pub(crate) fn grove_batch_operations_costs(
         &self,
-        ops: Vec<GroveDbOp>,
+        ops: GroveDbOpBatch,
         validate: bool,
         drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<(), Error> {
         let cost_context = self.grove.worst_case_operations_for_batch(
-            ops,
+            ops.operations,
             Some(BatchApplyOptions {
                 validate_insertion_does_not_override: validate,
             }),
         );
         push_drive_operation_result(cost_context, drive_operations)
-    }
-
-    pub fn apply_batch(
-        &self,
-        mut batch: GroveDbOpBatch,
-        validate: bool,
-        transaction: TransactionArg,
-    ) -> Result<(), Error> {
-        if batch.operations.len() == 0 {
-            return Err(Error::Drive(DriveError::BatchIsEmpty()));
-        }
-
-        self.apply_if_not_empty(batch, validate, transaction)
-    }
-
-    pub fn apply_if_not_empty(
-        &self,
-        mut batch: GroveDbOpBatch,
-        validate: bool,
-        transaction: TransactionArg,
-    ) -> Result<(), Error> {
-        let grovedb_operations = DriveOperation::grovedb_operations(&batch.operations);
-
-        self.grove_apply_batch(
-            grovedb_operations,
-            validate,
-            transaction,
-            &mut batch.operations,
-        )?;
-
-        Ok(())
     }
 }

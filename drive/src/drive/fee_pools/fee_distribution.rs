@@ -7,6 +7,7 @@ use crate::common::value_to_cbor;
 use crate::contract::document::Document;
 use crate::drive::batch::GroveDbOpBatch;
 use crate::drive::Drive;
+use crate::drive::fee_pools::constants;
 use crate::error::document::DocumentError;
 use crate::error::fee::FeeError;
 use crate::error::Error;
@@ -229,7 +230,7 @@ impl Drive {
     ) -> Result<Option<EpochPool>, Error> {
         let epoch_pool = EpochPool::new(epoch_index);
 
-        if self.is_proposers_tree_empty(&epoch_pool, transaction)? {
+        if self.is_epochs_proposers_tree_empty(&epoch_pool, transaction)? {
             return if epoch_index == from_epoch_index {
                 Ok(None)
             } else {
@@ -272,13 +273,13 @@ impl Drive {
         batch: &mut GroveDbOpBatch,
     ) -> Result<(), Error> {
         // update epoch pool processing fees
-        let epoch_processing_fees = self.get_processing_fee(current_epoch_pool, transaction)?;
+        let epoch_processing_fees = self.get_epoch_pool_processing_credits_for_distribution(current_epoch_pool, transaction)?;
 
         batch.push(current_epoch_pool
             .update_processing_fee_operation(epoch_processing_fees + processing_fees));
 
         // update storage fee pool
-        let storage_fee_pool = self.get_storage_fee_distribution_pool_fees(transaction)?;
+        let storage_fee_pool = self.get_aggregate_storage_fees_in_current_distribution_pool(transaction)?;
 
         batch.push(self.update_storage_fee_distribution_pool_operation(
             batch,

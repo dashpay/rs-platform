@@ -1,6 +1,7 @@
 use costs::OperationCost;
 use enum_map::Enum;
 use grovedb::{batch::GroveDbOp, Element, PathQuery};
+use crate::drive::batch::GroveDbOpBatch;
 
 use crate::drive::flags::StorageFlags;
 use crate::error::drive::DriveError;
@@ -313,14 +314,15 @@ impl DriveOperation {
         }
     }
 
-    pub fn grovedb_operations(insert_operations: &Vec<DriveOperation>) -> Vec<GroveDbOp> {
-        insert_operations
+    pub fn grovedb_operations_batch(insert_operations: &Vec<DriveOperation>) -> GroveDbOpBatch {
+        let operations = insert_operations
             .iter()
             .filter_map(|op| match op {
                 GroveOperation(grovedb_op) => Some(grovedb_op.clone()),
                 _ => None,
             })
-            .collect()
+            .collect();
+        GroveDbOpBatch::from_operations(operations)
     }
 
     pub fn for_empty_tree(

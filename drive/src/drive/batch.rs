@@ -1,27 +1,47 @@
 use grovedb::batch::{GroveDbOp, Op};
 use grovedb::Element;
 
-pub type GroveDbOpBatch = Vec<GroveDbOp>;
+#[derive(Debug)]
+pub struct GroveDbOpBatch {
+    pub(crate) operations: Vec<GroveDbOp>,
+}
+
 
 impl GroveDbOpBatch {
-    pub fn insert_empty_tree(&mut self, path: Vec<Vec<u8>>, key: Vec<u8>) {
-        self.push( GroveDbOp{
+    pub fn new() -> Self {
+        GroveDbOpBatch {
+            operations: Vec::new()
+        }
+    }
+
+    pub fn push(&mut self, op: GroveDbOp) {
+        self.operations.push(op);
+    }
+
+    pub fn from_operations(operations: Vec<GroveDbOp>) -> Self {
+        GroveDbOpBatch {
+            operations
+        }
+    }
+
+    pub fn add_insert_empty_tree(&mut self, path: Vec<Vec<u8>>, key: Vec<u8>) {
+        self.operations.push( GroveDbOp{
             path,
             key,
             op: Op::Insert { element: Element::empty_tree()}
         })
     }
 
-    pub fn delete(&mut self, path: Vec<Vec<u8>>, key: Vec<u8>) {
-        self.push( GroveDbOp{
+    pub fn add_delete(&mut self, path: Vec<Vec<u8>>, key: Vec<u8>) {
+        self.operations.push( GroveDbOp{
             path,
             key,
             op: Op::Delete
         })
     }
 
-    pub fn insert(&mut self, path: Vec<Vec<u8>>, key: Vec<u8>, element: Element) {
-        self.push( GroveDbOp{
+    pub fn add_insert(&mut self, path: Vec<Vec<u8>>, key: Vec<u8>, element: Element) {
+        self.operations.push( GroveDbOp{
             path,
             key,
             op: Op::Insert { element }

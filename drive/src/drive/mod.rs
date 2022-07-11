@@ -11,10 +11,10 @@ use object_size_info::DocumentInfo::DocumentSize;
 use crate::contract::Contract;
 use crate::drive::batch::GroveDbOpBatch;
 use crate::drive::config::DriveConfig;
-use crate::drive::object_size_info::KeyInfo;
 use crate::error::Error;
 use crate::fee::op::DriveOperation;
 use crate::fee::op::DriveOperation::GroveOperation;
+use crate::fee_pools::add_create_fee_pool_trees_operations;
 
 pub mod config;
 pub mod contract;
@@ -37,7 +37,6 @@ pub struct DriveCache {
 pub struct Drive {
     pub grove: GroveDb,
     pub config: DriveConfig,
-    pub fee_pools: FeePools,
     pub cache: RefCell<DriveCache>,
 }
 
@@ -91,7 +90,6 @@ impl Drive {
             Ok(grove) => Ok(Drive {
                 grove,
                 config: config.unwrap_or_default(),
-                fee_pools: FeePools::new(),
                 cache: RefCell::new(DriveCache {
                     cached_contracts: Cache::new(200),
                     genesis_time_ms: config.map( |c| c.default_genesis_time)
@@ -135,37 +133,35 @@ impl Drive {
     pub fn create_initial_state_structure(&self, transaction: TransactionArg) -> Result<(), Error> {
         let mut batch = GroveDbOpBatch::new();
 
-        batch.insert_empty_tree(
-            [],
-            KeyInfo::KeyRef(Into::<&[u8; 1]>::into(RootTree::Identities)),
-            None,
-        )?;
+        batch.add_insert_empty_tree(
+            vec![],
+            vec![RootTree::Identities as u8],
+        );
 
-        batch.insert_empty_tree(
-            [],
-            KeyInfo::KeyRef(Into::<&[u8; 1]>::into(RootTree::ContractDocuments)),
-            None,
-        )?;
+        batch.add_insert_empty_tree(
+            vec![],
+            vec![RootTree::ContractDocuments as u8],
+        );
 
-        batch.insert_empty_tree(
-            [],
-            KeyInfo::KeyRef(Into::<&[u8; 1]>::into(
-                RootTree::PublicKeyHashesToIdentities,
-            )),
-            None,
-        )?;
+        batch.add_insert_empty_tree(
+            vec![],
+            vec![RootTree::PublicKeyHashesToIdentities as u8],
+        );
 
-        batch.insert_empty_tree(
-            [],
-            KeyInfo::KeyRef(Into::<&[u8; 1]>::into(RootTree::SpentAssetLockTransactions)),
-            None,
-        )?;
+        batch.add_insert_empty_tree(
+            vec![],
+            vec![RootTree::SpentAssetLockTransactions as u8],
+        );
+
+        batch.add_insert_empty_tree(
+            vec![],
+            vec![RootTree::Pools as u8],
+        );
 
         // initialize the pools with epochs
-        self.fee_pools
-            .add_create_fee_pool_trees_operations(self, &mut batch)?;
+        add_create_fee_pool_trees_operations(&mut batch);
 
-        self.apply_batch(batch, false, transaction)?;
+        self.grove_apply_batch(batch, false, transaction)?;
 
         Ok(())
     }
@@ -178,11 +174,11 @@ impl Drive {
         drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<(), Error> {
         if apply {
-            self.grove_apply_batch(
-                DriveOperation::grovedb_operations(&batch_operations),
+            self.grove_apply_batch_with_add_costs(
+                DriveOperation::grovedb_operations_batch(&batch_operations),
                 false,
                 transaction,
-                drive_operations,
+                Some(drive_operations),
             )?;
             batch_operations.into_iter().for_each(|op| match op {
                 GroveOperation(_) => (),
@@ -190,7 +186,7 @@ impl Drive {
             });
         } else {
             self.grove_batch_operations_costs(
-                DriveOperation::grovedb_operations(&batch_operations),
+                DriveOperation::grovedb_operations_batch(&batch_operations),
                 false,
                 drive_operations,
             )?;

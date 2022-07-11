@@ -1,7 +1,6 @@
 use std::ops::Deref;
 
 use grovedb::TransactionArg;
-use rs_drive::drive::Drive;
 use rs_drive::fee::epoch::EpochInfo;
 use rs_drive::query::GroveError::StorageError;
 use rs_drive::query::TransactionArg;
@@ -17,19 +16,19 @@ use crate::platform::Platform;
 
 pub trait TenderdashAbci {
     fn init_chain(
-        drive: &Drive,
+        &self,
         request: InitChainRequest,
         transaction: TransactionArg,
     ) -> Result<InitChainResponse, Error>;
 
     fn block_begin(
-        drive: &Drive,
+        &self,
         request: BlockBeginRequest,
         transaction: TransactionArg,
     ) -> Result<BlockBeginResponse, Error>;
 
     fn block_end(
-        drive: &Drive,
+        &self,
         request: BlockEndRequest,
         transaction: TransactionArg,
     ) -> Result<BlockEndResponse, Error>;
@@ -87,7 +86,7 @@ impl TenderdashAbci for Platform {
         transaction: TransactionArg,
     ) -> Result<BlockEndResponse, Error> {
         // Retrieve block execution context
-        let block_execution_context = drive.block_execution_context.borrow();
+        let block_execution_context = self.block_execution_context.borrow();
         let block_execution_context = match block_execution_context.deref() {
             Some(block_execution_context) => block_execution_context,
             None => {
@@ -123,6 +122,8 @@ mod tests {
     mod handlers {
         use std::time::Duration;
         use chrono::{Duration, Utc};
+        use rs_drive::common::tests::helpers::fee_pools::{create_masternode_identities, create_masternode_share_identities_and_documents, create_mn_shares_contract};
+        use rs_drive::common::tests::helpers::setup::{setup_drive, setup_fee_pools};
 
         use crate::fee::pools::tests::helpers::fee_pools::create_masternode_identities;
         use crate::{

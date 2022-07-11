@@ -6,10 +6,10 @@ use crate::error::Error;
 use crate::error::fee::FeeError;
 use crate::fee_pools::epoch_pool::EpochPool;
 
-use super::tree_key_constants;
+use crate::fee_pools::epoch_pool::tree_key_constants;
 
 impl Drive {
-    pub(crate) fn get_storage_fee(&self, epoch_pool: &EpochPool, transaction: TransactionArg) -> Result<Decimal, Error> {
+    pub(crate) fn get_epoch_pool_storage_credits_for_distribution(&self, epoch_pool: &EpochPool, transaction: TransactionArg) -> Result<Decimal, Error> {
         let element = self
             .grove
             .get(
@@ -33,7 +33,7 @@ impl Drive {
         }
     }
 
-    pub(crate) fn get_processing_fee(&self, epoch_pool: &EpochPool, transaction: TransactionArg) -> Result<u64, Error> {
+    pub(crate) fn get_epoch_pool_processing_credits_for_distribution(&self, epoch_pool: &EpochPool, transaction: TransactionArg) -> Result<u64, Error> {
         let element = self
             .grove
             .get(
@@ -59,7 +59,7 @@ impl Drive {
         }
     }
 
-    pub(crate) fn get_fee_multiplier(&self, epoch_pool: &EpochPool, transaction: TransactionArg) -> Result<u64, Error> {
+    pub(crate) fn get_epoch_fee_multiplier(&self, epoch_pool: &EpochPool, transaction: TransactionArg) -> Result<u64, Error> {
         let element = self
             .grove
             .get(
@@ -85,14 +85,14 @@ impl Drive {
         }
     }
 
-    pub fn get_total_fees(&self, epoch_pool: &EpochPool, transaction: TransactionArg) -> Result<Decimal, Error> {
-        let storage_fee = self.get_storage_fee(epoch_pool, transaction)?;
+    pub fn get_epoch_pool_total_credits_for_distribution(&self, epoch_pool: &EpochPool, transaction: TransactionArg) -> Result<Decimal, Error> {
+        let storage_pool_credits = self.get_epoch_pool_storage_credits_for_distribution(epoch_pool, transaction)?;
 
-        let processing_fee = self.get_processing_fee(epoch_pool, transaction)?;
+        let processing_pool_credits = self.get_epoch_pool_processing_credits_for_distribution(epoch_pool, transaction)?;
 
-        let processing_fee = Decimal::from(processing_fee);
+        let processing_fee = Decimal::from(processing_pool_credits);
 
-        Ok(storage_fee + processing_fee)
+        Ok(storage_pool_credits + processing_fee)
     }
 }
 
@@ -103,9 +103,11 @@ mod tests {
     use rust_decimal_macros::dec;
 
     mod update_storage_fee {
+        use crate::common::tests::helpers::setup::setup_drive;
+
         #[test]
         fn test_error_if_epoch_pool_is_not_initiated() {
-            let drive = super::setup_drive();
+            let drive = setup_drive();
             let (transaction, _) = super::setup_fee_pools(&drive, None);
 
             let epoch = super::EpochPool::new(7000, &drive);
