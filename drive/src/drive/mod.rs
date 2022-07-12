@@ -28,6 +28,7 @@ mod grove_operations;
 pub mod identity;
 pub mod object_size_info;
 pub mod query;
+pub mod initialization;
 
 pub struct DriveCache {
     pub cached_contracts: Cache<[u8; 32], Arc<Contract>>,
@@ -128,27 +129,6 @@ impl Drive {
             let version = u32::from_be_bytes(version_set_bytes);
             Drive::check_protocol_version(version)
         }
-    }
-
-    pub fn create_initial_state_structure(&self, transaction: TransactionArg) -> Result<(), Error> {
-        let mut batch = GroveDbOpBatch::new();
-
-        batch.add_insert_empty_tree(vec![], vec![RootTree::Identities as u8]);
-
-        batch.add_insert_empty_tree(vec![], vec![RootTree::ContractDocuments as u8]);
-
-        batch.add_insert_empty_tree(vec![], vec![RootTree::PublicKeyHashesToIdentities as u8]);
-
-        batch.add_insert_empty_tree(vec![], vec![RootTree::SpentAssetLockTransactions as u8]);
-
-        batch.add_insert_empty_tree(vec![], vec![RootTree::Pools as u8]);
-
-        // initialize the pools with epochs
-        add_create_fee_pool_trees_operations(&mut batch);
-
-        self.grove_apply_batch(batch, false, transaction)?;
-
-        Ok(())
     }
 
     fn apply_batch_drive_operations(

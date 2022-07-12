@@ -2,7 +2,7 @@ use crate::block::BlockInfo;
 use crate::error::Error;
 use crate::platform::Platform;
 use rs_drive::drive::batch::GroveDbOpBatch;
-use rs_drive::drive::fee_pools::fee_distribution::DistributionInfo;
+use crate::execution::fee_distribution::DistributionInfo;
 use rs_drive::error::fee::FeeError;
 use rs_drive::fee::epoch::EpochInfo;
 use rs_drive::fee::fees_aggregate::FeesAggregate;

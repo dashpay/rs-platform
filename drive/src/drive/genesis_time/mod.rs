@@ -14,7 +14,7 @@ impl Drive {
         let element = self
             .grove
             .get(
-                [Into::<&[u8; 1]>::into(RootTree::SpentAssetLockTransactions).as_slice()],
+                [Into::<&[u8; 1]>::into(RootTree::Pools).as_slice()],
                 KEY_GENESIS_TIME.as_slice(),
                 transaction,
             )

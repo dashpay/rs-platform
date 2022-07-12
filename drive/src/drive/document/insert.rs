@@ -240,19 +240,12 @@ impl Drive {
         override_document: bool,
         block_time: f64,
         apply: bool,
+        storage_flags: StorageFlags,
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
         let contract = Contract::from_cbor(serialized_contract, None)?;
 
         let document = Document::from_cbor(serialized_document, None, owner_id)?;
-
-        let block_execution_context = self.block_execution_context.borrow();
-        let epoch = match block_execution_context.deref() {
-            Some(block_execution_context) => block_execution_context.epoch_info.current_epoch_index,
-            None => 0,
-        };
-
-        let storage_flags = StorageFlags { epoch };
 
         let document_info =
             DocumentAndSerialization((&document, serialized_document, &storage_flags));
@@ -282,17 +275,10 @@ impl Drive {
         override_document: bool,
         block_time: f64,
         apply: bool,
+        storage_flags: StorageFlags,
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
         let document = Document::from_cbor(serialized_document, None, owner_id)?;
-
-        let block_execution_context = self.block_execution_context.borrow();
-        let epoch = match block_execution_context.deref() {
-            Some(block_execution_context) => block_execution_context.epoch_info.current_epoch_index,
-            None => 0,
-        };
-
-        let storage_flags = StorageFlags { epoch };
 
         let document_info =
             DocumentAndSerialization((&document, serialized_document, &storage_flags));
@@ -654,6 +640,7 @@ mod tests {
                 false,
                 0f64,
                 true,
+                StorageFlags::default(),
                 None,
             )
             .expect("expected to insert a document successfully");
@@ -667,6 +654,7 @@ mod tests {
                 false,
                 0f64,
                 true,
+                StorageFlags::default(),
                 None,
             )
             .expect_err("expected not to be able to insert same document twice");
@@ -680,6 +668,7 @@ mod tests {
                 true,
                 0f64,
                 true,
+                StorageFlags::default(),
                 None,
             )
             .expect("expected to override a document successfully");
@@ -718,6 +707,7 @@ mod tests {
                 false,
                 0f64,
                 true,
+                StorageFlags::default(),
                 Some(&db_transaction),
             )
             .expect("expected to insert a document successfully");
@@ -731,6 +721,7 @@ mod tests {
                 false,
                 0f64,
                 true,
+                StorageFlags::default(),
                 Some(&db_transaction),
             )
             .expect_err("expected not to be able to insert same document twice");
@@ -744,6 +735,7 @@ mod tests {
                 true,
                 0f64,
                 true,
+                StorageFlags::default(),
                 Some(&db_transaction),
             )
             .expect("expected to override a document successfully");
@@ -784,6 +776,7 @@ mod tests {
                 false,
                 0f64,
                 true,
+                StorageFlags::default(),
                 Some(&db_transaction),
             )
             .expect("expected to insert a document successfully");
@@ -826,6 +819,7 @@ mod tests {
                 false,
                 0f64,
                 false,
+                StorageFlags::default(),
                 Some(&db_transaction),
             )
             .expect("expected to get back fee for document insertion successfully");
@@ -839,6 +833,7 @@ mod tests {
                 false,
                 0f64,
                 true,
+                StorageFlags::default(),
                 Some(&db_transaction),
             )
             .expect("expected to insert a document successfully");
@@ -1026,6 +1021,7 @@ mod tests {
                 false,
                 0f64,
                 true,
+                StorageFlags::default(),
                 None,
             )
             .expect("expected to insert a document successfully");
@@ -1038,6 +1034,7 @@ mod tests {
                 false,
                 0f64,
                 true,
+                StorageFlags::default(),
                 None,
             )
             .expect("expected to insert a document successfully");
@@ -1050,6 +1047,7 @@ mod tests {
                 false,
                 0f64,
                 true,
+                StorageFlags::default(),
                 None,
             )
             .expect("expected to insert a document successfully");
@@ -1079,6 +1077,7 @@ mod tests {
                 false,
                 0f64,
                 true,
+                StorageFlags::default(),
                 None,
             )
             .expect("expected to insert a document successfully");
@@ -1091,6 +1090,7 @@ mod tests {
                 false,
                 0f64,
                 true,
+                StorageFlags::default(),
                 None,
             )
             .expect_err(
@@ -1117,6 +1117,7 @@ mod tests {
                 None,
                 0f64,
                 true,
+                StorageFlags::default(),
                 Some(&db_transaction),
             )
             .expect("expected to apply contract successfully");
@@ -1134,6 +1135,7 @@ mod tests {
                 true,
                 0f64,
                 true,
+                StorageFlags::default(),
                 Some(&db_transaction),
             )
             .expect("should create dash tld");
@@ -1159,6 +1161,7 @@ mod tests {
                 true,
                 0f64,
                 true,
+                StorageFlags::default(),
                 Some(&db_transaction),
             )
             .expect("should add random tld");
