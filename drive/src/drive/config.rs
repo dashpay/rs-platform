@@ -11,7 +11,7 @@ pub enum DriveEncoding {
 pub struct DriveConfig {
     pub batching_enabled: bool,
     pub has_raw_enabled: bool,
-    pub default_genesis_time: u64,
+    pub default_genesis_time: Option<u64>,
     pub encoding: DriveEncoding,
 }
 
@@ -20,7 +20,7 @@ impl Default for DriveConfig {
         DriveConfig {
             batching_enabled: DEFAULT_GROVE_BATCHING_ENABLED,
             has_raw_enabled: DEFAULT_GROVE_HAS_RAW_ENABLED,
-            default_genesis_time: 0,
+            default_genesis_time: None,
             encoding: DriveProtobuf,
         }
     }

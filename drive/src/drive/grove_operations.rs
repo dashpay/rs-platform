@@ -1,8 +1,9 @@
+use std::borrow::{Borrow, BorrowMut};
 use crate::drive::batch::GroveDbOpBatch;
 use costs::CostContext;
 use grovedb::batch::{BatchApplyOptions, GroveDbOp, Op};
 use grovedb::{Element, PathQuery, TransactionArg};
-use std::ops::DerefMut;
+use std::ops::{Deref, DerefMut};
 
 use crate::drive::flags::StorageFlags;
 use crate::drive::object_size_info::KeyInfo::{Key, KeyRef, KeySize};
@@ -242,7 +243,7 @@ impl Drive {
         path_key_element_info: PathKeyElementInfo<'c, N>,
         transaction: TransactionArg,
         apply: bool,
-        drive_operations: Option<&mut Vec<DriveOperation>>,
+        drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<(), Error> {
         match path_key_element_info {
             PathKeyElement((path, key, element)) => {
@@ -250,44 +251,38 @@ impl Drive {
                     // println!("element {:#?}", element);
                     let path_iter: Vec<&[u8]> = path.iter().map(|x| x.as_slice()).collect();
                     let cost_context = self.grove.insert(path_iter, key, element, transaction);
-                    push_drive_operation_result_optional(cost_context, drive_operations)
+                    push_drive_operation_result(cost_context, drive_operations)
                 } else {
-                    if let Some(drive_operations) = drive_operations {
-                        let path_size = path.iter().map(|x| x.len() as u32).sum();
-                        let key_len = key.len();
-                        drive_operations.push(DriveOperation::for_insert_path_key_value_size(
-                            path_size,
-                            key_len as u16,
-                            element.node_byte_size(key_len) as u32,
-                        ));
-                    }
+                    let path_size = path.iter().map(|x| x.len() as u32).sum();
+                    let key_len = key.len();
+                    drive_operations.push(DriveOperation::for_insert_path_key_value_size(
+                        path_size,
+                        key_len as u16,
+                        element.node_byte_size(key_len) as u32,
+                    ));
                     Ok(())
                 }
             }
             PathKeyElementSize((path_max_length, key_max_length, element_max_size)) => {
-                if let Some(drive_operations) = drive_operations {
-                    drive_operations.push(DriveOperation::for_insert_path_key_value_size(
-                        path_max_length as u32,
-                        key_max_length as u16,
-                        element_max_size as u32,
-                    ));
-                }
+                drive_operations.push(DriveOperation::for_insert_path_key_value_size(
+                    path_max_length as u32,
+                    key_max_length as u16,
+                    element_max_size as u32,
+                ));
                 Ok(())
             }
             PathFixedSizeKeyElement((path, key, element)) => {
                 if apply {
                     let cost_context = self.grove.insert(path, key, element, transaction);
-                    push_drive_operation_result_optional(cost_context, drive_operations)
+                    push_drive_operation_result(cost_context, drive_operations)
                 } else {
-                    if let Some(drive_operations) = drive_operations {
-                        let path_size = path.into_iter().map(|a| a.len() as u32).sum();
-                        let key_len = key.len();
-                        drive_operations.push(DriveOperation::for_insert_path_key_value_size(
-                            path_size,
-                            key_len as u16,
-                            element.node_byte_size(key_len) as u32,
-                        ));
-                    }
+                    let path_size = path.into_iter().map(|a| a.len() as u32).sum();
+                    let key_len = key.len();
+                    drive_operations.push(DriveOperation::for_insert_path_key_value_size(
+                        path_size,
+                        key_len as u16,
+                        element.node_byte_size(key_len) as u32,
+                    ));
                     Ok(())
                 }
             }
@@ -387,13 +382,13 @@ impl Drive {
         key: &'p [u8],
         apply: bool,
         transaction: TransactionArg,
-        drive_operations: Option<&mut Vec<DriveOperation>>,
+        drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<(), Error> {
         if apply {
             let path_iter: Vec<&[u8]> = path.iter().map(|x| x.as_slice()).collect();
             let cost_context = self.grove.delete(path_iter, key, transaction);
-            push_drive_operation_result_optional(cost_context, drive_operations)
-        } else if let Some(drive_operations) = drive_operations {
+            push_drive_operation_result(cost_context, drive_operations)
+        } else {
             //todo: this is wrong
             drive_operations.push(DriveOperation::for_delete_path_key_value_size(
                 path,
@@ -401,8 +396,6 @@ impl Drive {
                 0,
                 1,
             ));
-            Ok(())
-        } else {
             Ok(())
         }
     }
@@ -779,7 +772,7 @@ impl Drive {
             },
             validate,
             transaction,
-            None,
+            &mut vec![],
         )
     }
 
@@ -789,7 +782,7 @@ impl Drive {
         validate: bool,
         transaction: TransactionArg,
     ) -> Result<(), Error> {
-        self.grove_apply_batch_with_add_costs(ops, validate, transaction, None)
+        self.grove_apply_batch_with_add_costs(ops, validate, transaction, &mut vec![])
     }
 
     pub(crate) fn grove_apply_batch_with_add_costs(
@@ -797,7 +790,7 @@ impl Drive {
         ops: GroveDbOpBatch,
         validate: bool,
         transaction: TransactionArg,
-        drive_operations: Option<&mut Vec<DriveOperation>>,
+        drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<(), Error> {
         if ops.len() == 0 {
             return Err(Error::Drive(DriveError::BatchIsEmpty()));
@@ -819,7 +812,7 @@ impl Drive {
                 }),
                 transaction,
             );
-            push_drive_operation_result_optional(cost_context, drive_operations)
+            push_drive_operation_result(cost_context, drive_operations)
         } else {
             //println!("changes {} {:#?}", ops.len(), ops);
             for op in ops.operations.into_iter() {
@@ -833,14 +826,14 @@ impl Drive {
                         )),
                         transaction,
                         true,
-                        drive_operations.map(|op| op),
+                        drive_operations,
                     )?,
                     Op::Delete => self.grove_delete(
                         op.path,
                         op.key.as_slice(),
                         true,
                         transaction,
-                        drive_operations.map(|op| op),
+                        drive_operations,
                     )?,
                     _ => {
                         return Err(Error::Drive(DriveError::UnsupportedPrivate(

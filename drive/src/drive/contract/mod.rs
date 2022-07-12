@@ -410,8 +410,8 @@ impl Drive {
         let stored_element = value.map_err(Error::GroveDB)?;
         if let Element::Item(stored_contract_bytes, element_flag) = stored_element {
             let contract = Arc::new(Contract::from_cbor(&stored_contract_bytes, None)?);
-            let mut drive_cache = self.cache.borrow_mut().deref();
-            drive_cache
+            let mut drive_cache = self.cache.borrow_mut();
+            drive_cache.deref()
                 .cached_contracts
                 .insert(contract_id, Arc::clone(&contract));
             let flags = StorageFlags::from_element_flags(element_flag)?;

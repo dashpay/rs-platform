@@ -88,14 +88,18 @@ fn contract_documents_path(contract_id: &[u8]) -> [&[u8]; 3] {
 impl Drive {
     pub fn open<P: AsRef<Path>>(path: P, config: Option<DriveConfig>) -> Result<Self, Error> {
         match GroveDb::open(path) {
-            Ok(grove) => Ok(Drive {
-                grove,
-                config: config.unwrap_or_default(),
-                cache: RefCell::new(DriveCache {
-                    cached_contracts: Cache::new(200),
-                    genesis_time_ms: config.map(|c| c.default_genesis_time),
-                }),
-            }),
+            Ok(grove) => {
+                let config = config.unwrap_or_default();
+                let genesis_time_ms = config.default_genesis_time.clone();
+                Ok(Drive {
+                    grove,
+                    config,
+                    cache: RefCell::new(DriveCache {
+                        cached_contracts: Cache::new(200),
+                        genesis_time_ms,
+                    }),
+                })
+            },
             Err(e) => Err(Error::GroveDB(e)),
         }
     }
@@ -164,7 +168,7 @@ impl Drive {
                 batch_operations,
                 false,
                 transaction,
-                Some(drive_operations),
+                drive_operations,
             )?;
         } else {
             self.grove_batch_operations_costs(batch_operations, false, drive_operations)?;
