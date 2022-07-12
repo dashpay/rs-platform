@@ -1,9 +1,9 @@
 use dpp::identity::Identity;
 use grovedb::{Element, TransactionArg};
 
+use crate::drive::batch::GroveDbOpBatch;
 use crate::drive::flags::StorageFlags;
 use crate::drive::{Drive, RootTree};
-use crate::drive::batch::GroveDbOpBatch;
 use crate::error::drive::DriveError;
 use crate::error::identity::IdentityError;
 use crate::error::Error;
@@ -31,7 +31,11 @@ impl Drive {
             &storage_flags,
         );
 
-        batch.add_insert(vec![vec![RootTree::Identities as u8], identity.id.buffer.to_vec()],
+        batch.add_insert(
+            vec![
+                vec![RootTree::Identities as u8],
+                identity.id.buffer.to_vec(),
+            ],
             IDENTITY_KEY.to_vec(),
             Element::Item(identity_bytes, storage_flags.to_element_flags()),
         );
@@ -90,10 +94,9 @@ impl Drive {
 
 #[cfg(test)]
 mod tests {
-    use dpp::identity::Identity;
     use crate::common::tests::helpers::setup::setup_drive;
     use crate::drive::flags::StorageFlags;
-
+    use dpp::identity::Identity;
 
     #[test]
     fn test_insert_and_fetch_identity() {
@@ -111,7 +114,12 @@ mod tests {
             .expect("expected to deserialize an identity");
 
         drive
-            .insert_identity(identity.clone(), true, StorageFlags::default(), Some(&transaction))
+            .insert_identity(
+                identity.clone(),
+                true,
+                StorageFlags::default(),
+                Some(&transaction),
+            )
             .expect("expected to insert identity");
 
         let (fetched_identity, _) = drive

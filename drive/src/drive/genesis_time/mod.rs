@@ -1,11 +1,11 @@
 pub mod operations;
 
+use crate::drive::genesis_time::operations::update_genesis_time_operation;
 use crate::drive::{Drive, RootTree};
 use crate::error::drive::DriveError;
 use crate::error::Error;
 use grovedb::{Element, TransactionArg};
 use std::array::TryFromSliceError;
-use crate::drive::genesis_time::operations::update_genesis_time_operation;
 
 const KEY_GENESIS_TIME: &[u8; 1] = b"g";
 
@@ -40,9 +40,10 @@ impl Drive {
         }
     }
 
-    pub fn init_genesis(&self,
-                        genesis_time: u64,
-                        transaction: TransactionArg,
+    pub fn init_genesis(
+        &self,
+        genesis_time: u64,
+        transaction: TransactionArg,
     ) -> Result<(), Error> {
         let op = update_genesis_time_operation(genesis_time);
 
@@ -52,11 +53,11 @@ impl Drive {
 
 #[cfg(test)]
 mod tests {
+    use crate::common::tests::helpers::setup::setup_drive;
     use crate::drive::genesis_time::KEY_GENESIS_TIME;
     use crate::drive::RootTree;
     use crate::error;
     use grovedb::Element;
-    use crate::common::tests::helpers::setup::setup_drive;
 
     mod get_genesis_time {
         #[test]

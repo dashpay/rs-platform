@@ -1,3 +1,6 @@
+use crate::block::BlockInfo;
+use crate::error::Error;
+use crate::platform::Platform;
 use rs_drive::drive::batch::GroveDbOpBatch;
 use rs_drive::drive::fee_pools::fee_distribution::DistributionInfo;
 use rs_drive::error::fee::FeeError;
@@ -6,9 +9,6 @@ use rs_drive::fee::fees_aggregate::FeesAggregate;
 use rs_drive::fee_pools::epochs::EpochPool;
 use rs_drive::query::GroveError::StorageError;
 use rs_drive::query::TransactionArg;
-use crate::block::BlockInfo;
-use crate::error::Error;
-use crate::platform::Platform;
 
 impl Platform {
     pub fn process_block_fees(
@@ -36,7 +36,6 @@ impl Platform {
             // distribute accumulated previous epochs storage fees
             if current_epoch_pool.index > 0 {
                 self.distribute_storage_fee_distribution_pool(
-
                     current_epoch_pool.index - 1,
                     transaction,
                     &mut batch,
@@ -44,7 +43,9 @@ impl Platform {
             }
 
             // We need to apply new epochs tree structure and distributed storage fee
-            self.drive.grove_apply_batch(batch, false, transaction).map_err(StorageError)?;
+            self.drive
+                .grove_apply_batch(batch, false, transaction)
+                .map_err(StorageError)?;
         }
 
         let mut batch = GroveDbOpBatch::new();
@@ -55,11 +56,13 @@ impl Platform {
             &mut batch,
         )?;
 
-        let distribution_info = self.drive.add_distribute_fees_from_unpaid_pools_to_proposers_operations(
-            epoch_info.current_epoch_index,
-            transaction,
-            &mut batch,
-        )?;
+        let distribution_info = self
+            .drive
+            .add_distribute_fees_from_unpaid_pools_to_proposers_operations(
+                epoch_info.current_epoch_index,
+                transaction,
+                &mut batch,
+            )?;
 
         // Move integer part of the leftovers to processing
         // and fractional part to storage fees for the upcoming epochs
@@ -73,10 +76,10 @@ impl Platform {
         let processing_fees_leftovers: u64 = (distribution_info.fee_leftovers.floor())
             .try_into()
             .map_err(|_| {
-                Error::Fee(FeeError::DecimalConversion(
-                    "can't convert processing fees leftover from Decimal to u64",
-                ))
-            })?;
+            Error::Fee(FeeError::DecimalConversion(
+                "can't convert processing fees leftover from Decimal to u64",
+            ))
+        })?;
 
         self.drive.add_distribute_fees_into_pools_operations(
             &current_epoch_pool,

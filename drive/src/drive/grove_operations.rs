@@ -1,8 +1,8 @@
+use crate::drive::batch::GroveDbOpBatch;
 use costs::CostContext;
 use grovedb::batch::{BatchApplyOptions, GroveDbOp, Op};
 use grovedb::{Element, PathQuery, TransactionArg};
 use std::ops::DerefMut;
-use crate::drive::batch::GroveDbOpBatch;
 
 use crate::drive::flags::StorageFlags;
 use crate::drive::object_size_info::KeyInfo::{Key, KeyRef, KeySize};
@@ -773,8 +773,14 @@ impl Drive {
         validate: bool,
         transaction: TransactionArg,
     ) -> Result<(), Error> {
-
-        self.grove_apply_batch_with_add_costs(GroveDbOpBatch { operations: vec![operation] }, validate, transaction, None)
+        self.grove_apply_batch_with_add_costs(
+            GroveDbOpBatch {
+                operations: vec![operation],
+            },
+            validate,
+            transaction,
+            None,
+        )
     }
 
     pub fn grove_apply_batch(
@@ -806,7 +812,7 @@ impl Drive {
                 )));
             }
 
-            let cost_context = self.grove.apply_batch(
+            let cost_context = self.grove.grove_apply_batch(
                 ops,
                 Some(BatchApplyOptions {
                     validate_insertion_does_not_override: validate,

@@ -1,11 +1,14 @@
 use std::ops::Deref;
 
+use crate::abci::messages::{
+    BlockBeginRequest, BlockBeginResponse, BlockEndRequest, BlockEndResponse, InitChainRequest,
+    InitChainResponse,
+};
+use crate::block::{BlockExecutionContext, BlockInfo};
 use grovedb::TransactionArg;
 use rs_drive::fee::epoch::EpochInfo;
 use rs_drive::query::GroveError::StorageError;
 use rs_drive::query::TransactionArg;
-use crate::abci::messages::{BlockBeginRequest, BlockBeginResponse, BlockEndRequest, BlockEndResponse, InitChainRequest, InitChainResponse};
-use crate::block::{BlockExecutionContext, BlockInfo};
 
 use crate::drive::storage::batch::Batch;
 use crate::drive::Drive;
@@ -40,7 +43,9 @@ impl TenderdashAbci for Platform {
         _request: InitChainRequest,
         transaction: TransactionArg,
     ) -> Result<InitChainResponse, Error> {
-        self.drive.create_initial_state_structure(transaction).map_err(StorageError)?;
+        self.drive
+            .create_initial_state_structure(transaction)
+            .map_err(StorageError)?;
 
         let response = InitChainResponse {};
 
@@ -71,8 +76,7 @@ impl TenderdashAbci for Platform {
             epoch_info,
         };
 
-        self
-            .block_execution_context
+        self.block_execution_context
             .replace(Some(block_execution_context));
 
         let response = BlockBeginResponse {};
@@ -120,11 +124,16 @@ impl TenderdashAbci for Platform {
 #[cfg(test)]
 mod tests {
     mod handlers {
-        use std::time::Duration;
         use chrono::{Duration, Utc};
-        use rs_drive::common::tests::helpers::fee_pools::{create_masternode_identities, create_masternode_share_identities_and_documents, create_mn_shares_contract};
+        use rs_drive::common::tests::helpers::fee_pools::{
+            create_masternode_identities, create_masternode_share_identities_and_documents,
+            create_mn_shares_contract,
+        };
         use rs_drive::common::tests::helpers::setup::{setup_drive, setup_fee_pools};
+        use std::time::Duration;
 
+        use crate::abci::handlers::{block_begin, block_end, init_chain};
+        use crate::abci::messages::{BlockBeginRequest, BlockEndRequest, InitChainRequest};
         use crate::fee::pools::tests::helpers::fee_pools::create_masternode_identities;
         use crate::{
             drive::abci::{
@@ -138,8 +147,6 @@ mod tests {
                 setup::{setup_drive, setup_fee_pools},
             },
         };
-        use crate::abci::handlers::{block_begin, block_end, init_chain};
-        use crate::abci::messages::{BlockBeginRequest, BlockEndRequest, InitChainRequest};
 
         #[test]
         fn test_abci_flow() {

@@ -7,7 +7,7 @@ use crate::error::Error;
 use super::constants;
 
 impl Drive {
-    pub fn get_aggregate_storage_fees_in_current_distribution_pool (
+    pub fn get_aggregate_storage_fees_in_current_distribution_pool(
         &self,
         transaction: TransactionArg,
     ) -> Result<u64, Error> {
@@ -41,10 +41,10 @@ impl Drive {
 mod tests {
 
     mod helpers {
-        use grovedb::TransactionArg;
-        use rust_decimal::Decimal;
         use crate::drive::Drive;
         use crate::fee_pools::epochs::EpochPool;
+        use grovedb::TransactionArg;
+        use rust_decimal::Decimal;
 
         pub fn get_storage_fees_from_epoch_pools(
             drive: &Drive,

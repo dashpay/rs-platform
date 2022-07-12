@@ -416,7 +416,9 @@ impl Drive {
         if let Element::Item(stored_contract_bytes, element_flag) = stored_element {
             let contract = Arc::new(Contract::from_cbor(&stored_contract_bytes, None)?);
             let mut drive_cache = self.cache.borrow_mut().deref();
-            drive_cache.cached_contracts.insert(contract_id, Arc::clone(&contract));
+            drive_cache
+                .cached_contracts
+                .insert(contract_id, Arc::clone(&contract));
             let flags = StorageFlags::from_element_flags(element_flag)?;
             Ok((Some(Arc::clone(&contract)), flags))
         } else {

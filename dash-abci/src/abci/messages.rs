@@ -1,5 +1,5 @@
-use rs_drive::fee::fees_aggregate::FeesAggregate;
 use crate::error;
+use rs_drive::fee::fees_aggregate::FeesAggregate;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]

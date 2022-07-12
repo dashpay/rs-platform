@@ -1,20 +1,19 @@
-use grovedb::batch::GroveDbOp;
-use grovedb::batch::Op::Insert;
-use grovedb::Element;
-use crate::drive::batch::{GroveDbOpBatch};
+use crate::drive::batch::GroveDbOpBatch;
 use crate::drive::fee_pools::constants::KEY_STORAGE_FEE_POOL;
 use crate::drive::fee_pools::fee_pool_vec_path;
 use crate::fee_pools::epochs::EpochPool;
+use grovedb::batch::GroveDbOp;
+use grovedb::batch::Op::Insert;
+use grovedb::Element;
 
 pub mod epochs;
 
-pub fn add_create_fee_pool_trees_operations(
-    batch: &mut GroveDbOpBatch,
-) {
+pub fn add_create_fee_pool_trees_operations(batch: &mut GroveDbOpBatch) {
     // Update storage credit pool
-    batch.add_insert(fee_pool_vec_path(),
-                     KEY_STORAGE_FEE_POOL.to_vec(),
-                     Element::new_item(0u64.to_be_bytes().to_vec()),
+    batch.add_insert(
+        fee_pool_vec_path(),
+        KEY_STORAGE_FEE_POOL.to_vec(),
+        Element::new_item(0u64.to_be_bytes().to_vec()),
     );
 
     // We need to insert 50 years worth of epochs,
@@ -25,12 +24,12 @@ pub fn add_create_fee_pool_trees_operations(
     }
 }
 
-pub fn update_storage_fee_distribution_pool_operation(
-    storage_fee: u64,
-) -> GroveDbOp {
+pub fn update_storage_fee_distribution_pool_operation(storage_fee: u64) -> GroveDbOp {
     GroveDbOp {
         path: fee_pool_vec_path(),
         key: KEY_STORAGE_FEE_POOL.to_vec(),
-        op: Insert { element: Element::new_item(storage_fee.to_be_bytes().to_vec())}
+        op: Insert {
+            element: Element::new_item(storage_fee.to_be_bytes().to_vec()),
+        },
     }
 }

@@ -1,10 +1,10 @@
-use grovedb::{Element, PathQuery, Query, SizedQuery, TransactionArg};
 use crate::drive::batch::GroveDbOpBatch;
+use grovedb::{Element, PathQuery, Query, SizedQuery, TransactionArg};
 
 use crate::drive::Drive;
 use crate::error::drive::DriveError;
-use crate::error::Error;
 use crate::error::fee::FeeError;
+use crate::error::Error;
 use crate::fee_pools::epochs::EpochPool;
 
 impl Drive {
@@ -23,10 +23,8 @@ impl Drive {
                 _ => Err(e),
             })?;
 
-        let op = epoch_pool.update_proposer_block_count_operation(
-            proposer_pro_tx_hash,
-            proposed_block_count + 1,
-        );
+        let op = epoch_pool
+            .update_proposer_block_count_operation(proposer_pro_tx_hash, proposed_block_count + 1);
 
         batch.push(op);
 
@@ -41,7 +39,11 @@ impl Drive {
     ) -> Result<u64, Error> {
         let element = self
             .grove
-            .get(epoch_pool.get_proposers_path(), proposer_tx_hash, transaction)
+            .get(
+                epoch_pool.get_proposers_path(),
+                proposer_tx_hash,
+                transaction,
+            )
             // TODO: Shouldn't we wrap all errors to Fee Pool errors?
             //  in this case we know the source of error
             .unwrap()
@@ -62,7 +64,11 @@ impl Drive {
         }
     }
 
-    pub fn is_epochs_proposers_tree_empty(&self, epoch_pool: &EpochPool, transaction: TransactionArg) -> Result<bool, Error> {
+    pub fn is_epochs_proposers_tree_empty(
+        &self,
+        epoch_pool: &EpochPool,
+        transaction: TransactionArg,
+    ) -> Result<bool, Error> {
         match self
             .is_empty_tree(epoch_pool.get_proposers_path(), transaction)
             .unwrap()
@@ -95,7 +101,8 @@ impl Drive {
         let path_query = PathQuery::new(path_as_vec, SizedQuery::new(query, Some(limit), None));
 
         let (elements, _) = self
-            .grove.query_raw(&path_query, transaction)
+            .grove
+            .query_raw(&path_query, transaction)
             .unwrap()
             .map_err(Error::GroveDB)?;
 
@@ -127,9 +134,7 @@ impl Drive {
 mod tests {
     use grovedb::Element;
 
-    use crate::{
-        error::{self, fee::FeeError},
-    };
+    use crate::error::{self, fee::FeeError};
 
     use crate::common::tests::helpers::setup::setup_drive;
     use crate::common::tests::helpers::setup::setup_fee_pools;
@@ -137,7 +142,6 @@ mod tests {
     use crate::fee_pools::epochs::EpochPool;
 
     mod get_proposer_block_count {
-
 
         #[test]
         fn test_error_if_value_has_invalid_length() {
@@ -150,13 +154,13 @@ mod tests {
 
             let mut batch = super::GroveDbOpBatch::new();
 
-            batch.push(epoch.init_proposers_operation());
+            batch.push(epoch.init_proposers_tree_operation());
 
-            batch
-                .add_insert(epoch.get_proposers_vec_path(),
-                    pro_tx_hash.to_vec(),
-                    super::Element::Item(u128::MAX.to_be_bytes().to_vec(), None),
-                );
+            batch.add_insert(
+                epoch.get_proposers_vec_path(),
+                pro_tx_hash.to_vec(),
+                super::Element::Item(u128::MAX.to_be_bytes().to_vec(), None),
+            );
 
             drive
                 .grove_apply_batch(batch, false, Some(&transaction))
@@ -212,10 +216,9 @@ mod tests {
 
             let mut batch = super::GroveDbOpBatch::new();
 
-            batch.push(epoch.init_proposers_operation());
+            batch.push(epoch.init_proposers_tree_operation());
 
-            batch.push(epoch
-                .update_proposer_block_count_operation(&pro_tx_hash, block_count));
+            batch.push(epoch.update_proposer_block_count_operation(&pro_tx_hash, block_count));
 
             drive
                 .grove_apply_batch(batch, false, Some(&transaction))
@@ -241,7 +244,7 @@ mod tests {
 
             let mut batch = super::GroveDbOpBatch::new();
 
-            batch.push(epoch.init_proposers_operation());
+            batch.push(epoch.init_proposers_tree_operation());
 
             // Apply proposers tree
             drive
@@ -256,7 +259,8 @@ mod tests {
                     &pro_tx_hash,
                     Some(&transaction),
                     &mut batch,
-                ).expect("should increment proposer block count operations");
+                )
+                .expect("should increment proposer block count operations");
 
             drive
                 .grove_apply_batch(batch, false, Some(&transaction))
@@ -280,7 +284,7 @@ mod tests {
 
             let mut batch = super::GroveDbOpBatch::new();
 
-            batch.push(epoch.init_proposers_operation());
+            batch.push(epoch.init_proposers_tree_operation());
 
             // Apply proposers tree
             drive
@@ -348,10 +352,9 @@ mod tests {
 
             let mut batch = super::GroveDbOpBatch::new();
 
-            batch.push(epoch.init_proposers_operation());
+            batch.push(epoch.init_proposers_tree_operation());
 
-            batch.push(epoch
-                .update_proposer_block_count_operation(&pro_tx_hash, block_count));
+            batch.push(epoch.update_proposer_block_count_operation(&pro_tx_hash, block_count));
 
             drive
                 .grove_apply_batch(batch, false, Some(&transaction))
@@ -378,7 +381,7 @@ mod tests {
 
             let mut batch = super::GroveDbOpBatch::new();
 
-            batch.push(epoch.init_proposers_operation());
+            batch.push(epoch.init_proposers_tree_operation());
 
             // Apply proposers tree
             drive
@@ -387,8 +390,7 @@ mod tests {
 
             let mut batch = super::GroveDbOpBatch::new();
 
-            batch.push(epoch
-                .delete_proposers_tree_operation());
+            batch.push(epoch.delete_proposers_tree_operation());
 
             drive
                 .grove_apply_batch(batch, false, Some(&transaction))
@@ -422,7 +424,7 @@ mod tests {
 
             let mut batch = super::GroveDbOpBatch::new();
 
-            batch.push(epoch.init_proposers_operation());
+            batch.push(epoch.init_proposers_tree_operation());
 
             // Apply proposers tree
             drive
@@ -434,7 +436,7 @@ mod tests {
             let mut batch = super::GroveDbOpBatch::new();
 
             for pro_tx_hash in pro_tx_hashes.iter() {
-                batch.push(epoch.update_proposer_block_count_operation( pro_tx_hash, 1));
+                batch.push(epoch.update_proposer_block_count_operation(pro_tx_hash, 1));
             }
 
             // Apply proposers block count updates
@@ -468,11 +470,7 @@ mod tests {
 
             let mut batch = super::GroveDbOpBatch::new();
 
-            epoch
-                .add_delete_proposers_operations(
-                    deleted_pro_tx_hashes,
-                    &mut batch,
-                );
+            epoch.add_delete_proposers_operations(deleted_pro_tx_hashes, &mut batch);
 
             // Apply proposers deletion
             drive

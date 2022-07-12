@@ -6,8 +6,8 @@ use serde_json::json;
 use crate::common::value_to_cbor;
 use crate::contract::document::Document;
 use crate::drive::batch::GroveDbOpBatch;
-use crate::drive::Drive;
 use crate::drive::fee_pools::constants;
+use crate::drive::Drive;
 use crate::error::document::DocumentError;
 use crate::error::fee::FeeError;
 use crate::error::Error;
@@ -43,7 +43,7 @@ impl Drive {
         // For current epochs we pay for previous
         // Find oldest unpaid epochs since previous epochs
         let unpaid_epoch_pool =
-            match self.get_oldest_unpaid_epoch_pool( current_epoch_index - 1, transaction)? {
+            match self.get_oldest_unpaid_epoch_pool(current_epoch_index - 1, transaction)? {
                 Some(epoch_pool) => epoch_pool,
                 None => return Ok(DistributionInfo::empty()),
             };
@@ -55,14 +55,16 @@ impl Drive {
             (current_epoch_index - unpaid_epoch_pool.index) * 50
         };
 
-        let total_fees = self.get_epoch_total_credits_for_distribution(&unpaid_epoch_pool, transaction)?;
+        let total_fees =
+            self.get_epoch_total_credits_for_distribution(&unpaid_epoch_pool, transaction)?;
 
         let unpaid_epoch_block_count =
             self.get_epoch_block_count(&unpaid_epoch_pool, transaction)?;
 
         let unpaid_epoch_block_count = Decimal::from(unpaid_epoch_block_count);
 
-        let proposers = self.get_epochs_proposers(&unpaid_epoch_pool, proposers_limit, transaction)?;
+        let proposers =
+            self.get_epochs_proposers(&unpaid_epoch_pool, proposers_limit, transaction)?;
 
         let proposers_len = proposers.len() as u16;
 
@@ -175,7 +177,7 @@ impl Drive {
 
         // We don't need additional verification, since we ensure an identity
         // existence in the data contract triggers in DPP
-        let  (mut identity, storage_flags ) = drive.fetch_identity(id, transaction)?;
+        let (mut identity, storage_flags) = drive.fetch_identity(id, transaction)?;
 
         //todo balance should be a u64
         identity.balance += reward as i64;
@@ -213,11 +215,7 @@ impl Drive {
         from_epoch_index: u16,
         transaction: TransactionArg,
     ) -> Result<Option<EpochPool>, Error> {
-        self.get_oldest_unpaid_epoch_pool_recursive(
-            from_epoch_index,
-            from_epoch_index,
-            transaction,
-        )
+        self.get_oldest_unpaid_epoch_pool_recursive(from_epoch_index, from_epoch_index, transaction)
     }
 
     fn get_oldest_unpaid_epoch_pool_recursive<'d>(
@@ -242,24 +240,7 @@ impl Drive {
             return Ok(Some(epoch_pool));
         }
 
-        self.get_oldest_unpaid_epoch_pool_recursive(
-            from_epoch_index,
-            epoch_index - 1,
-            transaction,
-        )
-    }
-
-    fn get_epoch_block_count(
-        &self,
-        epoch_pool: &EpochPool,
-        transaction: TransactionArg,
-    ) -> Result<u64, Error> {
-        let next_epoch_pool = EpochPool::new(epoch_pool.index + 1);
-
-        let block_count = self.get_start_block_height(next_epoch_pool, transaction)?
-            - self.get_start_block_height(epoch_pool, transaction)?;
-
-        Ok(block_count)
+        self.get_oldest_unpaid_epoch_pool_recursive(from_epoch_index, epoch_index - 1, transaction)
     }
 
     pub fn add_distribute_fees_into_pools_operations(
@@ -271,17 +252,23 @@ impl Drive {
         batch: &mut GroveDbOpBatch,
     ) -> Result<(), Error> {
         // update epochs pool processing fees
-        let epoch_processing_fees = self.get_epoch_pool_processing_credits_for_distribution(current_epoch_pool, transaction)?;
+        let epoch_processing_fees =
+            self.get_epoch_processing_credits_for_distribution(current_epoch_pool, transaction)?;
 
-        batch.push(current_epoch_pool
-            .update_processing_fee_operation(epoch_processing_fees + processing_fees));
+        batch.push(
+            current_epoch_pool.update_processing_credits_for_distribution_operation(
+                epoch_processing_fees + processing_fees,
+            ),
+        );
 
         // update storage fee pool
-        let storage_fee_pool = self.get_aggregate_storage_fees_in_current_distribution_pool(transaction)?;
+        let storage_fee_pool =
+            self.get_aggregate_storage_fees_in_current_distribution_pool(transaction)?;
 
-        batch.push(current_epoch_pool.update_storage_credits_for_distribution_operation(
-            storage_fee_pool + storage_fees,
-        ));
+        batch.push(
+            current_epoch_pool
+                .update_storage_credits_for_distribution_operation(storage_fee_pool + storage_fees),
+        );
 
         Ok(())
     }
@@ -330,7 +317,7 @@ mod tests {
 
             let mut batch = super::GroveDbOpBatch::new(&drive);
 
-            batch.push(unpaid_epoch_pool_0.init_proposers_operation());
+            batch.push(unpaid_epoch_pool_0.init_proposers_tree_operation());
 
             // Apply proposers tree
             drive
@@ -348,7 +335,7 @@ mod tests {
 
             let mut batch = super::GroveDbOpBatch::new();
 
-            batch.push(unpaid_epoch_pool_1.init_proposers_operation());
+            batch.push(unpaid_epoch_pool_1.init_proposers_tree_operation());
 
             // Apply proposers tree
             drive
@@ -432,23 +419,19 @@ mod tests {
 
             let mut batch = super::GroveDbOpBatch::new(&drive);
 
-            unpaid_epoch_pool_0
-                .add_init_current_operations(&mut batch, 1, 1, 1)
-                .expect("should create proposers tree");
+            unpaid_epoch_pool_0.add_init_current_operations(1, 1, 1, &mut batch);
 
             let unpaid_epoch_pool_0_proposers_count = 200;
 
-            unpaid_epoch_pool_1
-                .add_init_current_operations(
-                    &mut batch,
-                    1,
-                    unpaid_epoch_pool_0_proposers_count as u64 + 1,
-                    2,
-                )
-                .expect("should create proposers tree");
+            unpaid_epoch_pool_1.add_init_current_operations(
+                1,
+                unpaid_epoch_pool_0_proposers_count as u64 + 1,
+                2,
+                &mut batch,
+            );
 
             drive
-                .apply_batch(batch, false, Some(&transaction))
+                .grove_apply_batch(batch, false, Some(&transaction))
                 .expect("should apply batch");
 
             super::create_masternode_identities_and_increment_proposers(
@@ -479,7 +462,7 @@ mod tests {
                 .expect("distribute fees into epochs pool 0");
 
             drive
-                .apply_batch(batch, false, Some(&transaction))
+                .grove_apply_batch(batch, false, Some(&transaction))
                 .expect("should apply batch");
 
             let mut batch = super::GroveDbOpBatch::new(&drive);
@@ -509,19 +492,15 @@ mod tests {
             // Create masternode reward shares contract
             let contract = super::create_mn_shares_contract(&drive, Some(&transaction));
 
-            let unpaid_epoch_pool = super::EpochPool::new(0, &drive);
-            let next_epoch_pool = super::EpochPool::new(1, &drive);
+            let unpaid_epoch_pool = super::EpochPool::new(0);
+            let next_epoch_pool = super::EpochPool::new(1);
 
             let mut batch = super::GroveDbOpBatch::new(&drive);
 
-            unpaid_epoch_pool
-                .add_init_current_operations(&mut batch, 1, 1, 1)
-                .expect("should create proposers tree");
+            unpaid_epoch_pool.add_init_current_operations(1, 1, 1, &mut batch);
 
             // emulating epochs change
-            next_epoch_pool
-                .add_init_current_operations(&mut batch, 1, 11, 10)
-                .expect("should init current for next epochs");
+            next_epoch_pool.add_init_current_operations(1, 11, 10, &mut batch);
 
             drive
                 .grove_apply_batch(batch, false, Some(&transaction))
@@ -555,7 +534,7 @@ mod tests {
                 .expect("distribute fees into epochs pool");
 
             drive
-                .apply_batch(batch, false, Some(&transaction))
+                .grove_apply_batch(batch, false, Some(&transaction))
                 .expect("should apply batch");
 
             let mut batch = super::GroveDbOpBatch::new(&drive);
@@ -577,7 +556,7 @@ mod tests {
             assert_eq!(distribution_info.paid_epoch_index.unwrap(), 0);
 
             // expect unpaid proposers exist
-            match unpaid_epoch_pool.is_proposers_tree_empty(Some(&transaction)) {
+            match drive.is_epochs_proposers_tree_empty(&unpaid_epoch_pool, Some(&transaction)) {
                 Ok(is_empty) => assert!(!is_empty),
                 Err(e) => match e {
                     _ => assert!(false, "should be able to get proposers tree"),
@@ -593,19 +572,15 @@ mod tests {
             // Create masternode reward shares contract
             let contract = super::create_mn_shares_contract(&drive, Some(&transaction));
 
-            let unpaid_epoch_pool = super::EpochPool::new(0, &drive);
-            let next_epoch_pool = super::EpochPool::new(1, &drive);
+            let unpaid_epoch_pool = super::EpochPool::new(0);
+            let next_epoch_pool = super::EpochPool::new(1);
 
             let mut batch = super::GroveDbOpBatch::new(&drive);
 
-            unpaid_epoch_pool
-                .add_init_current_operations(&mut batch, 1, 1, 1)
-                .expect("should create proposers tree");
+            unpaid_epoch_pool.add_init_current_operations(1, 1, 1, &mut batch);
 
             // emulating epochs change
-            next_epoch_pool
-                .add_init_current_operations(&mut batch, 1, 11, 10)
-                .expect("should init current for next epochs");
+            next_epoch_pool.add_init_current_operations(1, 11, 10, &mut batch);
 
             drive
                 .grove_apply_batch(batch, false, Some(&transaction))
@@ -712,9 +687,7 @@ mod tests {
 
         let mut batch = super::GroveDbOpBatch::new();
 
-        current_epoch_pool
-            .add_init_current_operations(&mut batch, 1, 1, 1)
-            .expect("should init the epochs pool as current");
+        current_epoch_pool.add_init_current_operations(1, 1, 1, &mut batch);
 
         // Apply new pool structure
         drive
@@ -741,15 +714,15 @@ mod tests {
             .grove_apply_batch(batch, false, Some(&transaction))
             .expect("should apply batch");
 
-        let stored_processing_fees = current_epoch_pool
-            .get_processing_fee(Some(&transaction))
+        let stored_processing_fee_credits = drive
+            .get_epoch_processing_credits_for_distribution(&current_epoch_pool, Some(&transaction))
             .expect("should get processing fees");
 
-        let stored_storage_fee_pool = fee_pools
-            .get_storage_fee_distribution_pool_fees(&drive, Some(&transaction))
+        let stored_storage_fee_credits = drive
+            .get_epoch_storage_credits_for_distribution(&current_epoch_pool, Some(&transaction))
             .expect("should get storage fee pool");
 
-        assert_eq!(stored_processing_fees, processing_fees);
-        assert_eq!(stored_storage_fee_pool, storage_fees);
+        assert_eq!(stored_processing_fee_credits, processing_fees);
+        assert_eq!(stored_storage_fee_credits, storage_fees);
     }
 }

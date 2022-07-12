@@ -1,10 +1,10 @@
+use crate::error::Error;
+use crate::platform::Platform;
 use rs_drive::drive::batch::GroveDbOpBatch;
 use rs_drive::drive::fee_pools::constants;
 use rs_drive::error::fee::FeeError;
 use rs_drive::fee_pools::epochs::EpochPool;
 use rs_drive::query::TransactionArg;
-use crate::error::Error;
-use crate::platform::Platform;
 
 impl Platform {
     pub fn distribute_storage_fee_distribution_pool(
@@ -13,8 +13,7 @@ impl Platform {
         transaction: TransactionArg,
         batch: &mut GroveDbOpBatch,
     ) -> Result<(), Error> {
-        let storage_distribution_fees =
-            self.get_storage_fee_distribution_pool_fees(transaction)?;
+        let storage_distribution_fees = self.get_storage_fee_distribution_pool_fees(transaction)?;
         let storage_distribution_fees = Decimal::new(storage_distribution_fees, 0);
 
         // a separate buffer from which we withdraw to correctly calculate fee share
@@ -60,17 +59,16 @@ impl Platform {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
 
     mod distribute_storage_fee_distribution_pool {
+        use crate::error::drive::DriveError;
+        use crate::error::Error;
         use rs_drive::common::tests::helpers;
         use rs_drive::common::tests::helpers::setup::{setup_drive, setup_fee_pools};
         use rs_drive::error::drive::DriveError;
         use rs_drive::fee_pools::epochs::EpochPool;
-        use crate::error::drive::DriveError;
-        use crate::error::Error;
         use rust_decimal::Decimal;
         use rust_decimal_macros::dec;
 

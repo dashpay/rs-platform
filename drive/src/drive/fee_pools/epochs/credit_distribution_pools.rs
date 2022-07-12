@@ -1,14 +1,18 @@
 use grovedb::{Element, TransactionArg};
 
 use crate::drive::Drive;
-use crate::error::Error;
 use crate::error::fee::FeeError;
+use crate::error::Error;
 use crate::fee_pools::epochs::EpochPool;
 
 use crate::fee_pools::epochs::tree_key_constants;
 
 impl Drive {
-    pub(crate) fn get_epoch_storage_credits_for_distribution(&self, epoch_pool: &EpochPool, transaction: TransactionArg) -> Result<u64, Error> {
+    pub(crate) fn get_epoch_storage_credits_for_distribution(
+        &self,
+        epoch_pool: &EpochPool,
+        transaction: TransactionArg,
+    ) -> Result<u64, Error> {
         let element = self
             .grove
             .get(
@@ -34,7 +38,11 @@ impl Drive {
         }
     }
 
-    pub(crate) fn get_epoch_pool_processing_credits_for_distribution(&self, epoch_pool: &EpochPool, transaction: TransactionArg) -> Result<u64, Error> {
+    pub(crate) fn get_epoch_processing_credits_for_distribution(
+        &self,
+        epoch_pool: &EpochPool,
+        transaction: TransactionArg,
+    ) -> Result<u64, Error> {
         let element = self
             .grove
             .get(
@@ -60,7 +68,11 @@ impl Drive {
         }
     }
 
-    pub(crate) fn get_epoch_fee_multiplier(&self, epoch_pool: &EpochPool, transaction: TransactionArg) -> Result<u64, Error> {
+    pub(crate) fn get_epoch_fee_multiplier(
+        &self,
+        epoch_pool: &EpochPool,
+        transaction: TransactionArg,
+    ) -> Result<u64, Error> {
         let element = self
             .grove
             .get(
@@ -86,29 +98,39 @@ impl Drive {
         }
     }
 
-    pub fn get_epoch_total_credits_for_distribution(&self, epoch_pool: &EpochPool, transaction: TransactionArg) -> Result<u64, Error> {
-        let storage_pool_credits = self.get_epoch_storage_credits_for_distribution(epoch_pool, transaction)?;
+    pub fn get_epoch_total_credits_for_distribution(
+        &self,
+        epoch_pool: &EpochPool,
+        transaction: TransactionArg,
+    ) -> Result<u64, Error> {
+        let storage_pool_credits =
+            self.get_epoch_storage_credits_for_distribution(epoch_pool, transaction)?;
 
-        let processing_pool_credits = self.get_epoch_pool_processing_credits_for_distribution(epoch_pool, transaction)?;
+        let processing_pool_credits =
+            self.get_epoch_processing_credits_for_distribution(epoch_pool, transaction)?;
 
-        storage_pool_credits.checked_add(processing_pool_credits).ok_or(Error::Fee(FeeError::Overflow("overflow getting total credits for distribution")))
+        storage_pool_credits
+            .checked_add(processing_pool_credits)
+            .ok_or(Error::Fee(FeeError::Overflow(
+                "overflow getting total credits for distribution",
+            )))
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use grovedb::Element;
-    use rust_decimal::Decimal;
-    use rust_decimal_macros::dec;
     use crate::common::tests::helpers::setup::setup_drive;
     use crate::common::tests::helpers::setup::setup_fee_pools;
     use crate::drive::batch::GroveDbOpBatch;
-    use crate::fee_pools::epochs::EpochPool;
-    use crate::error;
     use crate::drive::fee_pools::constants;
+    use crate::error;
     use crate::error::fee::FeeError;
+    use crate::fee_pools::epochs::tree_key_constants;
+    use crate::fee_pools::epochs::EpochPool;
+    use grovedb::Element;
+    use rust_decimal::Decimal;
 
-    mod update_storage_fee {
+    mod update_epoch_storage_credits_for_distribution {
 
         #[test]
         fn test_error_if_epoch_pool_is_not_initiated() {
@@ -117,8 +139,7 @@ mod tests {
 
             let epoch = super::EpochPool::new(7000);
 
-            let op = epoch
-                .update_storage_credits_for_distribution_operation(42);
+            let op = epoch.update_storage_credits_for_distribution_operation(42);
 
             match drive.grove_apply_operation(op, false, Some(&transaction)) {
                 Ok(_) => assert!(
@@ -143,8 +164,7 @@ mod tests {
 
             let storage_fee = 42;
 
-            let op = epoch
-                .update_storage_credits_for_distribution_operation(storage_fee);
+            let op = epoch.update_storage_credits_for_distribution_operation(storage_fee);
 
             drive
                 .grove_apply_operation(op, false, Some(&transaction))
@@ -158,8 +178,7 @@ mod tests {
         }
     }
 
-    mod get_storage_fee {
-
+    mod get_epoch_storage_credits_for_distribution {
 
         #[test]
         fn test_error_if_epoch_pool_is_not_initiated() {
@@ -212,21 +231,17 @@ mod tests {
         }
     }
 
-    mod update_processing_fee {
+    mod update_epoch_processing_credits_for_distribution {
         #[test]
         fn test_error_if_epoch_pool_is_not_initiated() {
             let drive = super::setup_drive();
             let (transaction, _) = super::setup_fee_pools(&drive, None);
 
-            let epoch = super::EpochPool::new(7000, &drive);
+            let epoch = super::EpochPool::new(7000);
 
-            let mut batch = super::GroveDbOpBatch::new(&drive);
+            let op = epoch.update_processing_credits_for_distribution_operation(42);
 
-            epoch
-                .add_update_processing_fee_operations(&mut batch, 42)
-                .expect("should update processing fee");
-
-            match drive.apply_batch(batch, false, Some(&transaction)) {
+            match drive.grove_apply_operation(op, false, Some(&transaction)) {
                 Ok(_) => assert!(
                     false,
                     "should not be able to update processing fee on uninit epochs pool"
@@ -245,48 +260,44 @@ mod tests {
             let drive = super::setup_drive();
             let (transaction, _) = super::setup_fee_pools(&drive, None);
 
-            let epoch = super::EpochPool::new(0, &drive);
+            let epoch = super::EpochPool::new(0);
 
             let processing_fee: u64 = 42;
 
-            let mut batch = super::GroveDbOpBatch::new(&drive);
-
-            epoch
-                .add_update_processing_fee_operations(&mut batch, processing_fee)
-                .expect("should update processing fee");
+            let op = epoch.update_processing_credits_for_distribution_operation(42);
 
             drive
-                .apply_batch(batch, false, Some(&transaction))
+                .grove_apply_operation(op, false, Some(&transaction))
                 .expect("should apply batch");
 
-            let stored_processing_fee = epoch
-                .get_processing_fee(Some(&transaction))
+            let stored_processing_fee = drive
+                .get_epoch_processing_credits_for_distribution(&epoch, Some(&transaction))
                 .expect("should get processing fee");
 
             assert_eq!(stored_processing_fee, processing_fee);
         }
     }
 
-    mod get_processing_fee {
+    mod get_epoch_processing_credits_for_distribution {
         #[test]
         fn test_error_if_value_has_invalid_length() {
             let drive = super::setup_drive();
             let (transaction, _) = super::setup_fee_pools(&drive, None);
 
-            let epoch = super::EpochPool::new(0, &drive);
+            let epoch = super::EpochPool::new(0);
 
             drive
                 .grove
                 .insert(
                     epoch.get_path(),
-                    super::constants::KEY_PROCESSING_FEE.as_slice(),
+                    super::tree_key_constants::KEY_POOL_PROCESSING_FEES.as_slice(),
                     super::Element::Item(u128::MAX.to_be_bytes().to_vec(), None),
                     Some(&transaction),
                 )
                 .unwrap()
                 .expect("should insert invalid data");
 
-            match epoch.get_processing_fee(Some(&transaction)) {
+            match drive.get_epoch_processing_credits_for_distribution(&epoch, Some(&transaction)) {
                 Ok(_) => assert!(false, "should not be able to decode stored value"),
                 Err(e) => match e {
                     super::error::Error::Fee(
@@ -301,36 +312,30 @@ mod tests {
     }
 
     #[test]
-    fn test_get_total_fees() {
+    fn test_get_epoch_total_credits_for_distribution() {
         let drive = setup_drive();
         let (transaction, _) = setup_fee_pools(&drive, None);
 
         let processing_fee: u64 = 42;
-        let storage_fee = dec!(1000);
+        let storage_fee: u64 = 1000;
 
-        let epoch = EpochPool::new(0, &drive);
+        let epoch = EpochPool::new(0);
 
-        let mut batch = super::GroveDbOpBatch::new(&drive);
+        let mut batch = GroveDbOpBatch::new();
 
-        epoch
-            .add_update_processing_fee_operations(&mut batch, processing_fee)
-            .expect("should update processing fee");
+        batch.push(epoch.update_processing_credits_for_distribution_operation(processing_fee));
 
-        epoch
-            .add_update_storage_fee_operations(&mut batch, storage_fee)
-            .expect("should update storage fee");
+        batch.push(epoch.update_storage_credits_for_distribution_operation(storage_fee));
 
         drive
-            .apply_batch(batch, false, Some(&transaction))
+            .grove_apply_batch(batch, false, Some(&transaction))
             .expect("should apply batch");
 
-        let combined_fee = epoch
-            .get_total_fees(Some(&transaction))
+        let retrieved_combined_fee = drive
+            .get_epoch_total_credits_for_distribution(&epoch, Some(&transaction))
             .expect("should get combined fee");
 
-        let processing_fee = Decimal::from(processing_fee);
-
-        assert_eq!(combined_fee, processing_fee + storage_fee);
+        assert_eq!(retrieved_combined_fee, processing_fee + storage_fee);
     }
 
     mod fee_multiplier {
@@ -339,9 +344,9 @@ mod tests {
             let drive = super::setup_drive();
             let (transaction, _) = super::setup_fee_pools(&drive, None);
 
-            let epoch = super::EpochPool::new(7000, &drive);
+            let epoch = super::EpochPool::new(7000);
 
-            match epoch.get_fee_multiplier(Some(&transaction)) {
+            match drive.get_epoch_fee_multiplier(&epoch, Some(&transaction)) {
                 Ok(_) => assert!(
                     false,
                     "should not be able to get multiplier on uninit epochs pool"
@@ -358,20 +363,20 @@ mod tests {
             let drive = super::setup_drive();
             let (transaction, _) = super::setup_fee_pools(&drive, None);
 
-            let epoch = super::EpochPool::new(0, &drive);
+            let epoch = super::EpochPool::new(0);
 
             drive
                 .grove
                 .insert(
                     epoch.get_path(),
-                    super::constants::KEY_FEE_MULTIPLIER.as_slice(),
+                    super::tree_key_constants::KEY_FEE_MULTIPLIER.as_slice(),
                     super::Element::Item(u128::MAX.to_be_bytes().to_vec(), None),
                     Some(&transaction),
                 )
                 .unwrap()
                 .expect("should insert invalid data");
 
-            match epoch.get_fee_multiplier(Some(&transaction)) {
+            match drive.get_epoch_fee_multiplier(&epoch, Some(&transaction)) {
                 Ok(_) => assert!(false, "should not be able to decode stored value"),
                 Err(e) => match e {
                     super::error::Error::Fee(
@@ -389,26 +394,22 @@ mod tests {
             let drive = super::setup_drive();
             let (transaction, _) = super::setup_fee_pools(&drive, None);
 
-            let epoch = super::EpochPool::new(0, &drive);
+            let epoch = super::EpochPool::new(0);
 
             let multiplier = 42;
 
-            let mut batch = super::GroveDbOpBatch::new(&drive);
+            let mut batch = super::GroveDbOpBatch::new();
 
-            epoch
-                .add_init_empty_operations(&mut batch)
-                .expect("should init empty pool");
+            epoch.add_init_empty_operations(&mut batch);
 
-            epoch
-                .add_init_current_operations(&mut batch, multiplier, 1, 1)
-                .expect("should init current");
+            epoch.add_init_current_operations(multiplier, 1, 1, &mut batch);
 
             drive
-                .apply_batch(batch, false, Some(&transaction))
+                .grove_apply_batch(batch, false, Some(&transaction))
                 .expect("should apply batch");
 
-            let stored_multiplier = epoch
-                .get_fee_multiplier(Some(&transaction))
+            let stored_multiplier = drive
+                .get_epoch_fee_multiplier(&epoch, Some(&transaction))
                 .expect("should get multiplier");
 
             assert_eq!(stored_multiplier, multiplier);

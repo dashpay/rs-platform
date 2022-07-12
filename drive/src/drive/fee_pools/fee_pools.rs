@@ -1,5 +1,3 @@
-
-
 #[cfg(test)]
 mod tests {
     use crate::{
@@ -66,17 +64,16 @@ mod tests {
 
             let mut batch = super::GroveDbOpBatch::new(&drive);
 
-            fee_pools
-                .add_shift_current_epoch_pool_operations(
-                    &current_epoch_pool,
-                    start_block_height,
-                    start_block_time,
-                    multiplier,
-                    &mut batch,
-                );
+            fee_pools.add_shift_current_epoch_pool_operations(
+                &current_epoch_pool,
+                start_block_height,
+                start_block_time,
+                multiplier,
+                &mut batch,
+            );
 
             drive
-                .apply_batch(batch, false, Some(&transaction))
+                .grove_apply_batch(batch, false, Some(&transaction))
                 .expect("should apply batch");
 
             let next_thousandth_epoch = super::EpochPool::new(1000, &drive);
