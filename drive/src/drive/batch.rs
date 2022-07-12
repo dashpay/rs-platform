@@ -14,6 +14,10 @@ impl GroveDbOpBatch {
         }
     }
 
+    pub fn len(&self) -> usize {
+        self.operations.len()
+    }
+
     pub fn push(&mut self, op: GroveDbOp) {
         self.operations.push(op);
     }

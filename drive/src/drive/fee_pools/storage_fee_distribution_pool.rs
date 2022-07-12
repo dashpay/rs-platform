@@ -1,6 +1,6 @@
 use crate::drive::Drive;
 use grovedb::{Element, TransactionArg};
-use crate::drive::fee_pools::aggregate_storage_fees_distribution_pool_vec_path;
+use crate::drive::fee_pools::{aggregate_storage_fees_distribution_pool_path, aggregate_storage_fees_distribution_pool_vec_path};
 
 use crate::error::fee::FeeError;
 use crate::error::Error;
@@ -15,7 +15,7 @@ impl Drive {
         let element = self
             .grove
             .get(
-                aggregate_storage_fees_distribution_pool_vec_path(),
+                aggregate_storage_fees_distribution_pool_path(),
                 constants::KEY_STORAGE_FEE_POOL.as_slice(),
                 transaction,
             )

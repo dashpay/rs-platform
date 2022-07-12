@@ -724,7 +724,7 @@ impl Drive {
             key,
             only_delete_tree_if_empty,
             true,
-            &current_batch_operations,
+            &current_batch_operations.operations,
             transaction,
         );
 
@@ -754,7 +754,7 @@ impl Drive {
             key,
             stop_path_height,
             true,
-            current_batch_operations,
+            current_batch_operations.operations,
             transaction,
         );
         if let Some(delete_operations) =
@@ -804,7 +804,7 @@ impl Drive {
         }
         if self.config.batching_enabled {
             // println!("batch {:#?}", ops);
-            let consistency_results = GroveDbOp::verify_consistency_of_operations(&ops);
+            let consistency_results = GroveDbOp::verify_consistency_of_operations(&ops.operations);
             if !consistency_results.is_empty() {
                 // println!("results {:#?}", consistency_results);
                 return Err(Error::Drive(DriveError::GroveDBInsertion(
@@ -812,8 +812,8 @@ impl Drive {
                 )));
             }
 
-            let cost_context = self.grove.grove_apply_batch(
-                ops,
+            let cost_context = self.grove.apply_batch(
+                ops.operations,
                 Some(BatchApplyOptions {
                     validate_insertion_does_not_override: validate,
                 }),
@@ -822,7 +822,7 @@ impl Drive {
             push_drive_operation_result_optional(cost_context, drive_operations)
         } else {
             //println!("changes {} {:#?}", ops.len(), ops);
-            for op in ops.into_iter() {
+            for op in ops.operations.into_iter() {
                 //println!("on {:#?}", op);
                 match op.op {
                     Op::Insert { element } => self.grove_insert(
