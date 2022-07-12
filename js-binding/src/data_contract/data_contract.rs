@@ -12,7 +12,6 @@ use wasm_bindgen::prelude::*;
 
 use crate::identifier::IdentifierWrapper;
 use crate::metadata::MetadataWasm;
-use dpp::Convertible;
 
 #[wasm_bindgen(js_name=DataContract)]
 #[derive(Debug, Clone)]
