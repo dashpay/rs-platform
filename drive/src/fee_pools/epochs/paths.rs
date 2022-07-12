@@ -1,8 +1,8 @@
 use crate::drive::RootTree;
 use crate::fee_pools::epochs::tree_key_constants;
-use crate::fee_pools::epochs::EpochPool;
+use crate::fee_pools::epochs::Epoch;
 
-impl EpochPool {
+impl Epoch {
     pub fn get_proposers_path(&self) -> [&[u8]; 3] {
         [
             Into::<&[u8; 1]>::into(RootTree::Pools),

@@ -12,7 +12,7 @@ mod tests {
     use crate::drive::batch::GroveDbOpBatch;
     use crate::error;
     use crate::fee_pools::epochs::tree_key_constants;
-    use crate::fee_pools::epochs::EpochPool;
+    use crate::fee_pools::epochs::Epoch;
 
     mod init_empty {
 
@@ -26,7 +26,7 @@ mod tests {
                 }),
             );
 
-            let epoch = super::EpochPool::new(1042);
+            let epoch = super::Epoch::new(1042);
 
             let mut batch = super::GroveDbOpBatch::new();
 
@@ -48,7 +48,7 @@ mod tests {
             let drive = super::setup_drive();
             let (transaction, _) = super::setup_fee_pools(&drive, None);
 
-            let epoch = super::EpochPool::new(1042);
+            let epoch = super::Epoch::new(1042);
 
             let mut batch = super::GroveDbOpBatch::new();
 
@@ -73,7 +73,7 @@ mod tests {
             let drive = super::setup_drive();
             let (transaction, _) = super::setup_fee_pools(&drive, None);
 
-            let epoch = super::EpochPool::new(1042);
+            let epoch = super::Epoch::new(1042);
 
             let multiplier = 42;
             let start_time = 1;
@@ -133,7 +133,7 @@ mod tests {
             let drive = super::setup_drive();
             let (transaction, _) = super::setup_fee_pools(&drive, None);
 
-            let epoch = super::EpochPool::new(0);
+            let epoch = super::Epoch::new(0);
 
             let mut batch = super::GroveDbOpBatch::new();
 

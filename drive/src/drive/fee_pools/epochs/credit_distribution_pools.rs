@@ -3,14 +3,14 @@ use grovedb::{Element, TransactionArg};
 use crate::drive::Drive;
 use crate::error::fee::FeeError;
 use crate::error::Error;
-use crate::fee_pools::epochs::EpochPool;
+use crate::fee_pools::epochs::Epoch;
 
 use crate::fee_pools::epochs::tree_key_constants;
 
 impl Drive {
     pub(crate) fn get_epoch_storage_credits_for_distribution(
         &self,
-        epoch_pool: &EpochPool,
+        epoch_pool: &Epoch,
         transaction: TransactionArg,
     ) -> Result<u64, Error> {
         let element = self
@@ -40,7 +40,7 @@ impl Drive {
 
     pub(crate) fn get_epoch_processing_credits_for_distribution(
         &self,
-        epoch_pool: &EpochPool,
+        epoch_pool: &Epoch,
         transaction: TransactionArg,
     ) -> Result<u64, Error> {
         let element = self
@@ -70,7 +70,7 @@ impl Drive {
 
     pub(crate) fn get_epoch_fee_multiplier(
         &self,
-        epoch_pool: &EpochPool,
+        epoch_pool: &Epoch,
         transaction: TransactionArg,
     ) -> Result<u64, Error> {
         let element = self
@@ -100,7 +100,7 @@ impl Drive {
 
     pub fn get_epoch_total_credits_for_distribution(
         &self,
-        epoch_pool: &EpochPool,
+        epoch_pool: &Epoch,
         transaction: TransactionArg,
     ) -> Result<u64, Error> {
         let storage_pool_credits =
@@ -126,7 +126,7 @@ mod tests {
     use crate::error;
     use crate::error::fee::FeeError;
     use crate::fee_pools::epochs::tree_key_constants;
-    use crate::fee_pools::epochs::EpochPool;
+    use crate::fee_pools::epochs::Epoch;
     use grovedb::Element;
     use rust_decimal::Decimal;
 
@@ -137,7 +137,7 @@ mod tests {
             let drive = super::setup_drive();
             let (transaction, _) = super::setup_fee_pools(&drive, None);
 
-            let epoch = super::EpochPool::new(7000);
+            let epoch = super::Epoch::new(7000);
 
             let op = epoch.update_storage_credits_for_distribution_operation(42);
 
@@ -160,7 +160,7 @@ mod tests {
             let drive = super::setup_drive();
             let (transaction, _) = super::setup_fee_pools(&drive, None);
 
-            let epoch = super::EpochPool::new(0);
+            let epoch = super::Epoch::new(0);
 
             let storage_fee = 42;
 
@@ -185,7 +185,7 @@ mod tests {
             let drive = super::setup_drive();
             let (transaction, _) = super::setup_fee_pools(&drive, None);
 
-            let epoch = super::EpochPool::new(7000);
+            let epoch = super::Epoch::new(7000);
 
             match drive.get_epoch_storage_credits_for_distribution(&epoch, Some(&transaction)) {
                 Ok(_) => assert!(
@@ -204,7 +204,7 @@ mod tests {
             let drive = super::setup_drive();
             let (transaction, _) = super::setup_fee_pools(&drive, None);
 
-            let epoch = super::EpochPool::new(0);
+            let epoch = super::Epoch::new(0);
 
             drive
                 .grove
@@ -237,7 +237,7 @@ mod tests {
             let drive = super::setup_drive();
             let (transaction, _) = super::setup_fee_pools(&drive, None);
 
-            let epoch = super::EpochPool::new(7000);
+            let epoch = super::Epoch::new(7000);
 
             let op = epoch.update_processing_credits_for_distribution_operation(42);
 
@@ -260,7 +260,7 @@ mod tests {
             let drive = super::setup_drive();
             let (transaction, _) = super::setup_fee_pools(&drive, None);
 
-            let epoch = super::EpochPool::new(0);
+            let epoch = super::Epoch::new(0);
 
             let processing_fee: u64 = 42;
 
@@ -284,7 +284,7 @@ mod tests {
             let drive = super::setup_drive();
             let (transaction, _) = super::setup_fee_pools(&drive, None);
 
-            let epoch = super::EpochPool::new(0);
+            let epoch = super::Epoch::new(0);
 
             drive
                 .grove
@@ -319,7 +319,7 @@ mod tests {
         let processing_fee: u64 = 42;
         let storage_fee: u64 = 1000;
 
-        let epoch = EpochPool::new(0);
+        let epoch = Epoch::new(0);
 
         let mut batch = GroveDbOpBatch::new();
 
@@ -344,7 +344,7 @@ mod tests {
             let drive = super::setup_drive();
             let (transaction, _) = super::setup_fee_pools(&drive, None);
 
-            let epoch = super::EpochPool::new(7000);
+            let epoch = super::Epoch::new(7000);
 
             match drive.get_epoch_fee_multiplier(&epoch, Some(&transaction)) {
                 Ok(_) => assert!(
@@ -363,7 +363,7 @@ mod tests {
             let drive = super::setup_drive();
             let (transaction, _) = super::setup_fee_pools(&drive, None);
 
-            let epoch = super::EpochPool::new(0);
+            let epoch = super::Epoch::new(0);
 
             drive
                 .grove
@@ -394,7 +394,7 @@ mod tests {
             let drive = super::setup_drive();
             let (transaction, _) = super::setup_fee_pools(&drive, None);
 
-            let epoch = super::EpochPool::new(0);
+            let epoch = super::Epoch::new(0);
 
             let multiplier = 42;
 

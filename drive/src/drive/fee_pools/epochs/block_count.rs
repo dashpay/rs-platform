@@ -1,16 +1,16 @@
 use crate::drive::Drive;
 use crate::error::fee::FeeError;
 use crate::error::Error;
-use crate::fee_pools::epochs::EpochPool;
+use crate::fee_pools::epochs::Epoch;
 use grovedb::TransactionArg;
 
 impl Drive {
     pub fn get_epoch_block_count(
         &self,
-        epoch_pool: &EpochPool,
+        epoch_pool: &Epoch,
         transaction: TransactionArg,
     ) -> Result<u64, Error> {
-        let next_epoch_pool = EpochPool::new(epoch_pool.index + 1);
+        let next_epoch_pool = Epoch::new(epoch_pool.index + 1);
 
         let next_start_block_height =
             self.get_epoch_start_block_height(&next_epoch_pool, transaction)?;

@@ -1,17 +1,12 @@
 use grovedb::TransactionArg;
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
-use serde_json::json;
-
-use crate::common::value_to_cbor;
-use crate::contract::document::Document;
 use crate::drive::batch::GroveDbOpBatch;
-use crate::drive::fee_pools::constants;
 use crate::drive::Drive;
 use crate::error::document::DocumentError;
 use crate::error::fee::FeeError;
 use crate::error::Error;
-use crate::fee_pools::epochs::EpochPool;
+use crate::fee_pools::epochs::Epoch;
 
 pub struct DistributionInfo {
     pub masternodes_paid_count: u16,
@@ -76,7 +71,7 @@ impl Drive {
             let mut masternode_reward =
                 (total_fees * proposed_block_count) / unpaid_epoch_block_count;
 
-            let documents = self.get_reward_shares(proposer_tx_hash, transaction)?;
+            let documents = self.get_reward_shares_list_for_masternode(proposer_tx_hash, transaction)?;
 
             for document in documents {
                 let pay_to_id = document
@@ -185,36 +180,11 @@ impl Drive {
         drive.add_insert_identity_operations(identity, storage_flags, batch)
     }
 
-    fn get_reward_shares(
-        masternode_owner_id: &Vec<u8>,
-        transaction: TransactionArg,
-    ) -> Result<Vec<Document>, Error> {
-        let query_json = json!({
-            "where": [
-                ["$ownerId", "==", bs58::encode(masternode_owner_id).into_string()]
-            ],
-        });
-
-        let query_cbor = value_to_cbor(query_json, None);
-
-        let (document_cbors, _, _) = drive.query_documents(
-            &query_cbor,
-            constants::MN_REWARD_SHARES_CONTRACT_ID,
-            constants::MN_REWARD_SHARES_DOCUMENT_TYPE,
-            transaction,
-        )?;
-
-        document_cbors
-            .iter()
-            .map(|cbor| Document::from_cbor(cbor, None, None))
-            .collect::<Result<Vec<Document>, Error>>()
-    }
-
     fn get_oldest_unpaid_epoch_pool<'d>(
         &'d self,
         from_epoch_index: u16,
         transaction: TransactionArg,
-    ) -> Result<Option<EpochPool>, Error> {
+    ) -> Result<Option<Epoch>, Error> {
         self.get_oldest_unpaid_epoch_pool_recursive(from_epoch_index, from_epoch_index, transaction)
     }
 
@@ -223,14 +193,14 @@ impl Drive {
         from_epoch_index: u16,
         epoch_index: u16,
         transaction: TransactionArg,
-    ) -> Result<Option<EpochPool>, Error> {
-        let epoch_pool = EpochPool::new(epoch_index);
+    ) -> Result<Option<Epoch>, Error> {
+        let epoch_pool = Epoch::new(epoch_index);
 
         if self.is_epochs_proposers_tree_empty(&epoch_pool, transaction)? {
             return if epoch_index == from_epoch_index {
                 Ok(None)
             } else {
-                let unpaid_epoch_pool = EpochPool::new(epoch_index + 1);
+                let unpaid_epoch_pool = Epoch::new(epoch_index + 1);
 
                 Ok(Some(unpaid_epoch_pool))
             };
@@ -245,7 +215,7 @@ impl Drive {
 
     pub fn add_distribute_fees_into_pools_operations(
         &self,
-        current_epoch_pool: &EpochPool,
+        current_epoch_pool: &Epoch,
         processing_fees: u64,
         storage_fees: u64,
         transaction: TransactionArg,
@@ -277,23 +247,13 @@ impl Drive {
 #[cfg(test)]
 mod tests {
     use crate::common::tests::helpers::setup::{setup_drive, setup_fee_pools};
-    use crate::fee::pools::{
-        epoch::constants,
-        epoch::epoch_pool::EpochPool,
-        tests::helpers::{
-            fee_pools::{
-                create_masternode_identities_and_increment_proposers,
-                create_masternode_share_identities_and_documents, create_mn_shares_contract,
-                fetch_identities_by_pro_tx_hashes, refetch_identities,
-            },
-            setup::{setup_drive, setup_fee_pools},
-        },
-    };
 
-    use crate::drive::storage::batch::GroveDbOpBatch;
-    use crate::fee_pools::epochs::EpochPool;
+    use crate::fee_pools::epochs::Epoch;
+    use crate::drive::batch::GroveDbOpBatch;
+    use crate::common::tests::helpers::fee_pools::create_masternode_identities_and_increment_proposers;
 
     mod get_oldest_unpaid_epoch_pool {
+
         #[test]
         fn test_all_epochs_paid() {
             let drive = super::setup_drive();
@@ -313,9 +273,9 @@ mod tests {
             let drive = super::setup_drive();
             let (transaction, fee_pools) = super::setup_fee_pools(&drive, None);
 
-            let unpaid_epoch_pool_0 = super::EpochPool::new(0);
+            let unpaid_epoch_pool_0 = super::Epoch::new(0);
 
-            let mut batch = super::GroveDbOpBatch::new(&drive);
+            let mut batch = super::GroveDbOpBatch::new();
 
             batch.push(unpaid_epoch_pool_0.init_proposers_tree_operation());
 
@@ -331,7 +291,7 @@ mod tests {
                 Some(&transaction),
             );
 
-            let unpaid_epoch_pool_1 = super::EpochPool::new(1);
+            let unpaid_epoch_pool_1 = super::Epoch::new(1);
 
             let mut batch = super::GroveDbOpBatch::new();
 
@@ -360,6 +320,9 @@ mod tests {
     }
 
     mod distribute_fees_from_unpaid_pools_to_proposers {
+        use crate::common::tests::helpers::fee_pools::{create_masternode_share_identities_and_documents, create_mn_shares_contract, fetch_identities_by_pro_tx_hashes, refetch_identities};
+        use crate::fee_pools::epochs::tree_key_constants::KEY_PROPOSERS;
+
         #[test]
         fn test_no_distribution_on_epoch_0() {
             let drive = super::setup_drive();
@@ -367,7 +330,7 @@ mod tests {
 
             let current_epoch_index = 0;
 
-            let mut batch = super::GroveDbOpBatch::new(&drive);
+            let mut batch = super::GroveDbOpBatch::new();
 
             let distribution_info = fee_pools
                 .add_distribute_fees_from_unpaid_pools_to_proposers_operations(
@@ -389,7 +352,7 @@ mod tests {
 
             let current_epoch_index = 1;
 
-            let mut batch = super::GroveDbOpBatch::new(&drive);
+            let mut batch = super::GroveDbOpBatch::new();
 
             let distribution_info = fee_pools
                 .add_distribute_fees_from_unpaid_pools_to_proposers_operations(
@@ -410,14 +373,14 @@ mod tests {
             let (transaction, fee_pools) = super::setup_fee_pools(&drive, None);
 
             // Create masternode reward shares contract
-            super::create_mn_shares_contract(&drive, Some(&transaction));
+            create_mn_shares_contract(&drive, Some(&transaction));
 
             // Create epochs
 
-            let unpaid_epoch_pool_0 = super::EpochPool::new(0);
-            let unpaid_epoch_pool_1 = super::EpochPool::new(1);
+            let unpaid_epoch_pool_0 = super::Epoch::new(0);
+            let unpaid_epoch_pool_1 = super::Epoch::new(1);
 
-            let mut batch = super::GroveDbOpBatch::new(&drive);
+            let mut batch = super::GroveDbOpBatch::new();
 
             unpaid_epoch_pool_0.add_init_current_operations(1, 1, 1, &mut batch);
 
@@ -448,7 +411,7 @@ mod tests {
                 Some(&transaction),
             );
 
-            let mut batch = super::GroveDbOpBatch::new(&drive);
+            let mut batch = super::GroveDbOpBatch::new();
 
             fee_pools
                 .add_distribute_fees_into_pools_operations(
@@ -465,7 +428,7 @@ mod tests {
                 .grove_apply_batch(batch, false, Some(&transaction))
                 .expect("should apply batch");
 
-            let mut batch = super::GroveDbOpBatch::new(&drive);
+            let mut batch = super::GroveDbOpBatch::new();
 
             let distribution_info = fee_pools
                 .add_distribute_fees_from_unpaid_pools_to_proposers_operations(
@@ -490,12 +453,12 @@ mod tests {
             let (transaction, fee_pools) = super::setup_fee_pools(&drive, None);
 
             // Create masternode reward shares contract
-            let contract = super::create_mn_shares_contract(&drive, Some(&transaction));
+            let contract = create_mn_shares_contract(&drive, Some(&transaction));
 
-            let unpaid_epoch_pool = super::EpochPool::new(0);
-            let next_epoch_pool = super::EpochPool::new(1);
+            let unpaid_epoch_pool = super::Epoch::new(0);
+            let next_epoch_pool = super::Epoch::new(1);
 
-            let mut batch = super::GroveDbOpBatch::new(&drive);
+            let mut batch = super::GroveDbOpBatch::new();
 
             unpaid_epoch_pool.add_init_current_operations(1, 1, 1, &mut batch);
 
@@ -513,14 +476,14 @@ mod tests {
                 Some(&transaction),
             );
 
-            super::create_masternode_share_identities_and_documents(
+            create_masternode_share_identities_and_documents(
                 &drive,
                 &contract,
                 &pro_tx_hashes,
                 Some(&transaction),
             );
 
-            let mut batch = super::GroveDbOpBatch::new(&drive);
+            let mut batch = super::GroveDbOpBatch::new();
 
             fee_pools
                 .add_distribute_fees_into_pools_operations(
@@ -537,7 +500,7 @@ mod tests {
                 .grove_apply_batch(batch, false, Some(&transaction))
                 .expect("should apply batch");
 
-            let mut batch = super::GroveDbOpBatch::new(&drive);
+            let mut batch = super::GroveDbOpBatch::new();
 
             let distribution_info = fee_pools
                 .add_distribute_fees_from_unpaid_pools_to_proposers_operations(
@@ -570,12 +533,12 @@ mod tests {
             let (transaction, fee_pools) = super::setup_fee_pools(&drive, None);
 
             // Create masternode reward shares contract
-            let contract = super::create_mn_shares_contract(&drive, Some(&transaction));
+            let contract = create_mn_shares_contract(&drive, Some(&transaction));
 
-            let unpaid_epoch_pool = super::EpochPool::new(0);
-            let next_epoch_pool = super::EpochPool::new(1);
+            let unpaid_epoch_pool = super::Epoch::new(0);
+            let next_epoch_pool = super::Epoch::new(1);
 
-            let mut batch = super::GroveDbOpBatch::new(&drive);
+            let mut batch = super::GroveDbOpBatch::new();
 
             unpaid_epoch_pool.add_init_current_operations(1, 1, 1, &mut batch);
 
@@ -594,14 +557,14 @@ mod tests {
             );
 
             let share_identities_and_documents =
-                super::create_masternode_share_identities_and_documents(
+                create_masternode_share_identities_and_documents(
                     &drive,
                     &contract,
                     &pro_tx_hashes,
                     Some(&transaction),
                 );
 
-            let mut batch = super::GroveDbOpBatch::new(&drive);
+            let mut batch = super::GroveDbOpBatch::new();
 
             fee_pools
                 .add_distribute_fees_into_pools_operations(
@@ -618,7 +581,7 @@ mod tests {
                 .grove_apply_batch(batch, false, Some(&transaction))
                 .expect("should apply batch");
 
-            let mut batch = super::GroveDbOpBatch::new(&drive);
+            let mut batch = super::GroveDbOpBatch::new();
 
             let distribution_info = fee_pools
                 .add_distribute_fees_from_unpaid_pools_to_proposers_operations(
@@ -637,7 +600,7 @@ mod tests {
             assert_eq!(distribution_info.paid_epoch_index.unwrap(), 0);
 
             // check we paid 500 to every mn identity
-            let paid_mn_identities = super::fetch_identities_by_pro_tx_hashes(
+            let paid_mn_identities = fetch_identities_by_pro_tx_hashes(
                 &drive,
                 &pro_tx_hashes,
                 Some(&transaction),
@@ -653,7 +616,7 @@ mod tests {
                 .collect();
 
             let refetched_share_identities =
-                super::refetch_identities(&drive, share_identities, Some(&transaction));
+                refetch_identities(&drive, share_identities, Some(&transaction));
 
             for identity in refetched_share_identities {
                 assert_eq!(identity.balance, 500);
@@ -664,7 +627,7 @@ mod tests {
                 .grove
                 .get(
                     unpaid_epoch_pool.get_path(),
-                    super::constants::KEY_PROPOSERS.as_slice(),
+                    KEY_PROPOSERS.as_slice(),
                     Some(&transaction),
                 )
                 .unwrap()
@@ -683,7 +646,7 @@ mod tests {
         let drive = setup_drive();
         let (transaction, fee_pools) = setup_fee_pools(&drive, None);
 
-        let current_epoch_pool = EpochPool::new(0);
+        let current_epoch_pool = Epoch::new(0);
 
         let mut batch = super::GroveDbOpBatch::new();
 

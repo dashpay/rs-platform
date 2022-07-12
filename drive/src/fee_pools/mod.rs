@@ -1,7 +1,7 @@
 use crate::drive::batch::GroveDbOpBatch;
 use crate::drive::fee_pools::constants::KEY_STORAGE_FEE_POOL;
 use crate::drive::fee_pools::fee_pool_vec_path;
-use crate::fee_pools::epochs::EpochPool;
+use crate::fee_pools::epochs::Epoch;
 use grovedb::batch::GroveDbOp;
 use grovedb::batch::Op::Insert;
 use grovedb::Element;
@@ -19,7 +19,7 @@ pub fn add_create_fee_pool_trees_operations(batch: &mut GroveDbOpBatch) {
     // We need to insert 50 years worth of epochs,
     // with 20 epochs per year that's 1000 epochs
     for i in 0..1000 {
-        let epoch = EpochPool::new(i);
+        let epoch = Epoch::new(i);
         epoch.add_init_empty_operations(batch);
     }
 }

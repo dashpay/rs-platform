@@ -3,11 +3,11 @@ use crate::platform::Platform;
 use rs_drive::drive::batch::GroveDbOpBatch;
 use rs_drive::drive::fee_pools::constants;
 use rs_drive::error::fee::FeeError;
-use rs_drive::fee_pools::epochs::EpochPool;
+use rs_drive::fee_pools::epochs::Epoch;
 use rs_drive::query::TransactionArg;
 
 impl Platform {
-    pub fn distribute_storage_fee_distribution_pool(
+    pub fn distribute_storage_fee_distribution_pool_to_epochs(
         &self,
         epoch_index: u16,
         transaction: TransactionArg,
@@ -32,7 +32,7 @@ impl Platform {
             let starting_epoch_index = epoch_index + year * 20;
 
             for index in starting_epoch_index..starting_epoch_index + 20 {
-                let epoch_pool = EpochPool::new(index);
+                let epoch_pool = Epoch::new(index);
 
                 let storage_fee = epoch_pool.get_storage_fee(transaction)?;
 
@@ -68,7 +68,7 @@ mod tests {
         use rs_drive::common::tests::helpers;
         use rs_drive::common::tests::helpers::setup::{setup_drive, setup_fee_pools};
         use rs_drive::error::drive::DriveError;
-        use rs_drive::fee_pools::epochs::EpochPool;
+        use rs_drive::fee_pools::epochs::Epoch;
         use rust_decimal::Decimal;
         use rust_decimal_macros::dec;
 
@@ -166,7 +166,7 @@ mod tests {
 
             // init additional epochs pools as it will be done in epoch_change
             for i in 1000..=1000 + epoch_index {
-                let epoch = EpochPool::new(i);
+                let epoch = Epoch::new(i);
                 epoch
                     .add_init_empty_operations(&mut batch)
                     .expect("should init additional epochs pool");

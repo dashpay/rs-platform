@@ -5,22 +5,22 @@ use crate::fee_pools::epochs::tree_key_constants::{
     KEY_FEE_MULTIPLIER, KEY_POOL_PROCESSING_FEES, KEY_POOL_STORAGE_FEES, KEY_START_BLOCK_HEIGHT,
     KEY_START_TIME,
 };
-use crate::fee_pools::epochs::{tree_key_constants, EpochPool};
+use crate::fee_pools::epochs::{tree_key_constants, Epoch};
 use grovedb::batch::Op::Insert;
 use grovedb::batch::{GroveDbOp, Op};
 use grovedb::{Element, TransactionArg};
 
-impl EpochPool {
+impl Epoch {
     pub fn add_shift_current_epoch_pool_operations(
         &self,
-        current_epoch_pool: &EpochPool,
+        current_epoch_pool: &Epoch,
         start_block_height: u64,
         start_block_time_ms: u64,
         fee_multiplier: u64,
         batch: &mut GroveDbOpBatch,
     ) {
         // create and init next thousandth epochs
-        let next_thousandth_epoch = EpochPool::new(current_epoch_pool.index + 1000);
+        let next_thousandth_epoch = Epoch::new(current_epoch_pool.index + 1000);
         next_thousandth_epoch.add_init_empty_operations(batch);
 
         // init first_proposer_block_height and processing_fee for an epochs

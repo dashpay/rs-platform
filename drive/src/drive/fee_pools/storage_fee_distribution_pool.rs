@@ -1,5 +1,6 @@
 use crate::drive::Drive;
 use grovedb::{Element, TransactionArg};
+use crate::drive::fee_pools::aggregate_storage_fees_distribution_pool_vec_path;
 
 use crate::error::fee::FeeError;
 use crate::error::Error;
@@ -14,7 +15,7 @@ impl Drive {
         let element = self
             .grove
             .get(
-                get_poo,
+                aggregate_storage_fees_distribution_pool_vec_path(),
                 constants::KEY_STORAGE_FEE_POOL.as_slice(),
                 transaction,
             )
@@ -42,7 +43,7 @@ mod tests {
 
     mod helpers {
         use crate::drive::Drive;
-        use crate::fee_pools::epochs::EpochPool;
+        use crate::fee_pools::epochs::Epoch;
         use grovedb::TransactionArg;
         use rust_decimal::Decimal;
 
@@ -53,7 +54,7 @@ mod tests {
         ) -> Vec<Decimal> {
             (epoch_index..epoch_index + 1000)
                 .map(|index| {
-                    let epoch_pool = EpochPool::new(index);
+                    let epoch_pool = Epoch::new(index);
                     epoch_pool
                         .get_storage_fee(transaction)
                         .expect("should get storage fee")

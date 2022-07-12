@@ -5,12 +5,12 @@ use crate::drive::Drive;
 use crate::error::drive::DriveError;
 use crate::error::fee::FeeError;
 use crate::error::Error;
-use crate::fee_pools::epochs::EpochPool;
+use crate::fee_pools::epochs::Epoch;
 
 impl Drive {
     pub fn increment_proposer_block_count_operations(
         &self,
-        epoch_pool: &EpochPool,
+        epoch_pool: &Epoch,
         proposer_pro_tx_hash: &[u8; 32],
         transaction: TransactionArg,
         batch: &mut GroveDbOpBatch,
@@ -33,7 +33,7 @@ impl Drive {
 
     fn get_epochs_proposer_block_count(
         &self,
-        epoch_pool: &EpochPool,
+        epoch_pool: &Epoch,
         proposer_tx_hash: &[u8; 32],
         transaction: TransactionArg,
     ) -> Result<u64, Error> {
@@ -66,7 +66,7 @@ impl Drive {
 
     pub fn is_epochs_proposers_tree_empty(
         &self,
-        epoch_pool: &EpochPool,
+        epoch_pool: &Epoch,
         transaction: TransactionArg,
     ) -> Result<bool, Error> {
         match self
@@ -85,7 +85,7 @@ impl Drive {
 
     pub fn get_epochs_proposers(
         &self,
-        epoch_pool: &EpochPool,
+        epoch_pool: &Epoch,
         limit: u16,
         transaction: TransactionArg,
     ) -> Result<Vec<(Vec<u8>, u64)>, Error> {
@@ -139,7 +139,7 @@ mod tests {
     use crate::common::tests::helpers::setup::setup_drive;
     use crate::common::tests::helpers::setup::setup_fee_pools;
     use crate::drive::batch::GroveDbOpBatch;
-    use crate::fee_pools::epochs::EpochPool;
+    use crate::fee_pools::epochs::Epoch;
 
     mod get_proposer_block_count {
 
@@ -150,7 +150,7 @@ mod tests {
 
             let pro_tx_hash: [u8; 32] = rand::random();
 
-            let epoch = super::EpochPool::new(0);
+            let epoch = super::Epoch::new(0);
 
             let mut batch = super::GroveDbOpBatch::new();
 
@@ -186,7 +186,7 @@ mod tests {
 
             let pro_tx_hash: [u8; 32] = rand::random();
 
-            let epoch = super::EpochPool::new(7000);
+            let epoch = super::Epoch::new(7000);
 
             match drive.get_epochs_proposer_block_count(&epoch, &pro_tx_hash, Some(&transaction)) {
                 Ok(_) => assert!(
@@ -212,7 +212,7 @@ mod tests {
             let pro_tx_hash: [u8; 32] = rand::random();
             let block_count = 42;
 
-            let epoch = super::EpochPool::new(0);
+            let epoch = super::Epoch::new(0);
 
             let mut batch = super::GroveDbOpBatch::new();
 
@@ -240,7 +240,7 @@ mod tests {
 
             let pro_tx_hash: [u8; 32] = rand::random();
 
-            let epoch = super::EpochPool::new(0);
+            let epoch = super::Epoch::new(0);
 
             let mut batch = super::GroveDbOpBatch::new();
 
@@ -280,7 +280,7 @@ mod tests {
 
             let pro_tx_hash: [u8; 32] = rand::random();
 
-            let epoch = super::EpochPool::new(0);
+            let epoch = super::Epoch::new(0);
 
             let mut batch = super::GroveDbOpBatch::new();
 
@@ -329,7 +329,7 @@ mod tests {
             let drive = super::setup_drive();
             let (transaction, _) = super::setup_fee_pools(&drive, None);
 
-            let epoch = super::EpochPool::new(0);
+            let epoch = super::Epoch::new(0);
 
             let result = drive
                 .is_epochs_proposers_tree_empty(&epoch, Some(&transaction))
@@ -348,7 +348,7 @@ mod tests {
             let pro_tx_hash: [u8; 32] = rand::random();
             let block_count = 42;
 
-            let epoch = super::EpochPool::new(0);
+            let epoch = super::Epoch::new(0);
 
             let mut batch = super::GroveDbOpBatch::new();
 
@@ -377,7 +377,7 @@ mod tests {
             let drive = super::setup_drive();
             let (transaction, _) = super::setup_fee_pools(&drive, None);
 
-            let epoch = super::EpochPool::new(0);
+            let epoch = super::Epoch::new(0);
 
             let mut batch = super::GroveDbOpBatch::new();
 
@@ -420,7 +420,7 @@ mod tests {
             let drive = super::setup_drive();
             let (transaction, _) = super::setup_fee_pools(&drive, None);
 
-            let epoch = super::EpochPool::new(0);
+            let epoch = super::Epoch::new(0);
 
             let mut batch = super::GroveDbOpBatch::new();
 

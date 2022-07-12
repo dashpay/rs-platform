@@ -1,7 +1,7 @@
 use crate::drive::Drive;
 use crate::error::fee::FeeError;
 use crate::error::Error;
-use crate::fee_pools::epochs::EpochPool;
+use crate::fee_pools::epochs::Epoch;
 use grovedb::{Element, TransactionArg};
 
 use crate::fee_pools::epochs::tree_key_constants;
@@ -9,7 +9,7 @@ use crate::fee_pools::epochs::tree_key_constants;
 impl Drive {
     pub fn get_epoch_start_time(
         &self,
-        epoch_pool: &EpochPool,
+        epoch_pool: &Epoch,
         transaction: TransactionArg,
     ) -> Result<u64, Error> {
         let element = self
@@ -43,7 +43,7 @@ mod tests {
     use crate::error;
     use crate::error::fee::FeeError;
 
-    use super::EpochPool;
+    use super::Epoch;
 
     #[test]
     fn test_update_start_time() {
@@ -51,7 +51,7 @@ mod tests {
 
         let (transaction, _) = setup_fee_pools(&drive, None);
 
-        let epoch_pool = super::EpochPool::new(0);
+        let epoch_pool = super::Epoch::new(0);
 
         let start_time_ms: u64 = Utc::now().timestamp_millis() as u64;
 
@@ -79,7 +79,7 @@ mod tests {
 
             let (transaction, _) = super::setup_fee_pools(&drive, None);
 
-            let non_initiated_epoch_pool = super::EpochPool::new(7000);
+            let non_initiated_epoch_pool = super::Epoch::new(7000);
 
             match drive.get_epoch_start_time(&non_initiated_epoch_pool, Some(&transaction)) {
                 Ok(_) => assert!(
@@ -99,7 +99,7 @@ mod tests {
 
             let (transaction, _) = super::setup_fee_pools(&drive, None);
 
-            let epoch_pool = super::EpochPool::new(0);
+            let epoch_pool = super::Epoch::new(0);
 
             match drive.get_epoch_start_time(&epoch_pool, Some(&transaction)) {
                 Ok(_) => assert!(false, "must be an error"),
@@ -116,7 +116,7 @@ mod tests {
 
             let (transaction, _) = super::setup_fee_pools(&drive, None);
 
-            let epoch = super::EpochPool::new(0);
+            let epoch = super::Epoch::new(0);
 
             drive
                 .grove
@@ -146,7 +146,7 @@ mod tests {
 
             let (transaction, _) = super::setup_fee_pools(&drive, None);
 
-            let epoch_pool = super::EpochPool::new(0);
+            let epoch_pool = super::Epoch::new(0);
 
             drive
                 .grove

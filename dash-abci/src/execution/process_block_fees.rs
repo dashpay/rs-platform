@@ -6,7 +6,7 @@ use rs_drive::drive::fee_pools::fee_distribution::DistributionInfo;
 use rs_drive::error::fee::FeeError;
 use rs_drive::fee::epoch::EpochInfo;
 use rs_drive::fee::fees_aggregate::FeesAggregate;
-use rs_drive::fee_pools::epochs::EpochPool;
+use rs_drive::fee_pools::epochs::Epoch;
 use rs_drive::query::GroveError::StorageError;
 use rs_drive::query::TransactionArg;
 
@@ -18,7 +18,7 @@ impl Platform {
         fees: &FeesAggregate,
         transaction: TransactionArg,
     ) -> Result<DistributionInfo, Error> {
-        let current_epoch_pool = EpochPool::new(epoch_info.current_epoch_index);
+        let current_epoch_pool = Epoch::new(epoch_info.current_epoch_index);
 
         if epoch_info.is_epoch_change {
             let mut batch = GroveDbOpBatch::new();
@@ -35,7 +35,7 @@ impl Platform {
 
             // distribute accumulated previous epochs storage fees
             if current_epoch_pool.index > 0 {
-                self.distribute_storage_fee_distribution_pool(
+                self.distribute_storage_fee_distribution_pool_to_epochs(
                     current_epoch_pool.index - 1,
                     transaction,
                     &mut batch,
