@@ -69,7 +69,8 @@ impl Drive {
         epoch_pool: &Epoch,
         transaction: TransactionArg,
     ) -> Result<bool, Error> {
-        match self.grove
+        match self
+            .grove
             .is_empty_tree(epoch_pool.get_proposers_path(), transaction)
             .unwrap()
         {

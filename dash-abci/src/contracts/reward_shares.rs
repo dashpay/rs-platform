@@ -1,8 +1,8 @@
+use crate::error::Error;
+use crate::platform::Platform;
 use rs_drive::common::value_to_cbor;
 use rs_drive::contract::document::Document;
 use rs_drive::query::TransactionArg;
-use crate::error::Error;
-use crate::platform::Platform;
 
 pub const MN_REWARD_SHARES_CONTRACT_ID: [u8; 32] = [
     0x0c, 0xac, 0xe2, 0x05, 0x24, 0x66, 0x93, 0xa7, 0xc8, 0x15, 0x65, 0x23, 0x62, 0x0d, 0xaa, 0x93,

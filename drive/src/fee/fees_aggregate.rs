@@ -4,6 +4,6 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "camelCase")]
 pub struct FeesAggregate {
     pub processing_fees: u64,
-    pub storage_fees: i64,
+    pub storage_fees: u64,
     pub fee_multiplier: u64,
 }

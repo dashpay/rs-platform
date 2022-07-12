@@ -1,12 +1,13 @@
 use grovedb::TransactionArg;
-use rust_decimal::Decimal;
-use rust_decimal_macros::dec;
 use rs_drive::drive::batch::GroveDbOpBatch;
 use rs_drive::drive::Drive;
 use rs_drive::error::document::DocumentError;
 use rs_drive::error::fee::FeeError;
 use rs_drive::error::Error;
 use rs_drive::fee_pools::epochs::Epoch;
+use rs_drive::query::TransactionArg;
+use rust_decimal::Decimal;
+use rust_decimal_macros::dec;
 
 pub struct DistributionInfo {
     pub masternodes_paid_count: u16,
@@ -71,7 +72,8 @@ impl Drive {
             let mut masternode_reward =
                 (total_fees * proposed_block_count) / unpaid_epoch_block_count;
 
-            let documents = self.get_reward_shares_list_for_masternode(proposer_tx_hash, transaction)?;
+            let documents =
+                self.get_reward_shares_list_for_masternode(proposer_tx_hash, transaction)?;
 
             for document in documents {
                 let pay_to_id = document
@@ -222,8 +224,9 @@ impl Drive {
         batch: &mut GroveDbOpBatch,
     ) -> Result<(), Error> {
         // update epochs pool processing fees
-        let epoch_processing_fees =
-            self.get_epoch_processing_credits_for_distribution(current_epoch_pool, transaction)?;
+        let epoch_processing_fees = self
+            .drive
+            .get_epoch_processing_credits_for_distribution(current_epoch_pool, transaction)?;
 
         batch.push(
             current_epoch_pool.update_processing_credits_for_distribution_operation(
@@ -248,8 +251,8 @@ impl Drive {
 mod tests {
     use rs_drive::common::tests::helpers::setup::{setup_drive, setup_fee_pools};
 
-    use rs_drive::fee_pools::epochs::Epoch;
     use rs_drive::drive::batch::GroveDbOpBatch;
+    use rs_drive::fee_pools::epochs::Epoch;
 
     mod get_oldest_unpaid_epoch_pool {
         use rs_drive::common::tests::helpers::{fee_pools, setup};
@@ -322,11 +325,14 @@ mod tests {
     }
 
     mod distribute_fees_from_unpaid_pools_to_proposers {
-        use rs_drive::common::tests::helpers::fee_pools::{create_masternode_share_identities_and_documents, create_mn_shares_contract, fetch_identities_by_pro_tx_hashes, refetch_identities};
+        use rs_drive::common::tests::helpers::fee_pools::{
+            create_masternode_share_identities_and_documents, create_mn_shares_contract,
+            fetch_identities_by_pro_tx_hashes, refetch_identities,
+        };
         use rs_drive::common::tests::helpers::{fee_pools, setup};
         use rs_drive::drive::batch::GroveDbOpBatch;
-        use rs_drive::fee_pools::epochs::Epoch;
         use rs_drive::fee_pools::epochs::tree_key_constants::KEY_PROPOSERS;
+        use rs_drive::fee_pools::epochs::Epoch;
 
         #[test]
         fn test_no_distribution_on_epoch_0() {
@@ -561,13 +567,12 @@ mod tests {
                 Some(&transaction),
             );
 
-            let share_identities_and_documents =
-                create_masternode_share_identities_and_documents(
-                    &drive,
-                    &contract,
-                    &pro_tx_hashes,
-                    Some(&transaction),
-                );
+            let share_identities_and_documents = create_masternode_share_identities_and_documents(
+                &drive,
+                &contract,
+                &pro_tx_hashes,
+                Some(&transaction),
+            );
 
             let mut batch = GroveDbOpBatch::new();
 
@@ -605,11 +610,8 @@ mod tests {
             assert_eq!(distribution_info.paid_epoch_index.unwrap(), 0);
 
             // check we paid 500 to every mn identity
-            let paid_mn_identities = fetch_identities_by_pro_tx_hashes(
-                &drive,
-                &pro_tx_hashes,
-                Some(&transaction),
-            );
+            let paid_mn_identities =
+                fetch_identities_by_pro_tx_hashes(&drive, &pro_tx_hashes, Some(&transaction));
 
             for paid_mn_identity in paid_mn_identities {
                 assert_eq!(paid_mn_identity.balance, 500);

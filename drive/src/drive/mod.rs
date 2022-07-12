@@ -26,9 +26,9 @@ pub mod flags;
 pub mod genesis_time;
 mod grove_operations;
 pub mod identity;
+pub mod initialization;
 pub mod object_size_info;
 pub mod query;
-pub mod initialization;
 
 pub struct DriveCache {
     pub cached_contracts: Cache<[u8; 32], Arc<Contract>>,
@@ -99,7 +99,7 @@ impl Drive {
                         genesis_time_ms,
                     }),
                 })
-            },
+            }
             Err(e) => Err(Error::GroveDB(e)),
         }
     }

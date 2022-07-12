@@ -1,8 +1,8 @@
-use grovedb::TransactionArg;
 use crate::drive::batch::GroveDbOpBatch;
 use crate::drive::{Drive, RootTree};
 use crate::error::Error;
 use crate::fee_pools::add_create_fee_pool_trees_operations;
+use grovedb::TransactionArg;
 
 impl Drive {
     pub fn create_initial_state_structure(&self, transaction: TransactionArg) -> Result<(), Error> {

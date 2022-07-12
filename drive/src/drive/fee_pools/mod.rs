@@ -16,7 +16,6 @@ pub(crate) fn aggregate_storage_fees_distribution_pool_path() -> [&'static [u8];
     ]
 }
 
-
 pub(crate) fn aggregate_storage_fees_distribution_pool_vec_path() -> Vec<Vec<u8>> {
     vec![vec![RootTree::Pools as u8], KEY_STORAGE_FEE_POOL.to_vec()]
 }
@@ -25,9 +24,9 @@ pub(crate) fn aggregate_storage_fees_distribution_pool_vec_path() -> Vec<Vec<u8>
 mod tests {
     use crate::common::tests::helpers::setup::setup_drive;
     use crate::common::tests::helpers::setup::setup_fee_pools;
-    use crate::fee_pools::epochs::Epoch;
-    use crate::error;
     use crate::drive::batch::GroveDbOpBatch;
+    use crate::error;
+    use crate::fee_pools::epochs::Epoch;
 
     mod create_fee_pool_trees {
         #[test]
@@ -98,7 +97,10 @@ mod tests {
             let next_thousandth_epoch = super::Epoch::new(1000);
 
             let storage_fee_pool = drive
-                .get_epoch_storage_credits_for_distribution(&next_thousandth_epoch, Some(&transaction))
+                .get_epoch_storage_credits_for_distribution(
+                    &next_thousandth_epoch,
+                    Some(&transaction),
+                )
                 .expect("should get storage fee");
 
             assert_eq!(storage_fee_pool, 0);
@@ -116,7 +118,7 @@ mod tests {
             assert_eq!(stored_start_block_time, start_block_time);
 
             let stored_multiplier = drive
-                .get_epoch_fee_multiplier(&current_epoch_pool,Some(&transaction))
+                .get_epoch_fee_multiplier(&current_epoch_pool, Some(&transaction))
                 .expect("should get fee multiplier");
 
             assert_eq!(stored_multiplier, multiplier);

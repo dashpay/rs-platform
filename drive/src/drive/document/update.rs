@@ -556,7 +556,14 @@ mod tests {
         let contract = Contract::from_cbor(contract_cbor.as_slice(), None)
             .expect("expected to create contract");
         drive
-            .apply_contract_cbor(contract_cbor.clone(), None, 0f64, true, StorageFlags::default(), None)
+            .apply_contract_cbor(
+                contract_cbor.clone(),
+                None,
+                0f64,
+                true,
+                StorageFlags::default(),
+                None,
+            )
             .expect("expected to apply contract successfully");
 
         // Create Alice profile
@@ -907,7 +914,14 @@ mod tests {
         let contract = value_to_cbor(contract, Some(defaults::PROTOCOL_VERSION));
 
         drive
-            .apply_contract_cbor(contract.clone(), None, 0f64, true, StorageFlags::default(), None)
+            .apply_contract_cbor(
+                contract.clone(),
+                None,
+                0f64,
+                true,
+                StorageFlags::default(),
+                None,
+            )
             .expect("should create a contract");
 
         // Create document

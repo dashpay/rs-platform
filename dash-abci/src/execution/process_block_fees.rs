@@ -1,8 +1,9 @@
 use crate::block::BlockInfo;
 use crate::error::Error;
+use crate::error::Error::Execution;
+use crate::execution::fee_distribution::DistributionInfo;
 use crate::platform::Platform;
 use rs_drive::drive::batch::GroveDbOpBatch;
-use crate::execution::fee_distribution::DistributionInfo;
 use rs_drive::error::fee::FeeError;
 use rs_drive::fee::epoch::EpochInfo;
 use rs_drive::fee::fees_aggregate::FeesAggregate;
@@ -11,6 +12,40 @@ use rs_drive::query::GroveError::StorageError;
 use rs_drive::query::TransactionArg;
 
 impl Platform {
+    fn process_epoch_change(
+        &self,
+        current_epoch: &Epoch,
+        block_info: &BlockInfo,
+        fees: &FeesAggregate,
+        transaction: TransactionArg,
+    ) {
+        let mut batch = GroveDbOpBatch::new();
+
+        // make next epochs pool as a current
+        // and create one more in future
+        current_epoch.add_shift_current_epoch_pool_operations(
+            &current_epoch,
+            block_info.block_height,
+            block_info.block_time,
+            fees.fee_multiplier,
+            &mut batch,
+        );
+
+        // distribute accumulated previous epochs storage fees
+        if current_epoch.index > 0 {
+            self.distribute_storage_fee_distribution_pool_to_epochs(
+                current_epoch.index - 1,
+                transaction,
+                &mut batch,
+            )?;
+        }
+
+        // We need to apply new epochs tree structure and distributed storage fee
+        self.drive
+            .grove_apply_batch(batch, false, transaction)
+            .map_err(StorageError)?;
+    }
+
     pub fn process_block_fees(
         &self,
         block_info: &BlockInfo,
@@ -18,39 +53,15 @@ impl Platform {
         fees: &FeesAggregate,
         transaction: TransactionArg,
     ) -> Result<DistributionInfo, Error> {
-        let current_epoch_pool = Epoch::new(epoch_info.current_epoch_index);
+        let current_epoch = Epoch::new(epoch_info.current_epoch_index);
 
         if epoch_info.is_epoch_change {
-            let mut batch = GroveDbOpBatch::new();
-
-            // make next epochs pool as a current
-            // and create one more in future
-            current_epoch_pool.add_shift_current_epoch_pool_operations(
-                &current_epoch_pool,
-                block_info.block_height,
-                block_info.block_time,
-                fees.fee_multiplier,
-                &mut batch,
-            );
-
-            // distribute accumulated previous epochs storage fees
-            if current_epoch_pool.index > 0 {
-                self.distribute_storage_fee_distribution_pool_to_epochs(
-                    current_epoch_pool.index - 1,
-                    transaction,
-                    &mut batch,
-                )?;
-            }
-
-            // We need to apply new epochs tree structure and distributed storage fee
-            self.drive
-                .grove_apply_batch(batch, false, transaction)
-                .map_err(StorageError)?;
+            self.process_epoch_change(&current_epoch, block_info, fees, transaction);
         }
 
         let mut batch = GroveDbOpBatch::new();
 
-        current_epoch_pool.add_increment_proposer_block_count_operations(
+        current_epoch.add_increment_proposer_block_count_operations(
             &block_info.proposer_pro_tx_hash,
             transaction,
             &mut batch,
@@ -81,15 +92,29 @@ impl Platform {
             ))
         })?;
 
+        let processing_fees_with_leftovers = fees
+            .processing_fees
+            .checked_add(processing_fees_leftovers)
+            .ok_or(Error::Execution(ExecutionError::Overflow(
+                "overflow combining processing with leftovers",
+            )))?;
+
+        let storage_fees_with_leftovers = fees
+            .storage_fees
+            .checked_add(storage_fees_leftovers)
+            .ok_or(Error::Execution(ExecutionError::Overflow(
+                "overflow combining storage with leftovers",
+            )))?;
+
         self.drive.add_distribute_fees_into_pools_operations(
             &current_epoch_pool,
-            fees.processing_fees + processing_fees_leftovers,
-            fees.storage_fees + storage_fees_leftovers,
+            processing_fees_with_leftovers,
+            storage_fees_with_leftovers,
             transaction,
             &mut batch,
         )?;
 
-        self.drive.apply_if_not_empty(batch, false, transaction)?;
+        self.drive.grove_apply_batch(batch, false, transaction)?;
 
         Ok(distribution_info)
     }
