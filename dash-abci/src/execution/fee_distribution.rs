@@ -1,3 +1,4 @@
+use crate::platform::Platform;
 use grovedb::TransactionArg;
 use rs_drive::drive::batch::GroveDbOpBatch;
 use rs_drive::drive::Drive;
@@ -25,7 +26,7 @@ impl DistributionInfo {
     }
 }
 
-impl Drive {
+impl Platform {
     pub fn add_distribute_fees_from_unpaid_pools_to_proposers_operations(
         &self,
         current_epoch_index: u16,
@@ -249,20 +250,18 @@ impl Drive {
 
 #[cfg(test)]
 mod tests {
-    use rs_drive::common::tests::helpers::setup::{setup_drive, setup_fee_pools};
-
     use rs_drive::drive::batch::GroveDbOpBatch;
     use rs_drive::fee_pools::epochs::Epoch;
 
     mod get_oldest_unpaid_epoch_pool {
-        use rs_drive::common::tests::helpers::{fee_pools, setup};
+        use crate::common::helpers::fee_pools;
+        use rs_drive::common::tests::helpers::setup;
         use rs_drive::drive::batch::GroveDbOpBatch;
         use rs_drive::fee_pools::epochs::Epoch;
 
         #[test]
         fn test_all_epochs_paid() {
-            let drive = setup::setup_drive();
-            let (transaction, fee_pools) = setup::setup_fee_pools(&drive, None);
+            let (drive, transaction) = setup::setup_drive_with_initial_state_structure();
 
             match fee_pools
                 .get_oldest_unpaid_epoch_pool(&drive, 999, Some(&transaction))
@@ -275,8 +274,7 @@ mod tests {
 
         #[test]
         fn test_two_unpaid_epochs() {
-            let drive = setup::setup_drive();
-            let (transaction, fee_pools) = setup::setup_fee_pools(&drive, None);
+            let (drive, transaction) = setup::setup_drive_with_initial_state_structure();
 
             let unpaid_epoch_pool_0 = Epoch::new(0);
 
@@ -325,30 +323,24 @@ mod tests {
     }
 
     mod distribute_fees_from_unpaid_pools_to_proposers {
-        use rs_drive::common::tests::helpers::fee_pools::{
-            create_masternode_share_identities_and_documents, create_mn_shares_contract,
-            fetch_identities_by_pro_tx_hashes, refetch_identities,
-        };
-        use rs_drive::common::tests::helpers::{fee_pools, setup};
+        use crate::common::helpers::setup;
         use rs_drive::drive::batch::GroveDbOpBatch;
         use rs_drive::fee_pools::epochs::tree_key_constants::KEY_PROPOSERS;
         use rs_drive::fee_pools::epochs::Epoch;
 
         #[test]
         fn test_no_distribution_on_epoch_0() {
-            let drive = setup::setup_drive();
-            let (transaction, fee_pools) = setup::setup_fee_pools(&drive, None);
+            let (platform, transaction) = setup::setup_platform_with_initial_state_structure();
 
             let current_epoch_index = 0;
 
             let mut batch = GroveDbOpBatch::new();
 
-            let distribution_info = fee_pools
+            let distribution_info = platform
                 .add_distribute_fees_from_unpaid_pools_to_proposers_operations(
-                    &drive,
-                    &mut batch,
                     current_epoch_index,
                     Some(&transaction),
+                    &mut batch,
                 )
                 .expect("should distribute fees");
 
@@ -358,19 +350,17 @@ mod tests {
 
         #[test]
         fn test_no_distribution_when_all_epochs_paid() {
-            let drive = setup::setup_drive();
-            let (transaction, fee_pools) = setup::setup_fee_pools(&drive, None);
+            let (platform, transaction) = setup::setup_platform_with_initial_state_structure();
 
             let current_epoch_index = 1;
 
             let mut batch = GroveDbOpBatch::new();
 
-            let distribution_info = fee_pools
+            let distribution_info = platform
                 .add_distribute_fees_from_unpaid_pools_to_proposers_operations(
-                    &drive,
-                    &mut batch,
                     current_epoch_index,
                     Some(&transaction),
+                    &mut batch,
                 )
                 .expect("should distribute fees");
 
@@ -380,8 +370,7 @@ mod tests {
 
         #[test]
         fn test_increased_proposers_limit_for_two_unpaid_epochs() {
-            let drive = setup::setup_drive();
-            let (transaction, fee_pools) = setup::setup_fee_pools(&drive, None);
+            let (platform, transaction) = setup::setup_platform_with_initial_state_structure();
 
             // Create masternode reward shares contract
             create_mn_shares_contract(&drive, Some(&transaction));
@@ -460,8 +449,7 @@ mod tests {
 
         #[test]
         fn test_partial_distribution() {
-            let drive = setup::setup_drive();
-            let (transaction, fee_pools) = setup::setup_fee_pools(&drive, None);
+            let (drive, transaction) = setup::setup_drive_with_initial_state_structure();
 
             // Create masternode reward shares contract
             let contract = create_mn_shares_contract(&drive, Some(&transaction));
@@ -540,8 +528,7 @@ mod tests {
 
         #[test]
         fn test_complete_distribution() {
-            let drive = setup::setup_drive();
-            let (transaction, fee_pools) = setup::setup_fee_pools(&drive, None);
+            let (drive, transaction) = setup::setup_drive_with_initial_state_structure();
 
             // Create masternode reward shares contract
             let contract = create_mn_shares_contract(&drive, Some(&transaction));
@@ -650,8 +637,8 @@ mod tests {
 
     #[test]
     fn test_distribute_fees_into_pools() {
-        let drive = setup_drive();
-        let (transaction, fee_pools) = setup_fee_pools(&drive, None);
+        let drive = super::setup_drive_with_initial_state_structure();
+        let transaction = drive.grove.start_transaction();
 
         let current_epoch_pool = Epoch::new(0);
 

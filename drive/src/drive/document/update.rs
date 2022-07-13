@@ -1185,7 +1185,7 @@ mod tests {
         let config = DriveConfig {
             batching_enabled: using_batches,
             has_raw_enabled: using_has_raw,
-            default_genesis_time: 0,
+            default_genesis_time: Some(0),
             encoding: DriveEncoding::DriveCbor,
         };
         let tmp_dir = TempDir::new().unwrap();

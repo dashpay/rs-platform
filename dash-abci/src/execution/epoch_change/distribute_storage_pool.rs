@@ -63,10 +63,10 @@ impl Platform {
 mod tests {
 
     mod distribute_storage_fee_distribution_pool {
+        use crate::common::helpers;
+        use crate::common::helpers::setup::setup_platform_with_initial_state_structure;
         use crate::error::drive::DriveError;
         use crate::error::Error;
-        use rs_drive::common::tests::helpers;
-        use rs_drive::common::tests::helpers::setup::{setup_drive, setup_fee_pools};
         use rs_drive::error::drive::DriveError;
         use rs_drive::fee_pools::epochs::Epoch;
         use rust_decimal::Decimal;
@@ -78,8 +78,7 @@ mod tests {
 
         #[test]
         fn test_nothing_to_distribute() {
-            let drive = setup_drive();
-            let (transaction, fee_pools) = setup_fee_pools(&drive, None);
+            let (platform, transaction) = setup_platform_with_initial_state_structure();
 
             let epoch_index = 0;
 
@@ -96,7 +95,10 @@ mod tests {
                 )
                 .expect("should distribute storage fee pool");
 
-            match drive.grove_apply_batch(batch, false, Some(&transaction)) {
+            match platform
+                .drive
+                .grove_apply_batch(batch, false, Some(&transaction))
+            {
                 Ok(()) => assert!(false, "should return BatchIsEmpty error"),
                 Err(e) => match e {
                     Error::Drive(DriveError::BatchIsEmpty()) => assert!(true),
@@ -104,8 +106,11 @@ mod tests {
                 },
             }
 
-            let storage_fees =
-                helpers::get_storage_fees_from_epoch_pools(&drive, epoch_index, Some(&transaction));
+            let storage_fees = helpers::get_storage_credits_for_distribution_for_epochs_in_range(
+                &drive,
+                epoch_index..1000,
+                Some(&transaction),
+            );
 
             let reference_fees: Vec<Decimal> = (0..1000).map(|_| dec!(0)).collect();
 
@@ -114,8 +119,7 @@ mod tests {
 
         #[test]
         fn test_distribution_overflow() {
-            let drive = setup_drive();
-            let (transaction, fee_pools) = setup_fee_pools(&drive, None);
+            let (platform, transaction) = setup_platform_with_initial_state_structure();
 
             let storage_pool = i64::MAX;
             let epoch_index = 0;
@@ -127,7 +131,8 @@ mod tests {
                 .expect("should update storage fee pool");
 
             // Apply storage fee distribution pool update
-            drive
+            platform
+                .drive
                 .grove_apply_batch(batch, false, Some(&transaction))
                 .expect("should apply batch");
 
@@ -142,7 +147,8 @@ mod tests {
                 )
                 .expect("should distribute storage fee pool");
 
-            drive
+            platform
+                .drive
                 .grove_apply_batch(batch, false, Some(&transaction))
                 .expect("should apply batch");
 
@@ -156,8 +162,7 @@ mod tests {
 
         #[test]
         fn test_deterministic_distribution() {
-            let drive = setup_drive();
-            let (transaction, fee_pools) = setup_fee_pools(&drive, None);
+            let (platform, transaction) = setup_platform_with_initial_state_structure();
 
             let storage_pool = 1000;
             let epoch_index = 42;
@@ -177,7 +182,8 @@ mod tests {
                 .expect("should update storage fee pool");
 
             // Apply storage fee distribution pool update
-            drive
+            platform
+                .drive
                 .grove_apply_batch(batch, false, Some(&transaction))
                 .expect("should apply batch");
 
@@ -192,7 +198,8 @@ mod tests {
                 )
                 .expect("should distribute storage fee pool");
 
-            drive
+            platform
+                .drive
                 .grove_apply_batch(batch, false, Some(&transaction))
                 .expect("should apply batch");
 

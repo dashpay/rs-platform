@@ -1,3 +1,4 @@
+use crate::fee_pools::epochs::Epoch;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
@@ -5,5 +6,5 @@ use serde::{Deserialize, Serialize};
 pub struct FeesAggregate {
     pub processing_fees: u64,
     pub storage_fees: u64,
-    pub fee_multiplier: u64,
+    pub refunds_by_epoch: Vec<(Epoch, u64)>,
 }

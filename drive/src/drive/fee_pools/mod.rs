@@ -23,7 +23,7 @@ pub(crate) fn aggregate_storage_fees_distribution_pool_vec_path() -> Vec<Vec<u8>
 #[cfg(test)]
 mod tests {
     use crate::common::tests::helpers::setup::setup_drive;
-    use crate::common::tests::helpers::setup::setup_fee_pools;
+    use crate::common::tests::helpers::setup::setup_drive_with_initial_state_structure;
     use crate::drive::batch::GroveDbOpBatch;
     use crate::error;
     use crate::fee_pools::epochs::Epoch;
@@ -31,11 +31,11 @@ mod tests {
     mod create_fee_pool_trees {
         #[test]
         fn test_values_are_set() {
-            let drive = super::setup_drive();
-            let (transaction, fee_pools) = super::setup_fee_pools(&drive, None);
+            let drive = super::setup_drive_with_initial_state_structure();
+            let transaction = drive.grove.start_transaction();
 
-            let storage_fee_pool = fee_pools
-                .get_storage_fee_distribution_pool_fees(&drive, Some(&transaction))
+            let storage_fee_pool = drive
+                .get_aggregate_storage_fees_in_current_distribution_pool(Some(&transaction))
                 .expect("should get storage fee pool");
 
             assert_eq!(storage_fee_pool, 0u64);
@@ -43,8 +43,8 @@ mod tests {
 
         #[test]
         fn test_epoch_pools_are_created() {
-            let drive = super::setup_drive();
-            let (transaction, _) = super::setup_fee_pools(&drive, None);
+            let drive = super::setup_drive_with_initial_state_structure();
+            let transaction = drive.grove.start_transaction();
 
             for epoch_index in 0..1000 {
                 let epoch = super::Epoch::new(epoch_index);
@@ -71,8 +71,8 @@ mod tests {
     mod shift_current_epoch_pool {
         #[test]
         fn test_values_are_set() {
-            let drive = super::setup_drive();
-            let (transaction, fee_pools) = super::setup_fee_pools(&drive, None);
+            let drive = super::setup_drive_with_initial_state_structure();
+            let transaction = drive.grove.start_transaction();
 
             let current_epoch_pool = super::Epoch::new(0);
 
@@ -82,8 +82,7 @@ mod tests {
 
             let mut batch = super::GroveDbOpBatch::new();
 
-            fee_pools.add_shift_current_epoch_pool_operations(
-                &current_epoch_pool,
+            current_epoch_pool.shift_to_new_epoch_operations(
                 start_block_height,
                 start_block_time,
                 multiplier,

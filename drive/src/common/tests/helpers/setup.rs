@@ -1,5 +1,4 @@
 use crate::drive::Drive;
-use crate::fee::pools::fee_pools::FeePools;
 use grovedb::Transaction;
 use tempfile::TempDir;
 
@@ -22,21 +21,11 @@ pub fn setup_drive() -> Drive {
     drive
 }
 
-pub fn setup_fee_pools<'a>(
-    drive: &'a Drive,
-    options: Option<SetupFeePoolsOptions>,
-) -> (Transaction<'a>, FeePools) {
-    let options = options.unwrap_or(SetupFeePoolsOptions::default());
+pub fn setup_drive_with_initial_state_structure() -> Drive {
+    let drive = setup_drive();
+    drive
+        .create_initial_state_structure(None)
+        .expect("should create root tree successfully");
 
-    let transaction = drive.grove.start_transaction();
-
-    let fee_pools = FeePools::new();
-
-    if options.apply_fee_pool_structure {
-        drive
-            .create_initial_state_structure(None)
-            .expect("should create root tree successfully");
-    }
-
-    (transaction, fee_pools)
+    drive
 }

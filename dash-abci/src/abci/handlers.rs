@@ -10,11 +10,8 @@ use rs_drive::fee::epoch::EpochInfo;
 use rs_drive::query::GroveError::StorageError;
 use rs_drive::query::TransactionArg;
 
-use crate::drive::storage::batch::Batch;
-use crate::drive::Drive;
 use crate::error;
 use crate::error::Error;
-use crate::fee::epoch::EpochInfo;
 use crate::platform::Platform;
 
 pub trait TenderdashAbci {
@@ -124,16 +121,15 @@ impl TenderdashAbci for Platform {
 #[cfg(test)]
 mod tests {
     mod handlers {
-        use chrono::{Duration, Utc};
-        use rs_drive::common::tests::helpers::fee_pools::{
+        use crate::common::helpers::fee_pools::{
             create_masternode_identities, create_masternode_share_identities_and_documents,
-            create_mn_shares_contract,
         };
-        use rs_drive::common::tests::helpers::setup::{setup_drive, setup_fee_pools};
+        use chrono::{Duration, Utc};
         use std::time::Duration;
 
         use crate::abci::handlers::{block_begin, block_end, init_chain};
         use crate::abci::messages::{BlockBeginRequest, BlockEndRequest, InitChainRequest};
+        use crate::common::helpers::setup::setup_platform_with_initial_state_structure;
         use crate::fee::pools::tests::helpers::fee_pools::create_masternode_identities;
         use crate::{
             drive::abci::{
@@ -141,25 +137,23 @@ mod tests {
                 messages::{BlockBeginRequest, BlockEndRequest, Fees, InitChainRequest},
             },
             fee::pools::tests::helpers::{
-                fee_pools::{
-                    create_masternode_share_identities_and_documents, create_mn_shares_contract,
-                },
+                fee_pools::create_masternode_share_identities_and_documents,
                 setup::{setup_drive, setup_fee_pools},
             },
         };
 
         #[test]
         fn test_abci_flow() {
-            let drive = setup_drive();
-            let (transaction, fee_pools) = setup_fee_pools(&drive, None);
+            let (platform, transaction) = setup_platform_with_initial_state_structure();
 
             // init chain
             let init_chain_request = InitChainRequest {};
 
-            init_chain(&drive, init_chain_request, Some(&transaction)).expect("should init chain");
+            init_chain(&platform, init_chain_request, Some(&transaction))
+                .expect("should init chain");
 
             // setup the contract
-            let contract = create_mn_shares_contract(&drive, Some(&transaction));
+            let contract = platform.create_mn_shares_contract(Some(&transaction));
 
             let genesis_time = Utc::now();
 

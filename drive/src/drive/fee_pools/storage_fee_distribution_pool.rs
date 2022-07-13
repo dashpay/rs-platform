@@ -40,29 +40,3 @@ impl Drive {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-
-    mod helpers {
-        use crate::drive::Drive;
-        use crate::fee_pools::epochs::Epoch;
-        use grovedb::TransactionArg;
-        use rust_decimal::Decimal;
-
-        pub fn get_storage_fees_from_epoch_pools(
-            drive: &Drive,
-            epoch_index: u16,
-            transaction: TransactionArg,
-        ) -> Vec<Decimal> {
-            (epoch_index..epoch_index + 1000)
-                .map(|index| {
-                    let epoch_pool = Epoch::new(index);
-                    epoch_pool
-                        .get_storage_fee(transaction)
-                        .expect("should get storage fee")
-                })
-                .collect()
-        }
-    }
-}

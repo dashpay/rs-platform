@@ -11,6 +11,19 @@ use rs_drive::fee_pools::epochs::Epoch;
 use rs_drive::query::GroveError::StorageError;
 use rs_drive::query::TransactionArg;
 
+/// From the Dash Improvement Proposal:
+
+/// For the purpose of this explanation we can trivialize that the execution of a block comprises
+/// the sum of the execution of all state transitions contained within the block. In order to
+/// avoid altering participating masternode identity balances every block and distribute fees
+/// evenly, the concept of pools is introduced. We will also introduce the concepts of an Epoch
+/// and the Epoch Year that are both covered later in this document. As the block executes state
+/// transitions, processing and storage fees are accumulated, as well as a list of refunded fees
+/// from various Epochs and fee multipliers. When there are no more state transitions to execute
+/// we can say the block has ended its state transition execution phase. The system will then add
+/// the accumulated fees to their corresponding pools, and in the case of deletion of data, remove
+/// storage fees from future Epoch storage pools.
+
 impl Platform {
     fn process_epoch_change(
         &self,
@@ -23,7 +36,7 @@ impl Platform {
 
         // make next epochs pool as a current
         // and create one more in future
-        current_epoch.add_shift_current_epoch_pool_operations(
+        current_epoch.shift_to_new_epoch_operations(
             &current_epoch,
             block_info.block_height,
             block_info.block_time,
@@ -61,11 +74,11 @@ impl Platform {
 
         let mut batch = GroveDbOpBatch::new();
 
-        current_epoch.add_increment_proposer_block_count_operations(
+        batch.push(current_epoch.increment_proposer_block_count_operation(
+            &drive,
             &block_info.proposer_pro_tx_hash,
             transaction,
-            &mut batch,
-        )?;
+        )?);
 
         let distribution_info = self
             .drive

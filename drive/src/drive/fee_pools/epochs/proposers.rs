@@ -8,30 +8,7 @@ use crate::error::Error;
 use crate::fee_pools::epochs::Epoch;
 
 impl Drive {
-    pub fn increment_proposer_block_count_operations(
-        &self,
-        epoch_pool: &Epoch,
-        proposer_pro_tx_hash: &[u8; 32],
-        transaction: TransactionArg,
-        batch: &mut GroveDbOpBatch,
-    ) -> Result<(), Error> {
-        // update proposer's block count
-        let proposed_block_count = self
-            .get_epochs_proposer_block_count(epoch_pool, proposer_pro_tx_hash, transaction)
-            .or_else(|e| match e {
-                Error::GroveDB(grovedb::Error::PathKeyNotFound(_)) => Ok(0u64),
-                _ => Err(e),
-            })?;
-
-        let op = epoch_pool
-            .update_proposer_block_count_operation(proposer_pro_tx_hash, proposed_block_count + 1);
-
-        batch.push(op);
-
-        Ok(())
-    }
-
-    fn get_epochs_proposer_block_count(
+    pub(crate) fn get_epochs_proposer_block_count(
         &self,
         epoch_pool: &Epoch,
         proposer_tx_hash: &[u8; 32],
@@ -138,7 +115,7 @@ mod tests {
     use crate::error::{self, fee::FeeError};
 
     use crate::common::tests::helpers::setup::setup_drive;
-    use crate::common::tests::helpers::setup::setup_fee_pools;
+    use crate::common::tests::helpers::setup::setup_drive_with_initial_state_structure;
     use crate::drive::batch::GroveDbOpBatch;
     use crate::fee_pools::epochs::Epoch;
 
@@ -146,8 +123,8 @@ mod tests {
 
         #[test]
         fn test_error_if_value_has_invalid_length() {
-            let drive = super::setup_drive();
-            let (transaction, _) = super::setup_fee_pools(&drive, None);
+            let drive = super::setup_drive_with_initial_state_structure();
+            let transaction = drive.grove.start_transaction();
 
             let pro_tx_hash: [u8; 32] = rand::random();
 
@@ -182,8 +159,8 @@ mod tests {
 
         #[test]
         fn test_error_if_epoch_pool_is_not_initiated() {
-            let drive = super::setup_drive();
-            let (transaction, _) = super::setup_fee_pools(&drive, None);
+            let drive = super::setup_drive_with_initial_state_structure();
+            let transaction = drive.grove.start_transaction();
 
             let pro_tx_hash: [u8; 32] = rand::random();
 
@@ -207,8 +184,8 @@ mod tests {
     mod update_proposer_block_count {
         #[test]
         fn test_value_is_set() {
-            let drive = super::setup_drive();
-            let (transaction, _) = super::setup_fee_pools(&drive, None);
+            let drive = super::setup_drive_with_initial_state_structure();
+            let transaction = drive.grove.start_transaction();
 
             let pro_tx_hash: [u8; 32] = rand::random();
             let block_count = 42;
@@ -236,8 +213,8 @@ mod tests {
     mod increment_proposer_block_count {
         #[test]
         fn test_value_is_set_if_epoch_is_not_initialized() {
-            let drive = super::setup_drive();
-            let (transaction, _) = super::setup_fee_pools(&drive, None);
+            let drive = super::setup_drive_with_initial_state_structure();
+            let transaction = drive.grove.start_transaction();
 
             let pro_tx_hash: [u8; 32] = rand::random();
 
@@ -254,14 +231,15 @@ mod tests {
 
             let mut batch = super::GroveDbOpBatch::new();
 
-            drive
-                .increment_proposer_block_count_operations(
-                    &epoch,
-                    &pro_tx_hash,
-                    Some(&transaction),
-                    &mut batch,
-                )
-                .expect("should increment proposer block count operations");
+            batch.push(
+                epoch
+                    .increment_proposer_block_count_operation(
+                        &drive,
+                        &pro_tx_hash,
+                        Some(&transaction),
+                    )
+                    .expect("should increment proposer block count operations"),
+            );
 
             drive
                 .grove_apply_batch(batch, false, Some(&transaction))
@@ -276,8 +254,8 @@ mod tests {
 
         #[test]
         fn test_value_is_incremented() {
-            let drive = super::setup_drive();
-            let (transaction, _) = super::setup_fee_pools(&drive, None);
+            let drive = super::setup_drive_with_initial_state_structure();
+            let transaction = drive.grove.start_transaction();
 
             let pro_tx_hash: [u8; 32] = rand::random();
 
@@ -303,14 +281,15 @@ mod tests {
 
             let mut batch = super::GroveDbOpBatch::new();
 
-            drive
-                .increment_proposer_block_count_operations(
-                    &epoch,
-                    &pro_tx_hash,
-                    Some(&transaction),
-                    &mut batch,
-                )
-                .expect("should update proposer block count");
+            batch.push(
+                epoch
+                    .increment_proposer_block_count_operation(
+                        &drive,
+                        &pro_tx_hash,
+                        Some(&transaction),
+                    )
+                    .expect("should update proposer block count"),
+            );
 
             drive
                 .grove_apply_batch(batch, false, Some(&transaction))
@@ -327,8 +306,8 @@ mod tests {
     mod is_empty_tree {
         #[test]
         fn test_check_if_empty() {
-            let drive = super::setup_drive();
-            let (transaction, _) = super::setup_fee_pools(&drive, None);
+            let drive = super::setup_drive_with_initial_state_structure();
+            let transaction = drive.grove.start_transaction();
 
             let epoch = super::Epoch::new(0);
 
@@ -343,8 +322,8 @@ mod tests {
     mod get_proposers {
         #[test]
         fn test_value() {
-            let drive = super::setup_drive();
-            let (transaction, _) = super::setup_fee_pools(&drive, None);
+            let drive = super::setup_drive_with_initial_state_structure();
+            let transaction = drive.grove.start_transaction();
 
             let pro_tx_hash: [u8; 32] = rand::random();
             let block_count = 42;
@@ -375,8 +354,8 @@ mod tests {
 
         #[test]
         fn test_values_has_been_deleted() {
-            let drive = super::setup_drive();
-            let (transaction, _) = super::setup_fee_pools(&drive, None);
+            let drive = super::setup_drive_with_initial_state_structure();
+            let transaction = drive.grove.start_transaction();
 
             let epoch = super::Epoch::new(0);
 
@@ -418,8 +397,8 @@ mod tests {
     mod delete_proposers {
         #[test]
         fn test_values_are_being_deleted() {
-            let drive = super::setup_drive();
-            let (transaction, _) = super::setup_fee_pools(&drive, None);
+            let drive = super::setup_drive_with_initial_state_structure();
+            let transaction = drive.grove.start_transaction();
 
             let epoch = super::Epoch::new(0);
 

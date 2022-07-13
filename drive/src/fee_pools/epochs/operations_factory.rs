@@ -1,5 +1,6 @@
 use crate::drive::batch::GroveDbOpBatch;
 use crate::drive::fee_pools::fee_pool_vec_path;
+use crate::drive::Drive;
 use crate::error::Error;
 use crate::fee_pools::epochs::tree_key_constants::{
     KEY_FEE_MULTIPLIER, KEY_POOL_PROCESSING_FEES, KEY_POOL_STORAGE_FEES, KEY_START_BLOCK_HEIGHT,
@@ -11,20 +12,37 @@ use grovedb::batch::{GroveDbOp, Op};
 use grovedb::{Element, TransactionArg};
 
 impl Epoch {
-    pub fn add_shift_current_epoch_pool_operations(
+    pub fn increment_proposer_block_count_operation(
         &self,
-        current_epoch_pool: &Epoch,
+        drive: &Drive,
+        proposer_pro_tx_hash: &[u8; 32],
+        transaction: TransactionArg,
+    ) -> Result<GroveDbOp, Error> {
+        // update proposer's block count
+        let proposed_block_count = drive
+            .get_epochs_proposer_block_count(self, proposer_pro_tx_hash, transaction)
+            .or_else(|e| match e {
+                Error::GroveDB(grovedb::Error::PathKeyNotFound(_)) => Ok(0u64),
+                _ => Err(e),
+            })?;
+
+        Ok(self
+            .update_proposer_block_count_operation(proposer_pro_tx_hash, proposed_block_count + 1))
+    }
+
+    pub fn shift_to_new_epoch_operations(
+        &self,
         start_block_height: u64,
         start_block_time_ms: u64,
         fee_multiplier: u64,
         batch: &mut GroveDbOpBatch,
     ) {
         // create and init next thousandth epochs
-        let next_thousandth_epoch = Epoch::new(current_epoch_pool.index + 1000);
+        let next_thousandth_epoch = Epoch::new(self.index + 1000);
         next_thousandth_epoch.add_init_empty_operations(batch);
 
         // init first_proposer_block_height and processing_fee for an epochs
-        current_epoch_pool.add_init_current_operations(
+        self.add_init_current_operations(
             fee_multiplier,
             start_block_height,
             start_block_time_ms,

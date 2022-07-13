@@ -8,7 +8,7 @@ use crate::fee_pools::epochs::Epoch;
 use crate::fee_pools::epochs::tree_key_constants;
 
 impl Drive {
-    pub(crate) fn get_epoch_storage_credits_for_distribution(
+    pub fn get_epoch_storage_credits_for_distribution(
         &self,
         epoch_pool: &Epoch,
         transaction: TransactionArg,
@@ -120,7 +120,7 @@ impl Drive {
 #[cfg(test)]
 mod tests {
     use crate::common::tests::helpers::setup::setup_drive;
-    use crate::common::tests::helpers::setup::setup_fee_pools;
+    use crate::common::tests::helpers::setup::setup_drive_with_initial_state_structure;
     use crate::drive::batch::GroveDbOpBatch;
     use crate::drive::fee_pools::constants;
     use crate::error;
@@ -134,8 +134,8 @@ mod tests {
 
         #[test]
         fn test_error_if_epoch_pool_is_not_initiated() {
-            let drive = super::setup_drive();
-            let (transaction, _) = super::setup_fee_pools(&drive, None);
+            let drive = super::setup_drive_with_initial_state_structure();
+            let transaction = drive.grove.start_transaction();
 
             let epoch = super::Epoch::new(7000);
 
@@ -157,8 +157,8 @@ mod tests {
 
         #[test]
         fn test_value_is_set() {
-            let drive = super::setup_drive();
-            let (transaction, _) = super::setup_fee_pools(&drive, None);
+            let drive = super::setup_drive_with_initial_state_structure();
+            let transaction = drive.grove.start_transaction();
 
             let epoch = super::Epoch::new(0);
 
@@ -182,8 +182,8 @@ mod tests {
 
         #[test]
         fn test_error_if_epoch_pool_is_not_initiated() {
-            let drive = super::setup_drive();
-            let (transaction, _) = super::setup_fee_pools(&drive, None);
+            let drive = super::setup_drive_with_initial_state_structure();
+            let transaction = drive.grove.start_transaction();
 
             let epoch = super::Epoch::new(7000);
 
@@ -201,8 +201,8 @@ mod tests {
 
         #[test]
         fn test_error_if_value_has_invalid_length() {
-            let drive = super::setup_drive();
-            let (transaction, _) = super::setup_fee_pools(&drive, None);
+            let drive = super::setup_drive_with_initial_state_structure();
+            let transaction = drive.grove.start_transaction();
 
             let epoch = super::Epoch::new(0);
 
@@ -234,8 +234,8 @@ mod tests {
     mod update_epoch_processing_credits_for_distribution {
         #[test]
         fn test_error_if_epoch_pool_is_not_initiated() {
-            let drive = super::setup_drive();
-            let (transaction, _) = super::setup_fee_pools(&drive, None);
+            let drive = super::setup_drive_with_initial_state_structure();
+            let transaction = drive.grove.start_transaction();
 
             let epoch = super::Epoch::new(7000);
 
@@ -257,8 +257,8 @@ mod tests {
 
         #[test]
         fn test_value_is_set() {
-            let drive = super::setup_drive();
-            let (transaction, _) = super::setup_fee_pools(&drive, None);
+            let drive = super::setup_drive_with_initial_state_structure();
+            let transaction = drive.grove.start_transaction();
 
             let epoch = super::Epoch::new(0);
 
@@ -281,8 +281,8 @@ mod tests {
     mod get_epoch_processing_credits_for_distribution {
         #[test]
         fn test_error_if_value_has_invalid_length() {
-            let drive = super::setup_drive();
-            let (transaction, _) = super::setup_fee_pools(&drive, None);
+            let drive = super::setup_drive_with_initial_state_structure();
+            let transaction = drive.grove.start_transaction();
 
             let epoch = super::Epoch::new(0);
 
@@ -313,8 +313,8 @@ mod tests {
 
     #[test]
     fn test_get_epoch_total_credits_for_distribution() {
-        let drive = setup_drive();
-        let (transaction, _) = setup_fee_pools(&drive, None);
+        let drive = setup_drive_with_initial_state_structure();
+        let transaction = drive.grove.start_transaction();
 
         let processing_fee: u64 = 42;
         let storage_fee: u64 = 1000;
@@ -341,8 +341,8 @@ mod tests {
     mod fee_multiplier {
         #[test]
         fn test_error_if_epoch_pool_is_not_initiated() {
-            let drive = super::setup_drive();
-            let (transaction, _) = super::setup_fee_pools(&drive, None);
+            let drive = super::setup_drive_with_initial_state_structure();
+            let transaction = drive.grove.start_transaction();
 
             let epoch = super::Epoch::new(7000);
 
@@ -360,8 +360,8 @@ mod tests {
 
         #[test]
         fn test_error_if_value_has_invalid_length() {
-            let drive = super::setup_drive();
-            let (transaction, _) = super::setup_fee_pools(&drive, None);
+            let drive = super::setup_drive_with_initial_state_structure();
+            let transaction = drive.grove.start_transaction();
 
             let epoch = super::Epoch::new(0);
 
@@ -391,8 +391,8 @@ mod tests {
 
         #[test]
         fn test_value_is_set() {
-            let drive = super::setup_drive();
-            let (transaction, _) = super::setup_fee_pools(&drive, None);
+            let drive = super::setup_drive_with_initial_state_structure();
+            let transaction = drive.grove.start_transaction();
 
             let epoch = super::Epoch::new(0);
 

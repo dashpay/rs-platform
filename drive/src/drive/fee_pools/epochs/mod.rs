@@ -6,7 +6,9 @@ pub mod start_time;
 
 #[cfg(test)]
 mod tests {
-    use crate::common::tests::helpers::setup::{setup_drive, setup_fee_pools};
+    use crate::common::tests::helpers::setup::{
+        setup_drive, setup_drive_with_initial_state_structure,
+    };
 
     use crate::common::tests::helpers::setup::SetupFeePoolsOptions;
     use crate::drive::batch::GroveDbOpBatch;
@@ -18,13 +20,8 @@ mod tests {
 
         #[test]
         fn test_error_if_fee_pools_not_initialized() {
-            let drive = super::setup_drive();
-            let (transaction, _) = super::setup_fee_pools(
-                &drive,
-                Some(super::SetupFeePoolsOptions {
-                    apply_fee_pool_structure: false,
-                }),
-            );
+            let drive = super::setup_drive_with_initial_state_structure();
+            let transaction = drive.grove.start_transaction();
 
             let epoch = super::Epoch::new(1042);
 
@@ -45,8 +42,8 @@ mod tests {
 
         #[test]
         fn test_values_are_set() {
-            let drive = super::setup_drive();
-            let (transaction, _) = super::setup_fee_pools(&drive, None);
+            let drive = super::setup_drive_with_initial_state_structure();
+            let transaction = drive.grove.start_transaction();
 
             let epoch = super::Epoch::new(1042);
 
@@ -70,8 +67,8 @@ mod tests {
 
         #[test]
         fn test_values_are_set() {
-            let drive = super::setup_drive();
-            let (transaction, _) = super::setup_fee_pools(&drive, None);
+            let drive = super::setup_drive_with_initial_state_structure();
+            let transaction = drive.grove.start_transaction();
 
             let epoch = super::Epoch::new(1042);
 
@@ -130,8 +127,8 @@ mod tests {
 
         #[test]
         fn test_values_are_deleted() {
-            let drive = super::setup_drive();
-            let (transaction, _) = super::setup_fee_pools(&drive, None);
+            let drive = super::setup_drive_with_initial_state_structure();
+            let transaction = drive.grove.start_transaction();
 
             let epoch = super::Epoch::new(0);
 

@@ -34,7 +34,9 @@ impl Drive {
 
 #[cfg(test)]
 mod tests {
-    use crate::common::tests::helpers::setup::{setup_drive, setup_fee_pools};
+    use crate::common::tests::helpers::setup::{
+        setup_drive, setup_drive_with_initial_state_structure,
+    };
     use crate::fee_pools::epochs::tree_key_constants;
     use grovedb::Element;
     use rust_decimal_macros::dec;
@@ -46,9 +48,8 @@ mod tests {
 
     #[test]
     fn test_update_epoch_start_block_height() {
-        let drive = setup_drive();
-
-        let (transaction, _) = setup_fee_pools(&drive, None);
+        let drive = setup_drive_with_initial_state_structure();
+        let transaction = drive.grove.start_transaction();
 
         let epoch = Epoch::new(0);
 
@@ -70,9 +71,8 @@ mod tests {
     mod get_epoch_start_block_height {
         #[test]
         fn test_error_if_epoch_pool_is_not_initiated() {
-            let drive = super::setup_drive();
-
-            let (transaction, _) = super::setup_fee_pools(&drive, None);
+            let drive = super::setup_drive_with_initial_state_structure();
+            let transaction = drive.grove.start_transaction();
 
             let non_initiated_epoch = super::Epoch::new(7000);
 
@@ -90,9 +90,8 @@ mod tests {
 
         #[test]
         fn test_error_if_value_is_not_set() {
-            let drive = super::setup_drive();
-
-            let (transaction, _) = super::setup_fee_pools(&drive, None);
+            let drive = super::setup_drive_with_initial_state_structure();
+            let transaction = drive.grove.start_transaction();
 
             let epoch = super::Epoch::new(0);
 
@@ -107,9 +106,8 @@ mod tests {
 
         #[test]
         fn test_error_if_value_has_invalid_length() {
-            let drive = super::setup_drive();
-
-            let (transaction, _) = super::setup_fee_pools(&drive, None);
+            let drive = super::setup_drive_with_initial_state_structure();
+            let transaction = drive.grove.start_transaction();
 
             let epoch = super::Epoch::new(0);
 
@@ -139,9 +137,8 @@ mod tests {
 
         #[test]
         fn test_error_if_element_has_invalid_type() {
-            let drive = super::setup_drive();
-
-            let (transaction, _) = super::setup_fee_pools(&drive, None);
+            let drive = super::setup_drive_with_initial_state_structure();
+            let transaction = drive.grove.start_transaction();
 
             let epoch = super::Epoch::new(0);
 
