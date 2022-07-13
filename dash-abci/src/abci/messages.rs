@@ -1,6 +1,7 @@
 use crate::error;
-use rs_drive::fee::fees_aggregate::FeesAggregate;
 use serde::{Deserialize, Serialize};
+use crate::error::Error;
+use crate::error::serialization::SerializationError;
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -31,6 +32,14 @@ pub struct BlockEndRequest {
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct FeesAggregate {
+    pub processing_fees: u64,
+    pub storage_fees: u64,
+    pub refunds_by_epoch: Vec<(u16, u64)>,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct BlockEndResponse {
     pub current_epoch_index: u16,
     pub is_epoch_change: bool,
@@ -46,11 +55,11 @@ impl<'a> Serializable<'a> for BlockEndRequest {}
 impl<'a> Serializable<'a> for BlockEndResponse {}
 
 pub trait Serializable<'a>: Serialize + Deserialize<'a> {
-    fn to_bytes(&self) -> Result<Vec<u8>, error::Error> {
+    fn to_bytes(&self) -> Result<Vec<u8>, Error> {
         let mut bytes = vec![];
 
         ciborium::ser::into_writer(&self, &mut bytes).map_err(|_| {
-            error::Error::Drive(error::drive::DriveError::CorruptedSerialization(
+            Error::Serialization(SerializationError::CorruptedSerialization(
                 "can't serialize ABCI message",
             ))
         })?;
@@ -58,9 +67,9 @@ pub trait Serializable<'a>: Serialize + Deserialize<'a> {
         Ok(bytes)
     }
 
-    fn from_bytes(bytes: &[u8]) -> Result<Self, error::Error> {
+    fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
         ciborium::de::from_reader(bytes).map_err(|_| {
-            error::Error::Drive(error::drive::DriveError::CorruptedSerialization(
+            Error::Serialization(SerializationError::CorruptedDeserialization(
                 "can't deserialize ABCI message",
             ))
         })

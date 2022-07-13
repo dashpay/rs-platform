@@ -1,15 +1,15 @@
 use crate::block::BlockInfo;
 use crate::error::Error;
-use crate::error::Error::Execution;
 use crate::execution::fee_distribution::DistributionInfo;
 use crate::platform::Platform;
 use rs_drive::drive::batch::GroveDbOpBatch;
 use rs_drive::error::fee::FeeError;
 use crate::execution::epoch_change::epoch::EpochInfo;
-use rs_drive::fee::fees_aggregate::FeesAggregate;
 use rs_drive::fee_pools::epochs::Epoch;
 use rs_drive::query::GroveError::StorageError;
 use rs_drive::query::TransactionArg;
+use crate::abci::messages::FeesAggregate;
+use crate::error::execution::ExecutionError;
 
 /// From the Dash Improvement Proposal:
 
@@ -37,7 +37,6 @@ impl Platform {
         // make next epochs pool as a current
         // and create one more in future
         current_epoch.shift_to_new_epoch_operations(
-            &current_epoch,
             block_info.block_height,
             block_info.block_time,
             fees.fee_multiplier,
@@ -46,7 +45,7 @@ impl Platform {
 
         // distribute accumulated previous epochs storage fees
         if current_epoch.index > 0 {
-            self.distribute_storage_fee_distribution_pool_to_epochs(
+            self.distribute_storage_fee_distribution_pool_to_epochs_operations(
                 current_epoch.index - 1,
                 transaction,
                 &mut batch,

@@ -8,4 +8,7 @@ pub enum ExecutionError {
 
     #[error("conversion error: {0}")]
     Conversion(&'static str),
+
+    #[error("platform corrupted code execution error: {0}")]
+    CorruptedCodeExecution(&'static str),
 }

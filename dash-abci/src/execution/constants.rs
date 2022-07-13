@@ -1,6 +1,10 @@
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 
+pub const EPOCHS_PER_YEAR: u64 = 20;
+
+pub const EPOCHS_PER_YEAR_DEC: Decimal = dec!(20);
+
 #[rustfmt::skip]
 pub const FEE_DISTRIBUTION_TABLE: [Decimal; 50] = [
     dec!(0.05000), dec!(0.04800), dec!(0.04600), dec!(0.04400), dec!(0.04200),

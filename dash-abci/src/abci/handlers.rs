@@ -9,8 +9,8 @@ use rs_drive::grovedb::TransactionArg;
 use crate::execution::epoch_change::epoch::EpochInfo;
 use rs_drive::query::GroveError::StorageError;
 
-use crate::error;
 use crate::error::Error;
+use crate::error::execution::ExecutionError;
 use crate::platform::Platform;
 
 pub trait TenderdashAbci {
@@ -55,9 +55,10 @@ impl TenderdashAbci for Platform {
     ) -> Result<BlockBeginResponse, Error> {
         // Set genesis time
         let genesis_time = if request.block_height == 1 {
-            self.init_genesis(request.block_time_ms)
+            self.drive.init_genesis(request.block_time_ms, transaction)?;
+            request.block_time_ms
         } else {
-            drive.get_genesis_time(transaction)?
+            self.drive.get_genesis_time(transaction)?
         };
 
         // Init block execution context
@@ -90,8 +91,8 @@ impl TenderdashAbci for Platform {
         let block_execution_context = match block_execution_context.deref() {
             Some(block_execution_context) => block_execution_context,
             None => {
-                return Err(Error::Drive(
-                    error::drive::DriveError::CorruptedCodeExecution(
+                return Err(Error::Execution(
+                    ExecutionError::CorruptedCodeExecution(
                         "block execution context must be set in block begin handler",
                     ),
                 ))
@@ -124,10 +125,13 @@ mod tests {
             create_masternode_identities, create_masternode_share_identities_and_documents,
         };
         use chrono::{Duration, Utc};
+        use rust_decimal::prelude::ToPrimitive;
         use crate::abci::handlers::TenderdashAbci;
 
-        use crate::abci::messages::{BlockBeginRequest, BlockEndRequest, InitChainRequest};
+        use crate::abci::messages::{BlockBeginRequest, BlockEndRequest, FeesAggregate, InitChainRequest};
         use crate::common::helpers::setup::setup_platform_with_initial_state_structure;
+        use crate::error::Error;
+        use crate::error::execution::ExecutionError;
 
         #[test]
         fn test_abci_flow() {
@@ -154,10 +158,10 @@ mod tests {
 
             // and create masternode identities
             let proposers =
-                create_masternode_identities(&drive, proposers_count, Some(&transaction));
+                create_masternode_identities(&platform.drive, proposers_count, Some(&transaction));
 
             create_masternode_share_identities_and_documents(
-                &drive,
+                &platform.drive,
                 &contract,
                 &proposers,
                 Some(&transaction),
@@ -171,34 +175,35 @@ mod tests {
                     genesis_time + Duration::days(day as i64 - 1)
                 };
 
-                let previous_block_time = if day == 1 {
+                let previous_block_time_ms = if day == 1 {
                     None
                 } else {
-                    Some((genesis_time + Duration::days(day as i64 - 2)).timestamp_millis())
+                    Some((genesis_time + Duration::days(day as i64 - 2)).timestamp_millis().to_u64().ok_or(Error::Execution(ExecutionError::Overflow("block time can not be before 1970")))?)
                 };
 
                 let block_height = day as u64;
 
+                let block_time_ms = block_time.timestamp_millis().to_u64().ok_or(Error::Execution(ExecutionError::Overflow("block time can not be before 1970")))?;
                 // Processing block
                 let block_begin_request = BlockBeginRequest {
                     block_height,
-                    block_time_ms: block_time.timestamp_millis(),
-                    previous_block_time_ms: previous_block_time,
+                    block_time_ms,
+                    previous_block_time_ms,
                     proposer_pro_tx_hash: proposers[day as usize - 1],
                 };
 
-                block_begin(&drive, block_begin_request, Some(&transaction))
+                platform.block_begin(block_begin_request, Some(&transaction))
                     .expect(format!("should begin process block #{}", day).as_str());
 
                 let block_end_request = BlockEndRequest {
-                    fees: Fees {
+                    fees: FeesAggregate {
                         processing_fees: 1600,
                         storage_fees: storage_fees_per_block,
-                        fee_multiplier: 2,
+                        refunds_by_epoch: vec![(1, 100)], // we are refunding 100 credits from epoch 1
                     },
                 };
 
-                let block_end_response = block_end(&drive, block_end_request, Some(&transaction))
+                let block_end_response = platform.block_end(block_end_request, Some(&transaction))
                     .expect(format!("should end process block #{}", day).as_str());
 
                 // Should calculate correct current epochs
@@ -208,7 +213,7 @@ mod tests {
 
                 assert_eq!(
                     block_end_response.is_epoch_change,
-                    previous_block_time.is_none() || day == epoch_1_start_day
+                    previous_block_time_ms.is_none() || day == epoch_1_start_day
                 );
 
                 // Should pay to 19 masternodes, when epochs 1 started
@@ -236,13 +241,13 @@ mod tests {
                 }
             }
 
-            let storage_fee_pool_value = fee_pools
-                .get_storage_fee_distribution_pool_fees(&drive, Some(&transaction))
+            let storage_fee_pool_value = platform.drive
+                .get_aggregate_storage_fees_in_current_distribution_pool(Some(&transaction))
                 .expect("should get storage fee pool");
 
             assert_eq!(
                 storage_fee_pool_value,
-                storage_fees_per_block * (total_days - epoch_1_start_day + 1) as i64,
+                storage_fees_per_block * (total_days - epoch_1_start_day + 1) as u64,
                 "should contain only storage fees from the last block"
             );
         }

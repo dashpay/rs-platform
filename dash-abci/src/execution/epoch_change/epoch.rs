@@ -1,6 +1,7 @@
 use rust_decimal::Decimal;
 use crate::error::Error;
 use serde::{Serialize, Deserialize};
+use crate::error::execution::ExecutionError;
 
 pub const EPOCH_CHANGE_TIME: u64 = 1576800000;
 
