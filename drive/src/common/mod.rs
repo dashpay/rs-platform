@@ -1,6 +1,5 @@
 pub mod encode;
-#[cfg(test)]
-pub mod tests;
+pub mod helpers;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs::File;

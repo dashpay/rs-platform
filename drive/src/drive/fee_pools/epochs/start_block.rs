@@ -34,7 +34,7 @@ impl Drive {
 
 #[cfg(test)]
 mod tests {
-    use crate::common::tests::helpers::setup::{
+    use crate::common::helpers::setup::{
         setup_drive_with_initial_state_structure,
     };
     use crate::fee_pools::epochs::epoch_key_constants;

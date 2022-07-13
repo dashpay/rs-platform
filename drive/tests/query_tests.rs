@@ -132,7 +132,7 @@ pub fn setup_family_tests(count: u32, batching: bool, seed: u64) -> (Drive, Cont
     // setup code
     let contract = common::setup_contract(
         &drive,
-        "tests/supporting_files/contract/family/family-contract.json",
+        "helpers/supporting_files/contract/family/family-contract.json",
         None,
         Some(&db_transaction),
     );
@@ -201,7 +201,7 @@ pub fn setup_family_tests_with_nulls(
     // setup code
     let contract = common::setup_contract(
         &drive,
-        "tests/supporting_files/contract/family/family-contract.json",
+        "helpers/supporting_files/contract/family/family-contract.json",
         None,
         Some(&db_transaction),
     );
@@ -354,7 +354,7 @@ pub fn setup_dpns_tests_with_batches(count: u32, seed: u64) -> (Drive, Contract,
     // setup code
     let contract = setup_contract(
         &drive,
-        "tests/supporting_files/contract/dpns/dpns-contract.json",
+        "helpers/supporting_files/contract/dpns/dpns-contract.json",
         None,
         Some(&db_transaction),
     );
@@ -380,7 +380,7 @@ pub fn setup_dpns_test_with_data(path: &str) -> (Drive, Contract, TempDir) {
 
     let contract = setup_contract(
         &drive,
-        "tests/supporting_files/contract/dpns/dpns-contract.json",
+        "helpers/supporting_files/contract/dpns/dpns-contract.json",
         None,
         Some(&db_transaction),
     );
@@ -1906,8 +1906,8 @@ fn test_family_starts_at_queries() {
 
 #[test]
 fn test_family_sql_query() {
-    // These tests confirm that sql statements produce the same drive query
-    // as their json counterparts, tests above confirm that the json queries
+    // These helpers confirm that sql statements produce the same drive query
+    // as their json counterparts, helpers above confirm that the json queries
     // produce the correct result set
     let (_, contract, _tmp_dir) = setup_family_tests(10, true, 73509);
     let person_document_type = contract
@@ -2622,7 +2622,7 @@ fn test_dpns_query() {
 fn test_dpns_insertion_no_aliases() {
     // using ascending order with rangeTo operators
     let (drive, contract, _tmp_dir) =
-        setup_dpns_test_with_data("tests/supporting_files/contract/dpns/domains-no-alias.json");
+        setup_dpns_test_with_data("helpers/supporting_files/contract/dpns/domains-no-alias.json");
 
     let db_transaction = drive.grove.start_transaction();
 
@@ -2671,7 +2671,7 @@ fn test_dpns_insertion_no_aliases() {
 fn test_dpns_insertion_with_aliases() {
     // using ascending order with rangeTo operators
     let (drive, contract, _tmp_dir) =
-        setup_dpns_test_with_data("tests/supporting_files/contract/dpns/domains.json");
+        setup_dpns_test_with_data("helpers/supporting_files/contract/dpns/domains.json");
 
     let db_transaction = drive.grove.start_transaction();
 

@@ -122,10 +122,11 @@ impl TenderdashAbci for Platform {
 mod tests {
     mod handlers {
         use crate::common::helpers::fee_pools::{
-            create_masternode_identities, create_masternode_share_identities_and_documents,
+            create_masternode_share_identities_and_documents,
         };
         use chrono::{Duration, Utc};
         use rust_decimal::prelude::ToPrimitive;
+        use rs_drive::common::helpers::identities::create_test_masternode_identities;
         use crate::abci::handlers::TenderdashAbci;
 
         use crate::abci::messages::{BlockBeginRequest, BlockEndRequest, FeesAggregate, InitChainRequest};
@@ -158,7 +159,7 @@ mod tests {
 
             // and create masternode identities
             let proposers =
-                create_masternode_identities(&platform.drive, proposers_count, Some(&transaction));
+                create_test_masternode_identities(&platform.drive, proposers_count, Some(&transaction));
 
             create_masternode_share_identities_and_documents(
                 &platform.drive,

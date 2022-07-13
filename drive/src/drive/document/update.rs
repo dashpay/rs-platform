@@ -1016,7 +1016,7 @@ mod tests {
 
         let contract = setup_contract(
             &drive,
-            "tests/supporting_files/contract/dashpay/dashpay-contract.json",
+            "helpers/supporting_files/contract/dashpay/dashpay-contract.json",
             None,
             Some(&db_transaction),
         );
@@ -1082,7 +1082,7 @@ mod tests {
 
         let contract = setup_contract(
             &drive,
-            "tests/supporting_files/contract/dashpay/dashpay-contract-with-profile-history.json",
+            "helpers/supporting_files/contract/dashpay/dashpay-contract-with-profile-history.json",
             None,
             Some(&db_transaction),
         );
@@ -1206,7 +1206,7 @@ mod tests {
         // setup code
         let contract = setup_contract(
             &drive,
-            "tests/supporting_files/contract/family/family-contract-with-history-only-message-index.json",
+            "helpers/supporting_files/contract/family/family-contract-with-history-only-message-index.json",
             None,
             transaction.as_ref(),
         );

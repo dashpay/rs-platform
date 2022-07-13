@@ -34,7 +34,7 @@ jobs:
       - name: Install NPM deps
         run: npm ci
 
-      - name: Run tests
+      - name: Run helpers
         run: npm test
 
   linting:

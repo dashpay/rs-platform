@@ -511,7 +511,7 @@ mod tests {
             .create_initial_state_structure(None)
             .expect("expected to create root tree successfully");
 
-        let contract_path = "tests/supporting_files/contract/deepNested/deep-nested50.json";
+        let contract_path = "helpers/supporting_files/contract/deepNested/deep-nested50.json";
         // let's construct the grovedb structure for the dashpay data contract
         let contract_cbor = json_document_to_cbor(contract_path, Some(1));
         let contract = Contract::from_cbor(&contract_cbor, None)
@@ -538,7 +538,7 @@ mod tests {
             .create_initial_state_structure(None)
             .expect("expected to create root tree successfully");
 
-        let contract_path = "tests/supporting_files/contract/references/references.json";
+        let contract_path = "helpers/supporting_files/contract/references/references.json";
 
         // let's construct the grovedb structure for the dashpay data contract
         let contract_cbor = json_document_to_cbor(contract_path, Some(1));

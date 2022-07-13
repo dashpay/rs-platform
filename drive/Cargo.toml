@@ -25,6 +25,7 @@ enum-map = "2.0.3"
 thiserror = "1.0.30"
 moka = "0.8.1"
 nohash-hasher = "0.2.0"
+chrono = "0.4.0"
 
 [dependencies.grovedb]
 git = "https://github.com/dashevo/grovedb"

@@ -3,6 +3,7 @@ use crate::fee_pools::epochs_root_tree_key_constants::KEY_STORAGE_FEE_POOL;
 
 pub mod epochs;
 pub mod storage_fee_distribution_pool;
+pub mod unpaid_epoch;
 
 pub fn fee_pool_vec_path() -> Vec<Vec<u8>> {
     vec![vec![RootTree::Pools as u8]]
@@ -21,7 +22,7 @@ pub fn aggregate_storage_fees_distribution_pool_vec_path() -> Vec<Vec<u8>> {
 
 #[cfg(test)]
 mod tests {
-    use crate::common::tests::helpers::setup::setup_drive_with_initial_state_structure;
+    use crate::common::helpers::setup::setup_drive_with_initial_state_structure;
     use crate::drive::batch::GroveDbOpBatch;
     use crate::error;
     use crate::fee_pools::epochs::Epoch;

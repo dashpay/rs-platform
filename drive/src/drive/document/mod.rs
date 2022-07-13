@@ -95,9 +95,9 @@ pub(crate) mod tests {
             .expect("expected to create root tree successfully");
 
         let dashpay_path = if mutable_contact_requests {
-            "tests/supporting_files/contract/dashpay/dashpay-contract-all-mutable.json"
+            "helpers/supporting_files/contract/dashpay/dashpay-contract-all-mutable.json"
         } else {
-            "tests/supporting_files/contract/dashpay/dashpay-contract.json"
+            "helpers/supporting_files/contract/dashpay/dashpay-contract.json"
         };
 
         // let's construct the grovedb structure for the dashpay data contract

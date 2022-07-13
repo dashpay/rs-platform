@@ -1237,7 +1237,7 @@ mod tests {
             .create_initial_state_structure(None)
             .expect("expected to create root tree successfully");
 
-        let contract_path = "tests/supporting_files/contract/family/family-contract.json";
+        let contract_path = "helpers/supporting_files/contract/family/family-contract.json";
 
         // let's construct the grovedb structure for the dashpay data contract
         let contract_cbor = json_document_to_cbor(contract_path, Some(1));
@@ -1267,7 +1267,7 @@ mod tests {
             .expect("expected to create root tree successfully");
 
         let contract_path =
-            "tests/supporting_files/contract/family/family-contract-with-birthday.json";
+            "helpers/supporting_files/contract/family/family-contract-with-birthday.json";
 
         // let's construct the grovedb structure for the dashpay data contract
         let contract_cbor = json_document_to_cbor(contract_path, Some(1));

@@ -134,7 +134,7 @@ pub fn setup(
     // setup code
     let contract = common::setup_contract(
         &drive,
-        "tests/supporting_files/contract/family/family-contract-with-history.json",
+        "helpers/supporting_files/contract/family/family-contract-with-history.json",
         None,
         Some(&db_transaction),
     );

@@ -1,5 +1,5 @@
 use dpp::identity::Identity;
-use grovedb::{Element, TransactionArg};
+use grovedb::{Element, PathQuery, Query, QueryItem, SizedQuery, TransactionArg};
 
 use crate::drive::batch::GroveDbOpBatch;
 use crate::drive::flags::StorageFlags;
@@ -90,11 +90,55 @@ impl Drive {
             )))
         }
     }
+
+    pub fn fetch_identities(
+        &self,
+        ids: &Vec<[u8; 32]>,
+        transaction: TransactionArg,
+    ) -> Result<Vec<(Identity, StorageFlags)>, Error> {
+        let mut query = Query::new();
+        query.set_subquery_key(IDENTITY_KEY.to_vec());
+        for id in ids {
+            query.insert_item(QueryItem::Key(id.to_vec()));
+        }
+        let path_query = PathQuery {
+            path: vec![vec![RootTree::Identities as u8]],
+            query: SizedQuery {
+                query,
+                limit: None,
+                offset: None
+            }
+        };
+        let (elements, _) = self
+            .grove
+            .query_raw(
+                &path_query,
+                transaction,
+            )
+            .unwrap()
+            .map_err(Error::GroveDB)?;
+
+        elements.into_iter().map(|key_element_pair| {
+            if let Element::Item(identity_cbor, element_flags) = key_element_pair.1 {
+                let identity = Identity::from_buffer(identity_cbor.as_slice()).map_err(|_| {
+                    Error::Identity(IdentityError::IdentitySerialization(
+                        "failed to de-serialize identity from CBOR",
+                    ))
+                })?;
+
+                Ok((identity, StorageFlags::from_element_flags(element_flags)?))
+            } else {
+                Err(Error::Drive(DriveError::CorruptedIdentityNotItem(
+                    "identity must be an item",
+                )))
+            }
+        }).collect()
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::common::tests::helpers::setup::setup_drive;
+    use crate::common::helpers::setup::setup_drive;
     use crate::drive::flags::StorageFlags;
     use dpp::identity::Identity;
 

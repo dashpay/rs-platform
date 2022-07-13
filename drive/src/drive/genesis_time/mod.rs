@@ -53,7 +53,7 @@ impl Drive {
 
 #[cfg(test)]
 mod tests {
-    use crate::common::tests::helpers::setup::setup_drive;
+    use crate::common::helpers::setup::setup_drive;
     use crate::drive::genesis_time::KEY_GENESIS_TIME;
     use crate::drive::RootTree;
     use crate::error;
@@ -113,7 +113,7 @@ mod tests {
     }
 
     mod update_genesis_time {
-        use crate::common::tests::helpers::setup::setup_drive;
+        use crate::common::helpers::setup::setup_drive;
         use crate::drive::batch::GroveDbOpBatch;
         use crate::drive::genesis_time::operations::update_genesis_time_operation;
 

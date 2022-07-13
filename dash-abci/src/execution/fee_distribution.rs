@@ -40,7 +40,7 @@ impl Platform {
         // For current epochs we pay for previous
         // Find oldest unpaid epochs since previous epochs
         let unpaid_epoch_pool =
-            match self.get_oldest_unpaid_epoch_pool(current_epoch_index - 1, transaction)? {
+            match self.drive.get_oldest_unpaid_epoch_pool(current_epoch_index - 1, transaction)? {
                 Some(epoch_pool) => epoch_pool,
                 None => return Ok(DistributionInfo::empty()),
             };
@@ -114,8 +114,7 @@ impl Platform {
                 // update masternode reward that would be paid later
                 masternode_reward -= reward_floored;
 
-                Self::add_pay_reward_to_identity_operations(
-                    drive,
+                self.add_pay_reward_to_identity_operations(
                     pay_to_id,
                     reward_floored,
                     transaction,
@@ -128,8 +127,7 @@ impl Platform {
 
             fee_leftovers += masternode_reward - masternode_reward_floored;
 
-            Self::add_pay_reward_to_identity_operations(
-                drive,
+            self.add_pay_reward_to_identity_operations(
                 proposer_tx_hash,
                 masternode_reward_floored,
                 transaction,
@@ -159,7 +157,7 @@ impl Platform {
     }
 
     fn add_pay_reward_to_identity_operations(
-        drive: &Drive,
+        &self,
         id: &[u8],
         reward: Decimal,
         transaction: TransactionArg,
@@ -174,45 +172,12 @@ impl Platform {
 
         // We don't need additional verification, since we ensure an identity
         // existence in the data contract triggers in DPP
-        let (mut identity, storage_flags) = drive.fetch_identity(id, transaction)?;
+        let (mut identity, storage_flags) = self.drive.fetch_identity(id, transaction)?;
 
         //todo balance should be a u64
         identity.balance += reward as i64;
 
-        drive.add_insert_identity_operations(identity, storage_flags, batch)
-    }
-
-    fn get_oldest_unpaid_epoch_pool<'d>(
-        &'d self,
-        from_epoch_index: u16,
-        transaction: TransactionArg,
-    ) -> Result<Option<Epoch>, Error> {
-        self.get_oldest_unpaid_epoch_pool_recursive(from_epoch_index, from_epoch_index, transaction)
-    }
-
-    fn get_oldest_unpaid_epoch_pool_recursive<'d>(
-        &'d self,
-        from_epoch_index: u16,
-        epoch_index: u16,
-        transaction: TransactionArg,
-    ) -> Result<Option<Epoch>, Error> {
-        let epoch_pool = Epoch::new(epoch_index);
-
-        if self.is_epochs_proposers_tree_empty(&epoch_pool, transaction)? {
-            return if epoch_index == from_epoch_index {
-                Ok(None)
-            } else {
-                let unpaid_epoch_pool = Epoch::new(epoch_index + 1);
-
-                Ok(Some(unpaid_epoch_pool))
-            };
-        }
-
-        if epoch_index == 0 {
-            return Ok(Some(epoch_pool));
-        }
-
-        self.get_oldest_unpaid_epoch_pool_recursive(from_epoch_index, epoch_index - 1, transaction)
+        self.drive.add_insert_identity_operations(identity, storage_flags, batch)
     }
 
     pub fn add_distribute_fees_into_pools_operations(
@@ -252,73 +217,6 @@ mod tests {
     use rs_drive::drive::batch::GroveDbOpBatch;
     use rs_drive::fee_pools::epochs::Epoch;
 
-    mod get_oldest_unpaid_epoch_pool {
-        use crate::common::helpers::{fee_pools, setup};
-        use rs_drive::drive::batch::GroveDbOpBatch;
-        use rs_drive::fee_pools::epochs::Epoch;
-
-        #[test]
-        fn test_all_epochs_paid() {
-            let (platform, transaction) = setup::setup_platform_with_initial_state_structure();
-
-            match fee_pools
-                .get_oldest_unpaid_epoch_pool(&platform.drive, 999, Some(&transaction))
-                .expect("should get oldest epochs pool")
-            {
-                Some(_) => assert!(false, "shouldn't return any unpaid epochs"),
-                None => assert!(true),
-            }
-        }
-
-        #[test]
-        fn test_two_unpaid_epochs() {
-            let (platform, transaction) = setup::setup_platform_with_initial_state_structure();
-
-            let unpaid_epoch_pool_0 = Epoch::new(0);
-
-            let mut batch = GroveDbOpBatch::new();
-
-            batch.push(unpaid_epoch_pool_0.init_proposers_tree_operation());
-
-            // Apply proposers tree
-            drive
-                .grove_apply_batch(batch, false, Some(&transaction))
-                .expect("should apply batch");
-
-            fee_pools::create_masternode_identities_and_increment_proposers(
-                &drive,
-                &unpaid_epoch_pool_0,
-                2,
-                Some(&transaction),
-            );
-
-            let unpaid_epoch_pool_1 = Epoch::new(1);
-
-            let mut batch = GroveDbOpBatch::new();
-
-            batch.push(unpaid_epoch_pool_1.init_proposers_tree_operation());
-
-            // Apply proposers tree
-            drive
-                .grove_apply_batch(batch, false, Some(&transaction))
-                .expect("should apply batch");
-
-            fee_pools::create_masternode_identities_and_increment_proposers(
-                &drive,
-                &unpaid_epoch_pool_1,
-                2,
-                Some(&transaction),
-            );
-
-            match fee_pools
-                .get_oldest_unpaid_epoch_pool(&drive, 1, Some(&transaction))
-                .expect("should get oldest epochs pool")
-            {
-                Some(epoch_pool) => assert_eq!(epoch_pool.index, 0),
-                None => assert!(false, "should have unpaid epochs"),
-            }
-        }
-    }
 
     mod distribute_fees_from_unpaid_pools_to_proposers {
         use crate::common::helpers::setup;
@@ -326,7 +224,7 @@ mod tests {
         use rs_drive::fee_pools::epochs::epoch_key_constants::KEY_PROPOSERS;
         use rs_drive::fee_pools::epochs::Epoch;
         use rs_drive::grovedb;
-        use crate::common::helpers::fee_pools::{create_masternode_identities_and_increment_proposers, create_masternode_share_identities_and_documents, fetch_identities_by_pro_tx_hashes, refetch_identities};
+        use crate::common::helpers::fee_pools::{create_masternode_identities_and_increment_proposers, create_masternode_share_identities_and_documents, refetch_identities};
 
         #[test]
         fn test_no_distribution_on_epoch_0() {
@@ -598,7 +496,7 @@ mod tests {
 
             // check we paid 500 to every mn identity
             let paid_mn_identities =
-                fetch_identities_by_pro_tx_hashes(&drive, &pro_tx_hashes, Some(&transaction));
+                drive.fetch_identities(&pro_tx_hashes, Some(&transaction));
 
             for paid_mn_identity in paid_mn_identities {
                 assert_eq!(paid_mn_identity.balance, 500);

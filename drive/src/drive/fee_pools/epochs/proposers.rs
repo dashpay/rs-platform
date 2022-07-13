@@ -114,8 +114,8 @@ mod tests {
 
     use crate::error::{self, fee::FeeError};
 
-    use crate::common::tests::helpers::setup::setup_drive;
-    use crate::common::tests::helpers::setup::setup_drive_with_initial_state_structure;
+    use crate::common::helpers::setup::setup_drive;
+    use crate::common::helpers::setup::setup_drive_with_initial_state_structure;
     use crate::drive::batch::GroveDbOpBatch;
     use crate::fee_pools::epochs::Epoch;
 
