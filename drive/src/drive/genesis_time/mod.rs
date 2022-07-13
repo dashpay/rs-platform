@@ -11,6 +11,21 @@ const KEY_GENESIS_TIME: &[u8; 1] = b"g";
 
 impl Drive {
     pub fn get_genesis_time(&self, transaction: TransactionArg) -> Result<Option<u64>, Error> {
+        // let's first check the cache
+        match self.cache.borrow_mut().genesis_time_ms {
+            None => {
+                let genesis_time_ms = self.fetch_genesis_time(transaction)?;
+                if let Some(genesis_time_ms) = genesis_time_ms {
+                    // put it into the cache
+                    self.cache.borrow_mut().genesis_time_ms = Some(genesis_time_ms);
+                }
+                Ok(genesis_time_ms)
+            }
+            Some(genesis_time_ms ) => { Ok(Some(genesis_time_ms)) }
+        }
+    }
+
+    fn fetch_genesis_time(&self, transaction: TransactionArg) -> Result<Option<u64>, Error> {
         let element = self
             .grove
             .get(
@@ -42,10 +57,11 @@ impl Drive {
 
     pub fn init_genesis(
         &self,
-        genesis_time: u64,
+        genesis_time_ms: u64,
         transaction: TransactionArg,
     ) -> Result<(), Error> {
-        let op = update_genesis_time_operation(genesis_time);
+        self.cache.borrow_mut().genesis_time_ms = Some(genesis_time_ms);
+        let op = update_genesis_time_operation(genesis_time_ms);
 
         self.grove_apply_operation(op, false, transaction)
     }

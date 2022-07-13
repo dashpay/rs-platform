@@ -6,7 +6,7 @@ use crate::drive::Drive;
 use crate::drive::flags::StorageFlags;
 use crate::fee_pools::epochs::Epoch;
 
-fn create_test_identity(drive: &Drive, id: [u8; 32], transaction: TransactionArg) -> Identity {
+pub fn create_test_identity(drive: &Drive, id: [u8; 32], transaction: TransactionArg) -> Identity {
     let identity_key = IdentityPublicKey {
         id: 1,
         key_type: KeyType::ECDSA_SECP256K1,

@@ -7,7 +7,6 @@ use crate::abci::messages::{
 use crate::block::{BlockExecutionContext, BlockInfo};
 use rs_drive::grovedb::TransactionArg;
 use crate::execution::epoch_change::epoch::EpochInfo;
-use rs_drive::query::GroveError::StorageError;
 
 use crate::error::Error;
 use crate::error::execution::ExecutionError;
@@ -41,7 +40,7 @@ impl TenderdashAbci for Platform {
     ) -> Result<InitChainResponse, Error> {
         self.drive
             .create_initial_state_structure(transaction)
-            .map_err(StorageError)?;
+            .map_err(Error::Drive)?;
 
         let response = InitChainResponse {};
 
@@ -58,7 +57,7 @@ impl TenderdashAbci for Platform {
             self.drive.init_genesis(request.block_time_ms, transaction)?;
             request.block_time_ms
         } else {
-            self.drive.get_genesis_time(transaction)?
+            self.drive.get_genesis_time(transaction).map_err(Error::Drive)?.ok_or(Error::Execution(ExecutionError::DriveIncoherence("the genesis time must be set")))?
         };
 
         // Init block execution context
@@ -100,7 +99,7 @@ impl TenderdashAbci for Platform {
         };
 
         // Process fees
-        let distribution_info = self.drive.process_block_fees(
+        let distribution_info = self.process_block_fees(
             &block_execution_context.block_info,
             &block_execution_context.epoch_info,
             &request.fees,
@@ -122,7 +121,7 @@ impl TenderdashAbci for Platform {
 mod tests {
     mod handlers {
         use crate::common::helpers::fee_pools::{
-            create_masternode_share_identities_and_documents,
+            create_test_masternode_share_identities_and_documents,
         };
         use chrono::{Duration, Utc};
         use rust_decimal::prelude::ToPrimitive;
@@ -161,7 +160,7 @@ mod tests {
             let proposers =
                 create_test_masternode_identities(&platform.drive, proposers_count, Some(&transaction));
 
-            create_masternode_share_identities_and_documents(
+            create_test_masternode_share_identities_and_documents(
                 &platform.drive,
                 &contract,
                 &proposers,

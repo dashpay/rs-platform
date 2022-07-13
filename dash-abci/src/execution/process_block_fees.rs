@@ -6,8 +6,7 @@ use rs_drive::drive::batch::GroveDbOpBatch;
 use rs_drive::error::fee::FeeError;
 use crate::execution::epoch_change::epoch::EpochInfo;
 use rs_drive::fee_pools::epochs::Epoch;
-use rs_drive::query::GroveError::StorageError;
-use rs_drive::query::TransactionArg;
+use rs_drive::grovedb::TransactionArg;
 use crate::abci::messages::FeesAggregate;
 use crate::error::execution::ExecutionError;
 
@@ -55,7 +54,7 @@ impl Platform {
         // We need to apply new epochs tree structure and distributed storage fee
         self.drive
             .grove_apply_batch(batch, false, transaction)
-            .map_err(StorageError)?;
+            .map_err(Error::Drive)?;
     }
 
     pub fn process_block_fees(
@@ -74,7 +73,7 @@ impl Platform {
         let mut batch = GroveDbOpBatch::new();
 
         batch.push(current_epoch.increment_proposer_block_count_operation(
-            &drive,
+            &self.drive,
             &block_info.proposer_pro_tx_hash,
             transaction,
         )?);
@@ -118,8 +117,8 @@ impl Platform {
                 "overflow combining storage with leftovers",
             )))?;
 
-        self.drive.add_distribute_fees_into_pools_operations(
-            &current_epoch_pool,
+        self.add_distribute_fees_into_pools_operations(
+            &current_epoch,
             processing_fees_with_leftovers,
             storage_fees_with_leftovers,
             transaction,

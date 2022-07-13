@@ -95,6 +95,14 @@ impl Drive {
         &self,
         ids: &Vec<[u8; 32]>,
         transaction: TransactionArg,
+    ) -> Result<Vec<Identity>, Error> {
+        Ok(self.fetch_identities_with_flags(ids, transaction)?.into_iter().map(|(identity, _)| identity).collect())
+    }
+
+    pub fn fetch_identities_with_flags(
+        &self,
+        ids: &Vec<[u8; 32]>,
+        transaction: TransactionArg,
     ) -> Result<Vec<(Identity, StorageFlags)>, Error> {
         let mut query = Query::new();
         query.set_subquery_key(IDENTITY_KEY.to_vec());

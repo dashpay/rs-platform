@@ -9,7 +9,7 @@ use crate::execution::constants;
 use rs_drive::error::fee::FeeError;
 use rs_drive::fee_pools::epochs::Epoch;
 use rs_drive::fee_pools::update_storage_fee_distribution_pool_operation;
-use rs_drive::query::TransactionArg;
+use rs_drive::grovedb::TransactionArg;
 use crate::execution::constants::EPOCHS_PER_YEAR_DEC;
 
 impl Platform {
@@ -73,17 +73,15 @@ impl Platform {
 mod tests {
 
     mod distribute_storage_fee_distribution_pool {
-        use crate::common::helpers;
         use crate::common::helpers::setup::setup_platform_with_initial_state_structure;
         use crate::error::Error;
         use rs_drive::error::drive::DriveError;
         use rs_drive::fee_pools::epochs::Epoch;
         use rust_decimal::Decimal;
         use rust_decimal_macros::dec;
+        use rs_drive::common::helpers::epoch::get_storage_credits_for_distribution_for_epochs_in_range;
         use rs_drive::drive::batch::GroveDbOpBatch;
         use rs_drive::fee_pools::update_storage_fee_distribution_pool_operation;
-        use crate::common::helpers::fee_pools::get_storage_credits_for_distribution_for_epochs_in_range;
-
         #[test]
         fn test_nothing_to_distribute() {
             let (platform, transaction) = setup_platform_with_initial_state_structure();

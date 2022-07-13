@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::convert::identity;
 use std::ops::Range;
 use ciborium::value::Value;
 
@@ -6,6 +7,7 @@ use dpp::{
     identifier::Identifier,
     identity::{Identity, IdentityPublicKey, KeyType},
 };
+use rs_drive::common::helpers::identities::create_test_identity;
 use rs_drive::contract::Contract;
 use rs_drive::contract::document::Document;
 use rs_drive::grovedb::TransactionArg;
@@ -15,24 +17,11 @@ use rs_drive::drive::flags::StorageFlags;
 use rs_drive::drive::object_size_info::DocumentAndContractInfo;
 use rs_drive::drive::object_size_info::DocumentInfo::DocumentAndSerialization;
 use rs_drive::fee_pools::epochs::Epoch;
+use rs_drive::grovedb::Error::StorageError;
 use crate::contracts::reward_shares::MN_REWARD_SHARES_DOCUMENT_TYPE;
+use crate::error::Error;
 
-pub fn get_storage_credits_for_distribution_for_epochs_in_range(
-    drive: &Drive,
-    epoch_range: Range<u16>,
-    transaction: TransactionArg,
-) -> Vec<u64> {
-    epoch_range
-        .map(|index| {
-            let epoch = Epoch::new(index);
-            drive
-                .get_epoch_storage_credits_for_distribution(&epoch, transaction)
-                .expect("should get storage fee")
-        })
-        .collect()
-}
-
-fn create_mn_share_document(
+fn create_test_mn_share_document(
     drive: &Drive,
     contract: &Contract,
     identity: &Identity,
@@ -86,18 +75,18 @@ fn create_mn_share_document(
     document
 }
 
-pub fn create_masternode_share_identities_and_documents(
+pub fn create_test_masternode_share_identities_and_documents(
     drive: &Drive,
     contract: &Contract,
     pro_tx_hashes: &Vec<[u8; 32]>,
     transaction: TransactionArg,
 ) -> Vec<(Identity, Document)> {
-    drive.fetch_identities(pro_tx_hashes, transaction)
-        .into_iter()
-        .map(|(mn_identity, flags)| {
+    drive.fetch_identities(pro_tx_hashes, transaction).expect("expected to fetch identities")
+        .iter()
+        .map(|mn_identity| {
             let id: [u8; 32] = rand::random();
             let identity = create_test_identity(drive, id, transaction);
-            let document = create_mn_share_document(
+            let document = create_test_mn_share_document(
                 drive,
                 contract,
                 mn_identity,
@@ -115,13 +104,10 @@ pub fn refetch_identities(
     drive: &Drive,
     identities: Vec<&Identity>,
     transaction: TransactionArg,
-) -> Vec<Identity> {
-    identities
-        .iter()
-        .map(|identity| {
-            drive
-                .fetch_identity(&identity.id.buffer, transaction)
-                .unwrap()
-        })
-        .collect()
+) -> Result<Vec<Identity>, Error> {
+    let ids = identities.into_iter().map(|identity| {
+        identity.id.buffer
+    }).collect();
+
+    drive.fetch_identities(&ids, transaction).map_err(Error::Drive)
 }

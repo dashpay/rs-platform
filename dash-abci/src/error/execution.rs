@@ -11,4 +11,7 @@ pub enum ExecutionError {
 
     #[error("platform corrupted code execution error: {0}")]
     CorruptedCodeExecution(&'static str),
+
+    #[error("drive incoherence error: {0}")]
+    DriveIncoherence(&'static str),
 }

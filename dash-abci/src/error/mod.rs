@@ -8,7 +8,7 @@ pub mod serialization;
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("storage: {0}")]
-    Storage(#[from] DriveError),
+    Drive(#[from] DriveError),
     #[error("execution: {0}")]
     Execution(#[from] ExecutionError),
     #[error("serialization: {0}")]
