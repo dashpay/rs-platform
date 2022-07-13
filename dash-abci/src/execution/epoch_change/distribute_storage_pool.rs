@@ -67,7 +67,6 @@ mod tests {
     mod distribute_storage_fee_distribution_pool {
         use crate::common::helpers;
         use crate::common::helpers::setup::setup_platform_with_initial_state_structure;
-        use crate::error::drive::DriveError;
         use crate::error::Error;
         use rs_drive::error::drive::DriveError;
         use rs_drive::fee_pools::epochs::Epoch;
@@ -370,6 +369,7 @@ mod tests {
 
     mod update_storage_fee_distribution_pool {
         use rs_drive::grovedb;
+        use rs_drive::error::Error as DriveError;
 
         #[test]
         fn test_error_if_pool_is_not_initiated() {
@@ -395,7 +395,7 @@ mod tests {
                     "should not be able to update genesis time on uninit fee pools"
                 ),
                 Err(e) => match e {
-                    super::error::Error::GroveDB(grovedb::Error::PathKeyNotFound(_)) => {
+                    DriveError::GroveDB(grovedb::Error::PathKeyNotFound(_)) => {
                         assert!(true)
                     }
                     _ => assert!(false, "invalid error type"),
@@ -430,6 +430,7 @@ mod tests {
 
     mod get_storage_fee_distribution_pool_fees {
         use rs_drive::grovedb;
+        use rs_drive::error::Error as DriveError;
 
         #[test]
         fn test_error_if_pool_is_not_initiated() {
@@ -447,7 +448,7 @@ mod tests {
                     "should not be able to get genesis time on uninit fee pools"
                 ),
                 Err(e) => match e {
-                    super::error::Error::GroveDB(grovedb::Error::PathNotFound(_)) => assert!(true),
+                    DriveError::GroveDB(grovedb::Error::PathNotFound(_)) => assert!(true),
                     _ => assert!(false, "invalid error type"),
                 },
             }
@@ -475,7 +476,7 @@ mod tests {
             match fee_pools.get_storage_fee_distribution_pool_fees(&drive, Some(&transaction)) {
                 Ok(_) => assert!(false, "should not be able to decode stored value"),
                 Err(e) => match e {
-                    super::error::Error::Fee(
+                    DriveError::Fee(
                         super::FeeError::CorruptedStorageFeePoolInvalidItemLength(_),
                     ) => {
                         assert!(true)

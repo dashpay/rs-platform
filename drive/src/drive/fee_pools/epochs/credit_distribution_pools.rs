@@ -38,7 +38,7 @@ impl Drive {
         }
     }
 
-    pub(crate) fn get_epoch_processing_credits_for_distribution(
+    pub fn get_epoch_processing_credits_for_distribution(
         &self,
         epoch_pool: &Epoch,
         transaction: TransactionArg,

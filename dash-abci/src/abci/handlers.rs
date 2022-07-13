@@ -124,7 +124,6 @@ mod tests {
             create_masternode_identities, create_masternode_share_identities_and_documents,
         };
         use chrono::{Duration, Utc};
-        use std::time::Duration;
         use crate::abci::handlers::TenderdashAbci;
 
         use crate::abci::messages::{BlockBeginRequest, BlockEndRequest, InitChainRequest};

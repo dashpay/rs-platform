@@ -1,14 +1,21 @@
 use std::collections::BTreeMap;
 use std::ops::Range;
+use ciborium::value::Value;
 
 use dpp::{
     identifier::Identifier,
     identity::{Identity, IdentityPublicKey, KeyType},
 };
+use rs_drive::contract::Contract;
+use rs_drive::contract::document::Document;
 use rs_drive::grovedb::TransactionArg;
 use rs_drive::drive::batch::GroveDbOpBatch;
 use rs_drive::drive::Drive;
+use rs_drive::drive::flags::StorageFlags;
+use rs_drive::drive::object_size_info::DocumentAndContractInfo;
+use rs_drive::drive::object_size_info::DocumentInfo::DocumentAndSerialization;
 use rs_drive::fee_pools::epochs::Epoch;
+use crate::contracts::reward_shares::MN_REWARD_SHARES_DOCUMENT_TYPE;
 
 pub fn get_storage_credits_for_distribution_for_epochs_in_range(
     drive: &Drive,

@@ -1,10 +1,10 @@
+use serde_json::json;
 use crate::error::Error;
 use crate::platform::Platform;
 use rs_drive::common::value_to_cbor;
 use rs_drive::contract::document::Document;
 use rs_drive::contract::Contract;
 use rs_drive::drive::flags::StorageFlags;
-use rs_drive::drive::Drive;
 use rs_drive::query::TransactionArg;
 
 pub const MN_REWARD_SHARES_CONTRACT_ID: [u8; 32] = [

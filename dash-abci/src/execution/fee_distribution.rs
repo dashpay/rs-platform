@@ -142,14 +142,13 @@ impl Platform {
             proposers.iter().map(|(hash, _)| hash.clone()).collect();
 
         unpaid_epoch_pool.add_delete_proposers_operations(
-            batch,
             proposer_pro_tx_hashes,
-            transaction,
-        )?;
+            batch,
+        );
 
         // if less then a limit processed then mark the epochs pool as paid
         if proposers_len < proposers_limit {
-            unpaid_epoch_pool.add_mark_as_paid_operations(batch, transaction)?;
+            unpaid_epoch_pool.add_mark_as_paid_operations(batch);
         }
 
         Ok(DistributionInfo {
@@ -254,17 +253,16 @@ mod tests {
     use rs_drive::fee_pools::epochs::Epoch;
 
     mod get_oldest_unpaid_epoch_pool {
-        use crate::common::helpers::fee_pools;
-        use rs_drive::common::tests::helpers::setup;
+        use crate::common::helpers::{fee_pools, setup};
         use rs_drive::drive::batch::GroveDbOpBatch;
         use rs_drive::fee_pools::epochs::Epoch;
 
         #[test]
         fn test_all_epochs_paid() {
-            let (drive, transaction) = setup::setup_drive_with_initial_state_structure();
+            let (platform, transaction) = setup::setup_platform_with_initial_state_structure();
 
             match fee_pools
-                .get_oldest_unpaid_epoch_pool(&drive, 999, Some(&transaction))
+                .get_oldest_unpaid_epoch_pool(&platform.drive, 999, Some(&transaction))
                 .expect("should get oldest epochs pool")
             {
                 Some(_) => assert!(false, "shouldn't return any unpaid epochs"),
@@ -274,7 +272,7 @@ mod tests {
 
         #[test]
         fn test_two_unpaid_epochs() {
-            let (drive, transaction) = setup::setup_drive_with_initial_state_structure();
+            let (platform, transaction) = setup::setup_platform_with_initial_state_structure();
 
             let unpaid_epoch_pool_0 = Epoch::new(0);
 
@@ -327,6 +325,8 @@ mod tests {
         use rs_drive::drive::batch::GroveDbOpBatch;
         use rs_drive::fee_pools::epochs::epoch_key_constants::KEY_PROPOSERS;
         use rs_drive::fee_pools::epochs::Epoch;
+        use rs_drive::grovedb;
+        use crate::common::helpers::fee_pools::{create_masternode_identities_and_increment_proposers, create_masternode_share_identities_and_documents, fetch_identities_by_pro_tx_hashes, refetch_identities};
 
         #[test]
         fn test_no_distribution_on_epoch_0() {
@@ -397,14 +397,14 @@ mod tests {
                 .grove_apply_batch(batch, false, Some(&transaction))
                 .expect("should apply batch");
 
-            fee_pools::create_masternode_identities_and_increment_proposers(
+            create_masternode_identities_and_increment_proposers(
                 &drive,
                 &unpaid_epoch_pool_0,
                 unpaid_epoch_pool_0_proposers_count,
                 Some(&transaction),
             );
 
-            fee_pools::create_masternode_identities_and_increment_proposers(
+            create_masternode_identities_and_increment_proposers(
                 &drive,
                 &unpaid_epoch_pool_1,
                 200,
@@ -468,7 +468,7 @@ mod tests {
                 .grove_apply_batch(batch, false, Some(&transaction))
                 .expect("should apply batch");
 
-            let pro_tx_hashes = fee_pools::create_masternode_identities_and_increment_proposers(
+            let pro_tx_hashes = create_masternode_identities_and_increment_proposers(
                 &drive,
                 &unpaid_epoch_pool,
                 60,
@@ -547,7 +547,7 @@ mod tests {
                 .grove_apply_batch(batch, false, Some(&transaction))
                 .expect("should apply batch");
 
-            let pro_tx_hashes = fee_pools::create_masternode_identities_and_increment_proposers(
+            let pro_tx_hashes = create_masternode_identities_and_increment_proposers(
                 &drive,
                 &unpaid_epoch_pool,
                 10,

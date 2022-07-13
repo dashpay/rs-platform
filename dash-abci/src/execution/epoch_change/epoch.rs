@@ -1,4 +1,6 @@
+use rust_decimal::Decimal;
 use crate::error::Error;
+use serde::{Serialize, Deserialize};
 
 pub const EPOCH_CHANGE_TIME: u64 = 1576800000;
 
@@ -57,7 +59,7 @@ impl EpochInfo {
 mod test {
 
     mod calculate {
-        use dash_abci::execution::epoch_change::epoch::EpochInfo;
+        use crate::execution::epoch_change::epoch::EpochInfo;
 
         #[test]
         fn test_epoch_change_to_0_epoch() {
