@@ -14,4 +14,7 @@ pub enum ExecutionError {
 
     #[error("drive incoherence error: {0}")]
     DriveIncoherence(&'static str),
+
+    #[error("drive missing data error: {0}")]
+    DriveMissingData(&'static str),
 }

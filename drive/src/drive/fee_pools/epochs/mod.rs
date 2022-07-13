@@ -116,7 +116,7 @@ mod tests {
             assert_eq!(stored_processing_fee, 0);
 
             let proposers = drive
-                .get_epochs_proposers(&epoch, 1, Some(&transaction))
+                .get_epoch_proposers(&epoch, 1, Some(&transaction))
                 .expect("should get proposers");
 
             assert_eq!(proposers, vec!());

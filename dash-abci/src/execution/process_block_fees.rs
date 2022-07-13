@@ -30,7 +30,7 @@ impl Platform {
         block_info: &BlockInfo,
         fees: &FeesAggregate,
         transaction: TransactionArg,
-    ) {
+    ) -> Result<(), Error> {
         let mut batch = GroveDbOpBatch::new();
 
         // make next epochs pool as a current
@@ -54,7 +54,7 @@ impl Platform {
         // We need to apply new epochs tree structure and distributed storage fee
         self.drive
             .grove_apply_batch(batch, false, transaction)
-            .map_err(Error::Drive)?;
+            .map_err(Error::Drive)
     }
 
     pub fn process_block_fees(
@@ -67,7 +67,7 @@ impl Platform {
         let current_epoch = Epoch::new(epoch_info.current_epoch_index);
 
         if epoch_info.is_epoch_change {
-            self.process_epoch_change(&current_epoch, block_info, fees, transaction);
+            self.process_epoch_change(&current_epoch, block_info, fees, transaction)?;
         }
 
         let mut batch = GroveDbOpBatch::new();
@@ -79,7 +79,6 @@ impl Platform {
         )?);
 
         let distribution_info = self
-            .drive
             .add_distribute_fees_from_unpaid_pools_to_proposers_operations(
                 epoch_info.current_epoch_index,
                 transaction,
@@ -91,14 +90,14 @@ impl Platform {
         let storage_fees_leftovers: u64 = (distribution_info.fee_leftovers.fract())
             .try_into()
             .map_err(|_| {
-                Error::Fee(FeeError::DecimalConversion(
+                Error::Execution(ExecutionError::Overflow(
                     "can't convert storage fees leftovers from Decimal to i64",
                 ))
             })?;
         let processing_fees_leftovers: u64 = (distribution_info.fee_leftovers.floor())
             .try_into()
             .map_err(|_| {
-            Error::Fee(FeeError::DecimalConversion(
+                Error::Execution(ExecutionError::Overflow(
                 "can't convert processing fees leftover from Decimal to u64",
             ))
         })?;

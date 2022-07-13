@@ -3,10 +3,12 @@ use rs_drive::grovedb::TransactionArg;
 use rs_drive::drive::batch::GroveDbOpBatch;
 use rs_drive::error::document::DocumentError;
 use rs_drive::error::fee::FeeError;
-use rs_drive::error::Error;
 use rs_drive::fee_pools::epochs::Epoch;
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
+use rs_drive::error::drive::DriveError;
+use crate::error::Error;
+use crate::error::execution::ExecutionError;
 
 pub struct DistributionInfo {
     pub masternodes_paid_count: u16,
@@ -38,7 +40,7 @@ impl Platform {
         // For current epochs we pay for previous
         // Find oldest unpaid epochs since previous epochs
         let unpaid_epoch_pool =
-            match self.drive.get_oldest_unpaid_epoch_pool(current_epoch_index - 1, transaction)? {
+            match self.drive.get_oldest_unpaid_epoch_pool(current_epoch_index - 1, transaction).map_err(Error::Drive)? {
                 Some(epoch_pool) => epoch_pool,
                 None => return Ok(DistributionInfo::empty()),
             };
@@ -51,15 +53,15 @@ impl Platform {
         };
 
         let total_fees =
-            self.get_epoch_total_credits_for_distribution(&unpaid_epoch_pool, transaction)?;
+            self.drive.get_epoch_total_credits_for_distribution(&unpaid_epoch_pool, transaction).map_err(Error::Drive)?;
 
         let unpaid_epoch_block_count =
-            self.get_epoch_block_count(&unpaid_epoch_pool, transaction)?;
+            self.drive.get_epoch_block_count(&unpaid_epoch_pool, transaction).map_err(Error::Drive)?;
 
         let unpaid_epoch_block_count = Decimal::from(unpaid_epoch_block_count);
 
         let proposers =
-            self.get_epochs_proposers(&unpaid_epoch_pool, proposers_limit, transaction)?;
+            self.drive.get_epoch_proposers(&unpaid_epoch_pool, proposers_limit, transaction).map_err(Error::Drive)?;
 
         let proposers_len = proposers.len() as u16;
 
@@ -69,7 +71,7 @@ impl Platform {
             let proposed_block_count = Decimal::from(*proposed_block_count);
 
             let mut masternode_reward =
-                (total_fees * proposed_block_count) / unpaid_epoch_block_count;
+                (Decimal::from(total_fees) * proposed_block_count) / unpaid_epoch_block_count;
 
             let documents =
                 self.get_reward_shares_list_for_masternode(proposer_tx_hash, transaction)?;
@@ -78,27 +80,28 @@ impl Platform {
                 let pay_to_id = document
                     .properties
                     .get("payToId")
-                    .ok_or(Error::Document(DocumentError::MissingDocumentProperty(
+                    .ok_or(Error::Execution(ExecutionError::DriveMissingData(
                         "payToId property is missing",
                     )))?
                     .as_bytes()
-                    .ok_or(Error::Document(DocumentError::InvalidDocumentPropertyType(
+                    .ok_or(Error::Execution(ExecutionError::DriveIncoherence(
                         "payToId property type is not bytes",
                     )))?;
 
+                //todo this shouldn't be a percentage
                 let share_percentage_integer: i64 = document
                     .properties
                     .get("percentage")
-                    .ok_or(Error::Document(DocumentError::MissingDocumentProperty(
+                    .ok_or(Error::Execution(ExecutionError::DriveMissingData(
                         "percentage property is missing",
                     )))?
                     .as_integer()
-                    .ok_or(Error::Document(DocumentError::InvalidDocumentPropertyType(
+                    .ok_or(Error::Execution(ExecutionError::DriveIncoherence(
                         "percentage property type is not integer",
                     )))?
                     .try_into()
                     .map_err(|_| {
-                        Error::Document(DocumentError::InvalidDocumentPropertyType(
+                        Error::Execution(ExecutionError::Overflow(
                             "percentage property cannot be converted to i64",
                         ))
                     })?;
@@ -163,7 +166,7 @@ impl Platform {
     ) -> Result<(), Error> {
         // Convert to integer, since identity balance is u64
         let reward: u64 = reward.try_into().map_err(|_| {
-            Error::Fee(FeeError::DecimalConversion(
+            Error::Execution(ExecutionError::Overflow(
                 "can't convert reward to i64 from Decimal",
             ))
         })?;
@@ -175,7 +178,7 @@ impl Platform {
         //todo balance should be a u64
         identity.balance += reward as i64;
 
-        self.drive.add_insert_identity_operations(identity, storage_flags, batch)
+        self.drive.add_insert_identity_operations(identity, storage_flags, batch).map_err(Error::Drive)
     }
 
     pub fn add_distribute_fees_into_pools_operations(
@@ -199,7 +202,7 @@ impl Platform {
 
         // update storage fee pool
         let storage_fee_pool =
-            self.get_aggregate_storage_fees_in_current_distribution_pool(transaction)?;
+            self.drive.get_aggregate_storage_fees_in_current_distribution_pool(transaction)?;
 
         batch.push(
             current_epoch_pool
@@ -229,7 +232,8 @@ mod tests {
 
         #[test]
         fn test_no_distribution_on_epoch_0() {
-            let (platform, transaction) = setup::setup_platform_with_initial_state_structure();
+            let platform = setup::setup_platform_with_initial_state_structure();
+            let transaction = platform.drive.grove.start_transaction();
 
             let current_epoch_index = 0;
 
@@ -249,7 +253,8 @@ mod tests {
 
         #[test]
         fn test_no_distribution_when_all_epochs_paid() {
-            let (platform, transaction) = setup::setup_platform_with_initial_state_structure();
+            let platform = setup::setup_platform_with_initial_state_structure();
+            let transaction = platform.drive.grove.start_transaction();
 
             let current_epoch_index = 1;
 

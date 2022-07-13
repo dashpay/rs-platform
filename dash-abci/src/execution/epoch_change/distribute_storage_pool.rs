@@ -10,7 +10,8 @@ use rs_drive::error::fee::FeeError;
 use rs_drive::fee_pools::epochs::Epoch;
 use rs_drive::fee_pools::update_storage_fee_distribution_pool_operation;
 use rs_drive::grovedb::TransactionArg;
-use crate::execution::constants::EPOCHS_PER_YEAR_DEC;
+use crate::error::execution::ExecutionError;
+use crate::execution::constants::{EPOCHS_PER_YEAR, EPOCHS_PER_YEAR_DEC};
 
 impl Platform {
     pub fn distribute_storage_fee_distribution_pool_to_epochs_operations(
@@ -19,8 +20,8 @@ impl Platform {
         transaction: TransactionArg,
         batch: &mut GroveDbOpBatch,
     ) -> Result<(), Error> {
-        let storage_distribution_fees = self.get_storage_fee_distribution_pool_fees(transaction)?;
-        let storage_distribution_fees = Decimal::new(storage_distribution_fees, 0);
+        let storage_distribution_fees = self.drive.get_aggregate_storage_fees_in_current_distribution_pool(transaction)?;
+        let storage_distribution_fees = Decimal::new(storage_distribution_fees as i64, 0);
 
         // a separate buffer from which we withdraw to correctly calculate fee share
         let mut storage_distribution_fees_buffer = storage_distribution_fees;
@@ -36,21 +37,21 @@ impl Platform {
             let epoch_fee_share_dec = (year_fee_share / EPOCHS_PER_YEAR_DEC).floor();
             let epoch_fee_share=
                 epoch_fee_share_dec.to_u64().ok_or(
-                    Error::Fee(FeeError::CorruptedStorageFeePoolInvalidItemLength(
+                    Error::Execution(ExecutionError::Overflow(
                         "storage distribution fees are not fitting in a u64",
                     ))
                 )?;
 
 
-            let starting_epoch_index = epoch_index + year * EPOCHS_PER_YEAR_DEC;
+            let starting_epoch_index = epoch_index + EPOCHS_PER_YEAR * year;
 
             for index in starting_epoch_index..starting_epoch_index + 20 {
                 let epoch_pool = Epoch::new(index);
 
                 let storage_fee = self.drive.get_epoch_storage_credits_for_distribution(&epoch_pool, transaction)?;
 
-                epoch_pool
-                    .add_update_storage_fee_operations(batch, storage_fee + epoch_fee_share)?;
+                batch.push(epoch_pool
+                    .update_storage_credits_for_distribution_operation(storage_fee + epoch_fee_share));
 
                 storage_distribution_fees_buffer -= epoch_fee_share_dec;
             }
@@ -58,7 +59,7 @@ impl Platform {
 
         let storage_distribution_fees_buffer =
             storage_distribution_fees_buffer.to_u64().ok_or(
-                Error::Fee(FeeError::CorruptedStorageFeePoolInvalidItemLength(
+                Error::Execution(ExecutionError::Overflow(
                     "storage distribution fees are not fitting in a u64",
                 ))
             )?;
@@ -84,7 +85,8 @@ mod tests {
         use rs_drive::fee_pools::update_storage_fee_distribution_pool_operation;
         #[test]
         fn test_nothing_to_distribute() {
-            let (platform, transaction) = setup_platform_with_initial_state_structure();
+            let platform = setup_platform_with_initial_state_structure();
+            let transaction = platform.drive.grove.start_transaction();
 
             let epoch_index = 0;
 

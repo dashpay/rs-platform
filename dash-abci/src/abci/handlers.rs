@@ -135,7 +135,8 @@ mod tests {
 
         #[test]
         fn test_abci_flow() {
-            let (platform, transaction) = setup_platform_with_initial_state_structure();
+            let platform = setup_platform_with_initial_state_structure();
+            let transaction = platform.drive.grove.start_transaction();
 
             // init chain
             let init_chain_request = InitChainRequest {};
@@ -178,12 +179,12 @@ mod tests {
                 let previous_block_time_ms = if day == 1 {
                     None
                 } else {
-                    Some((genesis_time + Duration::days(day as i64 - 2)).timestamp_millis().to_u64().ok_or(Error::Execution(ExecutionError::Overflow("block time can not be before 1970")))?)
+                    Some((genesis_time + Duration::days(day as i64 - 2)).timestamp_millis().to_u64().expect("block time can not be before 1970"))
                 };
 
                 let block_height = day as u64;
 
-                let block_time_ms = block_time.timestamp_millis().to_u64().ok_or(Error::Execution(ExecutionError::Overflow("block time can not be before 1970")))?;
+                let block_time_ms = block_time.timestamp_millis().to_u64().expect("block time can not be before 1970");
                 // Processing block
                 let block_begin_request = BlockBeginRequest {
                     block_height,

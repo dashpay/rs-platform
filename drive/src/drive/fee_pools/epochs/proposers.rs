@@ -61,7 +61,7 @@ impl Drive {
         }
     }
 
-    pub fn get_epochs_proposers(
+    pub fn get_epoch_proposers(
         &self,
         epoch_pool: &Epoch,
         limit: u16,
@@ -341,7 +341,7 @@ mod tests {
                 .expect("should apply batch");
 
             let result = drive
-                .get_epochs_proposers(&epoch, 100, Some(&transaction))
+                .get_epoch_proposers(&epoch, 100, Some(&transaction))
                 .expect("should get proposers");
 
             assert_eq!(result, vec!((pro_tx_hash.to_vec(), block_count)));
@@ -424,7 +424,7 @@ mod tests {
                 .expect("should apply batch");
 
             let mut stored_proposers = drive
-                .get_epochs_proposers(&epoch, 20, Some(&transaction))
+                .get_epoch_proposers(&epoch, 20, Some(&transaction))
                 .expect("should get proposers");
 
             let mut awaited_result = pro_tx_hashes
@@ -457,7 +457,7 @@ mod tests {
                 .expect("should apply batch");
 
             let stored_proposers = drive
-                .get_epochs_proposers(&epoch, 20, Some(&transaction))
+                .get_epoch_proposers(&epoch, 20, Some(&transaction))
                 .expect("should get proposers");
 
             let mut stored_hexes: Vec<String> = stored_proposers
