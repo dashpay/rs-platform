@@ -2,11 +2,11 @@ use crate::drive::batch::GroveDbOpBatch;
 use crate::drive::fee_pools::fee_pool_vec_path;
 use crate::drive::Drive;
 use crate::error::Error;
-use crate::fee_pools::epochs::tree_key_constants::{
+use crate::fee_pools::epochs::epoch_key_constants::{
     KEY_FEE_MULTIPLIER, KEY_POOL_PROCESSING_FEES, KEY_POOL_STORAGE_FEES, KEY_START_BLOCK_HEIGHT,
     KEY_START_TIME,
 };
-use crate::fee_pools::epochs::{tree_key_constants, Epoch};
+use crate::fee_pools::epochs::{epoch_key_constants, Epoch};
 use grovedb::batch::Op::Insert;
 use grovedb::batch::{GroveDbOp, Op};
 use grovedb::{Element, TransactionArg};
@@ -169,7 +169,7 @@ impl Epoch {
     pub fn init_proposers_tree_operation(&self) -> GroveDbOp {
         GroveDbOp {
             path: self.get_vec_path(),
-            key: tree_key_constants::KEY_PROPOSERS.to_vec(),
+            key: epoch_key_constants::KEY_PROPOSERS.to_vec(),
             op: Insert {
                 element: Element::empty_tree(),
             },
@@ -179,7 +179,7 @@ impl Epoch {
     pub fn delete_proposers_tree_operation(&self) -> GroveDbOp {
         GroveDbOp {
             path: self.get_vec_path(),
-            key: tree_key_constants::KEY_PROPOSERS.to_vec(),
+            key: epoch_key_constants::KEY_PROPOSERS.to_vec(),
             op: Op::Delete,
         }
     }

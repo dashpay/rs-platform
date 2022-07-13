@@ -1,7 +1,4 @@
-use crate::error::fee::FeeError;
 use crate::error::Error;
-use rust_decimal::Decimal;
-use serde::{Deserialize, Serialize};
 
 pub const EPOCH_CHANGE_TIME: u64 = 1576800000;
 
@@ -44,7 +41,7 @@ impl EpochInfo {
         let is_epoch_change = epoch_index_floored > prev_epoch_index_floored;
 
         let current_epoch_index: u16 = epoch_index_floored.try_into().map_err(|_| {
-            Error::Fee(FeeError::DecimalConversion(
+            Error::Execution(ExecutionError::Conversion(
                 "can't convert epochs index from Decimal to u16",
             ))
         })?;
@@ -60,7 +57,7 @@ impl EpochInfo {
 mod test {
 
     mod calculate {
-        use crate::fee::epoch::EpochInfo;
+        use dash_abci::execution::epoch_change::epoch::EpochInfo;
 
         #[test]
         fn test_epoch_change_to_0_epoch() {

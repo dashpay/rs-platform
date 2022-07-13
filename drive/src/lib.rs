@@ -5,3 +5,4 @@ pub mod error;
 pub mod fee;
 pub mod fee_pools;
 pub mod query;
+pub use grovedb;

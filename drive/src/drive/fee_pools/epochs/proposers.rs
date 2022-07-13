@@ -349,8 +349,7 @@ mod tests {
     }
 
     mod delete_proposers_tree {
-        use crate::drive::fee_pools::constants;
-        use crate::fee_pools::epochs::tree_key_constants::KEY_PROPOSERS;
+        use crate::fee_pools::epochs::epoch_key_constants::KEY_PROPOSERS;
 
         #[test]
         fn test_values_has_been_deleted() {

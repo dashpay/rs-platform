@@ -1,5 +1,5 @@
 use crate::drive::RootTree;
-use crate::fee_pools::epochs::tree_key_constants;
+use crate::fee_pools::epochs::epoch_key_constants;
 use crate::fee_pools::epochs::Epoch;
 
 impl Epoch {
@@ -7,7 +7,7 @@ impl Epoch {
         [
             Into::<&[u8; 1]>::into(RootTree::Pools),
             &self.key,
-            tree_key_constants::KEY_PROPOSERS.as_slice(),
+            epoch_key_constants::KEY_PROPOSERS.as_slice(),
         ]
     }
 
@@ -15,7 +15,7 @@ impl Epoch {
         vec![
             vec![RootTree::Pools as u8],
             self.key.to_vec(),
-            tree_key_constants::KEY_PROPOSERS.to_vec(),
+            epoch_key_constants::KEY_PROPOSERS.to_vec(),
         ]
     }
 

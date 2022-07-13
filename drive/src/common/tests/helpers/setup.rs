@@ -1,5 +1,4 @@
 use crate::drive::Drive;
-use grovedb::Transaction;
 use tempfile::TempDir;
 
 pub struct SetupFeePoolsOptions {

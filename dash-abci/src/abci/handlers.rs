@@ -5,10 +5,9 @@ use crate::abci::messages::{
     InitChainResponse,
 };
 use crate::block::{BlockExecutionContext, BlockInfo};
-use grovedb::TransactionArg;
-use rs_drive::fee::epoch::EpochInfo;
+use rs_drive::grovedb::TransactionArg;
+use crate::execution::epoch_change::epoch::EpochInfo;
 use rs_drive::query::GroveError::StorageError;
-use rs_drive::query::TransactionArg;
 
 use crate::error;
 use crate::error::Error;
@@ -126,21 +125,10 @@ mod tests {
         };
         use chrono::{Duration, Utc};
         use std::time::Duration;
+        use crate::abci::handlers::TenderdashAbci;
 
-        use crate::abci::handlers::{block_begin, block_end, init_chain};
         use crate::abci::messages::{BlockBeginRequest, BlockEndRequest, InitChainRequest};
         use crate::common::helpers::setup::setup_platform_with_initial_state_structure;
-        use crate::fee::pools::tests::helpers::fee_pools::create_masternode_identities;
-        use crate::{
-            drive::abci::{
-                handlers::{block_begin, block_end, init_chain},
-                messages::{BlockBeginRequest, BlockEndRequest, Fees, InitChainRequest},
-            },
-            fee::pools::tests::helpers::{
-                fee_pools::create_masternode_share_identities_and_documents,
-                setup::{setup_drive, setup_fee_pools},
-            },
-        };
 
         #[test]
         fn test_abci_flow() {
@@ -149,7 +137,7 @@ mod tests {
             // init chain
             let init_chain_request = InitChainRequest {};
 
-            init_chain(&platform, init_chain_request, Some(&transaction))
+            platform.init_chain(init_chain_request, Some(&transaction))
                 .expect("should init chain");
 
             // setup the contract

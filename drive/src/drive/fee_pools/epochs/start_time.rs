@@ -4,7 +4,7 @@ use crate::error::Error;
 use crate::fee_pools::epochs::Epoch;
 use grovedb::{Element, TransactionArg};
 
-use crate::fee_pools::epochs::tree_key_constants;
+use crate::fee_pools::epochs::epoch_key_constants;
 
 impl Drive {
     pub fn get_epoch_start_time(
@@ -16,7 +16,7 @@ impl Drive {
             .grove
             .get(
                 epoch_pool.get_path(),
-                tree_key_constants::KEY_START_TIME.as_slice(),
+                epoch_key_constants::KEY_START_TIME.as_slice(),
                 transaction,
             )
             .unwrap()
@@ -35,12 +35,11 @@ impl Drive {
 #[cfg(test)]
 mod tests {
     use crate::common::tests::helpers::setup::{
-        setup_drive, setup_drive_with_initial_state_structure,
+        setup_drive_with_initial_state_structure,
     };
     use crate::drive::batch::GroveDbOpBatch;
     use chrono::Utc;
     use grovedb::Element;
-    use rust_decimal_macros::dec;
 
     use crate::error;
     use crate::error::fee::FeeError;
@@ -72,7 +71,7 @@ mod tests {
     }
 
     mod get_start_time {
-        use crate::fee_pools::epochs::tree_key_constants::KEY_START_TIME;
+        use crate::fee_pools::epochs::epoch_key_constants::KEY_START_TIME;
 
         #[test]
         fn test_error_if_epoch_pool_is_not_initiated() {

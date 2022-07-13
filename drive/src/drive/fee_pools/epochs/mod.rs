@@ -13,7 +13,7 @@ mod tests {
     use crate::common::tests::helpers::setup::SetupFeePoolsOptions;
     use crate::drive::batch::GroveDbOpBatch;
     use crate::error;
-    use crate::fee_pools::epochs::tree_key_constants;
+    use crate::fee_pools::epochs::epoch_key_constants;
     use crate::fee_pools::epochs::Epoch;
 
     mod init_empty {
@@ -153,7 +153,7 @@ mod tests {
                 .grove
                 .get(
                     epoch.get_path(),
-                    super::tree_key_constants::KEY_PROPOSERS.as_slice(),
+                    super::epoch_key_constants::KEY_PROPOSERS.as_slice(),
                     Some(&transaction),
                 )
                 .unwrap()

@@ -1,5 +1,5 @@
 use crate::platform::Platform;
-use grovedb::TransactionArg;
+use rs_drive::grovedb::TransactionArg;
 use rs_drive::drive::batch::GroveDbOpBatch;
 use rs_drive::drive::Drive;
 use rs_drive::error::document::DocumentError;
@@ -325,7 +325,7 @@ mod tests {
     mod distribute_fees_from_unpaid_pools_to_proposers {
         use crate::common::helpers::setup;
         use rs_drive::drive::batch::GroveDbOpBatch;
-        use rs_drive::fee_pools::epochs::tree_key_constants::KEY_PROPOSERS;
+        use rs_drive::fee_pools::epochs::epoch_key_constants::KEY_PROPOSERS;
         use rs_drive::fee_pools::epochs::Epoch;
 
         #[test]

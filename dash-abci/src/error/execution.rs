@@ -5,4 +5,7 @@ pub enum ExecutionError {
 
     #[error("overflow error: {0}")]
     Overflow(&'static str),
+
+    #[error("conversion error: {0}")]
+    Conversion(&'static str),
 }

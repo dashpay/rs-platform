@@ -5,7 +5,7 @@ use crate::execution::fee_distribution::DistributionInfo;
 use crate::platform::Platform;
 use rs_drive::drive::batch::GroveDbOpBatch;
 use rs_drive::error::fee::FeeError;
-use rs_drive::fee::epoch::EpochInfo;
+use crate::execution::epoch_change::epoch::EpochInfo;
 use rs_drive::fee::fees_aggregate::FeesAggregate;
 use rs_drive::fee_pools::epochs::Epoch;
 use rs_drive::query::GroveError::StorageError;

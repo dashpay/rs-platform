@@ -5,7 +5,7 @@ use crate::error::fee::FeeError;
 use crate::error::Error;
 use crate::fee_pools::epochs::Epoch;
 
-use crate::fee_pools::epochs::tree_key_constants;
+use crate::fee_pools::epochs::epoch_key_constants;
 
 impl Drive {
     pub fn get_epoch_storage_credits_for_distribution(
@@ -17,7 +17,7 @@ impl Drive {
             .grove
             .get(
                 epoch_pool.get_path(),
-                tree_key_constants::KEY_POOL_STORAGE_FEES.as_slice(),
+                epoch_key_constants::KEY_POOL_STORAGE_FEES.as_slice(),
                 transaction,
             )
             .unwrap()
@@ -47,7 +47,7 @@ impl Drive {
             .grove
             .get(
                 epoch_pool.get_path(),
-                tree_key_constants::KEY_POOL_PROCESSING_FEES.as_slice(),
+                epoch_key_constants::KEY_POOL_PROCESSING_FEES.as_slice(),
                 transaction,
             )
             .unwrap()
@@ -77,7 +77,7 @@ impl Drive {
             .grove
             .get(
                 epoch_pool.get_path(),
-                tree_key_constants::KEY_FEE_MULTIPLIER.as_slice(),
+                epoch_key_constants::KEY_FEE_MULTIPLIER.as_slice(),
                 transaction,
             )
             .unwrap()
@@ -119,16 +119,13 @@ impl Drive {
 
 #[cfg(test)]
 mod tests {
-    use crate::common::tests::helpers::setup::setup_drive;
     use crate::common::tests::helpers::setup::setup_drive_with_initial_state_structure;
     use crate::drive::batch::GroveDbOpBatch;
-    use crate::drive::fee_pools::constants;
     use crate::error;
     use crate::error::fee::FeeError;
-    use crate::fee_pools::epochs::tree_key_constants;
+    use crate::fee_pools::epochs::epoch_key_constants;
     use crate::fee_pools::epochs::Epoch;
     use grovedb::Element;
-    use rust_decimal::Decimal;
 
     mod update_epoch_storage_credits_for_distribution {
 
@@ -179,6 +176,7 @@ mod tests {
     }
 
     mod get_epoch_storage_credits_for_distribution {
+        use crate::fee_pools::epochs_root_tree_key_constants::KEY_STORAGE_FEE_POOL;
 
         #[test]
         fn test_error_if_epoch_pool_is_not_initiated() {
@@ -210,7 +208,7 @@ mod tests {
                 .grove
                 .insert(
                     epoch.get_path(),
-                    super::constants::KEY_STORAGE_FEE_POOL.as_slice(),
+                    KEY_STORAGE_FEE_POOL.as_slice(),
                     super::Element::Item(u64::MAX.to_be_bytes().to_vec(), None),
                     Some(&transaction),
                 )
@@ -290,7 +288,7 @@ mod tests {
                 .grove
                 .insert(
                     epoch.get_path(),
-                    super::tree_key_constants::KEY_POOL_PROCESSING_FEES.as_slice(),
+                    super::epoch_key_constants::KEY_POOL_PROCESSING_FEES.as_slice(),
                     super::Element::Item(u128::MAX.to_be_bytes().to_vec(), None),
                     Some(&transaction),
                 )
@@ -369,7 +367,7 @@ mod tests {
                 .grove
                 .insert(
                     epoch.get_path(),
-                    super::tree_key_constants::KEY_FEE_MULTIPLIER.as_slice(),
+                    super::epoch_key_constants::KEY_FEE_MULTIPLIER.as_slice(),
                     super::Element::Item(u128::MAX.to_be_bytes().to_vec(), None),
                     Some(&transaction),
                 )
@@ -413,24 +411,6 @@ mod tests {
                 .expect("should get multiplier");
 
             assert_eq!(stored_multiplier, multiplier);
-        }
-    }
-
-    mod overflow {
-        use std::str::FromStr;
-
-        #[test]
-        fn test_u64_fee_conversion() {
-            let processing_fee = u64::MAX;
-
-            let decimal = super::Decimal::from_str(processing_fee.to_string().as_str())
-                .expect("should convert u64::MAX to Decimal");
-
-            let converted_to_u64: u64 = decimal
-                .try_into()
-                .expect("should convert Decimal back to u64::MAX");
-
-            assert_eq!(processing_fee, converted_to_u64);
         }
     }
 }

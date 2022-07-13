@@ -4,7 +4,7 @@ use crate::error::Error;
 use crate::fee_pools::epochs::Epoch;
 use grovedb::{Element, TransactionArg};
 
-use crate::fee_pools::epochs::tree_key_constants;
+use crate::fee_pools::epochs::epoch_key_constants;
 
 impl Drive {
     pub fn get_epoch_start_block_height(
@@ -16,7 +16,7 @@ impl Drive {
             .grove
             .get(
                 epoch_pool.get_path(),
-                tree_key_constants::KEY_START_BLOCK_HEIGHT.as_slice(),
+                epoch_key_constants::KEY_START_BLOCK_HEIGHT.as_slice(),
                 transaction,
             )
             .unwrap()
@@ -35,11 +35,10 @@ impl Drive {
 #[cfg(test)]
 mod tests {
     use crate::common::tests::helpers::setup::{
-        setup_drive, setup_drive_with_initial_state_structure,
+        setup_drive_with_initial_state_structure,
     };
-    use crate::fee_pools::epochs::tree_key_constants;
+    use crate::fee_pools::epochs::epoch_key_constants;
     use grovedb::Element;
-    use rust_decimal_macros::dec;
 
     use crate::error;
     use crate::error::fee::FeeError;
@@ -115,7 +114,7 @@ mod tests {
                 .grove
                 .insert(
                     epoch.get_path(),
-                    super::tree_key_constants::KEY_START_BLOCK_HEIGHT.as_slice(),
+                    super::epoch_key_constants::KEY_START_BLOCK_HEIGHT.as_slice(),
                     super::Element::Item(u128::MAX.to_be_bytes().to_vec(), None),
                     Some(&transaction),
                 )
@@ -146,7 +145,7 @@ mod tests {
                 .grove
                 .insert(
                     epoch.get_path(),
-                    super::tree_key_constants::KEY_START_BLOCK_HEIGHT.as_slice(),
+                    super::epoch_key_constants::KEY_START_BLOCK_HEIGHT.as_slice(),
                     super::Element::empty_tree(),
                     Some(&transaction),
                 )
