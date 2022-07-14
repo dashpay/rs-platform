@@ -2,16 +2,14 @@ mod converter;
 
 use std::{option::Option::None, path::Path, sync::mpsc, thread};
 
-use dash_abci::abci::messages::InitChainRequest;
+use dash_abci::abci::messages::{BlockBeginRequest, BlockEndRequest, InitChainRequest, Serializable};
 use dpp::identity::Identity;
 use grovedb::{PathQuery, Transaction, TransactionArg};
 use neon::prelude::*;
 use neon::types::JsDate;
-use rs_drive::drive::abci::handlers;
-use rs_drive::drive::abci::messages::{
-    BlockBeginRequest, BlockEndRequest, InitChainRequest, Serializable,
-};
+use dash_abci::abci::handlers;
 use rs_drive::drive::Drive;
+use rs_drive::drive::flags::StorageFlags;
 
 const READONLY_MSG: &str =
     "db is in readonly mode due to the active transaction. Please provide transaction or commit it";
@@ -280,6 +278,7 @@ impl DriveWrapper {
                     None,
                     block_time,
                     apply,
+                    StorageFlags::default(),
                     using_transaction.then(|| transaction).flatten(),
                 );
 
@@ -352,6 +351,7 @@ impl DriveWrapper {
                     override_document,
                     block_time,
                     apply,
+                    StorageFlags::default(),
                     using_transaction.then(|| transaction).flatten(),
                 );
 
@@ -421,6 +421,7 @@ impl DriveWrapper {
                     Some(&owner_id),
                     block_time,
                     apply,
+                    StorageFlags::default(),
                     using_transaction.then(|| transaction).flatten(),
                 );
 
@@ -557,6 +558,7 @@ impl DriveWrapper {
                 let result = drive.insert_identity(
                     identity,
                     apply,
+                    StorageFlags::default(),
                     using_transaction.then(|| transaction).flatten(),
                 );
 
@@ -1459,7 +1461,7 @@ impl DriveWrapper {
         db.send_to_drive_thread(move |drive: &Drive, transaction, channel| {
             let result = InitChainRequest::from_bytes(&request_bytes)
                 .and_then(|request| {
-                    handlers::init_chain(
+                    init_chain(
                         drive,
                         request,
                         using_transaction.then(|| transaction).flatten(),

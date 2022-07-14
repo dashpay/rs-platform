@@ -1,23 +1,17 @@
 use std::collections::BTreeMap;
-use std::convert::identity;
-use std::ops::Range;
-use ciborium::value::Value;
 
-use dpp::{
-    identifier::Identifier,
-    identity::{Identity, IdentityPublicKey, KeyType},
-};
+use ciborium::value::Value;
+use dpp::identity::Identity;
+
 use rs_drive::common::helpers::identities::create_test_identity;
 use rs_drive::contract::Contract;
 use rs_drive::contract::document::Document;
-use rs_drive::grovedb::TransactionArg;
-use rs_drive::drive::batch::GroveDbOpBatch;
 use rs_drive::drive::Drive;
 use rs_drive::drive::flags::StorageFlags;
 use rs_drive::drive::object_size_info::DocumentAndContractInfo;
 use rs_drive::drive::object_size_info::DocumentInfo::DocumentAndSerialization;
-use rs_drive::fee_pools::epochs::Epoch;
-use rs_drive::grovedb::Error::StorageError;
+use rs_drive::grovedb::TransactionArg;
+
 use crate::contracts::reward_shares::MN_REWARD_SHARES_DOCUMENT_TYPE;
 use crate::error::Error;
 

@@ -34,7 +34,7 @@ impl Epoch {
         &self,
         start_block_height: u64,
         start_block_time_ms: u64,
-        fee_multiplier: u64,
+        fee_multiplier: f64,
         batch: &mut GroveDbOpBatch,
     ) {
         // create and init next thousandth epochs
@@ -59,7 +59,7 @@ impl Epoch {
 
     pub fn add_init_current_operations(
         &self,
-        multiplier: u64,
+        multiplier: f64,
         start_block_height: u64,
         start_time_ms: u64,
         batch: &mut GroveDbOpBatch,
@@ -103,7 +103,7 @@ impl Epoch {
         }
     }
 
-    pub fn update_fee_multiplier_operation(&self, multiplier: u64) -> GroveDbOp {
+    pub fn update_fee_multiplier_operation(&self, multiplier: f64) -> GroveDbOp {
         GroveDbOp {
             path: fee_pool_vec_path(),
             key: KEY_FEE_MULTIPLIER.to_vec(),

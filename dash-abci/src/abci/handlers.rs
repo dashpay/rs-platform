@@ -130,8 +130,6 @@ mod tests {
 
         use crate::abci::messages::{BlockBeginRequest, BlockEndRequest, FeesAggregate, InitChainRequest};
         use crate::common::helpers::setup::setup_platform_with_initial_state_structure;
-        use crate::error::Error;
-        use crate::error::execution::ExecutionError;
 
         #[test]
         fn test_abci_flow() {

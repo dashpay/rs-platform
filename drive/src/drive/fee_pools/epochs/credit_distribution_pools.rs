@@ -72,7 +72,7 @@ impl Drive {
         &self,
         epoch_pool: &Epoch,
         transaction: TransactionArg,
-    ) -> Result<u64, Error> {
+    ) -> Result<f64, Error> {
         let element = self
             .grove
             .get(
@@ -84,7 +84,7 @@ impl Drive {
             .map_err(Error::GroveDB)?;
 
         if let Element::Item(item, _) = element {
-            Ok(u64::from_be_bytes(item.as_slice().try_into().map_err(
+            Ok(f64::from_be_bytes(item.as_slice().try_into().map_err(
                 |_| {
                     Error::Fee(FeeError::CorruptedMultiplierInvalidItemLength(
                         "epochs multiplier item have an invalid length",
@@ -394,7 +394,7 @@ mod tests {
 
             let epoch = super::Epoch::new(0);
 
-            let multiplier = 42;
+            let multiplier = 42.0;
 
             let mut batch = super::GroveDbOpBatch::new();
 

@@ -359,6 +359,7 @@ fn test_root_hash_with_batches(drive: &Drive, db_transaction: &Transaction) {
             None,
             0f64,
             true,
+            StorageFlags::default(),
             Some(db_transaction),
         )
         .expect("apply contract");

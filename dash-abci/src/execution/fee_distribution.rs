@@ -1,12 +1,9 @@
 use crate::platform::Platform;
 use rs_drive::grovedb::TransactionArg;
 use rs_drive::drive::batch::GroveDbOpBatch;
-use rs_drive::error::document::DocumentError;
-use rs_drive::error::fee::FeeError;
 use rs_drive::fee_pools::epochs::Epoch;
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
-use rs_drive::error::drive::DriveError;
 use crate::error::Error;
 use crate::error::execution::ExecutionError;
 
@@ -287,12 +284,12 @@ mod tests {
 
             let mut batch = GroveDbOpBatch::new();
 
-            unpaid_epoch_pool_0.add_init_current_operations(1, 1, 1, &mut batch);
+            unpaid_epoch_pool_0.add_init_current_operations(1.0, 1, 1, &mut batch);
 
             let unpaid_epoch_pool_0_proposers_count = 200;
 
             unpaid_epoch_pool_1.add_init_current_operations(
-                1,
+                1.0,
                 unpaid_epoch_pool_0_proposers_count as u64 + 1,
                 2,
                 &mut batch,
@@ -363,10 +360,10 @@ mod tests {
 
             let mut batch = GroveDbOpBatch::new();
 
-            unpaid_epoch_pool.add_init_current_operations(1, 1, 1, &mut batch);
+            unpaid_epoch_pool.add_init_current_operations(1.0, 1, 1, &mut batch);
 
             // emulating epochs change
-            next_epoch_pool.add_init_current_operations(1, 11, 10, &mut batch);
+            next_epoch_pool.add_init_current_operations(1.0, 11, 10, &mut batch);
 
             platform.drive
                 .grove_apply_batch(batch, false, Some(&transaction))
@@ -441,10 +438,10 @@ mod tests {
 
             let mut batch = GroveDbOpBatch::new();
 
-            unpaid_epoch_pool.add_init_current_operations(1, 1, 1, &mut batch);
+            unpaid_epoch_pool.add_init_current_operations(1.0, 1, 1, &mut batch);
 
             // emulating epochs change
-            next_epoch_pool.add_init_current_operations(1, 11, 10, &mut batch);
+            next_epoch_pool.add_init_current_operations(1.0, 11, 10, &mut batch);
 
             platform.drive
                 .grove_apply_batch(batch, false, Some(&transaction))
@@ -499,7 +496,7 @@ mod tests {
 
             // check we paid 500 to every mn identity
             let paid_mn_identities =
-                platform.drive.fetch_identities(&pro_tx_hashes, Some(&transaction));
+                platform.drive.fetch_identities(&pro_tx_hashes, Some(&transaction)).expect("expected to get identities");
 
             for paid_mn_identity in paid_mn_identities {
                 assert_eq!(paid_mn_identity.balance, 500);
@@ -511,7 +508,7 @@ mod tests {
                 .collect();
 
             let refetched_share_identities =
-                refetch_identities(&platform.drive, share_identities, Some(&transaction));
+                refetch_identities(&platform.drive, share_identities, Some(&transaction)).expect("expected to refresh identities");
 
             for identity in refetched_share_identities {
                 assert_eq!(identity.balance, 500);
@@ -545,7 +542,7 @@ mod tests {
 
         let mut batch = GroveDbOpBatch::new();
 
-        current_epoch_pool.add_init_current_operations(1, 1, 1, &mut batch);
+        current_epoch_pool.add_init_current_operations(1.0, 1, 1, &mut batch);
 
         // Apply new pool structure
         platform.drive

@@ -77,7 +77,7 @@ mod tests {
 
             let start_block_height = 10;
             let start_block_time = 1655396517912;
-            let multiplier = 42;
+            let multiplier = 42.0;
 
             let mut batch = super::GroveDbOpBatch::new();
 

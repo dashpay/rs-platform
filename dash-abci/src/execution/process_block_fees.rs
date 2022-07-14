@@ -9,6 +9,7 @@ use rs_drive::fee_pools::epochs::Epoch;
 use rs_drive::grovedb::TransactionArg;
 use crate::abci::messages::FeesAggregate;
 use crate::error::execution::ExecutionError;
+use crate::execution::constants::DEFAULT_ORIGINAL_FEE_MULTIPLIER;
 
 /// From the Dash Improvement Proposal:
 
@@ -28,7 +29,6 @@ impl Platform {
         &self,
         current_epoch: &Epoch,
         block_info: &BlockInfo,
-        fees: &FeesAggregate,
         transaction: TransactionArg,
     ) -> Result<(), Error> {
         let mut batch = GroveDbOpBatch::new();
@@ -38,7 +38,7 @@ impl Platform {
         current_epoch.shift_to_new_epoch_operations(
             block_info.block_height,
             block_info.block_time,
-            fees.fee_multiplier,
+            DEFAULT_ORIGINAL_FEE_MULTIPLIER, //todo use a data contract to choose the fee multiplier
             &mut batch,
         );
 
@@ -67,7 +67,7 @@ impl Platform {
         let current_epoch = Epoch::new(epoch_info.current_epoch_index);
 
         if epoch_info.is_epoch_change {
-            self.process_epoch_change(&current_epoch, block_info, fees, transaction)?;
+            self.process_epoch_change(&current_epoch, block_info, transaction)?;
         }
 
         let mut batch = GroveDbOpBatch::new();

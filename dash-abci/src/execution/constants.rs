@@ -1,6 +1,8 @@
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 
+pub const DEFAULT_ORIGINAL_FEE_MULTIPLIER: f64 = 2.0;
+
 pub const EPOCHS_PER_YEAR: u16 = 20;
 
 pub const EPOCHS_PER_YEAR_DEC: Decimal = dec!(20);

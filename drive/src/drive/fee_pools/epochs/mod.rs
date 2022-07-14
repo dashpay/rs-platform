@@ -72,7 +72,7 @@ mod tests {
 
             let epoch = super::Epoch::new(1042);
 
-            let multiplier = 42;
+            let multiplier = 42.0;
             let start_time = 1;
             let start_block_height = 2;
 
@@ -134,7 +134,7 @@ mod tests {
 
             let mut batch = super::GroveDbOpBatch::new();
 
-            epoch.add_init_current_operations(1, 2, 3, &mut batch);
+            epoch.add_init_current_operations(1.0, 2, 3, &mut batch);
 
             // Apply init current
             drive

@@ -4,7 +4,6 @@ pub(crate) mod setup;
 #[cfg(test)]
 mod tests {
     use rust_decimal::Decimal;
-    use rust_decimal_macros::dec;
 
     mod overflow {
         use std::str::FromStr;
