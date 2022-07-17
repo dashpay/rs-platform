@@ -29,12 +29,14 @@ pub struct BlockEndRequest {
     pub fees: FeesAggregate,
 }
 
+pub type EpochRefund = (u16, u64);
+
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FeesAggregate {
     pub processing_fees: u64,
     pub storage_fees: u64,
-    pub refunds_by_epoch: Vec<(u16, u64)>,
+    pub refunds_by_epoch: Vec<EpochRefund>,
 }
 
 #[derive(Serialize, Deserialize)]

@@ -439,6 +439,17 @@ impl Drive {
         value.map_err(Error::GroveDB)
     }
 
+    pub(crate) fn grove_get_raw_path_query(
+        &self,
+        path_query: &PathQuery,
+        transaction: TransactionArg,
+        drive_operations: &mut Vec<DriveOperation>,
+    ) -> Result<(Vec<(Vec<u8>, Element)>, u16), Error> {
+        let CostContext { value, cost } = self.grove.query_raw(path_query, transaction);
+        drive_operations.push(CalculatedCostOperation(cost));
+        value.map_err(Error::GroveDB)
+    }
+
     pub(crate) fn grove_get_proved_path_query(
         &self,
         path_query: &PathQuery,

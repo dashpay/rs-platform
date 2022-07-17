@@ -26,3 +26,28 @@ impl Drive {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use grovedb::{PathQuery, Query, SizedQuery};
+    use tempfile::TempDir;
+    use crate::drive::Drive;
+
+    #[test]
+    fn test_create_initial_state_structure() {
+        let tmp_dir = TempDir::new().unwrap();
+        let drive: Drive = Drive::open(tmp_dir, None).expect("should open Drive successfully");
+
+        drive.create_initial_state_structure(None).expect("expected to create structure");
+        let mut query = Query::new();
+        query.insert_all();
+        let root_path_query = PathQuery::new(vec![], SizedQuery{
+            query,
+            limit: None,
+            offset: None
+        });
+        let mut drive_operations = vec![];
+        let (elements, _) = drive.grove_get_raw_path_query(&root_path_query, None, &mut drive_operations).expect("expected to get root elements");
+        assert_eq!(elements.len(), 5);
+    }
+}
