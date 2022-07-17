@@ -104,24 +104,23 @@ impl Platform {
         if let Some(distribute_storage_pool_info_on_epoch_change) =
             distribute_storage_pool_info_on_epoch_change
         {
-            distribution_info.storage_distribution_pool_current_credits =
-                distribute_storage_pool_info_on_epoch_change.leftover_storage_distribution_credits;
+            block_fees.storage_fees = block_fees
+                .storage_fees
+                .checked_add( distribute_storage_pool_info_on_epoch_change.leftover_storage_distribution_credits)
+                .ok_or(Error::Execution(ExecutionError::Overflow(
+                    "overflow combining storage with leftovers",
+                )))?;
         }
 
-        block_fees.storage_fees = block_fees
-            .storage_fees
-            .checked_add(distribution_info.storage_distribution_pool_current_credits)
-            .ok_or(Error::Execution(ExecutionError::Overflow(
-                "overflow combining storage with leftovers",
-            )))?;
-
-        self.add_distribute_fees_into_pools_operations(
+        let distribution_result = self.add_distribute_fees_into_pools_operations(
             &current_epoch,
             epoch_info.is_epoch_change,
             block_fees,
             transaction,
             &mut batch,
         )?;
+
+        distribution_info.storage_distribution_pool_current_credits = distribution_result.storage_fees_in_pool;
 
         self.drive.grove_apply_batch(batch, false, transaction)?;
 

@@ -17,6 +17,12 @@ pub struct DistributionInfo {
     pub paid_epoch_index: Option<u16>,
 }
 
+pub struct DistributeBlockFeesIntoEpochResult {
+    pub processing_fees_in_pool: u64,
+    pub storage_fees_in_pool: u64,
+}
+
+
 impl DistributionInfo {
     pub fn empty() -> Self {
         DistributionInfo {
@@ -213,7 +219,7 @@ impl Platform {
         block_fees: FeesAggregate,
         transaction: TransactionArg,
         batch: &mut GroveDbOpBatch,
-    ) -> Result<(), Error> {
+    ) -> Result<DistributeBlockFeesIntoEpochResult, Error> {
         // update epochs pool processing fees
         let epoch_processing_fees = if is_epoch_change {
             0
@@ -222,22 +228,26 @@ impl Platform {
                 .get_epoch_processing_credits_for_distribution(current_epoch, transaction)?
         };
 
+        let total_processing_fees = epoch_processing_fees + block_fees.processing_fees;
+
         batch.push(
             current_epoch.update_processing_credits_for_distribution_operation(
-                epoch_processing_fees + block_fees.processing_fees,
-            ),
-        );
+                total_processing_fees));
 
         // update storage fee pool
-        let storage_distribution_credits_in_fee_pool = self
-            .drive
-            .get_aggregate_storage_fees_in_current_distribution_pool(transaction)?;
+        let storage_distribution_credits_in_fee_pool = if is_epoch_change { 0 } else {
+            self
+                .drive
+                .get_aggregate_storage_fees_in_current_distribution_pool(transaction)?
+        };
+
+        let total_storage_fees = storage_distribution_credits_in_fee_pool + block_fees.storage_fees;
 
         batch.push(update_storage_fee_distribution_pool_operation(
             storage_distribution_credits_in_fee_pool + block_fees.storage_fees,
         ));
 
-        Ok(())
+        Ok(DistributeBlockFeesIntoEpochResult { processing_fees_in_pool: total_processing_fees, storage_fees_in_pool: total_storage_fees })
     }
 }
 
