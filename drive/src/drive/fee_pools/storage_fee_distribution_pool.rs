@@ -1,4 +1,4 @@
-use crate::drive::fee_pools::aggregate_storage_fees_distribution_pool_path;
+use crate::drive::fee_pools::{aggregate_storage_fees_distribution_pool_path, pools_path};
 use crate::drive::Drive;
 use grovedb::{Element, TransactionArg};
 
@@ -14,7 +14,7 @@ impl Drive {
         let element = self
             .grove
             .get(
-                aggregate_storage_fees_distribution_pool_path(),
+                pools_path(),
                 KEY_STORAGE_FEE_POOL.as_slice(),
                 transaction,
             )

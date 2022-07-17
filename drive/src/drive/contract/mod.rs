@@ -1,3 +1,4 @@
+use std::cell::RefMut;
 use std::collections::HashSet;
 use std::ops::Deref;
 use std::sync::Arc;
@@ -13,7 +14,7 @@ use crate::drive::object_size_info::PathKeyElementInfo::{
     PathFixedSizeKeyElement, PathKeyElementSize,
 };
 use crate::drive::object_size_info::PathKeyInfo::PathFixedSizeKeyRef;
-use crate::drive::{contract_documents_path, defaults, Drive, RootTree};
+use crate::drive::{contract_documents_path, defaults, Drive, DriveCache, RootTree};
 use crate::error::drive::DriveError;
 use crate::error::Error;
 use crate::fee::calculate_fee;
@@ -375,9 +376,10 @@ impl Drive {
     ) -> Result<Option<Arc<Contract>>, Error> {
         // We always charge for a contract fetch in order to remove non determinism issues
         drive_operations.push(ContractFetch);
-        match self.cache.borrow().cached_contracts.get(&contract_id) {
+        let cache = self.cache.borrow_mut();
+        match cache.cached_contracts.get(&contract_id) {
             None => self
-                .fetch_contract(contract_id, transaction)
+                .fetch_contract(contract_id, transaction, cache)
                 .map(|(c, _)| c),
             Some(contract) => {
                 let contract_ref = Arc::clone(&contract);
@@ -403,6 +405,7 @@ impl Drive {
         &self,
         contract_id: [u8; 32],
         transaction: TransactionArg,
+        drive_cache: RefMut<DriveCache>
     ) -> Result<(Option<Arc<Contract>>, StorageFlags), Error> {
         let CostContext { value, cost } =
             self.grove
@@ -410,7 +413,6 @@ impl Drive {
         let stored_element = value.map_err(Error::GroveDB)?;
         if let Element::Item(stored_contract_bytes, element_flag) = stored_element {
             let contract = Arc::new(Contract::from_cbor(&stored_contract_bytes, None)?);
-            let mut drive_cache = self.cache.borrow_mut();
             drive_cache
                 .deref()
                 .cached_contracts

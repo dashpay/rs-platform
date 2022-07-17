@@ -129,11 +129,11 @@ mod tests {
         use crate::abci::handlers::TenderdashAbci;
 
         use crate::abci::messages::{BlockBeginRequest, BlockEndRequest, FeesAggregate, InitChainRequest};
-        use crate::common::helpers::setup::setup_platform_with_initial_state_structure;
+        use crate::common::helpers::setup::{setup_platform, setup_platform_with_initial_state_structure};
 
         #[test]
         fn test_abci_flow() {
-            let platform = setup_platform_with_initial_state_structure();
+            let platform = setup_platform();
             let transaction = platform.drive.grove.start_transaction();
 
             // init chain

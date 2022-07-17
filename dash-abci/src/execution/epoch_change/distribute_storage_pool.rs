@@ -324,7 +324,7 @@ mod tests {
 
     mod get_storage_fee_distribution_pool_fees {
         use rs_drive::drive::batch::GroveDbOpBatch;
-        use rs_drive::drive::fee_pools::fee_pool_vec_path;
+        use rs_drive::drive::fee_pools::pools_vec_path;
         use rs_drive::grovedb;
         use rs_drive::error::Error as DriveError;
         use rs_drive::error::fee::FeeError;
@@ -359,7 +359,7 @@ mod tests {
 
             batch
                 .add_insert(
-                    fee_pool_vec_path(),
+                    pools_vec_path(),
                     KEY_STORAGE_FEE_POOL.to_vec(),
                     Element::Item(u128::MAX.to_be_bytes().to_vec(), None),
                 );

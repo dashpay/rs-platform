@@ -1,5 +1,5 @@
 use crate::drive::batch::GroveDbOpBatch;
-use crate::drive::fee_pools::fee_pool_vec_path;
+use crate::drive::fee_pools::pools_vec_path;
 use crate::drive::Drive;
 use crate::error::Error;
 use crate::fee_pools::epochs::epoch_key_constants::{
@@ -51,7 +51,7 @@ impl Epoch {
     }
 
     pub fn add_init_empty_operations(&self, batch: &mut GroveDbOpBatch) {
-        batch.add_insert_empty_tree(fee_pool_vec_path(), self.key.to_vec());
+        batch.add_insert_empty_tree(pools_vec_path(), self.key.to_vec());
 
         // init storage fee item to 0
         batch.push(self.update_storage_credits_for_distribution_operation(0));
@@ -105,7 +105,7 @@ impl Epoch {
 
     pub fn update_fee_multiplier_operation(&self, multiplier: f64) -> GroveDbOp {
         GroveDbOp {
-            path: fee_pool_vec_path(),
+            path: pools_vec_path(),
             key: KEY_FEE_MULTIPLIER.to_vec(),
             op: Insert {
                 element: Element::Item(multiplier.to_be_bytes().to_vec(), None),

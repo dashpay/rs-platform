@@ -123,7 +123,7 @@ impl Platform {
             transaction,
             &mut batch,
         )?;
-
+dbg!(&batch);
         self.drive.grove_apply_batch(batch, false, transaction)?;
 
         Ok(distribution_info)
