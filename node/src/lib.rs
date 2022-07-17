@@ -8,10 +8,10 @@ use dash_abci::abci::messages::{
 };
 use dash_abci::platform::Platform;
 use dpp::identity::Identity;
-use rs_drive::grovedb::{PathQuery, Transaction, TransactionArg};
 use neon::prelude::*;
 use neon::types::JsDate;
 use rs_drive::drive::flags::StorageFlags;
+use rs_drive::grovedb::{PathQuery, Transaction, TransactionArg};
 
 const READONLY_MSG: &str =
     "db is in readonly mode due to the active transaction. Please provide transaction or commit it";

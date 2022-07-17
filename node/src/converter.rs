@@ -1,8 +1,8 @@
-use rs_drive::grovedb::{Element, PathQuery, Query, SizedQuery};
 use neon::handle::Managed;
 use neon::prelude::*;
 use neon::types::buffer::TypedArray;
 use rs_drive::drive::flags::StorageFlags;
+use rs_drive::grovedb::{Element, PathQuery, Query, SizedQuery};
 use std::borrow::Borrow;
 
 fn element_to_string(element: &Element) -> &'static str {

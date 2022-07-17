@@ -1,5 +1,5 @@
-use crate::execution::epoch_change::epoch::EpochInfo;
 use crate::abci::messages::BlockBeginRequest;
+use crate::execution::epoch_change::epoch::EpochInfo;
 
 pub struct BlockInfo {
     pub block_height: u64,

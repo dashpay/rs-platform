@@ -1,5 +1,5 @@
-use tempfile::TempDir;
 use crate::platform::Platform;
+use tempfile::TempDir;
 
 pub fn setup_platform() -> Platform {
     let tmp_dir = TempDir::new().unwrap();

@@ -143,8 +143,6 @@ pub fn setup(
 
     let people_at_block_times = Person::random_people_for_block_times(count, seed, block_times);
 
-    dbg!(&people_at_block_times);
-
     for (block_time, people) in people_at_block_times {
         for (i, person) in people.iter().enumerate() {
             if let Some(range_insert) = &restrict_to_inserts {

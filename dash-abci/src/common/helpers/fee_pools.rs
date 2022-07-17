@@ -4,12 +4,12 @@ use ciborium::value::Value;
 use dpp::identity::Identity;
 
 use rs_drive::common::helpers::identities::create_test_identity;
-use rs_drive::contract::Contract;
 use rs_drive::contract::document::Document;
-use rs_drive::drive::Drive;
+use rs_drive::contract::Contract;
 use rs_drive::drive::flags::StorageFlags;
 use rs_drive::drive::object_size_info::DocumentAndContractInfo;
 use rs_drive::drive::object_size_info::DocumentInfo::DocumentAndSerialization;
+use rs_drive::drive::Drive;
 use rs_drive::grovedb::TransactionArg;
 
 use crate::contracts::reward_shares::MN_REWARD_SHARES_DOCUMENT_TYPE;
@@ -75,7 +75,9 @@ pub fn create_test_masternode_share_identities_and_documents(
     pro_tx_hashes: &Vec<[u8; 32]>,
     transaction: TransactionArg,
 ) -> Vec<(Identity, Document)> {
-    drive.fetch_identities(pro_tx_hashes, transaction).expect("expected to fetch identities")
+    drive
+        .fetch_identities(pro_tx_hashes, transaction)
+        .expect("expected to fetch identities")
         .iter()
         .map(|mn_identity| {
             let id: [u8; 32] = rand::random();
@@ -99,9 +101,12 @@ pub fn refetch_identities(
     identities: Vec<&Identity>,
     transaction: TransactionArg,
 ) -> Result<Vec<Identity>, Error> {
-    let ids = identities.into_iter().map(|identity| {
-        identity.id.buffer
-    }).collect();
+    let ids = identities
+        .into_iter()
+        .map(|identity| identity.id.buffer)
+        .collect();
 
-    drive.fetch_identities(&ids, transaction).map_err(Error::Drive)
+    drive
+        .fetch_identities(&ids, transaction)
+        .map_err(Error::Drive)
 }

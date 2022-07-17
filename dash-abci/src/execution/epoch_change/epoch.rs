@@ -1,7 +1,7 @@
-use rust_decimal::Decimal;
-use crate::error::Error;
-use serde::{Serialize, Deserialize};
 use crate::error::execution::ExecutionError;
+use crate::error::Error;
+use rust_decimal::Decimal;
+use serde::{Deserialize, Serialize};
 
 pub const EPOCH_CHANGE_TIME: u64 = 1576800000;
 
@@ -10,6 +10,7 @@ pub const EPOCH_CHANGE_TIME: u64 = 1576800000;
 pub struct EpochInfo {
     pub current_epoch_index: u16,
     pub is_epoch_change: bool,
+    pub block_height: u64,
 }
 
 impl EpochInfo {
@@ -17,6 +18,7 @@ impl EpochInfo {
         EpochInfo {
             current_epoch_index: 0,
             is_epoch_change: true,
+            block_height: 0,
         }
     }
 
@@ -24,6 +26,7 @@ impl EpochInfo {
         genesis_time_ms: u64,
         block_time_ms: u64,
         previous_block_time_ms: Option<u64>,
+        block_height: u64,
     ) -> Result<EpochInfo, Error> {
         let previous_block_time = match previous_block_time_ms {
             Some(block_time) => block_time,
@@ -52,6 +55,7 @@ impl EpochInfo {
         Ok(EpochInfo {
             current_epoch_index,
             is_epoch_change,
+            block_height,
         })
     }
 }
@@ -67,7 +71,7 @@ mod test {
             let genesis_time_ms: u64 = 1655396517902;
             let block_time_ms: u64 = 1655396517922;
 
-            let epoch_info = EpochInfo::calculate(genesis_time_ms, block_time_ms, None)
+            let epoch_info = EpochInfo::calculate(genesis_time_ms, block_time_ms, None, 0)
                 .expect("should calculate epochs info");
 
             assert_eq!(epoch_info.current_epoch_index, 0);
@@ -81,7 +85,7 @@ mod test {
             let prev_block_time_ms: u64 = 1655396517912;
 
             let epoch_info =
-                EpochInfo::calculate(genesis_time_ms, block_time_ms, Some(prev_block_time_ms))
+                EpochInfo::calculate(genesis_time_ms, block_time_ms, Some(prev_block_time_ms), 0)
                     .expect("should calculate epochs info");
 
             assert_eq!(epoch_info.current_epoch_index, 0);
@@ -95,7 +99,7 @@ mod test {
             let block_time_ms: u64 = 1657125244561;
 
             let epoch_info =
-                EpochInfo::calculate(genesis_time_ms, block_time_ms, Some(prev_block_time_ms))
+                EpochInfo::calculate(genesis_time_ms, block_time_ms, Some(prev_block_time_ms), 0)
                     .expect("should calculate epochs info");
 
             assert_eq!(epoch_info.current_epoch_index, 1);

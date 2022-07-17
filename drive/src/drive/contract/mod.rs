@@ -405,7 +405,7 @@ impl Drive {
         &self,
         contract_id: [u8; 32],
         transaction: TransactionArg,
-        drive_cache: RefMut<DriveCache>
+        drive_cache: RefMut<DriveCache>,
     ) -> Result<(Option<Arc<Contract>>, StorageFlags), Error> {
         let CostContext { value, cost } =
             self.grove

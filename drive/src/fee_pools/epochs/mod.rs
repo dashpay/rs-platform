@@ -1,6 +1,6 @@
+pub mod epoch_key_constants;
 pub mod operations_factory;
 pub mod paths;
-pub mod epoch_key_constants;
 
 use serde::{Deserialize, Serialize};
 

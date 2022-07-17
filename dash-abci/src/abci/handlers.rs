@@ -5,11 +5,11 @@ use crate::abci::messages::{
     InitChainResponse,
 };
 use crate::block::{BlockExecutionContext, BlockInfo};
-use rs_drive::grovedb::TransactionArg;
 use crate::execution::epoch_change::epoch::EpochInfo;
+use rs_drive::grovedb::TransactionArg;
 
-use crate::error::Error;
 use crate::error::execution::ExecutionError;
+use crate::error::Error;
 use crate::platform::Platform;
 
 pub trait TenderdashAbci {
@@ -54,10 +54,16 @@ impl TenderdashAbci for Platform {
     ) -> Result<BlockBeginResponse, Error> {
         // Set genesis time
         let genesis_time = if request.block_height == 1 {
-            self.drive.init_genesis(request.block_time_ms, transaction)?;
+            self.drive
+                .init_genesis(request.block_time_ms, transaction)?;
             request.block_time_ms
         } else {
-            self.drive.get_genesis_time(transaction).map_err(Error::Drive)?.ok_or(Error::Execution(ExecutionError::DriveIncoherence("the genesis time must be set")))?
+            self.drive
+                .get_genesis_time(transaction)
+                .map_err(Error::Drive)?
+                .ok_or(Error::Execution(ExecutionError::DriveIncoherence(
+                    "the genesis time must be set",
+                )))?
         };
 
         // Init block execution context
@@ -65,6 +71,7 @@ impl TenderdashAbci for Platform {
             genesis_time,
             request.block_time_ms,
             request.previous_block_time_ms,
+            request.block_height,
         )?;
 
         let block_execution_context = BlockExecutionContext {
@@ -90,11 +97,9 @@ impl TenderdashAbci for Platform {
         let block_execution_context = match block_execution_context.deref() {
             Some(block_execution_context) => block_execution_context,
             None => {
-                return Err(Error::Execution(
-                    ExecutionError::CorruptedCodeExecution(
-                        "block execution context must be set in block begin handler",
-                    ),
-                ))
+                return Err(Error::Execution(ExecutionError::CorruptedCodeExecution(
+                    "block execution context must be set in block begin handler",
+                )))
             }
         };
 
@@ -102,34 +107,36 @@ impl TenderdashAbci for Platform {
         let distribution_info = self.process_block_fees(
             &block_execution_context.block_info,
             &block_execution_context.epoch_info,
-            &request.fees,
+            request.fees,
             transaction,
         )?;
 
-        let response = BlockEndResponse {
+        Ok(BlockEndResponse {
             current_epoch_index: block_execution_context.epoch_info.current_epoch_index,
             is_epoch_change: block_execution_context.epoch_info.is_epoch_change,
             masternodes_paid_count: distribution_info.masternodes_paid_count,
             paid_epoch_index: distribution_info.paid_epoch_index,
-        };
-
-        Ok(response)
+            distribution_pool_current_credits: distribution_info
+                .storage_distribution_pool_current_credits,
+        })
     }
 }
 
 #[cfg(test)]
 mod tests {
     mod handlers {
-        use crate::common::helpers::fee_pools::{
-            create_test_masternode_share_identities_and_documents,
-        };
-        use chrono::{Duration, Utc};
-        use rust_decimal::prelude::ToPrimitive;
-        use rs_drive::common::helpers::identities::create_test_masternode_identities;
         use crate::abci::handlers::TenderdashAbci;
+        use crate::common::helpers::fee_pools::create_test_masternode_share_identities_and_documents;
+        use chrono::{Duration, Utc};
+        use rs_drive::common::helpers::identities::create_test_masternode_identities;
+        use rust_decimal::prelude::ToPrimitive;
 
-        use crate::abci::messages::{BlockBeginRequest, BlockEndRequest, FeesAggregate, InitChainRequest};
-        use crate::common::helpers::setup::{setup_platform, setup_platform_with_initial_state_structure};
+        use crate::abci::messages::{
+            BlockBeginRequest, BlockEndRequest, FeesAggregate, InitChainRequest,
+        };
+        use crate::common::helpers::setup::{
+            setup_platform, setup_platform_with_initial_state_structure,
+        };
 
         #[test]
         fn test_abci_flow() {
@@ -139,7 +146,8 @@ mod tests {
             // init chain
             let init_chain_request = InitChainRequest {};
 
-            platform.init_chain(init_chain_request, Some(&transaction))
+            platform
+                .init_chain(init_chain_request, Some(&transaction))
                 .expect("should init chain");
 
             // setup the contract
@@ -156,8 +164,11 @@ mod tests {
             let storage_fees_per_block = 42000;
 
             // and create masternode identities
-            let proposers =
-                create_test_masternode_identities(&platform.drive, proposers_count, Some(&transaction));
+            let proposers = create_test_masternode_identities(
+                &platform.drive,
+                proposers_count,
+                Some(&transaction),
+            );
 
             create_test_masternode_share_identities_and_documents(
                 &platform.drive,
@@ -165,6 +176,8 @@ mod tests {
                 &proposers,
                 Some(&transaction),
             );
+
+            let mut last_distribution_pool_credits = 0;
 
             // process blocks
             for day in 1..=total_days {
@@ -177,12 +190,20 @@ mod tests {
                 let previous_block_time_ms = if day == 1 {
                     None
                 } else {
-                    Some((genesis_time + Duration::days(day as i64 - 2)).timestamp_millis().to_u64().expect("block time can not be before 1970"))
+                    Some(
+                        (genesis_time + Duration::days(day as i64 - 2))
+                            .timestamp_millis()
+                            .to_u64()
+                            .expect("block time can not be before 1970"),
+                    )
                 };
 
                 let block_height = day as u64;
 
-                let block_time_ms = block_time.timestamp_millis().to_u64().expect("block time can not be before 1970");
+                let block_time_ms = block_time
+                    .timestamp_millis()
+                    .to_u64()
+                    .expect("block time can not be before 1970");
                 // Processing block
                 let block_begin_request = BlockBeginRequest {
                     block_height,
@@ -191,7 +212,8 @@ mod tests {
                     proposer_pro_tx_hash: proposers[day as usize - 1],
                 };
 
-                platform.block_begin(block_begin_request, Some(&transaction))
+                platform
+                    .block_begin(block_begin_request, Some(&transaction))
                     .expect(format!("should begin process block #{}", day).as_str());
 
                 let block_end_request = BlockEndRequest {
@@ -202,7 +224,8 @@ mod tests {
                     },
                 };
 
-                let block_end_response = platform.block_end(block_end_request, Some(&transaction))
+                let block_end_response = platform
+                    .block_end(block_end_request, Some(&transaction))
                     .expect(format!("should end process block #{}", day).as_str());
 
                 // Should calculate correct current epochs
@@ -227,6 +250,9 @@ mod tests {
                     masternodes_paid_count
                 );
 
+                last_distribution_pool_credits =
+                    block_end_response.distribution_pool_current_credits;
+
                 // Should pay for the epochs 0, when epochs 1 started
                 match block_end_response.paid_epoch_index {
                     Some(index) => assert_eq!(
@@ -240,13 +266,13 @@ mod tests {
                 }
             }
 
-            let storage_fee_pool_value = platform.drive
+            let storage_fee_pool_value = platform
+                .drive
                 .get_aggregate_storage_fees_in_current_distribution_pool(Some(&transaction))
                 .expect("should get storage fee pool");
 
             assert_eq!(
-                storage_fee_pool_value,
-                storage_fees_per_block * (total_days - epoch_1_start_day + 1) as u64,
+                storage_fee_pool_value, last_distribution_pool_credits,
                 "should contain only storage fees from the last block"
             );
         }

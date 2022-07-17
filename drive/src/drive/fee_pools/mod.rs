@@ -6,9 +6,7 @@ pub mod storage_fee_distribution_pool;
 pub mod unpaid_epoch;
 
 pub fn pools_path() -> [&'static [u8]; 1] {
-    [
-        Into::<&[u8; 1]>::into(RootTree::Pools),
-    ]
+    [Into::<&[u8; 1]>::into(RootTree::Pools)]
 }
 
 pub fn pools_vec_path() -> Vec<Vec<u8>> {

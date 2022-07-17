@@ -13,11 +13,7 @@ impl Drive {
     ) -> Result<u64, Error> {
         let element = self
             .grove
-            .get(
-                pools_path(),
-                KEY_STORAGE_FEE_POOL.as_slice(),
-                transaction,
-            )
+            .get(pools_path(), KEY_STORAGE_FEE_POOL.as_slice(), transaction)
             .unwrap()
             .map_err(Error::GroveDB)?;
 

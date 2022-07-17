@@ -1,7 +1,7 @@
-use grovedb::TransactionArg;
 use crate::drive::Drive;
 use crate::error::Error;
 use crate::fee_pools::epochs::Epoch;
+use grovedb::TransactionArg;
 
 impl Drive {
     pub fn get_oldest_unpaid_epoch_pool(
@@ -50,7 +50,6 @@ mod tests {
         fn test_all_epochs_paid() {
             let drive = setup_drive_with_initial_state_structure();
             let transaction = drive.grove.start_transaction();
-
 
             match drive
                 .get_oldest_unpaid_epoch_pool(999, Some(&transaction))

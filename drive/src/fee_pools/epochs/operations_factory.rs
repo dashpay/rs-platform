@@ -15,16 +15,21 @@ impl Epoch {
     pub fn increment_proposer_block_count_operation(
         &self,
         drive: &Drive,
+        is_epoch_change: bool,
         proposer_pro_tx_hash: &[u8; 32],
         transaction: TransactionArg,
     ) -> Result<GroveDbOp, Error> {
         // update proposer's block count
-        let proposed_block_count = drive
-            .get_epochs_proposer_block_count(self, proposer_pro_tx_hash, transaction)
-            .or_else(|e| match e {
-                Error::GroveDB(grovedb::Error::PathKeyNotFound(_)) => Ok(0u64),
-                _ => Err(e),
-            })?;
+        let proposed_block_count = if is_epoch_change {
+            0
+        } else {
+            drive
+                .get_epochs_proposer_block_count(self, proposer_pro_tx_hash, transaction)
+                .or_else(|e| match e {
+                    Error::GroveDB(grovedb::Error::PathKeyNotFound(_)) => Ok(0u64),
+                    _ => Err(e),
+                })?
+        };
 
         Ok(self
             .update_proposer_block_count_operation(proposer_pro_tx_hash, proposed_block_count + 1))
@@ -65,8 +70,6 @@ impl Epoch {
         batch: &mut GroveDbOpBatch,
     ) {
         batch.push(self.update_start_block_height_operation(start_block_height));
-
-        batch.push(self.update_processing_credits_for_distribution_operation(0u64));
 
         batch.push(self.init_proposers_tree_operation());
 

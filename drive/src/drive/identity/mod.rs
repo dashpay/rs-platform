@@ -96,7 +96,11 @@ impl Drive {
         ids: &Vec<[u8; 32]>,
         transaction: TransactionArg,
     ) -> Result<Vec<Identity>, Error> {
-        Ok(self.fetch_identities_with_flags(ids, transaction)?.into_iter().map(|(identity, _)| identity).collect())
+        Ok(self
+            .fetch_identities_with_flags(ids, transaction)?
+            .into_iter()
+            .map(|(identity, _)| identity)
+            .collect())
     }
 
     pub fn fetch_identities_with_flags(
@@ -114,33 +118,34 @@ impl Drive {
             query: SizedQuery {
                 query,
                 limit: None,
-                offset: None
-            }
+                offset: None,
+            },
         };
         let (elements, _) = self
             .grove
-            .query_raw(
-                &path_query,
-                transaction,
-            )
+            .query_raw(&path_query, transaction)
             .unwrap()
             .map_err(Error::GroveDB)?;
 
-        elements.into_iter().map(|key_element_pair| {
-            if let Element::Item(identity_cbor, element_flags) = key_element_pair.1 {
-                let identity = Identity::from_buffer(identity_cbor.as_slice()).map_err(|_| {
-                    Error::Identity(IdentityError::IdentitySerialization(
-                        "failed to de-serialize identity from CBOR",
-                    ))
-                })?;
+        elements
+            .into_iter()
+            .map(|key_element_pair| {
+                if let Element::Item(identity_cbor, element_flags) = key_element_pair.1 {
+                    let identity =
+                        Identity::from_buffer(identity_cbor.as_slice()).map_err(|_| {
+                            Error::Identity(IdentityError::IdentitySerialization(
+                                "failed to de-serialize identity from CBOR",
+                            ))
+                        })?;
 
-                Ok((identity, StorageFlags::from_element_flags(element_flags)?))
-            } else {
-                Err(Error::Drive(DriveError::CorruptedIdentityNotItem(
-                    "identity must be an item",
-                )))
-            }
-        }).collect()
+                    Ok((identity, StorageFlags::from_element_flags(element_flags)?))
+                } else {
+                    Err(Error::Drive(DriveError::CorruptedIdentityNotItem(
+                        "identity must be an item",
+                    )))
+                }
+            })
+            .collect()
     }
 }
 

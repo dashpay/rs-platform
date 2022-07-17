@@ -21,7 +21,7 @@ impl Drive {
                 }
                 Ok(genesis_time_ms)
             }
-            Some(genesis_time_ms ) => { Ok(Some(genesis_time_ms)) }
+            Some(genesis_time_ms) => Ok(Some(genesis_time_ms)),
         }
     }
 
