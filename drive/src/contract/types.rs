@@ -1437,6 +1437,3 @@ pub use dpp::data_contract::document_field::{DocumentField, DocumentFieldType};
 
 //         let encoded_object =
 //             &DocumentFieldType::Object(BTreeMap::new()).encode_value_for_tree_keys(&object_value);
-
-//         assert!(encoded_object.is_err());
-//     }
