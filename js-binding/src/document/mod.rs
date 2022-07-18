@@ -46,12 +46,12 @@ impl DocumentWasm {
     }
 
     #[wasm_bindgen(js_name=setRevision)]
-    pub fn set_revision(&mut self, rev: i64) {
+    pub fn set_revision(&mut self, rev: u32) {
         self.0.revision = rev
     }
 
     #[wasm_bindgen(js_name=getRevision)]
-    pub fn get_revision(&self) -> i64 {
+    pub fn get_revision(&self) -> u32 {
         self.0.revision
     }
 
