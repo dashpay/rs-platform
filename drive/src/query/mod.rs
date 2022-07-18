@@ -868,7 +868,7 @@ impl<'a> DriveQuery<'a> {
                         Ok(Some(inner_query))
                     }
                     Some(query) => {
-                        if let Some((document, document_type, indexed_property, included)) =
+                        if let Some((document, document_type, _indexed_property, included)) =
                             starts_at_document
                         {
                             let start_at_key = document

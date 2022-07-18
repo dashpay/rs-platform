@@ -1,7 +1,7 @@
 use crate::common::encode::encode_float;
 use grovedb::{Element, TransactionArg};
 use std::collections::HashSet;
-use std::ops::Deref;
+
 use std::option::Option::None;
 
 use crate::contract::document::Document;

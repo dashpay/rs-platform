@@ -1,7 +1,7 @@
 use crate::abci::messages::FeesAggregate;
 use crate::error::execution::ExecutionError;
 use crate::error::Error;
-use crate::execution::epoch_change::distribute_storage_pool::DistributeStoragePoolResult;
+
 use crate::execution::epoch_change::epoch::EpochInfo;
 use crate::platform::Platform;
 use rs_drive::drive::batch::GroveDbOpBatch;
@@ -275,7 +275,7 @@ mod tests {
         use rs_drive::fee_pools::epochs::epoch_key_constants::KEY_PROPOSERS;
         use rs_drive::fee_pools::epochs::Epoch;
         use rs_drive::grovedb;
-        use std::option::Option::None;
+        
 
         #[test]
         fn test_no_distribution_on_epoch_0() {

@@ -136,7 +136,7 @@ mod tests {
             BlockBeginRequest, BlockEndRequest, FeesAggregate, InitChainRequest,
         };
         use crate::common::helpers::setup::{
-            setup_platform, setup_platform_with_initial_state_structure,
+            setup_platform,
         };
 
         #[test]

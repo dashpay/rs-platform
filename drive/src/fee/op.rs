@@ -81,7 +81,7 @@ pub enum FunctionOp {
 }
 
 impl FunctionOp {
-    pub fn cost(&self, word_count: u32) {}
+    pub fn cost(&self, _word_count: u32) {}
 }
 
 #[derive(Debug)]
@@ -396,7 +396,7 @@ impl DriveCost for OperationCost {
             seek_count,
             storage_written_bytes,
             storage_loaded_bytes,
-            storage_freed_bytes,
+            storage_freed_bytes: _,
             hash_byte_calls,
             hash_node_calls,
         } = *self;
@@ -406,7 +406,7 @@ impl DriveCost for OperationCost {
         let storage_written_bytes_ephemeral_cost = (storage_written_bytes as u64)
             .checked_mul(STORAGE_PROCESSING_CREDIT_PER_BYTE)
             .ok_or_else(|| get_overflow_error("storage written bytes cost overflow"))?;
-        let storage_loaded_bytes_cost = (storage_loaded_bytes as u64)
+        let _storage_loaded_bytes_cost = (storage_loaded_bytes as u64)
             .checked_mul(STORAGE_LOAD_CREDIT_PER_BYTE)
             .ok_or_else(|| get_overflow_error("storage loaded cost overflow"))?;
         let storage_loaded_bytes_cost = (storage_loaded_bytes as u64)

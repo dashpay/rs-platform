@@ -2,7 +2,7 @@ mod converter;
 
 use std::{option::Option::None, path::Path, sync::mpsc, thread};
 
-use dash_abci::abci::handlers::{self, TenderdashAbci};
+use dash_abci::abci::handlers::{TenderdashAbci};
 use dash_abci::abci::messages::{
     BlockBeginRequest, BlockEndRequest, InitChainRequest, Serializable,
 };

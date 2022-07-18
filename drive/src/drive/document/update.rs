@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::option::Option::None;
 
 use grovedb::{Element, TransactionArg};
-use std::ops::Deref;
+
 
 use crate::contract::document::Document;
 use crate::contract::Contract;

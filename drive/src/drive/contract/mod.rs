@@ -407,7 +407,7 @@ impl Drive {
         transaction: TransactionArg,
         drive_cache: RefMut<DriveCache>,
     ) -> Result<(Option<Arc<Contract>>, StorageFlags), Error> {
-        let CostContext { value, cost } =
+        let CostContext { value, cost: _ } =
             self.grove
                 .get(contract_root_path(&contract_id), &[0], transaction);
         let stored_element = value.map_err(Error::GroveDB)?;

@@ -479,7 +479,7 @@ impl Drive {
             } else {
                 self.grove
                     .get_raw(path, key, transaction)
-                    .map(|r| r.map(|e| true))
+                    .map(|r| r.map(|_e| true))
             }
         } else {
             self.grove.worst_case_for_has_raw(path, key)
