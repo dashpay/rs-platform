@@ -18,7 +18,7 @@ mod tests {
 
         #[test]
         fn test_error_if_fee_pools_not_initialized() {
-            let drive = super::setup_drive_with_initial_state_structure();
+            let drive = super::setup_drive();
             let transaction = drive.grove.start_transaction();
 
             let epoch = super::Epoch::new(1042);

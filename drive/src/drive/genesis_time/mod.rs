@@ -12,12 +12,13 @@ const KEY_GENESIS_TIME: &[u8; 1] = b"g";
 impl Drive {
     pub fn get_genesis_time(&self, transaction: TransactionArg) -> Result<Option<u64>, Error> {
         // let's first check the cache
-        match self.cache.borrow_mut().genesis_time_ms {
+        let mut cache = self.cache.borrow_mut();
+        match cache.genesis_time_ms {
             None => {
                 let genesis_time_ms = self.fetch_genesis_time(transaction)?;
                 if let Some(genesis_time_ms) = genesis_time_ms {
                     // put it into the cache
-                    self.cache.borrow_mut().genesis_time_ms = Some(genesis_time_ms);
+                    cache.genesis_time_ms = Some(genesis_time_ms);
                 }
                 Ok(genesis_time_ms)
             }
@@ -103,10 +104,7 @@ mod tests {
             drive
                 .grove
                 .insert(
-                    [
-                        Into::<&[u8; 1]>::into(super::RootTree::SpentAssetLockTransactions)
-                            .as_slice(),
-                    ],
+                    [Into::<&[u8; 1]>::into(super::RootTree::Pools).as_slice()],
                     super::KEY_GENESIS_TIME.as_slice(),
                     super::Element::Item(u128::MAX.to_be_bytes().to_vec(), None),
                     None,
@@ -122,7 +120,7 @@ mod tests {
                     ) => {
                         assert!(true)
                     }
-                    _ => assert!(false, "ivalid error type"),
+                    _ => assert!(false, "invalid error type"),
                 },
             }
         }

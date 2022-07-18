@@ -42,7 +42,7 @@ impl Platform {
 
             let year_fee_share = storage_distribution_fees_dec * distribution_for_that_year_ratio;
 
-            let epoch_fee_share_dec = (year_fee_share / EPOCHS_PER_YEAR_DEC);
+            let epoch_fee_share_dec = year_fee_share / EPOCHS_PER_YEAR_DEC;
             let epoch_fee_share = epoch_fee_share_dec
                 .round_dp_with_strategy(0, RoundingStrategy::ToZero)
                 .to_u64()
