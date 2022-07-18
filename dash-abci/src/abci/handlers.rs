@@ -135,9 +135,7 @@ mod tests {
         use crate::abci::messages::{
             BlockBeginRequest, BlockEndRequest, FeesAggregate, InitChainRequest,
         };
-        use crate::common::helpers::setup::{
-            setup_platform,
-        };
+        use crate::common::helpers::setup::setup_platform;
 
         #[test]
         fn test_abci_flow() {
@@ -156,7 +154,7 @@ mod tests {
 
             let genesis_time = Utc::now();
 
-            let total_days = 20;
+            let total_days = 29;
 
             let epoch_1_start_day = 18;
 
@@ -184,7 +182,9 @@ mod tests {
 
             let mut last_distribution_pool_credits = 0;
 
-            let block_step = 86400i64.div(blocks_per_day);
+            let block_interval = 86400i64.div(blocks_per_day);
+
+            let mut previous_block_time_ms: Option<u64> = None;
 
             // process blocks
             for day in 0..total_days {
@@ -194,18 +194,7 @@ mod tests {
                     } else {
                         genesis_time
                             + Duration::days(day as i64)
-                            + Duration::seconds(block_step * block_num)
-                    };
-
-                    let previous_block_time_ms = if day == 0 {
-                        None
-                    } else {
-                        Some(
-                            (genesis_time + Duration::days(day as i64 - 1))
-                                .timestamp_millis()
-                                .to_u64()
-                                .expect("block time can not be before 1970"),
-                        )
+                            + Duration::seconds(block_interval * block_num)
                     };
 
                     let block_height = 1 + (blocks_per_day as u64 * day as u64) + block_num as u64;
@@ -214,6 +203,7 @@ mod tests {
                         .timestamp_millis()
                         .to_u64()
                         .expect("block time can not be before 1970");
+
                     // Processing block
                     let block_begin_request = BlockBeginRequest {
                         block_height,
@@ -239,34 +229,36 @@ mod tests {
                         .block_end(block_end_request, Some(&transaction))
                         .expect(format!("should end process block #{}", day).as_str());
 
+                    // Set previous block time
+                    previous_block_time_ms = Some(block_time_ms);
+
                     // Should calculate correct current epochs
                     let (epoch_index, epoch_change) = if day > epoch_1_start_day {
                         (1, false)
-                    } else {
-                        if day == epoch_1_start_day {
-                            if block_num > epoch_1_start_block {
-                                (1, false)
-                            } else if block_num == epoch_1_start_block {
-                                (1, true)
-                            } else {
-                                (0, false)
-                            }
-                        } else {
+                    } else if day == epoch_1_start_day {
+                        if block_num < epoch_1_start_block {
                             (0, false)
+                        } else if block_num == epoch_1_start_block {
+                            (1, true)
+                        } else {
+                            (1, false)
                         }
+                    } else if day == 0 && block_num == 0 {
+                        (0, true)
+                    } else {
+                        (0, false)
                     };
 
                     assert_eq!(block_end_response.current_epoch_index, epoch_index);
 
-                    // if (previous_block_time_ms.is_none() || epoch_change) != block_end_response.is_epoch_change {
-                    //     assert_eq!(
-                    //         block_end_response.is_epoch_change,
-                    //         previous_block_time_ms.is_none() || epoch_change
-                    //     );
-                    // }
+                    assert_eq!(block_end_response.is_epoch_change, epoch_change);
 
                     // Should pay to all masternodes, when epochs 1 started
-                    let masternodes_paid_count = if epoch_change { proposers_count } else { 0 };
+                    let masternodes_paid_count = if epoch_index != 0 && epoch_change {
+                        proposers_count
+                    } else {
+                        0
+                    };
 
                     assert_eq!(
                         block_end_response.masternodes_paid_count,
