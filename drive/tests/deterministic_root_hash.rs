@@ -419,14 +419,14 @@ fn test_root_hash_matches_with_batching_just_contract() {
     // setup code
     setup_contract(
         &drive_with_batches,
-        "helpers/supporting_files/contract/dpns/dpns-contract.json",
+        "tests/supporting_files/contract/dpns/dpns-contract.json",
         None,
         Some(&db_transaction_with_batches),
     );
 
     setup_contract(
         &drive_without_batches,
-        "helpers/supporting_files/contract/dpns/dpns-contract.json",
+        "tests/supporting_files/contract/dpns/dpns-contract.json",
         None,
         Some(&db_transaction_without_batches),
     );
@@ -472,14 +472,14 @@ fn test_root_hash_matches_with_batching_contract_and_one_document() {
     // setup code
     let contract_with_batches = setup_contract(
         &drive_with_batches,
-        "helpers/supporting_files/contract/dpns/dpns-contract.json",
+        "tests/supporting_files/contract/dpns/dpns-contract.json",
         None,
         Some(&db_transaction_with_batches),
     );
 
     let contract_without_batches = setup_contract(
         &drive_without_batches,
-        "helpers/supporting_files/contract/dpns/dpns-contract.json",
+        "tests/supporting_files/contract/dpns/dpns-contract.json",
         None,
         Some(&db_transaction_without_batches),
     );

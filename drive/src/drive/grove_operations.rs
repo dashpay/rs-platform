@@ -806,12 +806,15 @@ impl Drive {
         }
         if self.config.batching_enabled {
             // println!("batch {:#?}", ops);
-            let consistency_results = GroveDbOp::verify_consistency_of_operations(&ops.operations);
-            if !consistency_results.is_empty() {
-                println!("results {:#?}", consistency_results);
-                return Err(Error::Drive(DriveError::GroveDBInsertion(
-                    "insertion order error",
-                )));
+            if self.config.batching_consistency_verification {
+                let consistency_results =
+                    GroveDbOp::verify_consistency_of_operations(&ops.operations);
+                if !consistency_results.is_empty() {
+                    println!("results {:#?}", consistency_results);
+                    return Err(Error::Drive(DriveError::GroveDBInsertion(
+                        "insertion order error",
+                    )));
+                }
             }
 
             let cost_context = self.grove.apply_batch(

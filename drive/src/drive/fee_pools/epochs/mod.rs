@@ -107,11 +107,9 @@ mod tests {
 
             assert_eq!(stored_block_height, start_block_height);
 
-            let stored_processing_fee = drive
+            drive
                 .get_epoch_processing_credits_for_distribution(&epoch, Some(&transaction))
-                .expect("should get processing fee");
-
-            assert_eq!(stored_processing_fee, 0);
+                .expect_err("should not get processing fee");
 
             let proposers = drive
                 .get_epoch_proposers(&epoch, 1, Some(&transaction))

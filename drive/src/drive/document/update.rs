@@ -1016,7 +1016,7 @@ mod tests {
 
         let contract = setup_contract(
             &drive,
-            "helpers/supporting_files/contract/dashpay/dashpay-contract.json",
+            "tests/supporting_files/contract/dashpay/dashpay-contract.json",
             None,
             Some(&db_transaction),
         );
@@ -1082,7 +1082,7 @@ mod tests {
 
         let contract = setup_contract(
             &drive,
-            "helpers/supporting_files/contract/dashpay/dashpay-contract-with-profile-history.json",
+            "tests/supporting_files/contract/dashpay/dashpay-contract-with-profile-history.json",
             None,
             Some(&db_transaction),
         );
@@ -1184,6 +1184,7 @@ mod tests {
     ) {
         let config = DriveConfig {
             batching_enabled: using_batches,
+            batching_consistency_verification: true,
             has_raw_enabled: using_has_raw,
             default_genesis_time: Some(0),
             encoding: DriveEncoding::DriveCbor,
@@ -1206,7 +1207,7 @@ mod tests {
         // setup code
         let contract = setup_contract(
             &drive,
-            "helpers/supporting_files/contract/family/family-contract-with-history-only-message-index.json",
+            "tests/supporting_files/contract/family/family-contract-with-history-only-message-index.json",
             None,
             transaction.as_ref(),
         );

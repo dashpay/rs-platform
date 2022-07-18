@@ -233,7 +233,7 @@ mod tests {
 
         let contract = setup_contract(
             &drive,
-            "helpers/supporting_files/contract/family/family-contract-reduced.json",
+            "tests/supporting_files/contract/family/family-contract-reduced.json",
             None,
             None,
         );
@@ -324,7 +324,7 @@ mod tests {
 
         let contract = setup_contract(
             &drive,
-            "helpers/supporting_files/contract/family/family-contract-reduced.json",
+            "tests/supporting_files/contract/family/family-contract-reduced.json",
             None,
             Some(&db_transaction),
         );
@@ -431,7 +431,7 @@ mod tests {
 
         let contract = setup_contract(
             &drive,
-            "helpers/supporting_files/contract/family/family-contract-reduced.json",
+            "tests/supporting_files/contract/family/family-contract-reduced.json",
             None,
             Some(&db_transaction),
         );
@@ -604,7 +604,7 @@ mod tests {
 
         let contract = setup_contract(
             &drive,
-            "helpers/supporting_files/contract/family/family-contract-reduced.json",
+            "tests/supporting_files/contract/family/family-contract-reduced.json",
             None,
             Some(&db_transaction),
         );
@@ -855,7 +855,7 @@ mod tests {
 
         let contract = setup_contract(
             &drive,
-            "helpers/supporting_files/contract/dashpay/dashpay-contract.json",
+            "tests/supporting_files/contract/dashpay/dashpay-contract.json",
             None,
             Some(&db_transaction),
         );

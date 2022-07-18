@@ -62,7 +62,7 @@ pub fn increment_in_epoch_each_proposers_block_count(
 pub fn create_test_masternode_identities_and_add_them_as_epoch_block_proposers(
     drive: &Drive,
     epoch: &Epoch,
-    count: u8,
+    count: u16,
     transaction: TransactionArg,
 ) -> Vec<[u8; 32]> {
     let proposers = create_test_masternode_identities(drive, count, transaction);
@@ -74,7 +74,7 @@ pub fn create_test_masternode_identities_and_add_them_as_epoch_block_proposers(
 
 pub fn create_test_masternode_identities(
     drive: &Drive,
-    count: u8,
+    count: u16,
     transaction: TransactionArg,
 ) -> Vec<[u8; 32]> {
     let mut identities: Vec<[u8; 32]> = Vec::with_capacity(count as usize);

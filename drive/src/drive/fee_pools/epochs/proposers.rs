@@ -260,7 +260,7 @@ mod tests {
 
             let pro_tx_hash: [u8; 32] = rand::random();
 
-            let epoch = super::Epoch::new(0);
+            let epoch = super::Epoch::new(1);
 
             let mut batch = super::GroveDbOpBatch::new();
 
@@ -286,7 +286,7 @@ mod tests {
                 epoch
                     .increment_proposer_block_count_operation(
                         &drive,
-                        true,
+                        false,
                         &pro_tx_hash,
                         Some(&transaction),
                     )

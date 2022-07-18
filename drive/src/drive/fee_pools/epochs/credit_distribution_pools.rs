@@ -26,7 +26,7 @@ impl Drive {
         if let Element::Item(item, _) = element {
             Ok(u64::from_be_bytes(item.as_slice().try_into().map_err(
                 |_| {
-                    Error::Fee(FeeError::CorruptedProcessingFeeInvalidItemLength(
+                    Error::Fee(FeeError::CorruptedStorageFeeInvalidItemLength(
                         "epochs processing fee is not u64",
                     ))
                 },
@@ -209,7 +209,7 @@ mod tests {
                 .insert(
                     epoch.get_path(),
                     KEY_STORAGE_FEE_POOL.as_slice(),
-                    super::Element::Item(u64::MAX.to_be_bytes().to_vec(), None),
+                    super::Element::Item(u128::MAX.to_be_bytes().to_vec(), None),
                     Some(&transaction),
                 )
                 .unwrap()

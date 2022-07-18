@@ -687,7 +687,7 @@ mod tests {
 
         let contract = setup_contract(
             &drive,
-            "helpers/supporting_files/contract/dashpay/dashpay-contract-all-mutable.json",
+            "tests/supporting_files/contract/dashpay/dashpay-contract-all-mutable.json",
             None,
             Some(&db_transaction),
         );
@@ -755,7 +755,7 @@ mod tests {
 
         let contract = setup_contract(
             &drive,
-            "helpers/supporting_files/contract/dashpay/dashpay-contract-all-mutable.json",
+            "tests/supporting_files/contract/dashpay/dashpay-contract-all-mutable.json",
             None,
             Some(&db_transaction),
         );
@@ -799,7 +799,7 @@ mod tests {
 
         let contract = setup_contract(
             &drive,
-            "helpers/supporting_files/contract/dashpay/dashpay-contract-all-mutable.json",
+            "tests/supporting_files/contract/dashpay/dashpay-contract-all-mutable.json",
             None,
             Some(&db_transaction),
         );
@@ -856,7 +856,7 @@ mod tests {
 
         let contract = setup_contract(
             &drive,
-            "helpers/supporting_files/contract/dashpay/dashpay-contract-all-mutable.json",
+            "tests/supporting_files/contract/dashpay/dashpay-contract-all-mutable.json",
             None,
             Some(&db_transaction),
         );
@@ -943,7 +943,7 @@ mod tests {
 
         let contract = setup_contract(
             &drive,
-            "helpers/supporting_files/contract/dpns/dpns-contract.json",
+            "tests/supporting_files/contract/dpns/dpns-contract.json",
             None,
             Some(&db_transaction),
         );
