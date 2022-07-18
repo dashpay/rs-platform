@@ -5,6 +5,8 @@ pub const DEFAULT_ORIGINAL_FEE_MULTIPLIER: f64 = 2.0;
 
 pub const EPOCHS_PER_YEAR: u16 = 20;
 
+pub const EPOCHS_PER_YEAR_F64: f64 = 20.0;
+
 pub const EPOCHS_PER_YEAR_DEC: Decimal = dec!(20);
 
 #[rustfmt::skip]

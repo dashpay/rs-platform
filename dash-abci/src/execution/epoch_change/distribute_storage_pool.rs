@@ -1,15 +1,15 @@
 use crate::error::execution::ExecutionError;
 use crate::error::Error;
 use crate::execution::constants;
-use crate::execution::constants::{EPOCHS_PER_YEAR, EPOCHS_PER_YEAR_DEC};
+use crate::execution::constants::{EPOCHS_PER_YEAR, EPOCHS_PER_YEAR_DEC, EPOCHS_PER_YEAR_F64};
 use crate::execution::epoch_change::epoch::EpochInfo;
 use crate::platform::Platform;
 use rs_drive::drive::batch::GroveDbOpBatch;
 use rs_drive::fee_pools::epochs::Epoch;
 use rs_drive::fee_pools::update_storage_fee_distribution_pool_operation;
 use rs_drive::grovedb::TransactionArg;
-use rust_decimal::prelude::ToPrimitive;
-use rust_decimal::Decimal;
+use rust_decimal::prelude::{FromPrimitive, ToPrimitive};
+use rust_decimal::{Decimal, RoundingStrategy};
 use rust_decimal_macros::dec;
 
 #[derive(Default)]
@@ -28,26 +28,27 @@ impl Platform {
         let storage_distribution_fees = self
             .drive
             .get_aggregate_storage_fees_in_current_distribution_pool(transaction)?;
-        let storage_distribution_fees = Decimal::new(storage_distribution_fees as i64, 0);
-
+        let storage_distribution_fees_dec =
+            Decimal::from_u64(storage_distribution_fees).expect("a");
         // a separate buffer from which we withdraw to correctly calculate fee share
-        let mut storage_distribution_fees_buffer = storage_distribution_fees;
+        let mut leftover_storage_distribution_credits = storage_distribution_fees;
 
-        if storage_distribution_fees == dec!(0.0) {
+        if storage_distribution_fees == 0 {
             return Ok(DistributeStoragePoolResult::default());
         }
 
         for year in 0..50u16 {
             let distribution_for_that_year_ratio = constants::FEE_DISTRIBUTION_TABLE[year as usize];
 
-            let year_fee_share = storage_distribution_fees * distribution_for_that_year_ratio;
-            let epoch_fee_share_dec = (year_fee_share / EPOCHS_PER_YEAR_DEC).floor();
-            let epoch_fee_share =
-                epoch_fee_share_dec
-                    .to_u64()
-                    .ok_or(Error::Execution(ExecutionError::Overflow(
-                        "storage distribution fees are not fitting in a u64",
-                    )))?;
+            let year_fee_share = storage_distribution_fees_dec * distribution_for_that_year_ratio;
+
+            let epoch_fee_share_dec = (year_fee_share / EPOCHS_PER_YEAR_DEC);
+            let epoch_fee_share = epoch_fee_share_dec
+                .round_dp_with_strategy(0, RoundingStrategy::ToZero)
+                .to_u64()
+                .ok_or(Error::Execution(ExecutionError::Overflow(
+                    "storage distribution fees are not fitting in a u64",
+                )))?;
 
             let starting_epoch_index = epoch_info.current_epoch_index + EPOCHS_PER_YEAR * year;
 
@@ -68,15 +69,13 @@ impl Platform {
                     ),
                 );
 
-                storage_distribution_fees_buffer -= epoch_fee_share_dec;
+                leftover_storage_distribution_credits = leftover_storage_distribution_credits
+                    .checked_sub(epoch_fee_share)
+                    .ok_or(Error::Execution(ExecutionError::Overflow(
+                        "leftover storage not fitting in a u64",
+                    )))?;
             }
         }
-
-        let leftover_storage_distribution_credits = storage_distribution_fees_buffer
-            .to_u64()
-            .ok_or(Error::Execution(ExecutionError::Overflow(
-                "storage distribution fees are not fitting in a u64",
-            )))?;
 
         if !epoch_info.is_epoch_change {
             batch.push(update_storage_fee_distribution_pool_operation(
@@ -173,7 +172,7 @@ mod tests {
                 .distribute_storage_fee_distribution_pool_to_epochs_operations(
                     EpochInfo {
                         current_epoch_index: epoch_index,
-                        is_epoch_change: true,
+                        is_epoch_change: false,
                         block_height: 0,
                     },
                     Some(&transaction),
@@ -192,7 +191,7 @@ mod tests {
                 .get_aggregate_storage_fees_in_current_distribution_pool(Some(&transaction))
                 .expect("should get storage fee pool");
 
-            assert_eq!(storage_fee_pool_leftover, 0);
+            assert_eq!(storage_fee_pool_leftover, 515);
         }
 
         #[test]
@@ -200,7 +199,7 @@ mod tests {
             let platform = setup_platform_with_initial_state_structure();
             let transaction = platform.drive.grove.start_transaction();
 
-            let storage_pool = 1000;
+            let storage_pool = 1000000;
             let epoch_index = 42;
 
             let mut batch = GroveDbOpBatch::new();
@@ -221,11 +220,11 @@ mod tests {
 
             let mut batch = GroveDbOpBatch::new();
 
-            platform
+            let distribute_storage_result = platform
                 .distribute_storage_fee_distribution_pool_to_epochs_operations(
                     EpochInfo {
                         current_epoch_index: epoch_index,
-                        is_epoch_change: true,
+                        is_epoch_change: false,
                         block_height: 0,
                     },
                     Some(&transaction),
@@ -239,12 +238,15 @@ mod tests {
                 .expect("should apply batch");
 
             // check leftover
-            let storage_fee_pool_leftover = platform
+            let checked_storage_fee_pool_leftover = platform
                 .drive
                 .get_aggregate_storage_fees_in_current_distribution_pool(Some(&transaction))
                 .expect("should get storage fee pool");
 
-            assert_eq!(storage_fee_pool_leftover, 0);
+            assert_eq!(
+                checked_storage_fee_pool_leftover,
+                distribute_storage_result.leftover_storage_distribution_credits
+            );
 
             // collect all the storage fee values of the 1000 epochs pools
             let storage_fees = get_storage_credits_for_distribution_for_epochs_in_range(
@@ -255,11 +257,83 @@ mod tests {
 
             // compare them with reference table
             #[rustfmt::skip]
-                let reference_fees: [u64; 1] = [1
-
+                let reference_fees: [u64; 1000] = [
+                2500, 2500, 2500, 2500, 2500, 2500, 2500, 2500, 2500, 2500, 2500, 2500, 2500, 2500,
+                2500, 2500, 2500, 2500, 2500, 2500, 2400, 2400, 2400, 2400, 2400, 2400, 2400, 2400,
+                2400, 2400, 2400, 2400, 2400, 2400, 2400, 2400, 2400, 2400, 2400, 2400, 2300, 2300,
+                2300, 2300, 2300, 2300, 2300, 2300, 2300, 2300, 2300, 2300, 2300, 2300, 2300, 2300,
+                2300, 2300, 2300, 2300, 2200, 2200, 2200, 2200, 2200, 2200, 2200, 2200, 2200, 2200,
+                2200, 2200, 2200, 2200, 2200, 2200, 2200, 2200, 2200, 2200, 2100, 2100, 2100, 2100,
+                2100, 2100, 2100, 2100, 2100, 2100, 2100, 2100, 2100, 2100, 2100, 2100, 2100, 2100,
+                2100, 2100, 2000, 2000, 2000, 2000, 2000, 2000, 2000, 2000, 2000, 2000, 2000, 2000,
+                2000, 2000, 2000, 2000, 2000, 2000, 2000, 2000, 1925, 1925, 1925, 1925, 1925, 1925,
+                1925, 1925, 1925, 1925, 1925, 1925, 1925, 1925, 1925, 1925, 1925, 1925, 1925, 1925,
+                1850, 1850, 1850, 1850, 1850, 1850, 1850, 1850, 1850, 1850, 1850, 1850, 1850, 1850,
+                1850, 1850, 1850, 1850, 1850, 1850, 1775, 1775, 1775, 1775, 1775, 1775, 1775, 1775,
+                1775, 1775, 1775, 1775, 1775, 1775, 1775, 1775, 1775, 1775, 1775, 1775, 1700, 1700,
+                1700, 1700, 1700, 1700, 1700, 1700, 1700, 1700, 1700, 1700, 1700, 1700, 1700, 1700,
+                1700, 1700, 1700, 1700, 1625, 1625, 1625, 1625, 1625, 1625, 1625, 1625, 1625, 1625,
+                1625, 1625, 1625, 1625, 1625, 1625, 1625, 1625, 1625, 1625, 1550, 1550, 1550, 1550,
+                1550, 1550, 1550, 1550, 1550, 1550, 1550, 1550, 1550, 1550, 1550, 1550, 1550, 1550,
+                1550, 1550, 1475, 1475, 1475, 1475, 1475, 1475, 1475, 1475, 1475, 1475, 1475, 1475,
+                1475, 1475, 1475, 1475, 1475, 1475, 1475, 1475, 1425, 1425, 1425, 1425, 1425, 1425,
+                1425, 1425, 1425, 1425, 1425, 1425, 1425, 1425, 1425, 1425, 1425, 1425, 1425, 1425,
+                1375, 1375, 1375, 1375, 1375, 1375, 1375, 1375, 1375, 1375, 1375, 1375, 1375, 1375,
+                1375, 1375, 1375, 1375, 1375, 1375, 1325, 1325, 1325, 1325, 1325, 1325, 1325, 1325,
+                1325, 1325, 1325, 1325, 1325, 1325, 1325, 1325, 1325, 1325, 1325, 1325, 1275, 1275,
+                1275, 1275, 1275, 1275, 1275, 1275, 1275, 1275, 1275, 1275, 1275, 1275, 1275, 1275,
+                1275, 1275, 1275, 1275, 1225, 1225, 1225, 1225, 1225, 1225, 1225, 1225, 1225, 1225,
+                1225, 1225, 1225, 1225, 1225, 1225, 1225, 1225, 1225, 1225, 1175, 1175, 1175, 1175,
+                1175, 1175, 1175, 1175, 1175, 1175, 1175, 1175, 1175, 1175, 1175, 1175, 1175, 1175,
+                1175, 1175, 1125, 1125, 1125, 1125, 1125, 1125, 1125, 1125, 1125, 1125, 1125, 1125,
+                1125, 1125, 1125, 1125, 1125, 1125, 1125, 1125, 1075, 1075, 1075, 1075, 1075, 1075,
+                1075, 1075, 1075, 1075, 1075, 1075, 1075, 1075, 1075, 1075, 1075, 1075, 1075, 1075,
+                1025, 1025, 1025, 1025, 1025, 1025, 1025, 1025, 1025, 1025, 1025, 1025, 1025, 1025,
+                1025, 1025, 1025, 1025, 1025, 1025, 975, 975, 975, 975, 975, 975, 975, 975, 975,
+                975, 975, 975, 975, 975, 975, 975, 975, 975, 975, 975, 937, 937, 937, 937, 937,
+                937, 937, 937, 937, 937, 937, 937, 937, 937, 937, 937, 937, 937, 937, 937, 900,
+                900, 900, 900, 900, 900, 900, 900, 900, 900, 900, 900, 900, 900, 900, 900, 900,
+                900, 900, 900, 862, 862, 862, 862, 862, 862, 862, 862, 862, 862, 862, 862, 862,
+                862, 862, 862, 862, 862, 862, 862, 825, 825, 825, 825, 825, 825, 825, 825, 825,
+                825, 825, 825, 825, 825, 825, 825, 825, 825, 825, 825, 787, 787, 787, 787, 787,
+                787, 787, 787, 787, 787, 787, 787, 787, 787, 787, 787, 787, 787, 787, 787, 750,
+                750, 750, 750, 750, 750, 750, 750, 750, 750, 750, 750, 750, 750, 750, 750, 750,
+                750, 750, 750, 712, 712, 712, 712, 712, 712, 712, 712, 712, 712, 712, 712, 712,
+                712, 712, 712, 712, 712, 712, 712, 675, 675, 675, 675, 675, 675, 675, 675, 675,
+                675, 675, 675, 675, 675, 675, 675, 675, 675, 675, 675, 637, 637, 637, 637, 637,
+                637, 637, 637, 637, 637, 637, 637, 637, 637, 637, 637, 637, 637, 637, 637, 600,
+                600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600,
+                600, 600, 600, 562, 562, 562, 562, 562, 562, 562, 562, 562, 562, 562, 562, 562,
+                562, 562, 562, 562, 562, 562, 562, 525, 525, 525, 525, 525, 525, 525, 525, 525,
+                525, 525, 525, 525, 525, 525, 525, 525, 525, 525, 525, 487, 487, 487, 487, 487,
+                487, 487, 487, 487, 487, 487, 487, 487, 487, 487, 487, 487, 487, 487, 487, 450,
+                450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450,
+                450, 450, 450, 412, 412, 412, 412, 412, 412, 412, 412, 412, 412, 412, 412, 412,
+                412, 412, 412, 412, 412, 412, 412, 375, 375, 375, 375, 375, 375, 375, 375, 375,
+                375, 375, 375, 375, 375, 375, 375, 375, 375, 375, 375, 337, 337, 337, 337, 337,
+                337, 337, 337, 337, 337, 337, 337, 337, 337, 337, 337, 337, 337, 337, 337, 300,
+                300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300,
+                300, 300, 300, 262, 262, 262, 262, 262, 262, 262, 262, 262, 262, 262, 262, 262,
+                262, 262, 262, 262, 262, 262, 262, 237, 237, 237, 237, 237, 237, 237, 237, 237,
+                237, 237, 237, 237, 237, 237, 237, 237, 237, 237, 237, 212, 212, 212, 212, 212,
+                212, 212, 212, 212, 212, 212, 212, 212, 212, 212, 212, 212, 212, 212, 212, 187,
+                187, 187, 187, 187, 187, 187, 187, 187, 187, 187, 187, 187, 187, 187, 187, 187,
+                187, 187, 187, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162,
+                162, 162, 162, 162, 162, 162, 162, 137, 137, 137, 137, 137, 137, 137, 137, 137,
+                137, 137, 137, 137, 137, 137, 137, 137, 137, 137, 137, 112, 112, 112, 112, 112,
+                112, 112, 112, 112, 112, 112, 112, 112, 112, 112, 112, 112, 112, 112, 112, 87,
+                87, 87, 87, 87, 87, 87, 87, 87, 87, 87, 87, 87, 87, 87, 87, 87, 87, 87, 87, 62,
+                62, 62, 62, 62, 62, 62, 62, 62, 62, 62, 62, 62, 62, 62, 62, 62, 62, 62, 62
             ];
 
             assert_eq!(storage_fees, reference_fees);
+
+            let total_distributed: u64 = storage_fees.iter().sum();
+
+            assert_eq!(
+                total_distributed + checked_storage_fee_pool_leftover,
+                storage_pool
+            );
 
             /*
 
@@ -285,7 +359,7 @@ mod tests {
                 .distribute_storage_fee_distribution_pool_to_epochs_operations(
                     EpochInfo {
                         current_epoch_index: epoch_index,
-                        is_epoch_change: true,
+                        is_epoch_change: false,
                         block_height: 0,
                     },
                     Some(&transaction),

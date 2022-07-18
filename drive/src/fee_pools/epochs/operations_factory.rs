@@ -108,7 +108,7 @@ impl Epoch {
 
     pub fn update_fee_multiplier_operation(&self, multiplier: f64) -> GroveDbOp {
         GroveDbOp {
-            path: pools_vec_path(),
+            path: self.get_vec_path(),
             key: KEY_FEE_MULTIPLIER.to_vec(),
             op: Insert {
                 element: Element::Item(multiplier.to_be_bytes().to_vec(), None),

@@ -235,6 +235,7 @@ mod tests {
                 epoch
                     .increment_proposer_block_count_operation(
                         &drive,
+                        true,
                         &pro_tx_hash,
                         Some(&transaction),
                     )
@@ -285,6 +286,7 @@ mod tests {
                 epoch
                     .increment_proposer_block_count_operation(
                         &drive,
+                        true,
                         &pro_tx_hash,
                         Some(&transaction),
                     )
