@@ -18,6 +18,8 @@ use rs_drive::drive::Drive;
 use rs_drive::error::{query::QueryError, Error};
 use rs_drive::query::DriveQuery;
 
+use dpp::data_contract::drive_api::DriveContractExt;
+
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Person {
@@ -245,7 +247,7 @@ fn test_query_historical() {
     });
     let where_cbor = common::value_to_cbor(query_value, None);
     let person_document_type = contract
-        .document_types
+        .document_types()
         .get("person")
         .expect("contract should have a person document type");
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &person_document_type)
@@ -282,7 +284,7 @@ fn test_query_historical() {
     let query_cbor = common::value_to_cbor(query_value, None);
 
     let person_document_type = contract
-        .document_types
+        .document_types()
         .get("person")
         .expect("contract should have a person document type");
 
@@ -304,7 +306,7 @@ fn test_query_historical() {
     let query_cbor = common::value_to_cbor(query_value, None);
 
     let person_document_type = contract
-        .document_types
+        .document_types()
         .get("person")
         .expect("contract should have a person document type");
 
@@ -341,7 +343,7 @@ fn test_query_historical() {
     let query_cbor = common::value_to_cbor(query_value, None);
 
     let person_document_type = contract
-        .document_types
+        .document_types()
         .get("person")
         .expect("contract should have a person document type");
 
@@ -365,7 +367,7 @@ fn test_query_historical() {
     let query_cbor = common::value_to_cbor(query_value, None);
 
     let person_document_type = contract
-        .document_types
+        .document_types()
         .get("person")
         .expect("contract should have a person document type");
 
@@ -397,7 +399,7 @@ fn test_query_historical() {
     let query_cbor = common::value_to_cbor(query_value, None);
 
     let person_document_type = contract
-        .document_types
+        .document_types()
         .get("person")
         .expect("contract should have a person document type");
 
@@ -418,7 +420,7 @@ fn test_query_historical() {
     let query_cbor = common::value_to_cbor(query_value, None);
 
     let person_document_type = contract
-        .document_types
+        .document_types()
         .get("person")
         .expect("contract should have a person document type");
 
@@ -441,7 +443,7 @@ fn test_query_historical() {
     });
     let where_cbor = common::value_to_cbor(query_value, None);
     let person_document_type = contract
-        .document_types
+        .document_types()
         .get("person")
         .expect("contract should have a person document type");
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
@@ -486,7 +488,7 @@ fn test_query_historical() {
     });
     let where_cbor = common::value_to_cbor(query_value, None);
     let person_document_type = contract
-        .document_types
+        .document_types()
         .get("person")
         .expect("contract should have a person document type");
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
@@ -527,7 +529,7 @@ fn test_query_historical() {
     });
     let where_cbor = common::value_to_cbor(query_value, None);
     let person_document_type = contract
-        .document_types
+        .document_types()
         .get("person")
         .expect("contract should have a person document type");
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
@@ -602,7 +604,7 @@ fn test_query_historical() {
     });
     let where_cbor = common::value_to_cbor(query_value, None);
     let person_document_type = contract
-        .document_types
+        .document_types()
         .get("person")
         .expect("contract should have a person document type");
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
@@ -651,7 +653,7 @@ fn test_query_historical() {
     });
     let where_cbor = common::value_to_cbor(query_value, None);
     let person_document_type = contract
-        .document_types
+        .document_types()
         .get("person")
         .expect("contract should have a person document type");
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
@@ -694,7 +696,7 @@ fn test_query_historical() {
     });
     let where_cbor = common::value_to_cbor(query_value, None);
     let person_document_type = contract
-        .document_types
+        .document_types()
         .get("person")
         .expect("contract should have a person document type");
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
@@ -731,7 +733,7 @@ fn test_query_historical() {
     });
     let where_cbor = common::value_to_cbor(query_value, None);
     let person_document_type = contract
-        .document_types
+        .document_types()
         .get("person")
         .expect("contract should have a person document type");
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
@@ -803,7 +805,7 @@ fn test_query_historical() {
     });
     let where_cbor = common::value_to_cbor(query_value, None);
     let person_document_type = contract
-        .document_types
+        .document_types()
         .get("person")
         .expect("contract should have a person document type");
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
@@ -852,7 +854,7 @@ fn test_query_historical() {
     });
     let where_cbor = common::value_to_cbor(query_value, None);
     let person_document_type = contract
-        .document_types
+        .document_types()
         .get("person")
         .expect("contract should have a person document type");
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
@@ -1016,7 +1018,7 @@ fn test_query_historical() {
     let query_cbor = common::value_to_cbor(query_value, None);
 
     let person_document_type = contract
-        .document_types
+        .document_types()
         .get("person")
         .expect("contract should have a person document type");
 
@@ -1040,7 +1042,7 @@ fn test_query_historical() {
     let query_cbor = common::value_to_cbor(query_value, None);
 
     let person_document_type = contract
-        .document_types
+        .document_types()
         .get("person")
         .expect("contract should have a person document type");
 
@@ -1065,7 +1067,7 @@ fn test_query_historical() {
     let query_cbor = common::value_to_cbor(query_value, None);
 
     let person_document_type = contract
-        .document_types
+        .document_types()
         .get("person")
         .expect("contract should have a person document type");
 
@@ -1092,7 +1094,7 @@ fn test_query_historical() {
     let query_cbor = common::value_to_cbor(query_value, None);
 
     let person_document_type = contract
-        .document_types
+        .document_types()
         .get("person")
         .expect("contract should have a person document type");
 
@@ -1131,7 +1133,7 @@ fn test_query_historical() {
     let query_cbor = common::value_to_cbor(query_value, None);
 
     let person_document_type = contract
-        .document_types
+        .document_types()
         .get("person")
         .expect("contract should have a person document type");
 
@@ -1166,7 +1168,7 @@ fn test_query_historical() {
     let query_cbor = common::value_to_cbor(query_value, None);
 
     let person_document_type = contract
-        .document_types
+        .document_types()
         .get("person")
         .expect("contract should have a person document type");
 
@@ -1191,7 +1193,7 @@ fn test_query_historical() {
     let query_cbor = common::value_to_cbor(query_value, None);
 
     let person_document_type = contract
-        .document_types
+        .document_types()
         .get("person")
         .expect("contract should have a person document type");
 
@@ -1241,7 +1243,7 @@ fn test_query_historical() {
     let query_cbor = common::value_to_cbor(query_value, None);
 
     let person_document_type = contract
-        .document_types
+        .document_types()
         .get("person")
         .expect("contract should have a person document type");
 
@@ -1293,7 +1295,7 @@ fn test_query_historical() {
     let query_cbor = common::value_to_cbor(query_value, None);
 
     let person_document_type = contract
-        .document_types
+        .document_types()
         .get("person")
         .expect("contract should have a person document type");
 
@@ -1321,7 +1323,7 @@ fn test_query_historical() {
     let query_cbor = common::value_to_cbor(query_value, None);
 
     let person_document_type = contract
-        .document_types
+        .document_types()
         .get("person")
         .expect("contract should have a person document type");
 
@@ -1383,7 +1385,7 @@ fn test_query_historical() {
     let query_cbor = common::value_to_cbor(query_value, None);
 
     let person_document_type = contract
-        .document_types
+        .document_types()
         .get("person")
         .expect("contract should have a person document type");
 
@@ -1411,7 +1413,7 @@ fn test_query_historical() {
     let query_cbor = common::value_to_cbor(query_value, None);
 
     let person_document_type = contract
-        .document_types
+        .document_types()
         .get("person")
         .expect("contract should have a person document type");
 

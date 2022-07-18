@@ -22,6 +22,8 @@ use rs_drive::drive::Drive;
 use rs_drive::error::{query::QueryError, Error};
 use rs_drive::query::DriveQuery;
 
+use dpp::data_contract::drive_api::DriveContractExt;
+
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Person {
@@ -522,7 +524,7 @@ fn test_family_basic_queries() {
     });
     let where_cbor = common::value_to_cbor(query_value, None);
     let person_document_type = contract
-        .document_types
+        .document_types()
         .get("person")
         .expect("contract should have a person document type");
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &person_document_type)
@@ -564,7 +566,7 @@ fn test_family_basic_queries() {
     let query_cbor = common::value_to_cbor(query_value, None);
 
     let person_document_type = contract
-        .document_types
+        .document_types()
         .get("person")
         .expect("contract should have a person document type");
 
@@ -596,7 +598,7 @@ fn test_family_basic_queries() {
     let query_cbor = common::value_to_cbor(query_value, None);
 
     let person_document_type = contract
-        .document_types
+        .document_types()
         .get("person")
         .expect("contract should have a person document type");
 
@@ -644,7 +646,7 @@ fn test_family_basic_queries() {
     let query_cbor = common::value_to_cbor(query_value, None);
 
     let person_document_type = contract
-        .document_types
+        .document_types()
         .get("person")
         .expect("contract should have a person document type");
 
@@ -679,7 +681,7 @@ fn test_family_basic_queries() {
     let query_cbor = common::value_to_cbor(query_value, None);
 
     let person_document_type = contract
-        .document_types
+        .document_types()
         .get("person")
         .expect("contract should have a person document type");
 
@@ -722,7 +724,7 @@ fn test_family_basic_queries() {
     let query_cbor = common::value_to_cbor(query_value, None);
 
     let person_document_type = contract
-        .document_types
+        .document_types()
         .get("person")
         .expect("contract should have a person document type");
 
@@ -754,7 +756,7 @@ fn test_family_basic_queries() {
     let query_cbor = common::value_to_cbor(query_value, None);
 
     let person_document_type = contract
-        .document_types
+        .document_types()
         .get("person")
         .expect("contract should have a person document type");
 
@@ -788,7 +790,7 @@ fn test_family_basic_queries() {
     });
     let where_cbor = common::value_to_cbor(query_value, None);
     let person_document_type = contract
-        .document_types
+        .document_types()
         .get("person")
         .expect("contract should have a person document type");
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
@@ -839,7 +841,7 @@ fn test_family_basic_queries() {
     });
     let where_cbor = common::value_to_cbor(query_value, None);
     let person_document_type = contract
-        .document_types
+        .document_types()
         .get("person")
         .expect("contract should have a person document type");
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
@@ -885,7 +887,7 @@ fn test_family_basic_queries() {
     });
     let where_cbor = common::value_to_cbor(query_value, None);
     let person_document_type = contract
-        .document_types
+        .document_types()
         .get("person")
         .expect("contract should have a person document type");
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
@@ -932,7 +934,7 @@ fn test_family_basic_queries() {
     });
     let where_cbor = common::value_to_cbor(query_value, None);
     let person_document_type = contract
-        .document_types
+        .document_types()
         .get("person")
         .expect("contract should have a person document type");
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
@@ -987,7 +989,7 @@ fn test_family_basic_queries() {
     });
     let where_cbor = common::value_to_cbor(query_value, None);
     let person_document_type = contract
-        .document_types
+        .document_types()
         .get("person")
         .expect("contract should have a person document type");
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
@@ -1030,7 +1032,7 @@ fn test_family_basic_queries() {
     });
     let where_cbor = common::value_to_cbor(query_value, None);
     let person_document_type = contract
-        .document_types
+        .document_types()
         .get("person")
         .expect("contract should have a person document type");
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
@@ -1085,7 +1087,7 @@ fn test_family_basic_queries() {
     });
     let where_cbor = common::value_to_cbor(query_value, None);
     let person_document_type = contract
-        .document_types
+        .document_types()
         .get("person")
         .expect("contract should have a person document type");
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
@@ -1139,7 +1141,7 @@ fn test_family_basic_queries() {
     });
     let where_cbor = common::value_to_cbor(query_value, None);
     let person_document_type = contract
-        .document_types
+        .document_types()
         .get("person")
         .expect("contract should have a person document type");
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
@@ -1307,7 +1309,7 @@ fn test_family_basic_queries() {
     let query_cbor = common::value_to_cbor(query_value, None);
 
     let person_document_type = contract
-        .document_types
+        .document_types()
         .get("person")
         .expect("contract should have a person document type");
 
@@ -1348,7 +1350,7 @@ fn test_family_basic_queries() {
     let query_cbor = common::value_to_cbor(query_value, None);
 
     let person_document_type = contract
-        .document_types
+        .document_types()
         .get("person")
         .expect("contract should have a person document type");
 
@@ -1387,7 +1389,7 @@ fn test_family_basic_queries() {
     let query_cbor = common::value_to_cbor(query_value, None);
 
     let person_document_type = contract
-        .document_types
+        .document_types()
         .get("person")
         .expect("contract should have a person document type");
 
@@ -1422,7 +1424,7 @@ fn test_family_basic_queries() {
     let query_cbor = common::value_to_cbor(query_value, None);
 
     let person_document_type = contract
-        .document_types
+        .document_types()
         .get("person")
         .expect("contract should have a person document type");
 
@@ -1447,7 +1449,7 @@ fn test_family_basic_queries() {
     let query_cbor = common::value_to_cbor(query_value, None);
 
     let person_document_type = contract
-        .document_types
+        .document_types()
         .get("person")
         .expect("contract should have a person document type");
 
@@ -1487,7 +1489,7 @@ fn test_family_basic_queries() {
     let query_cbor = common::value_to_cbor(query_value, None);
 
     let person_document_type = contract
-        .document_types
+        .document_types()
         .get("person")
         .expect("contract should have a person document type");
 
@@ -1515,7 +1517,7 @@ fn test_family_basic_queries() {
     let query_cbor = common::value_to_cbor(query_value, None);
 
     let person_document_type = contract
-        .document_types
+        .document_types()
         .get("person")
         .expect("contract should have a person document type");
 
@@ -1576,7 +1578,7 @@ fn test_family_basic_queries() {
     let query_cbor = common::value_to_cbor(query_value, None);
 
     let person_document_type = contract
-        .document_types
+        .document_types()
         .get("person")
         .expect("contract should have a person document type");
 
@@ -1604,7 +1606,7 @@ fn test_family_basic_queries() {
     let query_cbor = common::value_to_cbor(query_value, None);
 
     let person_document_type = contract
-        .document_types
+        .document_types()
         .get("person")
         .expect("contract should have a person document type");
 
@@ -1632,7 +1634,7 @@ fn test_family_basic_queries() {
     let query_cbor = common::value_to_cbor(query_value, None);
 
     let person_document_type = contract
-        .document_types
+        .document_types()
         .get("person")
         .expect("contract should have a person document type");
 
@@ -1710,7 +1712,7 @@ fn test_family_starts_at_queries() {
     });
     let where_cbor = common::value_to_cbor(query_value, None);
     let person_document_type = contract
-        .document_types
+        .document_types()
         .get("person")
         .expect("contract should have a person document type");
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
@@ -1764,7 +1766,7 @@ fn test_family_starts_at_queries() {
     });
     let where_cbor = common::value_to_cbor(query_value, None);
     let person_document_type = contract
-        .document_types
+        .document_types()
         .get("person")
         .expect("contract should have a person document type");
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
@@ -1812,7 +1814,7 @@ fn test_family_starts_at_queries() {
     });
     let where_cbor = common::value_to_cbor(query_value, None);
     let person_document_type = contract
-        .document_types
+        .document_types()
         .get("person")
         .expect("contract should have a person document type");
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
@@ -1866,7 +1868,7 @@ fn test_family_starts_at_queries() {
     });
     let where_cbor = common::value_to_cbor(query_value, None);
     let person_document_type = contract
-        .document_types
+        .document_types()
         .get("person")
         .expect("contract should have a person document type");
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
@@ -1910,7 +1912,7 @@ fn test_family_sql_query() {
     // produce the correct result set
     let (_, contract, _tmp_dir) = setup_family_tests(10, true, 73509);
     let person_document_type = contract
-        .document_types
+        .document_types()
         .get("person")
         .expect("contract should have a person document type");
 
@@ -2084,7 +2086,7 @@ fn test_family_with_nulls_query() {
     });
     let where_cbor = common::value_to_cbor(query_value, None);
     let person_document_type = contract
-        .document_types
+        .document_types()
         .get("person")
         .expect("contract should have a person document type");
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &person_document_type)
@@ -2184,14 +2186,14 @@ fn test_query_with_cached_contract() {
     let where_cbor = common::value_to_cbor(query_value, None);
 
     let contract_ref = drive
-        .get_cached_contract(contract.id)
+        .get_cached_contract(contract.id.as_bytes().clone())
         .expect("expected to be able to get no contract");
     assert!(contract_ref.is_none());
 
     let (results, _, _) = drive
         .query_documents(
             where_cbor.as_slice(),
-            contract.id,
+            contract.id.as_bytes().clone(),
             "person",
             Some(&db_transaction),
         )
@@ -2200,7 +2202,7 @@ fn test_query_with_cached_contract() {
     assert_eq!(results.len(), 10);
 
     let person_document_type = contract
-        .document_types
+        .document_types()
         .get("person")
         .expect("contract should have a person document type");
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &person_document_type)
@@ -2212,7 +2214,7 @@ fn test_query_with_cached_contract() {
     assert_eq!(results, proof_results);
 
     let contract_ref = drive
-        .get_cached_contract(contract.id)
+        .get_cached_contract(*contract.id.as_bytes())
         .expect("expected to be able to get contract")
         .expect("expected a reference counter to the contract");
     assert_eq!(Arc::strong_count(&contract_ref), 2);
@@ -2263,7 +2265,7 @@ fn test_dpns_query() {
     });
     let where_cbor = common::value_to_cbor(query_value, None);
     let domain_document_type = contract
-        .document_types
+        .document_types()
         .get("domain")
         .expect("contract should have a domain document type");
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &domain_document_type)
@@ -2309,7 +2311,7 @@ fn test_dpns_query() {
     });
     let where_cbor = common::value_to_cbor(query_value, None);
     let domain_document_type = contract
-        .document_types
+        .document_types()
         .get("domain")
         .expect("contract should have a domain document type");
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &domain_document_type)
@@ -2383,7 +2385,7 @@ fn test_dpns_query() {
     });
     let where_cbor = common::value_to_cbor(query_value, None);
     let domain_document_type = contract
-        .document_types
+        .document_types()
         .get("domain")
         .expect("contract should have a domain document type");
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &domain_document_type)
@@ -2436,7 +2438,7 @@ fn test_dpns_query() {
     });
     let where_cbor = common::value_to_cbor(query_value, None);
     let domain_document_type = contract
-        .document_types
+        .document_types()
         .get("domain")
         .expect("contract should have a domain document type");
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &domain_document_type)
@@ -2505,7 +2507,7 @@ fn test_dpns_query() {
     });
     let where_cbor = common::value_to_cbor(query_value, None);
     let domain_document_type = contract
-        .document_types
+        .document_types()
         .get("domain")
         .expect("contract should have a domain document type");
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &domain_document_type)
@@ -2556,7 +2558,7 @@ fn test_dpns_query() {
     });
     let where_cbor = common::value_to_cbor(query_value, None);
     let domain_document_type = contract
-        .document_types
+        .document_types()
         .get("domain")
         .expect("contract should have a domain document type");
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &domain_document_type)
@@ -2599,7 +2601,7 @@ fn test_dpns_query() {
     });
     let where_cbor = common::value_to_cbor(query_value, None);
     let domain_document_type = contract
-        .document_types
+        .document_types()
         .get("domain")
         .expect("contract should have a domain document type");
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &domain_document_type)
@@ -2632,7 +2634,7 @@ fn test_dpns_insertion_no_aliases() {
     let query_cbor = common::value_to_cbor(query_value, None);
 
     let domain_document_type = contract
-        .document_types
+        .document_types()
         .get("domain")
         .expect("contract should have a domain document type");
 
@@ -2681,7 +2683,7 @@ fn test_dpns_insertion_with_aliases() {
     let query_cbor = common::value_to_cbor(query_value, None);
 
     let domain_document_type = contract
-        .document_types
+        .document_types()
         .get("domain")
         .expect("contract should have a domain document type");
 
@@ -2766,7 +2768,7 @@ fn test_dpns_query_start_at() {
     });
     let where_cbor = common::value_to_cbor(query_value, None);
     let domain_document_type = contract
-        .document_types
+        .document_types()
         .get("domain")
         .expect("contract should have a domain document type");
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &domain_document_type)
@@ -2852,7 +2854,7 @@ fn test_dpns_query_start_after() {
     });
     let where_cbor = common::value_to_cbor(query_value, None);
     let domain_document_type = contract
-        .document_types
+        .document_types()
         .get("domain")
         .expect("contract should have a domain document type");
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &domain_document_type)
@@ -2938,7 +2940,7 @@ fn test_dpns_query_start_at_desc() {
     });
     let where_cbor = common::value_to_cbor(query_value, None);
     let domain_document_type = contract
-        .document_types
+        .document_types()
         .get("domain")
         .expect("contract should have a domain document type");
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &domain_document_type)
@@ -3024,7 +3026,7 @@ fn test_dpns_query_start_after_desc() {
     });
     let where_cbor = common::value_to_cbor(query_value, None);
     let domain_document_type = contract
-        .document_types
+        .document_types()
         .get("domain")
         .expect("contract should have a domain document type");
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &domain_document_type)
@@ -3207,7 +3209,7 @@ fn test_dpns_query_start_at_with_null_id() {
     });
     let where_cbor = common::value_to_cbor(query_value, None);
     let domain_document_type = contract
-        .document_types
+        .document_types()
         .get("domain")
         .expect("contract should have a domain document type");
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &domain_document_type)
@@ -3400,7 +3402,7 @@ fn test_dpns_query_start_after_with_null_id() {
     });
     let where_cbor = common::value_to_cbor(query_value, None);
     let domain_document_type = contract
-        .document_types
+        .document_types()
         .get("domain")
         .expect("contract should have a domain document type");
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &domain_document_type)
@@ -3605,7 +3607,7 @@ fn test_dpns_query_start_after_with_null_id_desc() {
     });
     let where_cbor = common::value_to_cbor(query_value, None);
     let domain_document_type = contract
-        .document_types
+        .document_types()
         .get("domain")
         .expect("contract should have a domain document type");
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &domain_document_type)
@@ -3653,7 +3655,7 @@ fn test_dpns_query_start_after_with_null_id_desc() {
     });
     let where_cbor = common::value_to_cbor(query_value, None);
     let domain_document_type = contract
-        .document_types
+        .document_types()
         .get("domain")
         .expect("contract should have a domain document type");
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &domain_document_type)
@@ -3701,7 +3703,7 @@ fn test_dpns_query_start_after_with_null_id_desc() {
     });
     let where_cbor = common::value_to_cbor(query_value, None);
     let domain_document_type = contract
-        .document_types
+        .document_types()
         .get("domain")
         .expect("contract should have a domain document type");
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &domain_document_type)

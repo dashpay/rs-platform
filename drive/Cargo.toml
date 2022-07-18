@@ -26,6 +26,12 @@ thiserror = "1.0.30"
 moka = "0.8.1"
 nohash-hasher = "0.2.0"
 
+# dpp = { path="../../rust-dpp/dpp"}
+
+[dependencies.dpp]
+git = "https://github.com/dashevo/rust-dpp"
+branch = "merge-with-rs-drive"
+
 [dependencies.grovedb]
 git = "https://github.com/dashevo/grovedb"
 branch = "develop"
