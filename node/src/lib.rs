@@ -2,15 +2,21 @@ mod converter;
 
 use std::{option::Option::None, path::Path, sync::mpsc, thread};
 
-use grovedb::{Transaction, TransactionArg};
+use dash_abci::abci::handlers::{TenderdashAbci};
+use dash_abci::abci::messages::{
+    BlockBeginRequest, BlockEndRequest, InitChainRequest, Serializable,
+};
+use dash_abci::platform::Platform;
+use dpp::identity::Identity;
 use neon::prelude::*;
 use neon::types::JsDate;
-use rs_drive::drive::Drive;
+use rs_drive::drive::flags::StorageFlags;
+use rs_drive::grovedb::{PathQuery, Transaction, TransactionArg};
 
 const READONLY_MSG: &str =
     "db is in readonly mode due to the active transaction. Please provide transaction or commit it";
 
-type DriveCallback = Box<dyn for<'a> FnOnce(&'a Drive, TransactionArg, &Channel) + Send>;
+type DriveCallback = Box<dyn for<'a> FnOnce(&'a Platform, TransactionArg, &Channel) + Send>;
 type UnitCallback = Box<dyn FnOnce(&Channel) + Send>;
 
 // Messages sent on the drive channel
@@ -59,7 +65,7 @@ impl DriveWrapper {
             let path = Path::new(&path_string);
             // Open a connection to groveDb, this will be moved to a separate thread
             // TODO: think how to pass this error to JS
-            let drive = Drive::open(path, None).unwrap();
+            let platform: Platform = Platform::open(path, None).unwrap();
 
             let mut transaction: Option<Transaction> = None;
 
@@ -73,32 +79,34 @@ impl DriveWrapper {
                         // The connection and channel are owned by the thread, but _lent_ to
                         // the callback. The callback has exclusive access to the connection
                         // for the duration of the callback.
-                        callback(&drive, transaction.as_ref(), &channel);
+                        callback(&platform, transaction.as_ref(), &channel);
                     }
                     // Immediately close the connection, even if there are pending messages
                     DriveMessage::Close(callback) => {
                         drop(transaction);
-                        drop(drive);
+                        drop(platform);
                         callback(&channel);
                         break;
                     }
                     // Flush message
                     DriveMessage::Flush(callback) => {
-                        drive.grove.flush().unwrap();
+                        platform.drive.grove.flush().unwrap();
                         callback(&channel);
                     }
                     DriveMessage::StartTransaction(callback) => {
-                        transaction = Some(drive.grove.start_transaction());
+                        transaction = Some(platform.drive.grove.start_transaction());
                         callback(&channel);
                     }
                     DriveMessage::CommitTransaction(callback) => {
-                        drive
+                        platform
+                            .drive
                             .commit_transaction(transaction.take().unwrap())
                             .unwrap();
                         callback(&channel);
                     }
                     DriveMessage::RollbackTransaction(callback) => {
-                        drive
+                        platform
+                            .drive
                             .rollback_transaction(&transaction.take().unwrap())
                             .unwrap();
                         callback(&channel);
@@ -126,7 +134,7 @@ impl DriveWrapper {
 
     fn send_to_drive_thread(
         &self,
-        callback: impl for<'a> FnOnce(&'a Drive, TransactionArg, &Channel) + Send + 'static,
+        callback: impl for<'a> FnOnce(&'a Platform, TransactionArg, &Channel) + Send + 'static,
     ) -> Result<(), mpsc::SendError<DriveMessage>> {
         self.tx.send(DriveMessage::Callback(Box::new(callback)))
     }
@@ -217,7 +225,7 @@ impl DriveWrapper {
         Ok(cx.undefined())
     }
 
-    fn js_create_root_tree(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+    fn js_create_initial_state_structure(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         let js_using_transaction = cx.argument::<JsBoolean>(0)?;
         let js_callback = cx.argument::<JsFunction>(1)?.root(&mut cx);
 
@@ -228,9 +236,12 @@ impl DriveWrapper {
         let using_transaction = js_using_transaction.value(&mut cx);
 
         drive
-            .send_to_drive_thread(move |drive: &Drive, transaction, channel| {
-                drive
-                    .create_root_tree(using_transaction.then(|| transaction).flatten())
+            .send_to_drive_thread(move |platform: &Platform, transaction, channel| {
+                platform
+                    .drive
+                    .create_initial_state_structure(
+                        using_transaction.then(|| transaction).flatten(),
+                    )
                     .expect("create_root_tree should not fail");
 
                 channel.send(move |mut task_context| {
@@ -266,12 +277,13 @@ impl DriveWrapper {
         let block_time = js_block_time.value(&mut cx);
 
         drive
-            .send_to_drive_thread(move |drive: &Drive, transaction, channel| {
-                let result = drive.apply_contract_cbor(
+            .send_to_drive_thread(move |platform: &Platform, transaction, channel| {
+                let result = platform.drive.apply_contract_cbor(
                     contract_cbor,
                     None,
                     block_time,
                     apply,
+                    StorageFlags::default(),
                     using_transaction.then(|| transaction).flatten(),
                 );
 
@@ -335,17 +347,20 @@ impl DriveWrapper {
         let using_transaction = js_using_transaction.value(&mut cx);
 
         drive
-            .send_to_drive_thread(move |drive: &Drive, transaction, channel| {
-                let result = drive.add_serialized_document_for_serialized_contract(
-                    &document_cbor,
-                    &contract_cbor,
-                    &document_type_name,
-                    Some(&owner_id),
-                    override_document,
-                    block_time,
-                    apply,
-                    using_transaction.then(|| transaction).flatten(),
-                );
+            .send_to_drive_thread(move |platform: &Platform, transaction, channel| {
+                let result = platform
+                    .drive
+                    .add_serialized_document_for_serialized_contract(
+                        &document_cbor,
+                        &contract_cbor,
+                        &document_type_name,
+                        Some(&owner_id),
+                        override_document,
+                        block_time,
+                        apply,
+                        StorageFlags::default(),
+                        using_transaction.then(|| transaction).flatten(),
+                    );
 
                 channel.send(move |mut task_context| {
                     let callback = js_callback.into_inner(&mut task_context);
@@ -405,14 +420,15 @@ impl DriveWrapper {
         let using_transaction = js_using_transaction.value(&mut cx);
 
         drive
-            .send_to_drive_thread(move |drive: &Drive, transaction, channel| {
-                let result = drive.update_document_for_contract_cbor(
+            .send_to_drive_thread(move |platform: &Platform, transaction, channel| {
+                let result = platform.drive.update_document_for_contract_cbor(
                     &document_cbor,
                     &contract_cbor,
                     &document_type_name,
                     Some(&owner_id),
                     block_time,
                     apply,
+                    StorageFlags::default(),
                     using_transaction.then(|| transaction).flatten(),
                 );
 
@@ -470,7 +486,7 @@ impl DriveWrapper {
         let using_transaction = js_using_transaction.value(&mut cx);
 
         drive
-            .send_to_drive_thread(move |drive: &Drive, transaction, channel| {
+            .send_to_drive_thread(move |platform: &Platform, transaction, channel| {
                 if transaction.is_some() && !using_transaction {
                     channel.send(move |mut task_context| {
                         let callback = js_callback.into_inner(&mut task_context);
@@ -482,7 +498,7 @@ impl DriveWrapper {
                         Ok(())
                     });
                 } else {
-                    let result = drive.delete_document_for_contract_cbor(
+                    let result = platform.drive.delete_document_for_contract_cbor(
                         &document_id,
                         &contract_cbor,
                         &document_type_name,
@@ -528,27 +544,28 @@ impl DriveWrapper {
     }
 
     fn js_insert_identity_cbor(mut cx: FunctionContext) -> JsResult<JsUndefined> {
-        let js_identity_id = cx.argument::<JsBuffer>(0)?;
-        let js_identity_cbor = cx.argument::<JsBuffer>(1)?;
-        let js_apply = cx.argument::<JsBoolean>(2)?;
-        let js_using_transaction = cx.argument::<JsBoolean>(3)?;
-        let js_callback = cx.argument::<JsFunction>(4)?.root(&mut cx);
+        let js_identity_cbor = cx.argument::<JsBuffer>(0)?;
+        let js_apply = cx.argument::<JsBoolean>(1)?;
+        let js_using_transaction = cx.argument::<JsBoolean>(2)?;
+        let js_callback = cx.argument::<JsFunction>(3)?.root(&mut cx);
 
         let drive = cx
             .this()
             .downcast_or_throw::<JsBox<DriveWrapper>, _>(&mut cx)?;
 
-        let identity_id = converter::js_buffer_to_vec_u8(js_identity_id, &mut cx);
         let identity_cbor = converter::js_buffer_to_vec_u8(js_identity_cbor, &mut cx);
         let apply = js_apply.value(&mut cx);
         let using_transaction = js_using_transaction.value(&mut cx);
 
+        let identity =
+            Identity::from_buffer(identity_cbor).or_else(|e| cx.throw_error(e.to_string()))?;
+
         drive
-            .send_to_drive_thread(move |drive: &Drive, transaction, channel| {
-                let result = drive.insert_identity_cbor(
-                    Some(&identity_id),
-                    identity_cbor,
+            .send_to_drive_thread(move |platform: &Platform, transaction, channel| {
+                let result = platform.drive.insert_identity(
+                    identity,
                     apply,
+                    StorageFlags::default(),
                     using_transaction.then(|| transaction).flatten(),
                 );
 
@@ -587,7 +604,7 @@ impl DriveWrapper {
         Ok(cx.undefined())
     }
 
-    fn js_create_and_execute_query(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+    fn js_query_documents(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         let js_query_cbor = cx.argument::<JsBuffer>(0)?;
         let js_contract_id = cx.argument::<JsBuffer>(1)?;
         let js_document_type_name = cx.argument::<JsString>(2)?;
@@ -604,8 +621,8 @@ impl DriveWrapper {
         let using_transaction = js_using_transaction.value(&mut cx);
 
         drive
-            .send_to_drive_thread(move |drive: &Drive, transaction, channel| {
-                let result = drive.query_documents(
+            .send_to_drive_thread(move |platform: &Platform, transaction, channel| {
+                let result = platform.drive.query_documents(
                     &query_cbor,
                     <[u8; 32]>::try_from(contract_id).unwrap(),
                     document_type_name.as_str(),
@@ -643,9 +660,7 @@ impl DriveWrapper {
         Ok(cx.undefined())
     }
 
-    fn js_create_and_execute_query_as_grove_proof(
-        mut cx: FunctionContext,
-    ) -> JsResult<JsUndefined> {
+    fn js_prove_documents_query(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         let js_query_cbor = cx.argument::<JsBuffer>(0)?;
         let js_contract_id = cx.argument::<JsBuffer>(1)?;
         let js_document_type_name = cx.argument::<JsString>(2)?;
@@ -662,8 +677,8 @@ impl DriveWrapper {
         let using_transaction = js_using_transaction.value(&mut cx);
 
         drive
-            .send_to_drive_thread(move |drive: &Drive, transaction, channel| {
-                let result = drive.query_documents_as_grove_proof(
+            .send_to_drive_thread(move |platform: &Platform, transaction, channel| {
+                let result = platform.drive.query_documents_as_grove_proof(
                     &query_cbor,
                     <[u8; 32]>::try_from(contract_id).unwrap(),
                     document_type_name.as_str(),
@@ -775,7 +790,7 @@ impl DriveWrapper {
             .this()
             .downcast_or_throw::<JsBox<DriveWrapper>, _>(&mut cx)?;
 
-        db.send_to_drive_thread(move |_drive: &Drive, transaction, channel| {
+        db.send_to_drive_thread(move |_platform: &Platform, transaction, channel| {
             let result = transaction.is_some();
 
             channel.send(move |mut task_context| {
@@ -836,8 +851,8 @@ impl DriveWrapper {
             .downcast_or_throw::<JsBox<DriveWrapper>, _>(&mut cx)?;
         let using_transaction = js_using_transaction.value(&mut cx);
 
-        db.send_to_drive_thread(move |drive: &Drive, transaction, channel| {
-            let grove_db = &drive.grove;
+        db.send_to_drive_thread(move |platform: &Platform, transaction, channel| {
+            let grove_db = &platform.drive.grove;
             let path_slice = path.iter().map(|fragment| fragment.as_slice());
             let result = grove_db
                 .get(
@@ -845,7 +860,7 @@ impl DriveWrapper {
                     &key,
                     using_transaction.then(|| transaction).flatten(),
                 )
-                .value;
+                .unwrap();
 
             channel.send(move |mut task_context| {
                 let callback = js_callback.into_inner(&mut task_context);
@@ -891,7 +906,7 @@ impl DriveWrapper {
             .this()
             .downcast_or_throw::<JsBox<DriveWrapper>, _>(&mut cx)?;
 
-        db.send_to_drive_thread(move |drive: &Drive, transaction, channel| {
+        db.send_to_drive_thread(move |platform: &Platform, transaction, channel| {
             if transaction.is_some() && !using_transaction {
                 channel.send(move |mut task_context| {
                     let callback = js_callback.into_inner(&mut task_context);
@@ -903,7 +918,7 @@ impl DriveWrapper {
                     Ok(())
                 });
             } else {
-                let grove_db = &drive.grove;
+                let grove_db = &platform.drive.grove;
                 let path_slice = path.iter().map(|fragment| fragment.as_slice());
                 let result = grove_db
                     .insert(
@@ -912,7 +927,7 @@ impl DriveWrapper {
                         element,
                         using_transaction.then(|| transaction).flatten(),
                     )
-                    .value;
+                    .unwrap();
 
                 channel.send(move |mut task_context| {
                     let callback = js_callback.into_inner(&mut task_context);
@@ -949,7 +964,7 @@ impl DriveWrapper {
             .this()
             .downcast_or_throw::<JsBox<DriveWrapper>, _>(&mut cx)?;
 
-        db.send_to_drive_thread(move |drive: &Drive, transaction, channel| {
+        db.send_to_drive_thread(move |platform: &Platform, transaction, channel| {
             if transaction.is_some() && !using_transaction {
                 channel.send(move |mut task_context| {
                     let callback = js_callback.into_inner(&mut task_context);
@@ -961,7 +976,7 @@ impl DriveWrapper {
                     Ok(())
                 });
             } else {
-                let grove_db = &drive.grove;
+                let grove_db = &platform.drive.grove;
 
                 let path_slice: Vec<&[u8]> =
                     path.iter().map(|fragment| fragment.as_slice()).collect();
@@ -972,7 +987,7 @@ impl DriveWrapper {
                         element,
                         using_transaction.then(|| transaction).flatten(),
                     )
-                    .value;
+                    .unwrap();
 
                 channel.send(move |mut task_context| {
                     let callback = js_callback.into_inner(&mut task_context);
@@ -1011,8 +1026,8 @@ impl DriveWrapper {
             .downcast_or_throw::<JsBox<DriveWrapper>, _>(&mut cx)?;
         let using_transaction = js_using_transaction.value(&mut cx);
 
-        db.send_to_drive_thread(move |drive: &Drive, transaction, channel| {
-            let grove_db = &drive.grove;
+        db.send_to_drive_thread(move |platform: &Platform, transaction, channel| {
+            let grove_db = &platform.drive.grove;
 
             let result = grove_db
                 .put_aux(
@@ -1020,7 +1035,7 @@ impl DriveWrapper {
                     &value,
                     using_transaction.then(|| transaction).flatten(),
                 )
-                .value;
+                .unwrap();
 
             channel.send(move |mut task_context| {
                 let callback = js_callback.into_inner(&mut task_context);
@@ -1057,7 +1072,7 @@ impl DriveWrapper {
             .downcast_or_throw::<JsBox<DriveWrapper>, _>(&mut cx)?;
         let using_transaction = js_using_transaction.value(&mut cx);
 
-        db.send_to_drive_thread(move |drive: &Drive, transaction, channel| {
+        db.send_to_drive_thread(move |platform: &Platform, transaction, channel| {
             if transaction.is_some() && !using_transaction {
                 channel.send(move |mut task_context| {
                     let callback = js_callback.into_inner(&mut task_context);
@@ -1069,7 +1084,7 @@ impl DriveWrapper {
                     Ok(())
                 });
             } else {
-                let grove_db = &drive.grove;
+                let grove_db = &platform.drive.grove;
 
                 let result = grove_db
                     .delete_aux(&key, using_transaction.then(|| transaction).flatten())
@@ -1111,8 +1126,8 @@ impl DriveWrapper {
             .downcast_or_throw::<JsBox<DriveWrapper>, _>(&mut cx)?;
         let using_transaction = js_using_transaction.value(&mut cx);
 
-        db.send_to_drive_thread(move |drive: &Drive, transaction, channel| {
-            let grove_db = &drive.grove;
+        db.send_to_drive_thread(move |platform: &Platform, transaction, channel| {
+            let grove_db = &platform.drive.grove;
 
             let result = grove_db
                 .get_aux(&key, using_transaction.then(|| transaction).flatten())
@@ -1160,8 +1175,8 @@ impl DriveWrapper {
             .downcast_or_throw::<JsBox<DriveWrapper>, _>(&mut cx)?;
         let using_transaction = js_using_transaction.value(&mut cx);
 
-        db.send_to_drive_thread(move |drive: &Drive, transaction, channel| {
-            let grove_db = &drive.grove;
+        db.send_to_drive_thread(move |platform: &Platform, transaction, channel| {
+            let grove_db = &platform.drive.grove;
 
             let result = grove_db
                 .query(
@@ -1212,8 +1227,8 @@ impl DriveWrapper {
 
         let using_transaction = js_using_transaction.value(&mut cx);
 
-        db.send_to_drive_thread(move |drive: &Drive, transaction, channel| {
-            let grove_db = &drive.grove;
+        db.send_to_drive_thread(move |platform: &Platform, transaction, channel| {
+            let grove_db = &platform.drive.grove;
 
             let result = grove_db
                 .get_proved_path_query(
@@ -1235,6 +1250,68 @@ impl DriveWrapper {
 
                     // Convert the error to a JavaScript exception on failure
                     Err(err) => vec![task_context.error(err.to_string())?.upcast()],
+                };
+
+                callback.call(&mut task_context, this, callback_arguments)?;
+
+                Ok(())
+            });
+        })
+        .or_else(|err| cx.throw_error(err.to_string()))?;
+
+        // The result is returned through the callback, not through direct return
+        Ok(cx.undefined())
+    }
+
+    fn js_grove_db_prove_query_many(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+        let js_path_queries = cx.argument::<JsArray>(0)?;
+        let js_using_transaction = cx.argument::<JsBoolean>(1)?;
+        let js_callback = cx.argument::<JsFunction>(2)?.root(&mut cx);
+
+        let js_path_queries = js_path_queries.to_vec(&mut cx)?;
+        let mut path_queries: Vec<PathQuery> = Vec::with_capacity(js_path_queries.len());
+
+        for js_path_query in js_path_queries {
+            let js_path_query = js_path_query.downcast_or_throw::<JsObject, _>(&mut cx)?;
+            path_queries.push(converter::js_path_query_to_path_query(
+                js_path_query,
+                &mut cx,
+            )?);
+        }
+
+        let db = cx
+            .this()
+            .downcast_or_throw::<JsBox<DriveWrapper>, _>(&mut cx)?;
+
+        let using_transaction = js_using_transaction.value(&mut cx);
+
+        db.send_to_drive_thread(move |platform: &Platform, _transaction, channel| {
+            let grove_db = &platform.drive.grove;
+
+            let path_queries = path_queries.iter().map(|path_query| path_query).collect();
+
+            let result = grove_db.prove_query_many(path_queries).unwrap();
+
+            channel.send(move |mut task_context| {
+                let this = task_context.undefined();
+                let callback = js_callback.into_inner(&mut task_context);
+
+                let callback_arguments: Vec<Handle<JsValue>> = if using_transaction {
+                    vec![task_context
+                        .error("transaction is no supported yet")?
+                        .upcast()]
+                } else {
+                    match result {
+                        Ok(proof) => {
+                            let js_buffer = JsBuffer::external(&mut task_context, proof.clone());
+                            let js_value = js_buffer.as_value(&mut task_context);
+
+                            vec![task_context.null().upcast(), js_value.upcast()]
+                        }
+
+                        // Convert the error to a JavaScript exception on failure
+                        Err(err) => vec![task_context.error(err.to_string())?.upcast()],
+                    }
                 };
 
                 callback.call(&mut task_context, this, callback_arguments)?;
@@ -1284,8 +1361,8 @@ impl DriveWrapper {
 
         let using_transaction = js_using_transaction.value(&mut cx);
 
-        db.send_to_drive_thread(move |drive: &Drive, transaction, channel| {
-            let grove_db = &drive.grove;
+        db.send_to_drive_thread(move |platform: &Platform, transaction, channel| {
+            let grove_db = &platform.drive.grove;
 
             let result = grove_db
                 .root_hash(using_transaction.then(|| transaction).flatten())
@@ -1328,7 +1405,7 @@ impl DriveWrapper {
             .downcast_or_throw::<JsBox<DriveWrapper>, _>(&mut cx)?;
         let using_transaction = js_using_transaction.value(&mut cx);
 
-        db.send_to_drive_thread(move |drive: &Drive, transaction, channel| {
+        db.send_to_drive_thread(move |platform: &Platform, transaction, channel| {
             if transaction.is_some() && !using_transaction {
                 channel.send(move |mut task_context| {
                     let callback = js_callback.into_inner(&mut task_context);
@@ -1340,7 +1417,7 @@ impl DriveWrapper {
                     Ok(())
                 });
             } else {
-                let grove_db = &drive.grove;
+                let grove_db = &platform.drive.grove;
 
                 let path_slice: Vec<&[u8]> =
                     path.iter().map(|fragment| fragment.as_slice()).collect();
@@ -1375,13 +1452,151 @@ impl DriveWrapper {
         // The result is returned through the callback, not through direct return
         Ok(cx.undefined())
     }
+
+    fn js_abci_init_chain(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+        let js_request = cx.argument::<JsBuffer>(0)?;
+        let js_using_transaction = cx.argument::<JsBoolean>(1)?;
+        let js_callback = cx.argument::<JsFunction>(2)?.root(&mut cx);
+
+        let db = cx
+            .this()
+            .downcast_or_throw::<JsBox<DriveWrapper>, _>(&mut cx)?;
+
+        let request_bytes = converter::js_buffer_to_vec_u8(js_request, &mut cx);
+        let using_transaction = js_using_transaction.value(&mut cx);
+
+        db.send_to_drive_thread(move |platform: &Platform, transaction, channel| {
+            let result = InitChainRequest::from_bytes(&request_bytes)
+                .and_then(|request| {
+                    platform.init_chain(request, using_transaction.then(|| transaction).flatten())
+                })
+                .and_then(|response| response.to_bytes());
+
+            channel.send(move |mut task_context| {
+                let callback = js_callback.into_inner(&mut task_context);
+                let this = task_context.undefined();
+
+                let callback_arguments: Vec<Handle<JsValue>> = match result {
+                    Ok(response_bytes) => {
+                        let value = JsBuffer::external(&mut task_context, response_bytes);
+
+                        vec![task_context.null().upcast(), value.upcast()]
+                    }
+
+                    // Convert the error to a JavaScript exception on failure
+                    Err(err) => vec![task_context.error(err.to_string())?.upcast()],
+                };
+
+                callback.call(&mut task_context, this, callback_arguments)?;
+
+                Ok(())
+            });
+        })
+        .or_else(|err| cx.throw_error(err.to_string()))?;
+
+        // The result is returned through the callback, not through direct return
+        Ok(cx.undefined())
+    }
+
+    fn js_abci_block_begin(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+        let js_request = cx.argument::<JsBuffer>(0)?;
+        let js_using_transaction = cx.argument::<JsBoolean>(1)?;
+        let js_callback = cx.argument::<JsFunction>(2)?.root(&mut cx);
+
+        let db = cx
+            .this()
+            .downcast_or_throw::<JsBox<DriveWrapper>, _>(&mut cx)?;
+
+        let request_bytes = converter::js_buffer_to_vec_u8(js_request, &mut cx);
+        let using_transaction = js_using_transaction.value(&mut cx);
+
+        db.send_to_drive_thread(move |platform: &Platform, transaction, channel| {
+            let result = BlockBeginRequest::from_bytes(&request_bytes)
+                .and_then(|request| {
+                    platform.block_begin(request, using_transaction.then(|| transaction).flatten())
+                })
+                .and_then(|response| response.to_bytes());
+
+            channel.send(move |mut task_context| {
+                let callback = js_callback.into_inner(&mut task_context);
+                let this = task_context.undefined();
+
+                let callback_arguments: Vec<Handle<JsValue>> = match result {
+                    Ok(response_bytes) => {
+                        let value = JsBuffer::external(&mut task_context, response_bytes);
+
+                        vec![task_context.null().upcast(), value.upcast()]
+                    }
+
+                    // Convert the error to a JavaScript exception on failure
+                    Err(err) => vec![task_context.error(err.to_string())?.upcast()],
+                };
+
+                callback.call(&mut task_context, this, callback_arguments)?;
+
+                Ok(())
+            });
+        })
+        .or_else(|err| cx.throw_error(err.to_string()))?;
+
+        // The result is returned through the callback, not through direct return
+        Ok(cx.undefined())
+    }
+
+    fn js_abci_block_end(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+        let js_request = cx.argument::<JsBuffer>(0)?;
+        let js_using_transaction = cx.argument::<JsBoolean>(1)?;
+        let js_callback = cx.argument::<JsFunction>(2)?.root(&mut cx);
+
+        let db = cx
+            .this()
+            .downcast_or_throw::<JsBox<DriveWrapper>, _>(&mut cx)?;
+
+        let request_bytes = converter::js_buffer_to_vec_u8(js_request, &mut cx);
+        let using_transaction = js_using_transaction.value(&mut cx);
+
+        db.send_to_drive_thread(move |platform: &Platform, transaction, channel| {
+            let result = BlockEndRequest::from_bytes(&request_bytes)
+                .and_then(|request| {
+                    platform.block_end(request, using_transaction.then(|| transaction).flatten())
+                })
+                .and_then(|response| response.to_bytes());
+
+            channel.send(move |mut task_context| {
+                let callback = js_callback.into_inner(&mut task_context);
+                let this = task_context.undefined();
+
+                let callback_arguments: Vec<Handle<JsValue>> = match result {
+                    Ok(response_bytes) => {
+                        let value = JsBuffer::external(&mut task_context, response_bytes);
+
+                        vec![task_context.null().upcast(), value.upcast()]
+                    }
+
+                    // Convert the error to a JavaScript exception on failure
+                    Err(err) => vec![task_context.error(err.to_string())?.upcast()],
+                };
+
+                callback.call(&mut task_context, this, callback_arguments)?;
+
+                Ok(())
+            });
+        })
+        .or_else(|err| cx.throw_error(err.to_string()))?;
+
+        // The result is returned through the callback, not through direct return
+        Ok(cx.undefined())
+    }
 }
 
 #[neon::main]
 fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("driveOpen", DriveWrapper::js_open)?;
     cx.export_function("driveClose", DriveWrapper::js_close)?;
-    cx.export_function("driveCreateRootTree", DriveWrapper::js_create_root_tree)?;
+    cx.export_function(
+        "driveCreateInitialStateStructure",
+        DriveWrapper::js_create_initial_state_structure,
+    )?;
     cx.export_function("driveApplyContract", DriveWrapper::js_apply_contract)?;
     cx.export_function(
         "driveCreateDocument",
@@ -1396,10 +1611,13 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
         DriveWrapper::js_delete_document_for_contract_cbor,
     )?;
     cx.export_function("driveInsertIdentity", DriveWrapper::js_insert_identity_cbor)?;
+    cx.export_function("driveQueryDocuments", DriveWrapper::js_query_documents)?;
+
     cx.export_function(
-        "driveQueryDocuments",
-        DriveWrapper::js_create_and_execute_query,
+        "driveProveDocumentsQuery",
+        DriveWrapper::js_prove_documents_query,
     )?;
+
     cx.export_function("groveDbInsert", DriveWrapper::js_grove_db_insert)?;
     cx.export_function(
         "groveDbInsertIfNotExists",
@@ -1433,7 +1651,15 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("groveDbGetAux", DriveWrapper::js_grove_db_get_aux)?;
     cx.export_function("groveDbQuery", DriveWrapper::js_grove_db_query)?;
     cx.export_function("groveDbProveQuery", DriveWrapper::js_grove_db_prove_query)?;
+    cx.export_function(
+        "groveDbProveQueryMany",
+        DriveWrapper::js_grove_db_prove_query_many,
+    )?;
     cx.export_function("groveDbRootHash", DriveWrapper::js_grove_db_root_hash)?;
+
+    cx.export_function("abciInitChain", DriveWrapper::js_abci_init_chain)?;
+    cx.export_function("abciBlockBegin", DriveWrapper::js_abci_block_begin)?;
+    cx.export_function("abciBlockEnd", DriveWrapper::js_abci_block_end)?;
 
     Ok(())
 }

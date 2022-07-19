@@ -3,6 +3,7 @@ use std::option::Option::None;
 
 use grovedb::{Element, TransactionArg};
 
+
 use crate::contract::document::Document;
 use crate::contract::Contract;
 use crate::drive::defaults::CONTRACT_DOCUMENTS_PATH_HEIGHT;
@@ -31,6 +32,7 @@ impl Drive {
         owner_id: Option<&[u8]>,
         block_time: f64,
         apply: bool,
+        storage_flags: StorageFlags,
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
         let contract = Contract::from_cbor(contract_cbor, None)?;
@@ -45,6 +47,7 @@ impl Drive {
             owner_id,
             block_time,
             apply,
+            storage_flags,
             transaction,
         )
     }
@@ -57,6 +60,7 @@ impl Drive {
         owner_id: Option<&[u8]>,
         block_time: f64,
         apply: bool,
+        storage_flags: StorageFlags,
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
         let document = Document::from_cbor(serialized_document, None, owner_id)?;
@@ -69,6 +73,7 @@ impl Drive {
             owner_id,
             block_time,
             apply,
+            storage_flags,
             transaction,
         )
     }
@@ -82,15 +87,12 @@ impl Drive {
         owner_id: Option<&[u8]>,
         block_time: f64,
         apply: bool,
+        storage_flags: StorageFlags,
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
         let mut drive_operations: Vec<DriveOperation> = vec![];
 
         let document_type = contract.document_type_for_name(document_type_name)?;
-
-        let epoch = self.epoch_info.borrow().current_epoch;
-
-        let storage_flags = StorageFlags { epoch };
 
         let document_info = if apply {
             DocumentAndSerialization((document, serialized_document, &storage_flags))
@@ -461,14 +463,13 @@ impl Drive {
                 }
             }
         }
-        self.apply_batch(apply, transaction, batch_operations, drive_operations)
+        self.apply_batch_drive_operations(apply, transaction, batch_operations, drive_operations)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use base64::Config;
-    use std::collections::BTreeMap;
+    use grovedb::TransactionArg;
     use std::option::Option::None;
 
     use rand::Rng;
@@ -478,7 +479,7 @@ mod tests {
 
     use crate::common::{json_document_to_cbor, setup_contract, value_to_cbor};
     use crate::contract::{document::Document, Contract};
-    use crate::drive::config::DriveConfig;
+    use crate::drive::config::{DriveConfig, DriveEncoding};
     use crate::drive::flags::StorageFlags;
     use crate::drive::object_size_info::DocumentAndContractInfo;
     use crate::drive::object_size_info::DocumentInfo::DocumentAndSerialization;
@@ -493,7 +494,7 @@ mod tests {
         let db_transaction = drive.grove.start_transaction();
 
         drive
-            .create_root_tree(Some(&db_transaction))
+            .create_initial_state_structure(Some(&db_transaction))
             .expect("expected to create root tree successfully");
 
         let contract_cbor = hex::decode("01000000a5632469645820b0248cd9a27f86d05badf475dd9ff574d63219cd60c52e2be1e540c2fdd713336724736368656d61783468747470733a2f2f736368656d612e646173682e6f72672f6470702d302d342d302f6d6574612f646174612d636f6e7472616374676f776e6572496458204c9bf0db6ae315c85465e9ef26e6a006de9673731d08d14881945ddef1b5c5f26776657273696f6e0169646f63756d656e7473a267636f6e74616374a56474797065666f626a65637467696e646963657381a3646e616d656f6f6e7765724964546f55736572496466756e69717565f56a70726f7065727469657382a168246f776e6572496463617363a168746f557365724964636173636872657175697265648268746f557365724964697075626c69634b65796a70726f70657274696573a268746f557365724964a56474797065656172726179686d61784974656d731820686d696e4974656d73182069627974654172726179f570636f6e74656e744d656469615479706578216170706c69636174696f6e2f782e646173682e6470702e6964656e746966696572697075626c69634b6579a36474797065656172726179686d61784974656d73182169627974654172726179f5746164646974696f6e616c50726f70657274696573f46770726f66696c65a56474797065666f626a65637467696e646963657381a3646e616d65676f776e6572496466756e69717565f56a70726f7065727469657381a168246f776e6572496463617363687265717569726564826961766174617255726c6561626f75746a70726f70657274696573a26561626f7574a2647479706566737472696e67696d61784c656e67746818ff6961766174617255726ca3647479706566737472696e6766666f726d61746375726c696d61784c656e67746818ff746164646974696f6e616c50726f70657274696573f4").unwrap();
@@ -504,6 +505,7 @@ mod tests {
                 None,
                 0f64,
                 true,
+                StorageFlags::default(),
                 Some(&db_transaction),
             )
             .expect("expected to apply contract successfully");
@@ -521,6 +523,7 @@ mod tests {
                 true,
                 0f64,
                 true,
+                StorageFlags::default(),
                 Some(&db_transaction),
             )
             .expect("should create alice profile");
@@ -537,6 +540,7 @@ mod tests {
                 None,
                 0f64,
                 true,
+                StorageFlags::default(),
                 Some(&db_transaction),
             )
             .expect("should update alice profile");
@@ -548,7 +552,7 @@ mod tests {
         let drive: Drive = Drive::open(tmp_dir, None).expect("expected to open Drive successfully");
 
         drive
-            .create_root_tree(None)
+            .create_initial_state_structure(None)
             .expect("expected to create root tree successfully");
 
         let contract_cbor = hex::decode("01000000a5632469645820b0248cd9a27f86d05badf475dd9ff574d63219cd60c52e2be1e540c2fdd713336724736368656d61783468747470733a2f2f736368656d612e646173682e6f72672f6470702d302d342d302f6d6574612f646174612d636f6e7472616374676f776e6572496458204c9bf0db6ae315c85465e9ef26e6a006de9673731d08d14881945ddef1b5c5f26776657273696f6e0169646f63756d656e7473a267636f6e74616374a56474797065666f626a65637467696e646963657381a3646e616d656f6f6e7765724964546f55736572496466756e69717565f56a70726f7065727469657382a168246f776e6572496463617363a168746f557365724964636173636872657175697265648268746f557365724964697075626c69634b65796a70726f70657274696573a268746f557365724964a56474797065656172726179686d61784974656d731820686d696e4974656d73182069627974654172726179f570636f6e74656e744d656469615479706578216170706c69636174696f6e2f782e646173682e6470702e6964656e746966696572697075626c69634b6579a36474797065656172726179686d61784974656d73182169627974654172726179f5746164646974696f6e616c50726f70657274696573f46770726f66696c65a56474797065666f626a65637467696e646963657381a3646e616d65676f776e6572496466756e69717565f56a70726f7065727469657381a168246f776e6572496463617363687265717569726564826961766174617255726c6561626f75746a70726f70657274696573a26561626f7574a2647479706566737472696e67696d61784c656e67746818ff6961766174617255726ca3647479706566737472696e6766666f726d61746375726c696d61784c656e67746818ff746164646974696f6e616c50726f70657274696573f4").unwrap();
@@ -556,7 +560,14 @@ mod tests {
         let contract = Contract::from_cbor(contract_cbor.as_slice(), None)
             .expect("expected to create contract");
         drive
-            .apply_contract_cbor(contract_cbor.clone(), None, 0f64, true, None)
+            .apply_contract_cbor(
+                contract_cbor.clone(),
+                None,
+                0f64,
+                true,
+                StorageFlags::default(),
+                None,
+            )
             .expect("expected to apply contract successfully");
 
         // Create Alice profile
@@ -612,6 +623,7 @@ mod tests {
                 None,
                 0f64,
                 true,
+                StorageFlags::default(),
                 None,
             )
             .expect("should update alice profile");
@@ -631,7 +643,7 @@ mod tests {
         let db_transaction = drive.grove.start_transaction();
 
         drive
-            .create_root_tree(Some(&db_transaction))
+            .create_initial_state_structure(Some(&db_transaction))
             .expect("expected to create root tree successfully");
 
         let contract_cbor = hex::decode("01000000a5632469645820b0248cd9a27f86d05badf475dd9ff574d63219cd60c52e2be1e540c2fdd713336724736368656d61783468747470733a2f2f736368656d612e646173682e6f72672f6470702d302d342d302f6d6574612f646174612d636f6e7472616374676f776e6572496458204c9bf0db6ae315c85465e9ef26e6a006de9673731d08d14881945ddef1b5c5f26776657273696f6e0169646f63756d656e7473a267636f6e74616374a56474797065666f626a65637467696e646963657381a3646e616d656f6f6e7765724964546f55736572496466756e69717565f56a70726f7065727469657382a168246f776e6572496463617363a168746f557365724964636173636872657175697265648268746f557365724964697075626c69634b65796a70726f70657274696573a268746f557365724964a56474797065656172726179686d61784974656d731820686d696e4974656d73182069627974654172726179f570636f6e74656e744d656469615479706578216170706c69636174696f6e2f782e646173682e6470702e6964656e746966696572697075626c69634b6579a36474797065656172726179686d61784974656d73182169627974654172726179f5746164646974696f6e616c50726f70657274696573f46770726f66696c65a56474797065666f626a65637467696e646963657381a3646e616d65676f776e6572496466756e69717565f56a70726f7065727469657381a168246f776e6572496463617363687265717569726564826961766174617255726c6561626f75746a70726f70657274696573a26561626f7574a2647479706566737472696e67696d61784c656e67746818ff6961766174617255726ca3647479706566737472696e6766666f726d61746375726c696d61784c656e67746818ff746164646974696f6e616c50726f70657274696573f4").unwrap();
@@ -644,6 +656,7 @@ mod tests {
                 None,
                 0f64,
                 true,
+                StorageFlags::default(),
                 Some(&db_transaction),
             )
             .expect("expected to apply contract successfully");
@@ -683,6 +696,7 @@ mod tests {
         drive
             .grove
             .commit_transaction(db_transaction)
+            .unwrap()
             .expect("should commit transaction");
 
         let sql_string = "select * from profile";
@@ -714,6 +728,7 @@ mod tests {
                 None,
                 0f64,
                 true,
+                StorageFlags::default(),
                 Some(&db_transaction),
             )
             .expect("should update alice profile");
@@ -727,6 +742,7 @@ mod tests {
         drive
             .grove
             .commit_transaction(db_transaction)
+            .unwrap()
             .expect("should commit transaction");
     }
 
@@ -738,7 +754,7 @@ mod tests {
         let db_transaction = drive.grove.start_transaction();
 
         drive
-            .create_root_tree(Some(&db_transaction))
+            .create_initial_state_structure(Some(&db_transaction))
             .expect("expected to create root tree successfully");
 
         let contract_cbor = hex::decode("01000000a5632469645820b0248cd9a27f86d05badf475dd9ff574d63219cd60c52e2be1e540c2fdd713336724736368656d61783468747470733a2f2f736368656d612e646173682e6f72672f6470702d302d342d302f6d6574612f646174612d636f6e7472616374676f776e6572496458204c9bf0db6ae315c85465e9ef26e6a006de9673731d08d14881945ddef1b5c5f26776657273696f6e0169646f63756d656e7473a267636f6e74616374a56474797065666f626a65637467696e646963657381a3646e616d656f6f6e7765724964546f55736572496466756e69717565f56a70726f7065727469657382a168246f776e6572496463617363a168746f557365724964636173636872657175697265648268746f557365724964697075626c69634b65796a70726f70657274696573a268746f557365724964a56474797065656172726179686d61784974656d731820686d696e4974656d73182069627974654172726179f570636f6e74656e744d656469615479706578216170706c69636174696f6e2f782e646173682e6470702e6964656e746966696572697075626c69634b6579a36474797065656172726179686d61784974656d73182169627974654172726179f5746164646974696f6e616c50726f70657274696573f46770726f66696c65a56474797065666f626a65637467696e646963657381a3646e616d65676f776e6572496466756e69717565f56a70726f7065727469657381a168246f776e6572496463617363687265717569726564826961766174617255726c6561626f75746a70726f70657274696573a26561626f7574a2647479706566737472696e67696d61784c656e67746818ff6961766174617255726ca3647479706566737472696e6766666f726d61746375726c696d61784c656e67746818ff746164646974696f6e616c50726f70657274696573f4").unwrap();
@@ -751,6 +767,7 @@ mod tests {
                 None,
                 0f64,
                 true,
+                StorageFlags::default(),
                 Some(&db_transaction),
             )
             .expect("expected to apply contract successfully");
@@ -790,6 +807,7 @@ mod tests {
         drive
             .grove
             .commit_transaction(db_transaction)
+            .unwrap()
             .expect("should commit transaction");
 
         let sql_string = "select * from profile";
@@ -849,6 +867,7 @@ mod tests {
                 None,
                 0f64,
                 true,
+                StorageFlags::default(),
                 Some(&db_transaction),
             )
             .expect("should update alice profile");
@@ -860,7 +879,7 @@ mod tests {
         let drive: Drive = Drive::open(tmp_dir, None).expect("expected to open Drive successfully");
 
         drive
-            .create_root_tree(None)
+            .create_initial_state_structure(None)
             .expect("should create root tree");
 
         let contract = json!({
@@ -899,7 +918,14 @@ mod tests {
         let contract = value_to_cbor(contract, Some(defaults::PROTOCOL_VERSION));
 
         drive
-            .apply_contract_cbor(contract.clone(), None, 0f64, true, None)
+            .apply_contract_cbor(
+                contract.clone(),
+                None,
+                0f64,
+                true,
+                StorageFlags::default(),
+                None,
+            )
             .expect("should create a contract");
 
         // Create document
@@ -928,6 +954,7 @@ mod tests {
                 true,
                 0f64,
                 true,
+                StorageFlags::default(),
                 None,
             )
             .expect("should add document");
@@ -957,6 +984,7 @@ mod tests {
                 None,
                 0f64,
                 true,
+                StorageFlags::default(),
                 None,
             )
             .expect("should update document");
@@ -987,7 +1015,7 @@ mod tests {
         let db_transaction = drive.grove.start_transaction();
 
         drive
-            .create_root_tree(Some(&db_transaction))
+            .create_initial_state_structure(Some(&db_transaction))
             .expect("expected to create root tree successfully");
 
         let contract = setup_contract(
@@ -1012,6 +1040,7 @@ mod tests {
                 false,
                 0f64,
                 true,
+                StorageFlags::default(),
                 Some(&db_transaction),
             )
             .expect("expected to insert a document successfully");
@@ -1024,6 +1053,7 @@ mod tests {
                 Some(&random_owner_id),
                 0f64,
                 true,
+                StorageFlags::default(),
                 Some(&db_transaction),
             )
             .expect_err("expected not to be able to update a non mutable document");
@@ -1037,6 +1067,7 @@ mod tests {
                 true,
                 0f64,
                 true,
+                StorageFlags::default(),
                 Some(&db_transaction),
             )
             .expect_err("expected not to be able to override a non mutable document");
@@ -1050,7 +1081,7 @@ mod tests {
         let db_transaction = drive.grove.start_transaction();
 
         drive
-            .create_root_tree(Some(&db_transaction))
+            .create_initial_state_structure(Some(&db_transaction))
             .expect("expected to create root tree successfully");
 
         let contract = setup_contract(
@@ -1080,6 +1111,7 @@ mod tests {
                 false,
                 0f64,
                 true,
+                StorageFlags::default(),
                 Some(&db_transaction),
             )
             .expect("expected to insert a document successfully");
@@ -1092,6 +1124,7 @@ mod tests {
                 Some(&random_owner_id),
                 0f64,
                 true,
+                StorageFlags::default(),
                 Some(&db_transaction),
             )
             .expect("expected to update a document with history successfully");
@@ -1111,14 +1144,68 @@ mod tests {
         age: u8,
     }
 
-    #[test]
-    fn test_update_complex_person_with_history_no_transaction() {
-        let tmp_dir = TempDir::new().unwrap();
-        let drive: Drive =
-            Drive::open(&tmp_dir, None).expect("expected to open Drive successfully");
+    fn apply_person(
+        drive: &Drive,
+        contract: &Contract,
+        block_time: u64,
+        person: &Person,
+        transaction: TransactionArg,
+    ) {
+        let value = serde_json::to_value(person).expect("serialized person");
+        let document_cbor = value_to_cbor(value, Some(defaults::PROTOCOL_VERSION));
+        let document = Document::from_cbor(document_cbor.as_slice(), None, None)
+            .expect("document should be properly deserialized");
+        let document_type = contract
+            .document_type_for_name("person")
+            .expect("expected to get document type");
+
+        let storage_flags = StorageFlags { epoch: 0 };
 
         drive
-            .create_root_tree(None)
+            .add_document_for_contract(
+                DocumentAndContractInfo {
+                    document_info: DocumentAndSerialization((
+                        &document,
+                        &document_cbor,
+                        &storage_flags,
+                    )),
+                    contract: &contract,
+                    document_type,
+                    owner_id: None,
+                },
+                true,
+                block_time as f64,
+                true,
+                transaction,
+            )
+            .expect("expected to add document");
+    }
+
+    fn test_update_complex_person_with_history(
+        using_transaction: bool,
+        using_batches: bool,
+        using_has_raw: bool,
+    ) {
+        let config = DriveConfig {
+            batching_enabled: using_batches,
+            batching_consistency_verification: true,
+            has_raw_enabled: using_has_raw,
+            default_genesis_time: Some(0),
+            encoding: DriveEncoding::DriveCbor,
+        };
+        let tmp_dir = TempDir::new().unwrap();
+
+        let drive: Drive =
+            Drive::open(&tmp_dir, Some(config)).expect("expected to open Drive successfully");
+
+        let transaction = if using_transaction {
+            Some(drive.grove.start_transaction())
+        } else {
+            None
+        };
+
+        drive
+            .create_initial_state_structure(transaction.as_ref())
             .expect("expected to create root tree successfully");
 
         // setup code
@@ -1126,7 +1213,7 @@ mod tests {
             &drive,
             "tests/supporting_files/contract/family/family-contract-with-history-only-message-index.json",
             None,
-            None,
+            transaction.as_ref()
         );
 
         let person_0_original = Person {
@@ -1169,151 +1256,73 @@ mod tests {
             age: 22,
         };
 
-        let mut people_at_block_times: BTreeMap<u64, Vec<Person>> = BTreeMap::new();
-        people_at_block_times.insert(0, vec![person_0_original, person_1_original]);
-        people_at_block_times.insert(100, vec![person_0_updated, person_1_updated]);
-
-        for (block_time, people) in people_at_block_times {
-            for (i, person) in people.iter().enumerate() {
-                let value = serde_json::to_value(&person).expect("serialized person");
-                let document_cbor = value_to_cbor(value, Some(defaults::PROTOCOL_VERSION));
-                let document = Document::from_cbor(document_cbor.as_slice(), None, None)
-                    .expect("document should be properly deserialized");
-                let document_type = contract
-                    .document_type_for_name("person")
-                    .expect("expected to get document type");
-
-                let storage_flags = StorageFlags { epoch: 0 };
-
-                // if block_time == 100 && i == 9 {
-                //     dbg!("block time {} {} {:#?}",block_time, i, person);
-                // }
-
-                drive
-                    .add_document_for_contract(
-                        DocumentAndContractInfo {
-                            document_info: DocumentAndSerialization((
-                                &document,
-                                &document_cbor,
-                                &storage_flags,
-                            )),
-                            contract: &contract,
-                            document_type,
-                            owner_id: None,
-                        },
-                        true,
-                        block_time as f64,
-                        true,
-                        None,
-                    )
-                    .expect("expected to add document");
-            }
-        }
+        apply_person(
+            &drive,
+            &contract,
+            0,
+            &person_0_original,
+            transaction.as_ref(),
+        );
+        apply_person(
+            &drive,
+            &contract,
+            0,
+            &person_1_original,
+            transaction.as_ref(),
+        );
+        apply_person(
+            &drive,
+            &contract,
+            100,
+            &person_0_updated,
+            transaction.as_ref(),
+        );
+        apply_person(
+            &drive,
+            &contract,
+            100,
+            &person_1_updated,
+            transaction.as_ref(),
+        );
     }
 
     #[test]
-    fn test_update_complex_person_with_history() {
-        let tmp_dir = TempDir::new().unwrap();
-        let drive: Drive =
-            Drive::open(&tmp_dir, None).expect("expected to open Drive successfully");
+    fn test_update_complex_person_with_history_no_transaction_using_batches_and_has_raw() {
+        test_update_complex_person_with_history(false, true, true)
+    }
 
-        let db_transaction = drive.grove.start_transaction();
+    #[test]
+    fn test_update_complex_person_with_history_no_transaction_using_batches_and_get_raw() {
+        test_update_complex_person_with_history(false, true, false)
+    }
 
-        drive
-            .create_root_tree(Some(&db_transaction))
-            .expect("expected to create root tree successfully");
+    #[test]
+    fn test_update_complex_person_with_history_with_transaction_using_batches_and_has_raw() {
+        test_update_complex_person_with_history(true, true, true)
+    }
 
-        // setup code
-        let contract = setup_contract(
-            &drive,
-            "tests/supporting_files/contract/family/family-contract-with-history-only-message-index.json",
-            None,
-            Some(&db_transaction),
-        );
+    #[test]
+    fn test_update_complex_person_with_history_with_transaction_using_batches_and_get_raw() {
+        test_update_complex_person_with_history(true, true, false)
+    }
 
-        let person_0_original = Person {
-            id: [0u8; 32].to_vec(),
-            owner_id: [0u8; 32].to_vec(),
-            first_name: "Samuel".to_string(),
-            middle_name: "Abraham".to_string(),
-            last_name: "Westrich".to_string(),
-            message: Some("My apples are safe".to_string()),
-            age: 33,
-        };
+    #[test]
+    fn test_update_complex_person_with_history_no_transaction_no_batches_and_has_raw() {
+        test_update_complex_person_with_history(false, false, true)
+    }
 
-        let person_0_updated = Person {
-            id: [0u8; 32].to_vec(),
-            owner_id: [0u8; 32].to_vec(),
-            first_name: "Samuel".to_string(),
-            middle_name: "Abraham".to_string(),
-            last_name: "Westrich".to_string(),
-            message: Some("Lemons are now my thing".to_string()),
-            age: 35,
-        };
+    #[test]
+    fn test_update_complex_person_with_history_no_transaction_no_batches_and_get_raw() {
+        test_update_complex_person_with_history(false, false, false)
+    }
 
-        let person_1_original = Person {
-            id: [1u8; 32].to_vec(),
-            owner_id: [1u8; 32].to_vec(),
-            first_name: "Wisdom".to_string(),
-            middle_name: "Madabuchukwu".to_string(),
-            last_name: "Ogwu".to_string(),
-            message: Some("Cantaloupe is the best fruit".to_string()),
-            age: 20,
-        };
+    #[test]
+    fn test_update_complex_person_with_history_with_transaction_no_batches_and_has_raw() {
+        test_update_complex_person_with_history(true, false, true)
+    }
 
-        let person_1_updated = Person {
-            id: [1u8; 32].to_vec(),
-            owner_id: [1u8; 32].to_vec(),
-            first_name: "Wisdom".to_string(),
-            middle_name: "Madabuchukwu".to_string(),
-            last_name: "Ogwu".to_string(),
-            message: Some("My apples are safe".to_string()),
-            age: 22,
-        };
-
-        let mut people_at_block_times: BTreeMap<u64, Vec<Person>> = BTreeMap::new();
-        people_at_block_times.insert(0, vec![person_0_original, person_1_original]);
-        people_at_block_times.insert(100, vec![person_0_updated, person_1_updated]);
-
-        for (block_time, people) in people_at_block_times {
-            for (i, person) in people.iter().enumerate() {
-                let value = serde_json::to_value(&person).expect("serialized person");
-                let document_cbor = value_to_cbor(value, Some(defaults::PROTOCOL_VERSION));
-                let document = Document::from_cbor(document_cbor.as_slice(), None, None)
-                    .expect("document should be properly deserialized");
-                let document_type = contract
-                    .document_type_for_name("person")
-                    .expect("expected to get document type");
-
-                let storage_flags = StorageFlags { epoch: 0 };
-
-                // if block_time == 100 && i == 9 {
-                //     dbg!("block time {} {} {:#?}",block_time, i, person);
-                // }
-
-                drive
-                    .add_document_for_contract(
-                        DocumentAndContractInfo {
-                            document_info: DocumentAndSerialization((
-                                &document,
-                                &document_cbor,
-                                &storage_flags,
-                            )),
-                            contract: &contract,
-                            document_type,
-                            owner_id: None,
-                        },
-                        true,
-                        block_time as f64,
-                        true,
-                        Some(&db_transaction),
-                    )
-                    .expect("expected to add document");
-            }
-        }
-        drive
-            .grove
-            .commit_transaction(db_transaction)
-            .expect("transaction should be committed");
+    #[test]
+    fn test_update_complex_person_with_history_with_transaction_no_batches_and_get_raw() {
+        test_update_complex_person_with_history(true, false, false)
     }
 }

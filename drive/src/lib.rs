@@ -3,5 +3,6 @@ pub mod contract;
 pub mod drive;
 pub mod error;
 pub mod fee;
-pub mod identity;
+pub mod fee_pools;
 pub mod query;
+pub use grovedb;

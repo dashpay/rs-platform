@@ -20,6 +20,7 @@ const {
   groveDbQuery,
   groveDbProveQuery,
   groveDbRootHash,
+  groveDbProveQueryMany,
 } = require('neon-load-or-build')({
   dir: pathJoin(__dirname, '..'),
 });
@@ -41,6 +42,7 @@ const groveDbDeleteAuxAsync = appendStack(promisify(groveDbDeleteAux));
 const groveDbGetAuxAsync = appendStack(promisify(groveDbGetAux));
 const groveDbQueryAsync = appendStack(promisify(groveDbQuery));
 const groveDbProveQueryAsync = appendStack(promisify(groveDbProveQuery));
+const groveDbProveQueryManyAsync = appendStack(promisify(groveDbProveQueryMany));
 const groveDbRootHashAsync = appendStack(promisify(groveDbRootHash));
 
 // Wrapper class for the boxed `GroveDB` for idiomatic JavaScript usage
@@ -211,6 +213,17 @@ class GroveDB {
   }
 
   /**
+   * Get proof using query.
+   *
+   * @param {PathQuery[]} queries
+   * @param {boolean} [useTransaction=false]
+   * @return {Promise<Buffer>}
+   */
+  async proveQueryMany(queries, useTransaction = false) {
+    return groveDbProveQueryManyAsync.call(this.db, queries, useTransaction);
+  }
+
+  /**
    * Get root hash
    *
    * @param {boolean} [useTransaction=false]
@@ -220,6 +233,12 @@ class GroveDB {
     return groveDbRootHashAsync.call(this.db, useTransaction);
   }
 }
+
+/**
+ * @typedef Element
+ * @property {"item"|"reference"|"tree"} type - element type. Can be "item", "reference" or "tree"
+ * @property {Buffer|Buffer[]} value - element value
+ */
 
 /**
  * @typedef PathQuery
@@ -247,7 +266,7 @@ class GroveDB {
  *    QueryItemRangeAfter|
  *    QueryItemRangeAfterTo|
  *    QueryItemRangeAfterToInclusive
- * >} items
+ * >} [items]
  * @property {Buffer} [subqueryKey]
  * @property {Query} [subquery]
  * @property {boolean} [leftToRight]

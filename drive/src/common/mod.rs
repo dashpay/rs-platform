@@ -1,3 +1,6 @@
+pub mod encode;
+pub mod helpers;
+
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs::File;
 use std::io;
@@ -10,6 +13,7 @@ use ciborium::value::Value;
 use grovedb::TransactionArg;
 
 use crate::contract::Contract;
+use crate::drive::flags::StorageFlags;
 use crate::drive::Drive;
 use crate::error::structure::StructureError;
 use crate::error::Error;
@@ -24,7 +28,14 @@ pub fn setup_contract(
     let contract =
         Contract::from_cbor(&contract_cbor, contract_id).expect("contract should be deserialized");
     drive
-        .apply_contract_cbor(contract_cbor, contract_id, 0f64, true, transaction)
+        .apply_contract_cbor(
+            contract_cbor,
+            contract_id,
+            0f64,
+            true,
+            StorageFlags::default(),
+            transaction,
+        )
         .expect("contract should be applied");
     contract
 }
@@ -38,7 +49,14 @@ pub fn setup_contract_from_hex(
     let contract =
         Contract::from_cbor(&contract_cbor, None).expect("contract should be deserialized");
     drive
-        .apply_contract_cbor(contract_cbor, None, 0f64, true, transaction)
+        .apply_contract_cbor(
+            contract_cbor,
+            None,
+            0f64,
+            true,
+            StorageFlags::default(),
+            transaction,
+        )
         .expect("contract should be applied");
     contract
 }

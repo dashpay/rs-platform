@@ -1,6 +1,5 @@
 use std::collections::{BTreeMap, HashMap};
 use std::fmt::{Debug, Display, Formatter};
-use std::ops::Range;
 use std::option::Option::None;
 
 use rand::seq::SliceRandom;
@@ -11,6 +10,7 @@ use tempfile::TempDir;
 
 use rs_drive::common;
 use rs_drive::contract::{document::Document, Contract};
+use rs_drive::drive::config::DriveConfig;
 use rs_drive::drive::flags::StorageFlags;
 use rs_drive::drive::object_size_info::DocumentAndContractInfo;
 use rs_drive::drive::object_size_info::DocumentInfo::DocumentAndSerialization;
@@ -113,15 +113,22 @@ impl Person {
 pub fn setup(
     count: usize,
     restrict_to_inserts: Option<Vec<usize>>,
+    batching: bool,
     seed: u64,
 ) -> (Drive, Contract, TempDir) {
     let tmp_dir = TempDir::new().unwrap();
-    let drive: Drive = Drive::open(&tmp_dir, None).expect("expected to open Drive successfully");
+    let drive_config = if batching {
+        Some(DriveConfig::default_with_batches())
+    } else {
+        Some(DriveConfig::default_without_batches())
+    };
+    let drive: Drive =
+        Drive::open(&tmp_dir, drive_config).expect("expected to open Drive successfully");
 
     let db_transaction = drive.grove.start_transaction();
 
     drive
-        .create_root_tree(Some(&db_transaction))
+        .create_initial_state_structure(Some(&db_transaction))
         .expect("expected to create root tree successfully");
 
     // setup code
@@ -135,8 +142,6 @@ pub fn setup(
     let block_times: Vec<u64> = vec![0, 15, 100, 1000];
 
     let people_at_block_times = Person::random_people_for_block_times(count, seed, block_times);
-
-    dbg!(&people_at_block_times);
 
     for (block_time, people) in people_at_block_times {
         for (i, person) in people.iter().enumerate() {
@@ -183,6 +188,7 @@ pub fn setup(
     drive
         .grove
         .commit_transaction(db_transaction)
+        .unwrap()
         .expect("transaction should be committed");
     (drive, contract, tmp_dir)
 }
@@ -190,12 +196,12 @@ pub fn setup(
 #[test]
 fn test_setup() {
     let range_inserts = vec![0, 2];
-    setup(10, Some(range_inserts), 73509);
+    setup(10, Some(range_inserts), true, 73509);
 }
 
 #[test]
 fn test_query_historical() {
-    let (drive, contract, _tmp_dir) = setup(10, None, 73509);
+    let (drive, contract, _tmp_dir) = setup(10, None, true, 73509);
 
     let db_transaction = drive.grove.start_transaction();
 
@@ -207,8 +213,8 @@ fn test_query_historical() {
     assert_eq!(
         root_hash.as_slice(),
         vec![
-            96, 19, 126, 79, 99, 45, 127, 237, 104, 129, 232, 207, 227, 95, 206, 158, 115, 195,
-            253, 53, 232, 50, 145, 86, 114, 181, 76, 119, 70, 83, 142, 231
+            179, 150, 246, 43, 154, 114, 190, 149, 82, 208, 114, 112, 51, 97, 96, 50, 176, 140, 12,
+            118, 209, 58, 22, 116, 94, 210, 240, 49, 73, 94, 92, 243
         ]
     );
 
@@ -1338,6 +1344,7 @@ fn test_query_historical() {
             None,
             0f64,
             true,
+            StorageFlags::default(),
             Some(&db_transaction),
         )
         .expect("expected to apply contract successfully");
@@ -1428,8 +1435,8 @@ fn test_query_historical() {
     assert_eq!(
         root_hash.as_slice(),
         vec![
-            187, 224, 48, 127, 216, 53, 129, 245, 160, 89, 93, 104, 16, 142, 71, 230, 192, 100,
-            156, 40, 153, 43, 145, 33, 238, 142, 192, 182, 52, 112, 26, 107
+            179, 127, 128, 179, 151, 176, 209, 139, 172, 47, 108, 229, 27, 39, 9, 134, 123, 165,
+            11, 220, 98, 189, 55, 5, 205, 227, 202, 138, 137, 85, 111, 173,
         ]
     );
 }

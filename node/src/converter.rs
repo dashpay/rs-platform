@@ -1,8 +1,8 @@
-use grovedb::{Element, PathQuery, Query, SizedQuery};
-use neon::handle::Managed;
+
 use neon::prelude::*;
 use neon::types::buffer::TypedArray;
 use rs_drive::drive::flags::StorageFlags;
+use rs_drive::grovedb::{Element, PathQuery, Query, SizedQuery};
 use std::borrow::Borrow;
 
 fn element_to_string(element: &Element) -> &'static str {
@@ -21,10 +21,10 @@ pub fn js_object_to_element<'a, C: Context<'a>>(
 
     let element_type: String = js_element_type.value(cx);
 
-    let js_element_epoch: Handle<JsNumber> = js_object.get(cx, "epoch")?;
+    let js_element_epoch: Handle<JsNumber> = js_object.get(cx, "epochs")?;
 
     let epoch = u16::try_from(js_element_epoch.value(cx) as i64)
-        .or_else(|_| cx.throw_range_error("`epoch` must fit in u16"))?;
+        .or_else(|_| cx.throw_range_error("`epochs` must fit in u16"))?;
 
     let storage_flags = StorageFlags { epoch };
 
