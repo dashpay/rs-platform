@@ -416,7 +416,7 @@ impl Drive {
         match key_value_info {
             KeyRefRequest(key) => {
                 if let Some(max_value_size) = query_stateless_with_max_value_size {
-                    let CostContext { value, cost } = self.grove.worst_case_for_get_raw(path, key, max_value_size as u32);
+                    let CostContext { value, cost } = self.grove.worst_case_for_has_raw(path, key, max_value_size as u32);
                     drive_operations.push(CalculatedCostOperation(cost));
                     value?;
                     Ok(None)
@@ -848,7 +848,7 @@ impl Drive {
             let cost_context = self.grove.apply_batch(
                 ops.operations,
                 Some(BatchApplyOptions {
-                    validate_tree_insertion_does_not_override: validate,
+                    validate_insertion_does_not_override: validate,
                 }),
                 transaction,
             );
@@ -895,7 +895,7 @@ impl Drive {
         let cost_context = self.grove.worst_case_operations_for_batch(
             ops.operations,
             Some(BatchApplyOptions {
-                validate_tree_insertion_does_not_override: validate,
+                validate_insertion_does_not_override: validate,
             }),
         );
         push_drive_operation_result(cost_context, drive_operations)
