@@ -101,19 +101,19 @@ impl TenderdashAbci for Platform {
         };
 
         // Process fees
-        let distribution_info = self.process_block_fees(
+        let process_block_fees_result = self.process_block_fees(
             &block_execution_context.block_info,
             &block_execution_context.epoch_info,
             request.fees,
             transaction,
         )?;
 
-        Ok(BlockEndResponse {
-            current_epoch_index: block_execution_context.epoch_info.current_epoch_index,
-            is_epoch_change: block_execution_context.epoch_info.is_epoch_change,
-            masternodes_paid_count: distribution_info.masternodes_paid_count,
-            paid_epoch_index: distribution_info.paid_epoch_index,
-        })
+        Ok(
+            BlockEndResponse::from_epoch_info_and_process_block_fees_result(
+                &block_execution_context.epoch_info,
+                &process_block_fees_result,
+            ),
+        )
     }
 }
 
@@ -258,30 +258,20 @@ mod tests {
 
                     assert_eq!(block_end_response.is_epoch_change, epoch_change);
 
-                    // Should pay to all masternodes, when epochs 1 started
-                    let masternodes_paid_count = if epoch_index != 0 && epoch_change {
-                        proposers_count
+                    // Should pay to all proposers for epoch 0, when epochs 1 started
+                    if epoch_index != 0 && epoch_change {
+                        assert!(block_end_response.proposers_paid_count.is_some());
+                        assert!(block_end_response.paid_epoch_index.is_some());
+
+                        assert_eq!(
+                            block_end_response.proposers_paid_count.unwrap(),
+                            proposers_count
+                        );
+                        assert_eq!(block_end_response.paid_epoch_index.unwrap(), 0);
                     } else {
-                        0
+                        assert!(block_end_response.proposers_paid_count.is_none());
+                        assert!(block_end_response.paid_epoch_index.is_none());
                     };
-
-                    assert_eq!(
-                        block_end_response.masternodes_paid_count,
-                        masternodes_paid_count
-                    );
-
-                    // Should pay for the epochs 0, when epochs 1 started
-                    match block_end_response.paid_epoch_index {
-                        Some(index) => assert_eq!(
-                            index, 0,
-                            "should pay to masternodes only when epochs 1 started"
-                        ),
-                        None => assert_ne!(
-                            (day, block_num),
-                            (epoch_1_start_day, epoch_1_start_block),
-                            "should pay to masternodes only when epochs 1 started"
-                        ),
-                    }
                 }
             }
         }
@@ -414,30 +404,20 @@ mod tests {
 
                     assert_eq!(block_end_response.is_epoch_change, epoch_change);
 
-                    // Should pay to all masternodes, when epochs 1 started
-                    let masternodes_paid_count = if epoch_index != 0 && epoch_change {
-                        proposers_count
+                    // Should pay to all proposers for epoch 0, when epochs 1 started
+                    if epoch_index != 0 && epoch_change {
+                        assert!(block_end_response.proposers_paid_count.is_some());
+                        assert!(block_end_response.paid_epoch_index.is_some());
+
+                        assert_eq!(
+                            block_end_response.proposers_paid_count.unwrap(),
+                            proposers_count
+                        );
+                        assert_eq!(block_end_response.paid_epoch_index.unwrap(), 0);
                     } else {
-                        0
+                        assert!(block_end_response.proposers_paid_count.is_none());
+                        assert!(block_end_response.paid_epoch_index.is_none());
                     };
-
-                    assert_eq!(
-                        block_end_response.masternodes_paid_count,
-                        masternodes_paid_count
-                    );
-
-                    // Should pay for the epochs 0, when epochs 1 started
-                    match block_end_response.paid_epoch_index {
-                        Some(index) => assert_eq!(
-                            index, 0,
-                            "should pay to masternodes only when epochs 1 started"
-                        ),
-                        None => assert_ne!(
-                            (day, block_num),
-                            (epoch_2_start_day, epoch_2_start_block),
-                            "should pay to masternodes only when epochs 1 started"
-                        ),
-                    }
                 }
             }
         }

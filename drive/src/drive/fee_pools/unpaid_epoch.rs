@@ -20,7 +20,6 @@ impl Drive {
     ) -> Result<Option<Epoch>, Error> {
         let epoch_pool = Epoch::new(epoch_index);
 
-        // TODO: Looks like epoch's method
         if !self.is_epoch_tree_exists(&epoch_pool, transaction)?
             && self.is_epochs_proposers_tree_empty(&epoch_pool, transaction)?
         {
