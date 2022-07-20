@@ -4,7 +4,9 @@ use crate::error::Error;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
-pub const EPOCH_CHANGE_TIME: u64 = 1576800000;
+pub const EPOCH_CHANGE_TIME_MS: u64 = 1576800000;
+
+// TODO: Not sure that parent module "epoch_change" fits here. Should we rename to just epoch?
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -36,7 +38,7 @@ impl EpochInfo {
             None => return Ok(EpochInfo::default()),
         };
 
-        let epoch_change_time = Decimal::from(EPOCH_CHANGE_TIME);
+        let epoch_change_time = Decimal::from(EPOCH_CHANGE_TIME_MS);
         let block_time = Decimal::from(block_time_ms);
         let genesis_time = Decimal::from(genesis_time_ms);
         let previous_block_time = Decimal::from(previous_block_time);
@@ -84,7 +86,7 @@ impl EpochInfo {
         Self::calculate(
             genesis_time_ms,
             block_info.block_time_ms,
-            block_info.previous_block_time,
+            block_info.previous_block_time_ms,
             block_info.block_height,
         )
     }

@@ -3,7 +3,6 @@ use std::option::Option::None;
 
 use grovedb::{Element, TransactionArg};
 
-
 use crate::contract::document::Document;
 use crate::contract::Contract;
 use crate::drive::defaults::CONTRACT_DOCUMENTS_PATH_HEIGHT;

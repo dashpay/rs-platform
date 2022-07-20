@@ -1,4 +1,3 @@
-
 use neon::prelude::*;
 use neon::types::buffer::TypedArray;
 use rs_drive::drive::flags::StorageFlags;

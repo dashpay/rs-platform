@@ -4,7 +4,7 @@ use crate::execution::epoch_change::epoch::EpochInfo;
 pub struct BlockInfo {
     pub block_height: u64,
     pub block_time_ms: u64,
-    pub previous_block_time: Option<u64>,
+    pub previous_block_time_ms: Option<u64>,
     pub proposer_pro_tx_hash: [u8; 32],
 }
 
@@ -13,7 +13,7 @@ impl BlockInfo {
         BlockInfo {
             block_height: block_begin_request.block_height,
             block_time_ms: block_begin_request.block_time_ms,
-            previous_block_time: block_begin_request.previous_block_time_ms,
+            previous_block_time_ms: block_begin_request.previous_block_time_ms,
             proposer_pro_tx_hash: block_begin_request.proposer_pro_tx_hash,
         }
     }

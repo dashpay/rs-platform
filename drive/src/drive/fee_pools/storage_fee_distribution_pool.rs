@@ -1,4 +1,4 @@
-use crate::drive::fee_pools::{pools_path};
+use crate::drive::fee_pools::pools_path;
 use crate::drive::Drive;
 use grovedb::{Element, TransactionArg};
 
@@ -7,6 +7,8 @@ use crate::error::Error;
 use crate::fee_pools::epochs_root_tree_key_constants::KEY_STORAGE_FEE_POOL;
 
 impl Drive {
+    // TODO: Could you please explain why it's the current? It's always the same pool, isn't it?
+    //  I would propose: get_aggregate_storage_fees_from_distribution_pool
     pub fn get_aggregate_storage_fees_in_current_distribution_pool(
         &self,
         transaction: TransactionArg,

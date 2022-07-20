@@ -15,7 +15,6 @@ use crate::error::Error;
 use crate::fee::op::DriveOperation;
 use crate::fee::op::DriveOperation::GroveOperation;
 
-
 pub mod batch;
 pub mod config;
 pub mod contract;

@@ -43,7 +43,7 @@ impl Epoch {
     pub fn add_init_current_operations(
         &self,
         multiplier: f64,
-        start_block_height: u64,
+        start_block_height: u64, // TODO Many method in drive needs block time and height. Maybe we need DTO for drive as well which will contain block information
         start_time_ms: u64,
         batch: &mut GroveDbOpBatch,
     ) {
