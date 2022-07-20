@@ -30,8 +30,8 @@ use crate::error::Error;
 use crate::fee::calculate_fee;
 use crate::fee::op::DriveOperation;
 
-use dpp::data_contract::document_field::encode_float;
-use dpp::data_contract::drive_api::DriveContractExt;
+use dpp::data_contract::extra::encode_float;
+use dpp::data_contract::extra::DriveContractExt;
 
 impl Drive {
     // If a document isn't sent to this function then we are just calling to know the query and

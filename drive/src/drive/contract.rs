@@ -2,8 +2,8 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use costs::CostContext;
-use dpp::data_contract::document_field::encode_float;
-use dpp::data_contract::drive_api::DriveContractExt;
+use dpp::data_contract::extra::encode_float;
+use dpp::data_contract::extra::DriveContractExt;
 use grovedb::{Element, TransactionArg};
 
 use crate::contract::Contract;

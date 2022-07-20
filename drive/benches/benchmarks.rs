@@ -1,5 +1,5 @@
 use criterion::{black_box, criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion};
-use dpp::data_contract::drive_api::DriveContractExt;
+use dpp::data_contract::extra::DriveContractExt;
 use rs_drive::common::json_document_to_cbor;
 use rs_drive::contract::document::Document;
 use rs_drive::contract::Contract;

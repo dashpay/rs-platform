@@ -8,7 +8,7 @@ use crate::fee::calculate_fee;
 use crate::fee::op::DriveOperation;
 use crate::query::DriveQuery;
 
-use dpp::data_contract::drive_api::DriveContractExt;
+use dpp::data_contract::extra::DriveContractExt;
 
 impl Drive {
     pub fn query_documents(

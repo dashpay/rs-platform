@@ -18,7 +18,7 @@ use rs_drive::drive::Drive;
 use rs_drive::error::{query::QueryError, Error};
 use rs_drive::query::DriveQuery;
 
-use dpp::data_contract::drive_api::DriveContractExt;
+use dpp::data_contract::extra::DriveContractExt;
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

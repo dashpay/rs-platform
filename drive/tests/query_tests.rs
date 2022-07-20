@@ -22,7 +22,7 @@ use rs_drive::drive::Drive;
 use rs_drive::error::{query::QueryError, Error};
 use rs_drive::query::DriveQuery;
 
-use dpp::data_contract::drive_api::DriveContractExt;
+use dpp::data_contract::extra::DriveContractExt;
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -3740,4 +3740,10 @@ fn test_dpns_query_start_after_with_null_id_desc() {
         .expect("we should be able to a proof");
     assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
+}
+
+#[test]
+fn pwd() {
+    let working_dir = std::env::current_dir().unwrap();
+    println!("{}", working_dir.display());
 }

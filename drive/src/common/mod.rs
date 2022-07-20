@@ -14,7 +14,7 @@ use crate::drive::Drive;
 use crate::error::structure::StructureError;
 use crate::error::Error;
 
-use dpp::data_contract::drive_api::DriveContractExt;
+use dpp::data_contract::extra::DriveContractExt;
 
 pub fn setup_contract(
     drive: &Drive,

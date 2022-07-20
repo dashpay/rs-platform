@@ -22,7 +22,7 @@ use crate::error::Error;
 use crate::fee::calculate_fee;
 use crate::fee::op::DriveOperation;
 
-use dpp::data_contract::drive_api::DriveContractExt;
+use dpp::data_contract::extra::DriveContractExt;
 
 impl Drive {
     pub fn update_document_for_contract_cbor(

@@ -2,9 +2,9 @@ use std::collections::BTreeMap;
 use std::ops::BitXor;
 
 use ciborium::value::Value;
-use dpp::data_contract::document_field::encode_float;
-use dpp::data_contract::drive_api::DriveContractExt;
-use dpp::data_contract::errors::contract::ContractError;
+use dpp::data_contract::extra::encode_float;
+use dpp::data_contract::extra::ContractError;
+use dpp::data_contract::extra::DriveContractExt;
 pub use grovedb::{
     Element, Error as GroveError, GroveDb, PathQuery, Query, QueryItem, SizedQuery, TransactionArg,
 };
@@ -1234,7 +1234,7 @@ mod tests {
     use crate::query::DriveQuery;
     use serde_json::Value::Null;
 
-    use dpp::data_contract::drive_api::DriveContractExt;
+    use dpp::data_contract::extra::DriveContractExt;
 
     fn setup_family_contract() -> (Drive, Contract) {
         let tmp_dir = TempDir::new().unwrap();
