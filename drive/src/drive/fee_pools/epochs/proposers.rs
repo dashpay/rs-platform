@@ -1,7 +1,6 @@
-
 use grovedb::{Element, PathQuery, Query, SizedQuery, TransactionArg};
 
-use crate::drive::Drive;
+use crate::drive::{Drive, RootTree};
 use crate::error::drive::DriveError;
 use crate::error::fee::FeeError;
 use crate::error::Error;
@@ -114,7 +113,6 @@ mod tests {
 
     use crate::error::{self, fee::FeeError};
 
-    
     use crate::common::helpers::setup::setup_drive_with_initial_state_structure;
     use crate::drive::batch::GroveDbOpBatch;
     use crate::fee_pools::epochs::Epoch;
@@ -207,101 +205,6 @@ mod tests {
                 .expect("should get proposer block count");
 
             assert_eq!(stored_block_count, block_count);
-        }
-    }
-
-    mod increment_proposer_block_count {
-        #[test]
-        fn test_value_is_set_if_epoch_is_not_initialized() {
-            let drive = super::setup_drive_with_initial_state_structure();
-            let transaction = drive.grove.start_transaction();
-
-            let pro_tx_hash: [u8; 32] = rand::random();
-
-            let epoch = super::Epoch::new(0);
-
-            let mut batch = super::GroveDbOpBatch::new();
-
-            batch.push(epoch.init_proposers_tree_operation());
-
-            // Apply proposers tree
-            drive
-                .grove_apply_batch(batch, false, Some(&transaction))
-                .expect("should apply batch");
-
-            let mut batch = super::GroveDbOpBatch::new();
-
-            batch.push(
-                epoch
-                    .increment_proposer_block_count_operation(
-                        &drive,
-                        true,
-                        &pro_tx_hash,
-                        Some(&transaction),
-                    )
-                    .expect("should increment proposer block count operations"),
-            );
-
-            drive
-                .grove_apply_batch(batch, false, Some(&transaction))
-                .expect("should apply batch");
-
-            let stored_block_count = drive
-                .get_epochs_proposer_block_count(&epoch, &pro_tx_hash, Some(&transaction))
-                .expect("should get proposer block count");
-
-            assert_eq!(stored_block_count, 1);
-        }
-
-        #[test]
-        fn test_value_is_incremented() {
-            let drive = super::setup_drive_with_initial_state_structure();
-            let transaction = drive.grove.start_transaction();
-
-            let pro_tx_hash: [u8; 32] = rand::random();
-
-            let epoch = super::Epoch::new(1);
-
-            let mut batch = super::GroveDbOpBatch::new();
-
-            batch.push(epoch.init_proposers_tree_operation());
-
-            // Apply proposers tree
-            drive
-                .grove_apply_batch(batch, false, Some(&transaction))
-                .expect("should apply batch");
-
-            let mut batch = super::GroveDbOpBatch::new();
-
-            batch.push(epoch.update_proposer_block_count_operation(&pro_tx_hash, 1));
-
-            // Apply proposer block count
-            drive
-                .grove_apply_batch(batch, false, Some(&transaction))
-                .expect("should apply batch");
-
-            let mut batch = super::GroveDbOpBatch::new();
-
-            batch.push(
-                epoch
-                    .increment_proposer_block_count_operation(
-                        &drive,
-                        false,
-                        &pro_tx_hash,
-                        Some(&transaction),
-                    )
-                    .expect("should update proposer block count"),
-            );
-
-            drive
-                .grove_apply_batch(batch, false, Some(&transaction))
-                .expect("should apply batch");
-
-            let stored_block_count = drive
-                .get_epochs_proposer_block_count(&epoch, &pro_tx_hash, Some(&transaction))
-                .expect("should get proposer block count");
-
-            assert_eq!(stored_block_count, 2);
         }
     }
 

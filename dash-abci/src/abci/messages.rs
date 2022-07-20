@@ -46,7 +46,6 @@ pub struct BlockEndResponse {
     pub is_epoch_change: bool,
     pub masternodes_paid_count: u16,
     pub paid_epoch_index: Option<u16>,
-    pub distribution_pool_current_credits: u64,
 }
 
 impl<'a> Serializable<'a> for InitChainRequest {}

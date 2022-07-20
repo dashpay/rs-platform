@@ -1,3 +1,4 @@
+use crate::block::BlockInfo;
 use crate::error::execution::ExecutionError;
 use crate::error::Error;
 use rust_decimal::Decimal;
@@ -9,6 +10,7 @@ pub const EPOCH_CHANGE_TIME: u64 = 1576800000;
 #[serde(rename_all = "camelCase")]
 pub struct EpochInfo {
     pub current_epoch_index: u16,
+    pub previous_epoch_index: Option<u16>,
     pub is_epoch_change: bool,
     pub block_height: u64,
 }
@@ -17,6 +19,7 @@ impl EpochInfo {
     pub fn default() -> EpochInfo {
         EpochInfo {
             current_epoch_index: 0,
+            previous_epoch_index: None,
             is_epoch_change: true,
             block_height: 0,
         }
@@ -27,7 +30,7 @@ impl EpochInfo {
         block_time_ms: u64,
         previous_block_time_ms: Option<u64>,
         block_height: u64,
-    ) -> Result<EpochInfo, Error> {
+    ) -> Result<Self, Error> {
         let previous_block_time = match previous_block_time_ms {
             Some(block_time) => block_time,
             None => return Ok(EpochInfo::default()),
@@ -38,13 +41,13 @@ impl EpochInfo {
         let genesis_time = Decimal::from(genesis_time_ms);
         let previous_block_time = Decimal::from(previous_block_time);
 
-        let prev_epoch_index = (previous_block_time - genesis_time) / epoch_change_time;
-        let prev_epoch_index_floored = prev_epoch_index.floor();
+        let previous_epoch_index = (previous_block_time - genesis_time) / epoch_change_time;
+        let previous_epoch_index_floored = previous_epoch_index.floor();
 
         let epoch_index = (block_time - genesis_time) / epoch_change_time;
         let epoch_index_floored = epoch_index.floor();
 
-        let is_epoch_change = epoch_index_floored > prev_epoch_index_floored;
+        let is_epoch_change = epoch_index_floored > previous_epoch_index_floored;
 
         let current_epoch_index: u16 = epoch_index_floored.try_into().map_err(|_| {
             Error::Execution(ExecutionError::Conversion(
@@ -52,11 +55,38 @@ impl EpochInfo {
             ))
         })?;
 
-        Ok(EpochInfo {
+        let previous_epoch_index: Option<u16> = if epoch_index_floored
+            != previous_epoch_index_floored
+        {
+            let previous_epoch_index = previous_epoch_index_floored.try_into().map_err(|_| {
+                Error::Execution(ExecutionError::Conversion(
+                    "can't convert epochs index from Decimal to u16",
+                ))
+            })?;
+
+            Some(previous_epoch_index)
+        } else {
+            None
+        };
+
+        Ok(Self {
             current_epoch_index,
+            previous_epoch_index,
             is_epoch_change,
             block_height,
         })
+    }
+
+    pub fn from_genesis_time_and_block_info(
+        genesis_time_ms: u64,
+        block_info: &BlockInfo,
+    ) -> Result<Self, Error> {
+        Self::calculate(
+            genesis_time_ms,
+            block_info.block_time_ms,
+            block_info.previous_block_time,
+            block_info.block_height,
+        )
     }
 }
 

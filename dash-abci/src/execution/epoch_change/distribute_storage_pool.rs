@@ -11,7 +11,6 @@ use rs_drive::grovedb::TransactionArg;
 use rust_decimal::prelude::{FromPrimitive, ToPrimitive};
 use rust_decimal::{Decimal, RoundingStrategy};
 
-
 #[derive(Default)]
 pub struct DistributeStoragePoolResult {
     pub leftover_storage_distribution_credits: u64,
@@ -100,8 +99,6 @@ mod tests {
         use rs_drive::error::drive::DriveError;
         use rs_drive::fee_pools::epochs::Epoch;
         use rs_drive::fee_pools::update_storage_fee_distribution_pool_operation;
-        
-        
 
         #[test]
         fn test_nothing_to_distribute() {
@@ -118,6 +115,7 @@ mod tests {
                 .distribute_storage_fee_distribution_pool_to_epochs_operations(
                     EpochInfo {
                         current_epoch_index: epoch_index,
+                        previous_epoch_index: None,
                         is_epoch_change: false,
                         block_height: 0,
                     },
@@ -172,6 +170,7 @@ mod tests {
                 .distribute_storage_fee_distribution_pool_to_epochs_operations(
                     EpochInfo {
                         current_epoch_index: epoch_index,
+                        previous_epoch_index: None,
                         is_epoch_change: false,
                         block_height: 0,
                     },
@@ -224,6 +223,7 @@ mod tests {
                 .distribute_storage_fee_distribution_pool_to_epochs_operations(
                     EpochInfo {
                         current_epoch_index: epoch_index,
+                        previous_epoch_index: None,
                         is_epoch_change: false,
                         block_height: 0,
                     },
@@ -359,6 +359,7 @@ mod tests {
                 .distribute_storage_fee_distribution_pool_to_epochs_operations(
                     EpochInfo {
                         current_epoch_index: epoch_index,
+                        previous_epoch_index: None,
                         is_epoch_change: false,
                         block_height: 0,
                     },

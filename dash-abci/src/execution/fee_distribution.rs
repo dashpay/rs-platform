@@ -8,25 +8,25 @@ use rs_drive::drive::batch::GroveDbOpBatch;
 use rs_drive::fee_pools::epochs::Epoch;
 use rs_drive::fee_pools::update_storage_fee_distribution_pool_operation;
 use rs_drive::grovedb::TransactionArg;
+use rs_drive::{error, grovedb};
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 
-pub struct DistributionInfo {
+pub struct DistributionFeesFromUnpaidPoolsToProposersInfo {
     pub masternodes_paid_count: u16,
-    pub storage_distribution_pool_current_credits: u64,
     pub paid_epoch_index: Option<u16>,
 }
 
+// TODO we shouldn't call it result otherwise it looks like Result<DistributeBlockFeesIntoEpochResult, Error>
 pub struct DistributeBlockFeesIntoEpochResult {
     pub processing_fees_in_pool: u64,
     pub storage_fees_in_pool: u64,
 }
 
-impl DistributionInfo {
+impl DistributionFeesFromUnpaidPoolsToProposersInfo {
     pub fn empty() -> Self {
-        DistributionInfo {
+        DistributionFeesFromUnpaidPoolsToProposersInfo {
             masternodes_paid_count: 0,
-            storage_distribution_pool_current_credits: 0,
             paid_epoch_index: None,
         }
     }
@@ -38,9 +38,9 @@ impl Platform {
         epoch_info: &EpochInfo,
         transaction: TransactionArg,
         batch: &mut GroveDbOpBatch,
-    ) -> Result<DistributionInfo, Error> {
+    ) -> Result<DistributionFeesFromUnpaidPoolsToProposersInfo, Error> {
         if epoch_info.current_epoch_index == 0 {
-            return Ok(DistributionInfo::empty());
+            return Ok(DistributionFeesFromUnpaidPoolsToProposersInfo::empty());
         }
 
         // For current epochs we pay for previous
@@ -51,7 +51,7 @@ impl Platform {
             .map_err(Error::Drive)?
         {
             Some(epoch_pool) => epoch_pool,
-            None => return Ok(DistributionInfo::empty()),
+            None => return Ok(DistributionFeesFromUnpaidPoolsToProposersInfo::empty()),
         };
 
         // Process more proposers at once if we have many unpaid epochs in past
@@ -178,9 +178,8 @@ impl Platform {
             unpaid_epoch_pool.add_mark_as_paid_operations(batch);
         }
 
-        Ok(DistributionInfo {
+        Ok(DistributionFeesFromUnpaidPoolsToProposersInfo {
             masternodes_paid_count: proposers_len,
-            storage_distribution_pool_current_credits: 0,
             paid_epoch_index: Some(unpaid_epoch_pool.index),
         })
     }
@@ -211,21 +210,22 @@ impl Platform {
             .map_err(Error::Drive)
     }
 
-    pub fn add_distribute_fees_into_pools_operations(
+    pub fn add_distribute_block_fees_into_pools_operations(
         &self,
         current_epoch: &Epoch,
-        is_epoch_change: bool,
         block_fees: FeesAggregate,
         transaction: TransactionArg,
         batch: &mut GroveDbOpBatch,
     ) -> Result<DistributeBlockFeesIntoEpochResult, Error> {
         // update epochs pool processing fees
-        let epoch_processing_fees = if is_epoch_change {
-            0
-        } else {
-            self.drive
-                .get_epoch_processing_credits_for_distribution(current_epoch, transaction)?
-        };
+        let epoch_processing_fees = self
+            .drive
+            .get_epoch_processing_credits_for_distribution(current_epoch, transaction)
+            .or_else(|e| match e {
+                // Handle epoch change when storage fees are not set yet
+                error::Error::GroveDB(grovedb::Error::PathKeyNotFound(_)) => Ok(0u64),
+                _ => Err(e),
+            })?;
 
         let total_processing_fees = epoch_processing_fees + block_fees.processing_fees;
 
@@ -235,12 +235,9 @@ impl Platform {
         );
 
         // update storage fee pool
-        let storage_distribution_credits_in_fee_pool = if is_epoch_change {
-            0
-        } else {
-            self.drive
-                .get_aggregate_storage_fees_in_current_distribution_pool(transaction)?
-        };
+        let storage_distribution_credits_in_fee_pool = self
+            .drive
+            .get_aggregate_storage_fees_in_current_distribution_pool(transaction)?;
 
         let total_storage_fees = storage_distribution_credits_in_fee_pool + block_fees.storage_fees;
 
@@ -275,7 +272,6 @@ mod tests {
         use rs_drive::fee_pools::epochs::epoch_key_constants::KEY_PROPOSERS;
         use rs_drive::fee_pools::epochs::Epoch;
         use rs_drive::grovedb;
-        
 
         #[test]
         fn test_no_distribution_on_epoch_0() {
@@ -284,6 +280,7 @@ mod tests {
 
             let epoch_info = EpochInfo {
                 current_epoch_index: 0,
+                previous_epoch_index: None,
                 is_epoch_change: true,
                 block_height: 0,
             };
@@ -309,6 +306,7 @@ mod tests {
 
             let epoch_info = EpochInfo {
                 current_epoch_index: 1,
+                previous_epoch_index: Some(0),
                 is_epoch_change: true,
                 block_height: 18,
             };
@@ -375,9 +373,8 @@ mod tests {
             let mut batch = GroveDbOpBatch::new();
 
             platform
-                .add_distribute_fees_into_pools_operations(
+                .add_distribute_block_fees_into_pools_operations(
                     &unpaid_epoch_pool_1,
-                    true, //because we are coming into it
                     FeesAggregate {
                         processing_fees: 10000,
                         storage_fees: 10000,
@@ -397,6 +394,7 @@ mod tests {
 
             let epoch_info = EpochInfo {
                 current_epoch_index: 3,
+                previous_epoch_index: Some(2),
                 is_epoch_change: false,
                 block_height: 36,
             };
@@ -459,9 +457,8 @@ mod tests {
             let mut batch = GroveDbOpBatch::new();
 
             platform
-                .add_distribute_fees_into_pools_operations(
+                .add_distribute_block_fees_into_pools_operations(
                     &unpaid_epoch_pool,
-                    true,
                     FeesAggregate {
                         processing_fees: 10000,
                         storage_fees: 10000,
@@ -481,6 +478,7 @@ mod tests {
 
             let epoch_info = EpochInfo {
                 current_epoch_index: 2,
+                previous_epoch_index: Some(1),
                 is_epoch_change: false,
                 block_height: 18,
             };
@@ -555,9 +553,8 @@ mod tests {
             let mut batch = GroveDbOpBatch::new();
 
             platform
-                .add_distribute_fees_into_pools_operations(
+                .add_distribute_block_fees_into_pools_operations(
                     &unpaid_epoch_pool,
-                    true, //because its coming into epoch 0
                     FeesAggregate {
                         processing_fees: 10000,
                         storage_fees: 10000,
@@ -577,6 +574,7 @@ mod tests {
 
             let epoch_info = EpochInfo {
                 current_epoch_index: 2,
+                previous_epoch_index: Some(1),
                 is_epoch_change: false,
                 block_height: 18,
             };
@@ -640,58 +638,116 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_distribute_fees_into_pools() {
-        let platform = setup_platform_with_initial_state_structure();
-        let transaction = platform.drive.grove.start_transaction();
+    mod add_distribute_block_fees_into_pools_operations {
+        use crate::abci::messages::FeesAggregate;
+        use crate::common::helpers::setup::setup_platform_with_initial_state_structure;
+        use rs_drive::drive::batch::GroveDbOpBatch;
+        use rs_drive::fee_pools::epochs::Epoch;
 
-        let current_epoch_pool = Epoch::new(1);
+        #[test]
+        fn test_distribute_block_fees_into_uncommitted_epoch_on_epoch_change() {
+            let platform = setup_platform_with_initial_state_structure();
+            let transaction = platform.drive.grove.start_transaction();
 
-        let mut batch = GroveDbOpBatch::new();
+            let current_epoch_pool = Epoch::new(1);
 
-        current_epoch_pool.add_init_current_operations(1.0, 1, 1, &mut batch);
+            let mut batch = GroveDbOpBatch::new();
 
-        // Apply new pool structure
-        platform
-            .drive
-            .grove_apply_batch(batch, false, Some(&transaction))
-            .expect("should apply batch");
+            current_epoch_pool.add_init_current_operations(1.0, 1, 1, &mut batch);
 
-        let mut batch = GroveDbOpBatch::new();
+            let processing_fees = 1000000;
+            let storage_fees = 2000000;
 
-        let processing_fees = 1000000;
-        let storage_fees = 2000000;
+            platform
+                .add_distribute_block_fees_into_pools_operations(
+                    &current_epoch_pool,
+                    FeesAggregate {
+                        processing_fees,
+                        storage_fees,
+                        refunds_by_epoch: vec![],
+                    },
+                    Some(&transaction),
+                    &mut batch,
+                )
+                .expect("should distribute fees into pools");
 
-        platform
-            .add_distribute_fees_into_pools_operations(
-                &current_epoch_pool,
-                true,
-                FeesAggregate {
-                    processing_fees,
-                    storage_fees,
-                    refunds_by_epoch: vec![],
-                },
-                Some(&transaction),
-                &mut batch,
-            )
-            .expect("should distribute fees into pools");
+            platform
+                .drive
+                .grove_apply_batch(batch, false, Some(&transaction))
+                .expect("should apply batch");
 
-        platform
-            .drive
-            .grove_apply_batch(batch, false, Some(&transaction))
-            .expect("should apply batch");
+            let stored_processing_fee_credits = platform
+                .drive
+                .get_epoch_processing_credits_for_distribution(
+                    &current_epoch_pool,
+                    Some(&transaction),
+                )
+                .expect("should get processing fees");
 
-        let stored_processing_fee_credits = platform
-            .drive
-            .get_epoch_processing_credits_for_distribution(&current_epoch_pool, Some(&transaction))
-            .expect("should get processing fees");
+            let stored_storage_fee_credits = platform
+                .drive
+                .get_aggregate_storage_fees_in_current_distribution_pool(Some(&transaction))
+                .expect("should get storage fee pool");
 
-        let stored_storage_fee_credits = platform
-            .drive
-            .get_aggregate_storage_fees_in_current_distribution_pool(Some(&transaction))
-            .expect("should get storage fee pool");
+            assert_eq!(stored_processing_fee_credits, processing_fees);
+            assert_eq!(stored_storage_fee_credits, storage_fees);
+        }
 
-        assert_eq!(stored_processing_fee_credits, processing_fees);
-        assert_eq!(stored_storage_fee_credits, storage_fees);
+        #[test]
+        fn test_distribute_block_fees_into_pools() {
+            let platform = setup_platform_with_initial_state_structure();
+            let transaction = platform.drive.grove.start_transaction();
+
+            let current_epoch_pool = Epoch::new(1);
+
+            let mut batch = GroveDbOpBatch::new();
+
+            current_epoch_pool.add_init_current_operations(1.0, 1, 1, &mut batch);
+
+            // Apply new pool structure
+            platform
+                .drive
+                .grove_apply_batch(batch, false, Some(&transaction))
+                .expect("should apply batch");
+
+            let mut batch = GroveDbOpBatch::new();
+
+            let processing_fees = 1000000;
+            let storage_fees = 2000000;
+
+            platform
+                .add_distribute_block_fees_into_pools_operations(
+                    &current_epoch_pool,
+                    FeesAggregate {
+                        processing_fees,
+                        storage_fees,
+                        refunds_by_epoch: vec![],
+                    },
+                    Some(&transaction),
+                    &mut batch,
+                )
+                .expect("should distribute fees into pools");
+
+            platform
+                .drive
+                .grove_apply_batch(batch, false, Some(&transaction))
+                .expect("should apply batch");
+
+            let stored_processing_fee_credits = platform
+                .drive
+                .get_epoch_processing_credits_for_distribution(
+                    &current_epoch_pool,
+                    Some(&transaction),
+                )
+                .expect("should get processing fees");
+
+            let stored_storage_fee_credits = platform
+                .drive
+                .get_aggregate_storage_fees_in_current_distribution_pool(Some(&transaction))
+                .expect("should get storage fee pool");
+
+            assert_eq!(stored_processing_fee_credits, processing_fees);
+            assert_eq!(stored_storage_fee_credits, storage_fees);
+        }
     }
 }

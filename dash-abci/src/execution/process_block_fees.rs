@@ -5,7 +5,7 @@ use crate::error::Error;
 use crate::execution::constants::DEFAULT_ORIGINAL_FEE_MULTIPLIER;
 use crate::execution::epoch_change::distribute_storage_pool::DistributeStoragePoolResult;
 use crate::execution::epoch_change::epoch::EpochInfo;
-use crate::execution::fee_distribution::DistributionInfo;
+use crate::execution::fee_distribution::DistributionFeesFromUnpaidPoolsToProposersInfo;
 use crate::platform::Platform;
 use rs_drive::drive::batch::GroveDbOpBatch;
 use rs_drive::fee_pools::epochs::Epoch;
@@ -29,56 +29,66 @@ use std::option::Option::None;
 impl Platform {
     /// When processing an epoch change a DistributeStorageResult will be returned, expect if
     /// we are at Epoch 0.
-    fn process_epoch_change_operations(
+    fn add_process_epoch_change_operations(
         &self,
-        current_epoch: &Epoch,
+        epoch_info: &EpochInfo,
         block_info: &BlockInfo,
         transaction: TransactionArg,
         batch: &mut GroveDbOpBatch,
     ) -> Result<Option<DistributeStoragePoolResult>, Error> {
-        // make next epochs pool as a current
-        // and create one more in future
-        current_epoch.shift_to_new_epoch_operations(
+        // init next thousandth empty epochs since last initiated
+        let last_initiated_epoch_index = epoch_info.previous_epoch_index.map_or(0, |i| i + 1);
+
+        for epoch_index in last_initiated_epoch_index..=epoch_info.current_epoch_index {
+            let next_thousandth_epoch = Epoch::new(epoch_index + 1000);
+            next_thousandth_epoch.add_init_empty_operations(batch);
+        }
+
+        // init current epoch pool for processing
+        let current_epoch = Epoch::new(epoch_info.current_epoch_index);
+
+        current_epoch.add_init_current_operations(
+            DEFAULT_ORIGINAL_FEE_MULTIPLIER, // TODO use a data contract to choose the fee multiplier
             block_info.block_height,
-            block_info.block_time,
-            DEFAULT_ORIGINAL_FEE_MULTIPLIER, //todo use a data contract to choose the fee multiplier
+            block_info.block_time_ms,
             batch,
         );
 
-        // distribute accumulated previous epochs storage fees
-        let distribute_storage_result = if current_epoch.index > 0 {
-            // On epoch change we
-            Some(
-                self.distribute_storage_fee_distribution_pool_to_epochs_operations(
-                    EpochInfo {
-                        current_epoch_index: current_epoch.index,
-                        is_epoch_change: true,
-                        block_height: block_info.block_height,
-                    },
-                    transaction,
-                    batch,
-                )?,
-            )
-        } else {
-            None
-        };
-        Ok(distribute_storage_result)
+        // Nothing to distribute on epoch 0 start
+        if current_epoch.index == 0 {
+            return Ok(None);
+        }
+
+        // Distribute accumulated storage fees from previous epoch
+        let distribute_storage_result = self
+            .distribute_storage_fee_distribution_pool_to_epochs_operations(
+                EpochInfo {
+                    current_epoch_index: current_epoch.index,
+                    previous_epoch_index: Some(current_epoch.index - 1),
+                    is_epoch_change: true,
+                    block_height: block_info.block_height,
+                },
+                transaction,
+                batch,
+            )?;
+
+        Ok(Some(distribute_storage_result))
     }
 
     pub fn process_block_fees(
         &self,
         block_info: &BlockInfo,
         epoch_info: &EpochInfo,
-        mut block_fees: FeesAggregate,
+        block_fees: FeesAggregate,
         transaction: TransactionArg,
-    ) -> Result<DistributionInfo, Error> {
+    ) -> Result<DistributionFeesFromUnpaidPoolsToProposersInfo, Error> {
         let current_epoch = Epoch::new(epoch_info.current_epoch_index);
 
         let mut batch = GroveDbOpBatch::new();
 
-        let distribute_storage_pool_info_on_epoch_change = if epoch_info.is_epoch_change {
-            self.process_epoch_change_operations(
-                &current_epoch,
+        let distribute_storage_pool_result = if epoch_info.is_epoch_change {
+            self.add_process_epoch_change_operations(
+                epoch_info,
                 block_info,
                 transaction,
                 &mut batch,
@@ -89,45 +99,101 @@ impl Platform {
 
         batch.push(current_epoch.increment_proposer_block_count_operation(
             &self.drive,
-            epoch_info.is_epoch_change,
             &block_info.proposer_pro_tx_hash,
             transaction,
         )?);
 
-        let mut distribution_info = self
+        let distribution_info = self
             .add_distribute_fees_from_unpaid_pools_to_proposers_operations(
                 epoch_info,
                 transaction,
                 &mut batch,
             )?;
 
-        if let Some(distribute_storage_pool_info_on_epoch_change) =
-            distribute_storage_pool_info_on_epoch_change
+        // Add leftovers after storage fee pool distribution to the current block storage fees
+        let block_fees_with_leftovers = if let Some(distribute_storage_pool_result) =
+            distribute_storage_pool_result
         {
-            block_fees.storage_fees = block_fees
+            let storage_fees_with_leftovers = block_fees
                 .storage_fees
-                .checked_add(
-                    distribute_storage_pool_info_on_epoch_change
-                        .leftover_storage_distribution_credits,
-                )
+                .checked_add(distribute_storage_pool_result.leftover_storage_distribution_credits)
                 .ok_or(Error::Execution(ExecutionError::Overflow(
                     "overflow combining storage with leftovers",
                 )))?;
-        }
 
-        let distribution_result = self.add_distribute_fees_into_pools_operations(
+            FeesAggregate {
+                storage_fees: storage_fees_with_leftovers,
+                ..block_fees
+            }
+        } else {
+            block_fees
+        };
+
+        self.add_distribute_block_fees_into_pools_operations(
             &current_epoch,
-            epoch_info.is_epoch_change,
-            block_fees,
+            block_fees_with_leftovers,
             transaction,
             &mut batch,
         )?;
-
-        distribution_info.storage_distribution_pool_current_credits =
-            distribution_result.storage_fees_in_pool;
 
         self.drive.grove_apply_batch(batch, false, transaction)?;
 
         Ok(distribution_info)
     }
+}
+
+#[cfg(test)]
+mod tests {
+    mod add_process_epoch_change_operations {
+        use crate::block::BlockInfo;
+        use crate::common::helpers::setup::setup_platform_with_initial_state_structure;
+        use crate::execution::epoch_change::epoch::EpochInfo;
+        use chrono::Utc;
+        use rs_drive::drive::batch::GroveDbOpBatch;
+        use rs_drive::fee_pools::epochs::Epoch;
+        use rust_decimal::prelude::ToPrimitive;
+
+        #[test]
+        fn test_processing_epoch_change_for_epoch_0_without_distribution() {
+            let platform = setup_platform_with_initial_state_structure();
+            let transaction = platform.drive.grove.start_transaction();
+
+            let genesis_time = Utc::now();
+            let genesis_time_ms = genesis_time
+                .timestamp_millis()
+                .to_u64()
+                .expect("block time can not be before 1970");
+            let block_height = 1;
+
+            let block_info = BlockInfo {
+                block_height,
+                block_time_ms: genesis_time_ms,
+                previous_block_time: None,
+                proposer_pro_tx_hash: rand::random(),
+            };
+
+            let epoch_info =
+                EpochInfo::from_genesis_time_and_block_info(genesis_time_ms, &block_info)
+                    .expect("should calculate epoch info");
+
+            let mut batch = GroveDbOpBatch::new();
+
+            platform
+                .add_process_epoch_change_operations(
+                    &epoch_info,
+                    &block_info,
+                    Some(&transaction),
+                    &mut batch,
+                )
+                .expect("should process epoch 0");
+        }
+
+        #[test]
+        fn test_processing_epoch_change_for_epoch_1_with_distribution() {}
+
+        #[test]
+        fn test_creation_of_multiple_next_empty_epochs_if_previous_epoch_was_few_epochs_ago() {}
+    }
+
+    mod process_block_fees {}
 }
