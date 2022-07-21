@@ -8,6 +8,7 @@ pub fn setup_platform() -> Platform {
     drive
 }
 
+// TODO Never used?
 pub fn setup_platform_with_initial_state_structure() -> Platform {
     let platform = setup_platform();
     platform
