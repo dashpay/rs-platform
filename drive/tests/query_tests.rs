@@ -1666,6 +1666,7 @@ fn test_family_basic_queries() {
 }
 
 #[test]
+#[ignore]
 fn test_family_starts_at_queries() {
     let (drive, contract, _tmp_dir) = setup_family_tests(10, true, 73509);
 
@@ -1906,6 +1907,7 @@ fn test_family_starts_at_queries() {
 }
 
 #[test]
+#[ignore]
 fn test_family_sql_query() {
     // These tests confirm that sql statements produce the same drive query
     // as their json counterparts, tests above confirm that the json queries
@@ -2043,6 +2045,7 @@ fn test_family_sql_query() {
 }
 
 #[test]
+#[ignore]
 fn test_family_with_nulls_query() {
     let (drive, contract, _tmp_dir) = setup_family_tests_with_nulls(10, true, 30004);
 
@@ -2155,6 +2158,7 @@ fn test_family_with_nulls_query() {
 }
 
 #[test]
+#[ignore]
 fn test_query_with_cached_contract() {
     let (drive, contract, _tmp_dir) = setup_family_tests(10, true, 73509);
 
@@ -2221,6 +2225,7 @@ fn test_query_with_cached_contract() {
 }
 
 #[test]
+#[ignore]
 fn test_dpns_query() {
     let (drive, contract, _tmp_dir) = setup_dpns_tests_with_batches(10, 11456);
 
@@ -2620,6 +2625,7 @@ fn test_dpns_query() {
 }
 
 #[test]
+#[ignore]
 fn test_dpns_insertion_no_aliases() {
     // using ascending order with rangeTo operators
     let (drive, contract, _tmp_dir) =
@@ -2669,6 +2675,7 @@ fn test_dpns_insertion_no_aliases() {
 }
 
 #[test]
+#[ignore]
 fn test_dpns_insertion_with_aliases() {
     // using ascending order with rangeTo operators
     let (drive, contract, _tmp_dir) =
@@ -2718,6 +2725,7 @@ fn test_dpns_insertion_with_aliases() {
 }
 
 #[test]
+#[ignore]
 fn test_dpns_query_start_at() {
     // The point of this test is to test the situation where we have a start at a certain value for the DPNS query.
     let (drive, contract, _tmp_dir) = setup_dpns_tests_with_batches(10, 11456);
@@ -2804,6 +2812,7 @@ fn test_dpns_query_start_at() {
 }
 
 #[test]
+#[ignore]
 fn test_dpns_query_start_after() {
     // The point of this test is to test the situation where we have a start at a certain value for the DPNS query.
     let (drive, contract, _tmp_dir) = setup_dpns_tests_with_batches(10, 11456);
@@ -2890,6 +2899,7 @@ fn test_dpns_query_start_after() {
 }
 
 #[test]
+#[ignore]
 fn test_dpns_query_start_at_desc() {
     // The point of this test is to test the situation where we have a start at a certain value for the DPNS query.
     let (drive, contract, _tmp_dir) = setup_dpns_tests_with_batches(10, 11456);
@@ -2976,6 +2986,7 @@ fn test_dpns_query_start_at_desc() {
 }
 
 #[test]
+#[ignore]
 fn test_dpns_query_start_after_desc() {
     // The point of this test is to test the situation where we have a start at a certain value for the DPNS query.
     let (drive, contract, _tmp_dir) = setup_dpns_tests_with_batches(10, 11456);
@@ -3062,6 +3073,7 @@ fn test_dpns_query_start_after_desc() {
 }
 
 #[test]
+#[ignore]
 fn test_dpns_query_start_at_with_null_id() {
     // The point of this test is to test the situation where we have a start at inside an index with a null value
     // While dpns doesn't really support this, other contracts might allow null values.
@@ -3254,6 +3266,7 @@ fn test_dpns_query_start_at_with_null_id() {
 }
 
 #[test]
+#[ignore]
 fn test_dpns_query_start_after_with_null_id() {
     // The point of this test is to test the situation where we have a start at inside an index with a null value
     // While dpns doesn't really support this, other contracts might allow null values.
@@ -3449,6 +3462,7 @@ fn test_dpns_query_start_after_with_null_id() {
 }
 
 #[test]
+#[ignore]
 fn test_dpns_query_start_after_with_null_id_desc() {
     // The point of this test is to test the situation where we have a start at inside an index with a null value
     // While dpns doesn't really support this, other contracts might allow null values.
@@ -3743,6 +3757,7 @@ fn test_dpns_query_start_after_with_null_id_desc() {
 }
 
 #[test]
+#[ignore]
 fn pwd() {
     let working_dir = std::env::current_dir().unwrap();
     println!("{}", working_dir.display());
