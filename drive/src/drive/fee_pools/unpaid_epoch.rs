@@ -20,18 +20,20 @@ impl Drive {
     ) -> Result<Option<Epoch>, Error> {
         let epoch_pool = Epoch::new(epoch_index);
 
-        if self.is_epochs_proposers_tree_empty(&epoch_pool, transaction)? {
-            return if epoch_index == from_epoch_index {
-                Ok(None)
-            } else {
-                let unpaid_epoch_pool = Epoch::new(epoch_index + 1);
+        if self.is_epoch_tree_exists(&epoch_pool, transaction)? {
+            if self.is_epochs_proposers_tree_empty(&epoch_pool, transaction)? {
+                return if epoch_index == from_epoch_index {
+                    Ok(None)
+                } else {
+                    let unpaid_epoch_pool = Epoch::new(epoch_index + 1);
 
-                Ok(Some(unpaid_epoch_pool))
-            };
-        }
+                    Ok(Some(unpaid_epoch_pool))
+                };
+            }
 
-        if epoch_index == 0 {
-            return Ok(Some(epoch_pool));
+            if epoch_index == 0 {
+                return Ok(Some(epoch_pool));
+            }
         }
 
         self.get_oldest_unpaid_epoch_pool_recursive(from_epoch_index, epoch_index - 1, transaction)

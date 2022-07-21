@@ -4,8 +4,6 @@ use rs_drive::contract::document::Document;
 use rs_drive::contract::Contract;
 use serde::Serialize;
 
-
-
 criterion_main!(serialization, deserialization);
 criterion_group!(serialization, test_drive_10_serialization);
 criterion_group!(deserialization, test_drive_10_deserialization);

@@ -19,3 +19,6 @@ impl Epoch {
         }
     }
 }
+
+// TODO Would be more convenient to have all methods here,
+//   because when you jump to implementation you arriving to this file and don't see any

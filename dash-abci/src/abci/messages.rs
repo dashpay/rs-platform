@@ -1,5 +1,7 @@
 use crate::error::serialization::SerializationError;
 use crate::error::Error;
+use crate::execution::epoch_change::epoch::EpochInfo;
+use crate::execution::process_block_fees::ProcessedBlockFeesResult;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
@@ -44,9 +46,32 @@ pub struct FeesAggregate {
 pub struct BlockEndResponse {
     pub current_epoch_index: u16,
     pub is_epoch_change: bool,
-    pub masternodes_paid_count: u16,
+    pub proposers_paid_count: Option<u16>,
     pub paid_epoch_index: Option<u16>,
-    pub distribution_pool_current_credits: u64,
+}
+
+impl BlockEndResponse {
+    pub(crate) fn from_epoch_info_and_process_block_fees_result(
+        epoch_info: &EpochInfo,
+        process_block_fees_result: &ProcessedBlockFeesResult,
+    ) -> Self {
+        let (proposers_paid_count, paid_epoch_index) =
+            process_block_fees_result
+                .payouts
+                .map_or((None, None), |proposer_payouts| {
+                    (
+                        Some(proposer_payouts.proposers_paid_count),
+                        Some(proposer_payouts.paid_epoch_index),
+                    )
+                });
+
+        Self {
+            current_epoch_index: epoch_info.current_epoch_index,
+            is_epoch_change: epoch_info.is_epoch_change,
+            proposers_paid_count,
+            paid_epoch_index,
+        }
+    }
 }
 
 impl<'a> Serializable<'a> for InitChainRequest {}

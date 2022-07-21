@@ -56,6 +56,7 @@ impl Drive {
         }
     }
 
+    // TODO init_genesis_time?
     pub fn init_genesis(
         &self,
         genesis_time_ms: u64,
