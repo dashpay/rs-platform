@@ -2,20 +2,21 @@ mod converter;
 
 use std::{option::Option::None, path::Path, sync::mpsc, thread};
 
-use dpp::identity::Identity;
-use grovedb::{PathQuery, Transaction, TransactionArg};
-use neon::prelude::*;
-use neon::types::JsDate;
-use rs_drive::drive::abci::handlers;
-use rs_drive::drive::abci::messages::{
+use dash_abci::abci::handlers::TenderdashAbci;
+use dash_abci::abci::messages::{
     BlockBeginRequest, BlockEndRequest, InitChainRequest, Serializable,
 };
-use rs_drive::drive::Drive;
+use dash_abci::platform::Platform;
+use dpp::identity::Identity;
+use neon::prelude::*;
+use neon::types::JsDate;
+use rs_drive::drive::flags::StorageFlags;
+use rs_drive::grovedb::{PathQuery, Transaction, TransactionArg};
 
 const READONLY_MSG: &str =
     "db is in readonly mode due to the active transaction. Please provide transaction or commit it";
 
-type DriveCallback = Box<dyn for<'a> FnOnce(&'a Drive, TransactionArg, &Channel) + Send>;
+type DriveCallback = Box<dyn for<'a> FnOnce(&'a Platform, TransactionArg, &Channel) + Send>;
 type UnitCallback = Box<dyn FnOnce(&Channel) + Send>;
 
 // Messages sent on the drive channel
@@ -64,7 +65,7 @@ impl DriveWrapper {
             let path = Path::new(&path_string);
             // Open a connection to groveDb, this will be moved to a separate thread
             // TODO: think how to pass this error to JS
-            let drive = Drive::open(path, None).unwrap();
+            let platform: Platform = Platform::open(path, None).unwrap();
 
             let mut transaction: Option<Transaction> = None;
 
@@ -78,32 +79,34 @@ impl DriveWrapper {
                         // The connection and channel are owned by the thread, but _lent_ to
                         // the callback. The callback has exclusive access to the connection
                         // for the duration of the callback.
-                        callback(&drive, transaction.as_ref(), &channel);
+                        callback(&platform, transaction.as_ref(), &channel);
                     }
                     // Immediately close the connection, even if there are pending messages
                     DriveMessage::Close(callback) => {
                         drop(transaction);
-                        drop(drive);
+                        drop(platform);
                         callback(&channel);
                         break;
                     }
                     // Flush message
                     DriveMessage::Flush(callback) => {
-                        drive.grove.flush().unwrap();
+                        platform.drive.grove.flush().unwrap();
                         callback(&channel);
                     }
                     DriveMessage::StartTransaction(callback) => {
-                        transaction = Some(drive.grove.start_transaction());
+                        transaction = Some(platform.drive.grove.start_transaction());
                         callback(&channel);
                     }
                     DriveMessage::CommitTransaction(callback) => {
-                        drive
+                        platform
+                            .drive
                             .commit_transaction(transaction.take().unwrap())
                             .unwrap();
                         callback(&channel);
                     }
                     DriveMessage::RollbackTransaction(callback) => {
-                        drive
+                        platform
+                            .drive
                             .rollback_transaction(&transaction.take().unwrap())
                             .unwrap();
                         callback(&channel);
@@ -131,7 +134,7 @@ impl DriveWrapper {
 
     fn send_to_drive_thread(
         &self,
-        callback: impl for<'a> FnOnce(&'a Drive, TransactionArg, &Channel) + Send + 'static,
+        callback: impl for<'a> FnOnce(&'a Platform, TransactionArg, &Channel) + Send + 'static,
     ) -> Result<(), mpsc::SendError<DriveMessage>> {
         self.tx.send(DriveMessage::Callback(Box::new(callback)))
     }
@@ -233,8 +236,9 @@ impl DriveWrapper {
         let using_transaction = js_using_transaction.value(&mut cx);
 
         drive
-            .send_to_drive_thread(move |drive: &Drive, transaction, channel| {
-                drive
+            .send_to_drive_thread(move |platform: &Platform, transaction, channel| {
+                platform
+                    .drive
                     .create_initial_state_structure(
                         using_transaction.then(|| transaction).flatten(),
                     )
@@ -273,12 +277,13 @@ impl DriveWrapper {
         let block_time = js_block_time.value(&mut cx);
 
         drive
-            .send_to_drive_thread(move |drive: &Drive, transaction, channel| {
-                let result = drive.apply_contract_cbor(
+            .send_to_drive_thread(move |platform: &Platform, transaction, channel| {
+                let result = platform.drive.apply_contract_cbor(
                     contract_cbor,
                     None,
                     block_time,
                     apply,
+                    StorageFlags::default(),
                     using_transaction.then(|| transaction).flatten(),
                 );
 
@@ -342,17 +347,20 @@ impl DriveWrapper {
         let using_transaction = js_using_transaction.value(&mut cx);
 
         drive
-            .send_to_drive_thread(move |drive: &Drive, transaction, channel| {
-                let result = drive.add_serialized_document_for_serialized_contract(
-                    &document_cbor,
-                    &contract_cbor,
-                    &document_type_name,
-                    Some(&owner_id),
-                    override_document,
-                    block_time,
-                    apply,
-                    using_transaction.then(|| transaction).flatten(),
-                );
+            .send_to_drive_thread(move |platform: &Platform, transaction, channel| {
+                let result = platform
+                    .drive
+                    .add_serialized_document_for_serialized_contract(
+                        &document_cbor,
+                        &contract_cbor,
+                        &document_type_name,
+                        Some(&owner_id),
+                        override_document,
+                        block_time,
+                        apply,
+                        StorageFlags::default(),
+                        using_transaction.then(|| transaction).flatten(),
+                    );
 
                 channel.send(move |mut task_context| {
                     let callback = js_callback.into_inner(&mut task_context);
@@ -412,14 +420,15 @@ impl DriveWrapper {
         let using_transaction = js_using_transaction.value(&mut cx);
 
         drive
-            .send_to_drive_thread(move |drive: &Drive, transaction, channel| {
-                let result = drive.update_document_for_contract_cbor(
+            .send_to_drive_thread(move |platform: &Platform, transaction, channel| {
+                let result = platform.drive.update_document_for_contract_cbor(
                     &document_cbor,
                     &contract_cbor,
                     &document_type_name,
                     Some(&owner_id),
                     block_time,
                     apply,
+                    StorageFlags::default(),
                     using_transaction.then(|| transaction).flatten(),
                 );
 
@@ -477,7 +486,7 @@ impl DriveWrapper {
         let using_transaction = js_using_transaction.value(&mut cx);
 
         drive
-            .send_to_drive_thread(move |drive: &Drive, transaction, channel| {
+            .send_to_drive_thread(move |platform: &Platform, transaction, channel| {
                 if transaction.is_some() && !using_transaction {
                     channel.send(move |mut task_context| {
                         let callback = js_callback.into_inner(&mut task_context);
@@ -489,7 +498,7 @@ impl DriveWrapper {
                         Ok(())
                     });
                 } else {
-                    let result = drive.delete_document_for_contract_cbor(
+                    let result = platform.drive.delete_document_for_contract_cbor(
                         &document_id,
                         &contract_cbor,
                         &document_type_name,
@@ -552,10 +561,11 @@ impl DriveWrapper {
             Identity::from_buffer(identity_cbor).or_else(|e| cx.throw_error(e.to_string()))?;
 
         drive
-            .send_to_drive_thread(move |drive: &Drive, transaction, channel| {
-                let result = drive.insert_identity(
+            .send_to_drive_thread(move |platform: &Platform, transaction, channel| {
+                let result = platform.drive.insert_identity(
                     identity,
                     apply,
+                    StorageFlags::default(),
                     using_transaction.then(|| transaction).flatten(),
                 );
 
@@ -611,8 +621,8 @@ impl DriveWrapper {
         let using_transaction = js_using_transaction.value(&mut cx);
 
         drive
-            .send_to_drive_thread(move |drive: &Drive, transaction, channel| {
-                let result = drive.query_documents(
+            .send_to_drive_thread(move |platform: &Platform, transaction, channel| {
+                let result = platform.drive.query_documents(
                     &query_cbor,
                     <[u8; 32]>::try_from(contract_id).unwrap(),
                     document_type_name.as_str(),
@@ -667,8 +677,8 @@ impl DriveWrapper {
         let using_transaction = js_using_transaction.value(&mut cx);
 
         drive
-            .send_to_drive_thread(move |drive: &Drive, transaction, channel| {
-                let result = drive.query_documents_as_grove_proof(
+            .send_to_drive_thread(move |platform: &Platform, transaction, channel| {
+                let result = platform.drive.query_documents_as_grove_proof(
                     &query_cbor,
                     <[u8; 32]>::try_from(contract_id).unwrap(),
                     document_type_name.as_str(),
@@ -780,7 +790,7 @@ impl DriveWrapper {
             .this()
             .downcast_or_throw::<JsBox<DriveWrapper>, _>(&mut cx)?;
 
-        db.send_to_drive_thread(move |_drive: &Drive, transaction, channel| {
+        db.send_to_drive_thread(move |_platform: &Platform, transaction, channel| {
             let result = transaction.is_some();
 
             channel.send(move |mut task_context| {
@@ -841,8 +851,8 @@ impl DriveWrapper {
             .downcast_or_throw::<JsBox<DriveWrapper>, _>(&mut cx)?;
         let using_transaction = js_using_transaction.value(&mut cx);
 
-        db.send_to_drive_thread(move |drive: &Drive, transaction, channel| {
-            let grove_db = &drive.grove;
+        db.send_to_drive_thread(move |platform: &Platform, transaction, channel| {
+            let grove_db = &platform.drive.grove;
             let path_slice = path.iter().map(|fragment| fragment.as_slice());
             let result = grove_db
                 .get(
@@ -896,7 +906,7 @@ impl DriveWrapper {
             .this()
             .downcast_or_throw::<JsBox<DriveWrapper>, _>(&mut cx)?;
 
-        db.send_to_drive_thread(move |drive: &Drive, transaction, channel| {
+        db.send_to_drive_thread(move |platform: &Platform, transaction, channel| {
             if transaction.is_some() && !using_transaction {
                 channel.send(move |mut task_context| {
                     let callback = js_callback.into_inner(&mut task_context);
@@ -908,7 +918,7 @@ impl DriveWrapper {
                     Ok(())
                 });
             } else {
-                let grove_db = &drive.grove;
+                let grove_db = &platform.drive.grove;
                 let path_slice = path.iter().map(|fragment| fragment.as_slice());
                 let result = grove_db
                     .insert(
@@ -954,7 +964,7 @@ impl DriveWrapper {
             .this()
             .downcast_or_throw::<JsBox<DriveWrapper>, _>(&mut cx)?;
 
-        db.send_to_drive_thread(move |drive: &Drive, transaction, channel| {
+        db.send_to_drive_thread(move |platform: &Platform, transaction, channel| {
             if transaction.is_some() && !using_transaction {
                 channel.send(move |mut task_context| {
                     let callback = js_callback.into_inner(&mut task_context);
@@ -966,7 +976,7 @@ impl DriveWrapper {
                     Ok(())
                 });
             } else {
-                let grove_db = &drive.grove;
+                let grove_db = &platform.drive.grove;
 
                 let path_slice: Vec<&[u8]> =
                     path.iter().map(|fragment| fragment.as_slice()).collect();
@@ -1016,8 +1026,8 @@ impl DriveWrapper {
             .downcast_or_throw::<JsBox<DriveWrapper>, _>(&mut cx)?;
         let using_transaction = js_using_transaction.value(&mut cx);
 
-        db.send_to_drive_thread(move |drive: &Drive, transaction, channel| {
-            let grove_db = &drive.grove;
+        db.send_to_drive_thread(move |platform: &Platform, transaction, channel| {
+            let grove_db = &platform.drive.grove;
 
             let result = grove_db
                 .put_aux(
@@ -1062,7 +1072,7 @@ impl DriveWrapper {
             .downcast_or_throw::<JsBox<DriveWrapper>, _>(&mut cx)?;
         let using_transaction = js_using_transaction.value(&mut cx);
 
-        db.send_to_drive_thread(move |drive: &Drive, transaction, channel| {
+        db.send_to_drive_thread(move |platform: &Platform, transaction, channel| {
             if transaction.is_some() && !using_transaction {
                 channel.send(move |mut task_context| {
                     let callback = js_callback.into_inner(&mut task_context);
@@ -1074,7 +1084,7 @@ impl DriveWrapper {
                     Ok(())
                 });
             } else {
-                let grove_db = &drive.grove;
+                let grove_db = &platform.drive.grove;
 
                 let result = grove_db
                     .delete_aux(&key, using_transaction.then(|| transaction).flatten())
@@ -1116,8 +1126,8 @@ impl DriveWrapper {
             .downcast_or_throw::<JsBox<DriveWrapper>, _>(&mut cx)?;
         let using_transaction = js_using_transaction.value(&mut cx);
 
-        db.send_to_drive_thread(move |drive: &Drive, transaction, channel| {
-            let grove_db = &drive.grove;
+        db.send_to_drive_thread(move |platform: &Platform, transaction, channel| {
+            let grove_db = &platform.drive.grove;
 
             let result = grove_db
                 .get_aux(&key, using_transaction.then(|| transaction).flatten())
@@ -1165,8 +1175,8 @@ impl DriveWrapper {
             .downcast_or_throw::<JsBox<DriveWrapper>, _>(&mut cx)?;
         let using_transaction = js_using_transaction.value(&mut cx);
 
-        db.send_to_drive_thread(move |drive: &Drive, transaction, channel| {
-            let grove_db = &drive.grove;
+        db.send_to_drive_thread(move |platform: &Platform, transaction, channel| {
+            let grove_db = &platform.drive.grove;
 
             let result = grove_db
                 .query(
@@ -1217,8 +1227,8 @@ impl DriveWrapper {
 
         let using_transaction = js_using_transaction.value(&mut cx);
 
-        db.send_to_drive_thread(move |drive: &Drive, transaction, channel| {
-            let grove_db = &drive.grove;
+        db.send_to_drive_thread(move |platform: &Platform, transaction, channel| {
+            let grove_db = &platform.drive.grove;
 
             let result = grove_db
                 .get_proved_path_query(
@@ -1275,8 +1285,8 @@ impl DriveWrapper {
 
         let using_transaction = js_using_transaction.value(&mut cx);
 
-        db.send_to_drive_thread(move |drive: &Drive, _transaction, channel| {
-            let grove_db = &drive.grove;
+        db.send_to_drive_thread(move |platform: &Platform, _transaction, channel| {
+            let grove_db = &platform.drive.grove;
 
             let path_queries = path_queries.iter().map(|path_query| path_query).collect();
 
@@ -1351,8 +1361,8 @@ impl DriveWrapper {
 
         let using_transaction = js_using_transaction.value(&mut cx);
 
-        db.send_to_drive_thread(move |drive: &Drive, transaction, channel| {
-            let grove_db = &drive.grove;
+        db.send_to_drive_thread(move |platform: &Platform, transaction, channel| {
+            let grove_db = &platform.drive.grove;
 
             let result = grove_db
                 .root_hash(using_transaction.then(|| transaction).flatten())
@@ -1395,7 +1405,7 @@ impl DriveWrapper {
             .downcast_or_throw::<JsBox<DriveWrapper>, _>(&mut cx)?;
         let using_transaction = js_using_transaction.value(&mut cx);
 
-        db.send_to_drive_thread(move |drive: &Drive, transaction, channel| {
+        db.send_to_drive_thread(move |platform: &Platform, transaction, channel| {
             if transaction.is_some() && !using_transaction {
                 channel.send(move |mut task_context| {
                     let callback = js_callback.into_inner(&mut task_context);
@@ -1407,7 +1417,7 @@ impl DriveWrapper {
                     Ok(())
                 });
             } else {
-                let grove_db = &drive.grove;
+                let grove_db = &platform.drive.grove;
 
                 let path_slice: Vec<&[u8]> =
                     path.iter().map(|fragment| fragment.as_slice()).collect();
@@ -1455,14 +1465,10 @@ impl DriveWrapper {
         let request_bytes = converter::js_buffer_to_vec_u8(js_request, &mut cx);
         let using_transaction = js_using_transaction.value(&mut cx);
 
-        db.send_to_drive_thread(move |drive: &Drive, transaction, channel| {
+        db.send_to_drive_thread(move |platform: &Platform, transaction, channel| {
             let result = InitChainRequest::from_bytes(&request_bytes)
                 .and_then(|request| {
-                    handlers::init_chain(
-                        drive,
-                        request,
-                        using_transaction.then(|| transaction).flatten(),
-                    )
+                    platform.init_chain(request, using_transaction.then(|| transaction).flatten())
                 })
                 .and_then(|response| response.to_bytes());
 
@@ -1504,14 +1510,10 @@ impl DriveWrapper {
         let request_bytes = converter::js_buffer_to_vec_u8(js_request, &mut cx);
         let using_transaction = js_using_transaction.value(&mut cx);
 
-        db.send_to_drive_thread(move |drive: &Drive, transaction, channel| {
+        db.send_to_drive_thread(move |platform: &Platform, transaction, channel| {
             let result = BlockBeginRequest::from_bytes(&request_bytes)
                 .and_then(|request| {
-                    handlers::block_begin(
-                        drive,
-                        request,
-                        using_transaction.then(|| transaction).flatten(),
-                    )
+                    platform.block_begin(request, using_transaction.then(|| transaction).flatten())
                 })
                 .and_then(|response| response.to_bytes());
 
@@ -1553,14 +1555,10 @@ impl DriveWrapper {
         let request_bytes = converter::js_buffer_to_vec_u8(js_request, &mut cx);
         let using_transaction = js_using_transaction.value(&mut cx);
 
-        db.send_to_drive_thread(move |drive: &Drive, transaction, channel| {
+        db.send_to_drive_thread(move |platform: &Platform, transaction, channel| {
             let result = BlockEndRequest::from_bytes(&request_bytes)
                 .and_then(|request| {
-                    handlers::block_end(
-                        drive,
-                        request,
-                        using_transaction.then(|| transaction).flatten(),
-                    )
+                    platform.block_end(request, using_transaction.then(|| transaction).flatten())
                 })
                 .and_then(|response| response.to_bytes());
 

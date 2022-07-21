@@ -9,35 +9,35 @@ use object_size_info::DocumentAndContractInfo;
 use object_size_info::DocumentInfo::DocumentSize;
 
 use crate::contract::Contract;
-use crate::drive::block::BlockExecutionContext;
+use crate::drive::batch::GroveDbOpBatch;
 use crate::drive::config::DriveConfig;
-use crate::drive::object_size_info::KeyInfo;
-use crate::drive::storage::batch::Batch;
 use crate::error::Error;
 use crate::fee::op::DriveOperation;
 use crate::fee::op::DriveOperation::GroveOperation;
-use crate::fee::pools::fee_pools::FeePools;
 
-pub mod abci;
-pub mod block;
+pub mod batch;
 pub mod config;
 pub mod contract;
 pub mod defaults;
 pub mod document;
+pub mod fee_pools;
 pub mod flags;
 pub mod genesis_time;
 mod grove_operations;
 pub mod identity;
+pub mod initialization;
 pub mod object_size_info;
 pub mod query;
-pub mod storage;
+
+pub struct DriveCache {
+    pub cached_contracts: Cache<[u8; 32], Arc<Contract>>,
+    pub genesis_time_ms: Option<u64>,
+}
 
 pub struct Drive {
     pub grove: GroveDb,
     pub config: DriveConfig,
-    pub fee_pools: FeePools,
-    pub cached_contracts: RefCell<Cache<[u8; 32], Arc<Contract>>>, //HashMap<[u8; 32], Rc<Contract>>>,
-    pub block_execution_context: RefCell<Option<BlockExecutionContext>>,
+    pub cache: RefCell<DriveCache>,
 }
 
 #[repr(u8)]
@@ -87,13 +87,18 @@ fn contract_documents_path(contract_id: &[u8]) -> [&[u8]; 3] {
 impl Drive {
     pub fn open<P: AsRef<Path>>(path: P, config: Option<DriveConfig>) -> Result<Self, Error> {
         match GroveDb::open(path) {
-            Ok(grove) => Ok(Drive {
-                grove,
-                config: config.unwrap_or_default(),
-                cached_contracts: RefCell::new(Cache::new(200)),
-                fee_pools: FeePools::new(),
-                block_execution_context: RefCell::new(None),
-            }),
+            Ok(grove) => {
+                let config = config.unwrap_or_default();
+                let genesis_time_ms = config.default_genesis_time.clone();
+                Ok(Drive {
+                    grove,
+                    config,
+                    cache: RefCell::new(DriveCache {
+                        cached_contracts: Cache::new(200),
+                        genesis_time_ms,
+                    }),
+                })
+            }
             Err(e) => Err(Error::GroveDB(e)),
         }
     }
@@ -129,72 +134,43 @@ impl Drive {
         }
     }
 
-    pub fn create_initial_state_structure(&self, transaction: TransactionArg) -> Result<(), Error> {
-        let mut batch = Batch::new(self);
-
-        batch.insert_empty_tree(
-            [],
-            KeyInfo::KeyRef(Into::<&[u8; 1]>::into(RootTree::Identities)),
-            None,
-        )?;
-
-        batch.insert_empty_tree(
-            [],
-            KeyInfo::KeyRef(Into::<&[u8; 1]>::into(RootTree::ContractDocuments)),
-            None,
-        )?;
-
-        batch.insert_empty_tree(
-            [],
-            KeyInfo::KeyRef(Into::<&[u8; 1]>::into(
-                RootTree::PublicKeyHashesToIdentities,
-            )),
-            None,
-        )?;
-
-        batch.insert_empty_tree(
-            [],
-            KeyInfo::KeyRef(Into::<&[u8; 1]>::into(RootTree::SpentAssetLockTransactions)),
-            None,
-        )?;
-
-        // initialize the pools with epochs
-        self.fee_pools
-            .add_create_fee_pool_trees_operations(self, &mut batch)?;
-
-        self.apply_batch(batch, false, transaction)?;
-
-        Ok(())
-    }
-
-    fn apply_batch_operations(
+    fn apply_batch_drive_operations(
         &self,
         apply: bool,
         transaction: TransactionArg,
         batch_operations: Vec<DriveOperation>,
         drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<(), Error> {
+        let grove_db_operations = DriveOperation::grovedb_operations_batch(&batch_operations);
+        self.apply_batch_grovedb_operations(
+            apply,
+            transaction,
+            grove_db_operations,
+            drive_operations,
+        )?;
+        batch_operations.into_iter().for_each(|op| match op {
+            GroveOperation(_) => (),
+            _ => drive_operations.push(op),
+        });
+        Ok(())
+    }
+
+    fn apply_batch_grovedb_operations(
+        &self,
+        apply: bool,
+        transaction: TransactionArg,
+        batch_operations: GroveDbOpBatch,
+        drive_operations: &mut Vec<DriveOperation>,
+    ) -> Result<(), Error> {
         if apply {
-            self.grove_apply_batch(
-                DriveOperation::grovedb_operations(&batch_operations),
+            self.grove_apply_batch_with_add_costs(
+                batch_operations,
                 false,
                 transaction,
                 drive_operations,
             )?;
-            batch_operations.into_iter().for_each(|op| match op {
-                GroveOperation(_) => (),
-                _ => drive_operations.push(op),
-            });
         } else {
-            self.grove_batch_operations_costs(
-                DriveOperation::grovedb_operations(&batch_operations),
-                false,
-                drive_operations,
-            )?;
-            batch_operations.into_iter().for_each(|op| match op {
-                GroveOperation(_) => (),
-                _ => drive_operations.push(op),
-            });
+            self.grove_batch_operations_costs(batch_operations, false, drive_operations)?;
         }
         Ok(())
     }

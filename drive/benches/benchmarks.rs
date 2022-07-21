@@ -1,10 +1,8 @@
-use criterion::{black_box, criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion};
+use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use rs_drive::common::json_document_to_cbor;
 use rs_drive::contract::document::Document;
 use rs_drive::contract::Contract;
 use serde::Serialize;
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
 
 criterion_main!(serialization, deserialization);
 criterion_group!(serialization, test_drive_10_serialization);

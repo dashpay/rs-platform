@@ -199,7 +199,7 @@ impl Drive {
                 )?;
             }
         }
-        self.apply_batch_operations(apply, transaction, batch_operations, drive_operations)
+        self.apply_batch_drive_operations(apply, transaction, batch_operations, drive_operations)
     }
 }
 
@@ -821,6 +821,7 @@ mod tests {
                 false,
                 0f64,
                 true,
+                StorageFlags::default(),
                 None,
             )
             .expect("expected to insert a document successfully");
@@ -874,6 +875,7 @@ mod tests {
                 false,
                 0f64,
                 true,
+                StorageFlags::default(),
                 Some(&db_transaction),
             )
             .expect("expected to insert a document successfully");

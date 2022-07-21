@@ -2,7 +2,6 @@ use std::collections::HashSet;
 use std::option::Option::None;
 
 use grovedb::{Element, TransactionArg};
-use std::ops::Deref;
 
 use crate::contract::document::Document;
 use crate::contract::Contract;
@@ -32,6 +31,7 @@ impl Drive {
         owner_id: Option<&[u8]>,
         block_time: f64,
         apply: bool,
+        storage_flags: StorageFlags,
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
         let contract = Contract::from_cbor(contract_cbor, None)?;
@@ -46,6 +46,7 @@ impl Drive {
             owner_id,
             block_time,
             apply,
+            storage_flags,
             transaction,
         )
     }
@@ -58,6 +59,7 @@ impl Drive {
         owner_id: Option<&[u8]>,
         block_time: f64,
         apply: bool,
+        storage_flags: StorageFlags,
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
         let document = Document::from_cbor(serialized_document, None, owner_id)?;
@@ -70,6 +72,7 @@ impl Drive {
             owner_id,
             block_time,
             apply,
+            storage_flags,
             transaction,
         )
     }
@@ -83,19 +86,12 @@ impl Drive {
         owner_id: Option<&[u8]>,
         block_time: f64,
         apply: bool,
+        storage_flags: StorageFlags,
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
         let mut drive_operations: Vec<DriveOperation> = vec![];
 
         let document_type = contract.document_type_for_name(document_type_name)?;
-
-        let block_execution_context = self.block_execution_context.borrow();
-        let epoch = match block_execution_context.deref() {
-            Some(block_execution_context) => block_execution_context.epoch_info.current_epoch_index,
-            None => 0,
-        };
-
-        let storage_flags = StorageFlags { epoch };
 
         let document_info = if apply {
             DocumentAndSerialization((document, serialized_document, &storage_flags))
@@ -462,7 +458,7 @@ impl Drive {
                 }
             }
         }
-        self.apply_batch_operations(apply, transaction, batch_operations, drive_operations)
+        self.apply_batch_drive_operations(apply, transaction, batch_operations, drive_operations)
     }
 }
 
@@ -504,6 +500,7 @@ mod tests {
                 None,
                 0f64,
                 true,
+                StorageFlags::default(),
                 Some(&db_transaction),
             )
             .expect("expected to apply contract successfully");
@@ -521,6 +518,7 @@ mod tests {
                 true,
                 0f64,
                 true,
+                StorageFlags::default(),
                 Some(&db_transaction),
             )
             .expect("should create alice profile");
@@ -537,6 +535,7 @@ mod tests {
                 None,
                 0f64,
                 true,
+                StorageFlags::default(),
                 Some(&db_transaction),
             )
             .expect("should update alice profile");
@@ -556,7 +555,14 @@ mod tests {
         let contract = Contract::from_cbor(contract_cbor.as_slice(), None)
             .expect("expected to create contract");
         drive
-            .apply_contract_cbor(contract_cbor.clone(), None, 0f64, true, None)
+            .apply_contract_cbor(
+                contract_cbor.clone(),
+                None,
+                0f64,
+                true,
+                StorageFlags::default(),
+                None,
+            )
             .expect("expected to apply contract successfully");
 
         // Create Alice profile
@@ -612,6 +618,7 @@ mod tests {
                 None,
                 0f64,
                 true,
+                StorageFlags::default(),
                 None,
             )
             .expect("should update alice profile");
@@ -644,6 +651,7 @@ mod tests {
                 None,
                 0f64,
                 true,
+                StorageFlags::default(),
                 Some(&db_transaction),
             )
             .expect("expected to apply contract successfully");
@@ -715,6 +723,7 @@ mod tests {
                 None,
                 0f64,
                 true,
+                StorageFlags::default(),
                 Some(&db_transaction),
             )
             .expect("should update alice profile");
@@ -753,6 +762,7 @@ mod tests {
                 None,
                 0f64,
                 true,
+                StorageFlags::default(),
                 Some(&db_transaction),
             )
             .expect("expected to apply contract successfully");
@@ -852,6 +862,7 @@ mod tests {
                 None,
                 0f64,
                 true,
+                StorageFlags::default(),
                 Some(&db_transaction),
             )
             .expect("should update alice profile");
@@ -902,7 +913,14 @@ mod tests {
         let contract = value_to_cbor(contract, Some(defaults::PROTOCOL_VERSION));
 
         drive
-            .apply_contract_cbor(contract.clone(), None, 0f64, true, None)
+            .apply_contract_cbor(
+                contract.clone(),
+                None,
+                0f64,
+                true,
+                StorageFlags::default(),
+                None,
+            )
             .expect("should create a contract");
 
         // Create document
@@ -931,6 +949,7 @@ mod tests {
                 true,
                 0f64,
                 true,
+                StorageFlags::default(),
                 None,
             )
             .expect("should add document");
@@ -960,6 +979,7 @@ mod tests {
                 None,
                 0f64,
                 true,
+                StorageFlags::default(),
                 None,
             )
             .expect("should update document");
@@ -1015,6 +1035,7 @@ mod tests {
                 false,
                 0f64,
                 true,
+                StorageFlags::default(),
                 Some(&db_transaction),
             )
             .expect("expected to insert a document successfully");
@@ -1027,6 +1048,7 @@ mod tests {
                 Some(&random_owner_id),
                 0f64,
                 true,
+                StorageFlags::default(),
                 Some(&db_transaction),
             )
             .expect_err("expected not to be able to update a non mutable document");
@@ -1040,6 +1062,7 @@ mod tests {
                 true,
                 0f64,
                 true,
+                StorageFlags::default(),
                 Some(&db_transaction),
             )
             .expect_err("expected not to be able to override a non mutable document");
@@ -1083,6 +1106,7 @@ mod tests {
                 false,
                 0f64,
                 true,
+                StorageFlags::default(),
                 Some(&db_transaction),
             )
             .expect("expected to insert a document successfully");
@@ -1095,6 +1119,7 @@ mod tests {
                 Some(&random_owner_id),
                 0f64,
                 true,
+                StorageFlags::default(),
                 Some(&db_transaction),
             )
             .expect("expected to update a document with history successfully");
@@ -1158,7 +1183,9 @@ mod tests {
     ) {
         let config = DriveConfig {
             batching_enabled: using_batches,
+            batching_consistency_verification: true,
             has_raw_enabled: using_has_raw,
+            default_genesis_time: Some(0),
             encoding: DriveEncoding::DriveCbor,
         };
         let tmp_dir = TempDir::new().unwrap();

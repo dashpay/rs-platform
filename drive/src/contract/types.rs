@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::io::{BufReader, Read};
 
-use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
+use byteorder::{BigEndian, ReadBytesExt};
 use ciborium::value::{Integer, Value};
 use integer_encoding::{VarInt, VarIntReader};
 use rand::distributions::{Alphanumeric, Standard};
@@ -540,7 +540,7 @@ impl DocumentFieldType {
                     Ok(Some(Value::Map(values)))
                 }
             }
-            DocumentFieldType::Array(array_field_type) => {
+            DocumentFieldType::Array(_array_field_type) => {
                 Err(Error::Drive(DriveError::Unsupported(
                     "serialization of arrays not yet supported",
                 )))

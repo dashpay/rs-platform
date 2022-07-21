@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::ops::BitXor;
 
 use ciborium::value::Value;
-pub use grovedb::{
+use grovedb::{
     Element, Error as GroveError, GroveDb, PathQuery, Query, QueryItem, SizedQuery, TransactionArg,
 };
 use indexmap::IndexMap;
@@ -868,7 +868,7 @@ impl<'a> DriveQuery<'a> {
                         Ok(Some(inner_query))
                     }
                     Some(query) => {
-                        if let Some((document, document_type, indexed_property, included)) =
+                        if let Some((document, document_type, _indexed_property, included)) =
                             starts_at_document
                         {
                             let start_at_key = document

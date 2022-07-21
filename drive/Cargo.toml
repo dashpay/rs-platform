@@ -26,20 +26,18 @@ thiserror = "1.0.30"
 moka = "0.8.1"
 nohash-hasher = "0.2.0"
 chrono = "0.4.0"
-rust_decimal = "1.2.5"
-rust_decimal_macros = "1.25"
 
 [dependencies.grovedb]
 git = "https://github.com/dashevo/grovedb"
-branch = "develop"
+branch = "feat/RawPathQueries"
 
 [dependencies.storage]
 git = "https://github.com/dashevo/grovedb"
-branch = "develop"
+branch = "feat/RawPathQueries"
 
 [dependencies.costs]
 git = "https://github.com/dashevo/grovedb"
-branch = "develop"
+branch = "feat/RawPathQueries"
 
 [dependencies.dpp]
 git = "https://github.com/dashevo/rust-dpp"
