@@ -13,6 +13,7 @@ use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 
 // TODO: Find better name
+#[derive(Default)]
 pub struct ProposersPayouts {
     pub proposers_paid_count: u16,
     pub paid_epoch_index: u16,

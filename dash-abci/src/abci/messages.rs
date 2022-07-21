@@ -56,14 +56,14 @@ impl BlockEndResponse {
         process_block_fees_result: &ProcessedBlockFeesResult,
     ) -> Self {
         let (proposers_paid_count, paid_epoch_index) =
-            if let Some(payouts) = &process_block_fees_result.payouts {
-                (
-                    Some(payouts.proposers_paid_count),
-                    Some(payouts.paid_epoch_index),
-                )
-            } else {
-                (None, None)
-            };
+            process_block_fees_result
+                .payouts
+                .map_or((None, None), |proposer_payouts| {
+                    (
+                        Some(proposer_payouts.proposers_paid_count),
+                        Some(proposer_payouts.paid_epoch_index),
+                    )
+                });
 
         Self {
             current_epoch_index: epoch_info.current_epoch_index,
