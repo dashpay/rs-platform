@@ -27,7 +27,7 @@ pub struct FeesInPools {
 impl Platform {
     pub fn add_distribute_fees_from_unpaid_pools_to_proposers_operations(
         &self,
-        pay_starting_with_epoch_index: u16,
+        pay_starting_at_epoch_index: u16,
         cached_current_epoch_start_block_height: Option<u64>,
         transaction: TransactionArg,
         batch: &mut GroveDbOpBatch,
@@ -35,7 +35,7 @@ impl Platform {
         // Find oldest from unpaid epochs
         let unpaid_epoch_pool = match self
             .drive
-            .get_oldest_unpaid_epoch_pool(pay_starting_with_epoch_index, transaction)
+            .get_oldest_unpaid_epoch_pool(pay_starting_at_epoch_index, transaction)
             .map_err(Error::Drive)?
         {
             Some(epoch_pool) => epoch_pool,
@@ -43,10 +43,10 @@ impl Platform {
         };
 
         // Process more proposers at once if we have many unpaid epochs in past
-        let proposers_limit: u16 = if unpaid_epoch_pool.index == pay_starting_with_epoch_index {
+        let proposers_limit: u16 = if unpaid_epoch_pool.index == pay_starting_at_epoch_index {
             50
         } else {
-            (pay_starting_with_epoch_index - unpaid_epoch_pool.index + 1) * 50
+            (pay_starting_at_epoch_index - unpaid_epoch_pool.index + 1) * 50
         };
 
         let total_fees = self

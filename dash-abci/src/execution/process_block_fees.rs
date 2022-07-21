@@ -113,7 +113,7 @@ impl Platform {
 
             // Since start_block_height is not committed for current epoch
             // we pass it explicitly
-            let cached_current_epoch_start_block_height = if epoch_info.is_epoch_change {
+            let current_epoch_start_block_height = if epoch_info.is_epoch_change {
                 Some(block_info.block_height)
             } else {
                 None
@@ -121,7 +121,7 @@ impl Platform {
 
             self.add_distribute_fees_from_unpaid_pools_to_proposers_operations(
                 pay_starting_with_epoch_index,
-                cached_current_epoch_start_block_height,
+                current_epoch_start_block_height,
                 transaction,
                 &mut batch,
             )?

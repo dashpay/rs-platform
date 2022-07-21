@@ -25,7 +25,6 @@ pub fn add_create_fee_pool_trees_operations(batch: &mut GroveDbOpBatch) {
     }
 }
 
-// TODO: It's very inconvenient to have it separately from function which gets this value. It's not obvious. I spent some time to find it.
 pub fn update_storage_fee_distribution_pool_operation(storage_fee: u64) -> GroveDbOp {
     GroveDbOp {
         path: pools_vec_path(),
