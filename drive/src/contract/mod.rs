@@ -1,12 +1,9 @@
-// TODO remove the file
 pub mod document;
-pub mod document_utils;
-pub mod types;
+pub mod factory;
 
-// re-exports
-pub use document_utils::DocumentFactory;
 pub use dpp::data_contract::{
-    extra::DocumentType,
+    extra::{DocumentField, DocumentFieldType, DocumentType},
     extra::{Index, IndexProperty},
     DataContract, DataContract as Contract,
 };
+pub use factory::RandomDocumentFactory;

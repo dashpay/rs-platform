@@ -49,7 +49,7 @@ impl Drive {
         let contract = document_and_contract_info.contract;
         let document_type = document_and_contract_info.document_type;
         let primary_key_path = contract_documents_primary_key_path(
-            contract.id.as_bytes(),
+            contract.id().as_bytes(),
             document_type.name.as_str(),
         );
         if document_type.documents_keep_history {
@@ -88,7 +88,7 @@ impl Drive {
                     );
                     let document_id_in_primary_path =
                         contract_documents_keeping_history_primary_key_path_for_document_id(
-                            contract.id.as_bytes(),
+                            contract.id().as_bytes(),
                             document_type.name.as_str(),
                             document.id.as_slice(),
                         );

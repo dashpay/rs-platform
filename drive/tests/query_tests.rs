@@ -481,6 +481,7 @@ fn test_query_many() {
 }
 
 #[test]
+// #[ignore]
 fn test_family_basic_queries() {
     let (drive, contract, _tmp_dir) = setup_family_tests(10, true, 73509);
 

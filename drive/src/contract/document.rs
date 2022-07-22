@@ -10,9 +10,8 @@ use crate::common::{bytes_for_system_value_from_tree_map, get_key_from_cbor_map}
 use crate::contract::Contract;
 use crate::drive::defaults::PROTOCOL_VERSION;
 use crate::drive::Drive;
-use dpp::data_contract::extra::DocumentType;
+use dpp::data_contract::extra::{ContractError, DocumentType};
 
-use crate::error::contract::ContractError;
 use crate::error::drive::DriveError;
 use crate::error::structure::StructureError;
 use crate::error::Error;
@@ -349,7 +348,7 @@ impl Document {
 mod tests {
     use super::*;
     use crate::common::json_document_to_cbor;
-    use crate::contract::DocumentFactory;
+    use crate::contract::RandomDocumentFactory;
     use dpp::data_contract::extra::DriveContractExt;
 
     #[test]

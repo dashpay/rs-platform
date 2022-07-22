@@ -1,13 +1,11 @@
-// TODO move the factory to higher higher level abstractions
-// TODO this factory is used in benchmark and tests - so probably the methods should be available under
-// TODO the test feature
 use super::document::Document;
 use crate::error::Error;
 use dpp::data_contract::extra::DocumentType;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 
-pub trait DocumentFactory {
+// TODO The factory is used in benchmark and tests. Probably it should be available under the test feature
+pub trait RandomDocumentFactory {
     fn random_documents(&self, count: u32, seed: Option<u64>) -> Vec<Document>;
     fn document_from_bytes(&self, bytes: &[u8]) -> Result<Document, Error>;
     fn random_document(&self, seed: Option<u64>) -> Document;
@@ -17,7 +15,7 @@ pub trait DocumentFactory {
     fn random_filled_document_with_rng(&self, rng: &mut StdRng) -> Document;
 }
 
-impl DocumentFactory for DocumentType {
+impl RandomDocumentFactory for DocumentType {
     fn random_documents(&self, count: u32, seed: Option<u64>) -> Vec<Document> {
         let mut rng = match seed {
             None => StdRng::from_entropy(),
