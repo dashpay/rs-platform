@@ -2,7 +2,6 @@ use crate::abci::messages::FeesAggregate;
 use crate::error::execution::ExecutionError;
 use crate::error::Error;
 
-use crate::execution::epoch_change::epoch::EpochInfo;
 use crate::platform::Platform;
 use rs_drive::drive::batch::GroveDbOpBatch;
 use rs_drive::fee_pools::epochs::Epoch;
@@ -12,9 +11,7 @@ use rs_drive::{error, grovedb};
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 
-// TODO: Find better name
-#[derive(Default)]
-pub struct ProposersPayouts {
+pub struct ProposerPayouts {
     pub proposers_paid_count: u16,
     pub paid_epoch_index: u16,
 }
@@ -31,7 +28,7 @@ impl Platform {
         cached_current_epoch_start_block_height: Option<u64>,
         transaction: TransactionArg,
         batch: &mut GroveDbOpBatch,
-    ) -> Result<Option<ProposersPayouts>, Error> {
+    ) -> Result<Option<ProposerPayouts>, Error> {
         // Find oldest from unpaid epochs
         let unpaid_epoch_pool = match self
             .drive
@@ -54,7 +51,15 @@ impl Platform {
             .get_epoch_total_credits_for_distribution(&unpaid_epoch_pool, transaction)
             .map_err(Error::Drive)?;
 
-        // TODO: Pass cached_current_epoch_start_block_height only in case unpaid epoch is previous one
+        let total_fees = Decimal::from(total_fees);
+
+        // Pass cached current epoch start block height only if we pay for the previous epoch
+        let cached_current_epoch_start_block_height =
+            if unpaid_epoch_pool.index == pay_starting_at_epoch_index {
+                cached_current_epoch_start_block_height
+            } else {
+                None
+            };
 
         let unpaid_epoch_block_count = self
             .drive
@@ -81,7 +86,7 @@ impl Platform {
             let proposed_block_count = Decimal::from(*proposed_block_count);
 
             let mut masternode_reward =
-                (Decimal::from(total_fees) * proposed_block_count) / unpaid_epoch_block_count;
+                (total_fees * proposed_block_count) / unpaid_epoch_block_count;
 
             let documents =
                 self.get_reward_shares_list_for_masternode(proposer_tx_hash, transaction)?;
@@ -117,7 +122,7 @@ impl Platform {
                         ))
                     })?;
 
-                let share_percentage = Decimal::new(share_percentage_integer, 0) / dec!(10000.0);
+                let share_percentage = Decimal::from(share_percentage_integer) / dec!(10000);
 
                 let reward = masternode_reward * share_percentage;
 
@@ -134,7 +139,8 @@ impl Platform {
                 )?;
             }
 
-            // Since balance is an integer, we collect rewards remainder and distribute leftovers afterwards
+            // Since balance is an integer, we collect rewards remainder
+            // and the distribute
             let masternode_reward_floored = masternode_reward.floor();
 
             fee_leftovers += masternode_reward - masternode_reward_floored;
@@ -144,6 +150,8 @@ impl Platform {
             } else {
                 masternode_reward_floored
             };
+
+            // TODO It seems we pass a value with reminder but inside we do a conversion to u64
 
             self.add_pay_reward_to_identity_operations(
                 proposer_tx_hash,
@@ -161,11 +169,12 @@ impl Platform {
 
         // if less then a limit processed then mark the epochs pool as paid
         if proposers_len < proposers_limit {
-            // TODO It must be called in upper function. this function deals only with proposers tree
+            // TODO It must be called in upper function. It's not this function
+            //   responsibility to remove some keys from epoch pools, it deals only with proposers tree
             unpaid_epoch_pool.add_mark_as_paid_operations(batch);
         }
 
-        Ok(Some(ProposersPayouts {
+        Ok(Some(ProposerPayouts {
             proposers_paid_count: proposers_len,
             paid_epoch_index: unpaid_epoch_pool.index,
         }))
@@ -218,7 +227,7 @@ impl Platform {
 
         batch.push(
             current_epoch
-                // TODO Why update processing fees in Epoch but get in Drive?
+                // TODO Why update processing fees in Epoch but get function in Drive?
                 .update_processing_credits_for_distribution_operation(total_processing_fees),
         );
 
@@ -253,6 +262,8 @@ mod tests {
         use rs_drive::fee_pools::epochs::epoch_key_constants::KEY_PROPOSERS;
         use rs_drive::fee_pools::epochs::Epoch;
         use rs_drive::grovedb;
+        use rust_decimal::Decimal;
+        use rust_decimal_macros::dec;
 
         #[test]
         fn test_no_distribution_when_all_epochs_paid() {
@@ -451,16 +462,6 @@ mod tests {
                     assert_eq!(payouts.paid_epoch_index, 0);
                 }
             }
-
-            // check we paid 500 to every mn identity
-            let paid_mn_identities = platform
-                .drive
-                .fetch_identities(&pro_tx_hashes, Some(&transaction))
-                .expect("expected to get identities");
-
-            for paid_mn_identity in paid_mn_identities {
-                assert_eq!(paid_mn_identity.balance, 100);
-            }
         }
 
         #[test]
@@ -480,6 +481,11 @@ mod tests {
             let mut batch = GroveDbOpBatch::new();
 
             unpaid_epoch_pool_0.add_init_current_operations(1.0, 1, 1, &mut batch);
+
+            batch.push(
+                unpaid_epoch_pool_0.update_processing_credits_for_distribution_operation(10000),
+            );
+
             unpaid_epoch_pool_1.add_init_current_operations(
                 1.0,
                 proposers_count as u64 + 1,
@@ -487,22 +493,32 @@ mod tests {
                 &mut batch,
             );
 
-            // Add some fees to unpaid epoch pool
-            batch.push(
-                unpaid_epoch_pool_0.update_processing_credits_for_distribution_operation(10000),
-            );
-
             platform
                 .drive
                 .grove_apply_batch(batch, false, Some(&transaction))
                 .expect("should apply batch");
 
-            // Populate proposers into unpaid epoch pool
+            // Populate proposers into unpaid epoch pools
 
             let pro_tx_hashes =
                 create_test_masternode_identities_and_add_them_as_epoch_block_proposers(
                     &platform.drive,
                     &unpaid_epoch_pool_0,
+                    proposers_count,
+                    Some(&transaction),
+                );
+
+            create_test_masternode_share_identities_and_documents(
+                &platform.drive,
+                &contract,
+                &pro_tx_hashes,
+                Some(&transaction),
+            );
+
+            let pro_tx_hashes =
+                create_test_masternode_identities_and_add_them_as_epoch_block_proposers(
+                    &platform.drive,
+                    &unpaid_epoch_pool_1,
                     proposers_count,
                     Some(&transaction),
                 );
@@ -526,7 +542,7 @@ mod tests {
                 &mut batch,
             );
 
-            let pay_starting_with_epoch_index = 0;
+            let pay_starting_with_epoch_index = 1;
             let cached_current_epoch_start_block_height = Some(epoch_pool_2_start_block_height);
 
             let proposer_payouts = platform
@@ -546,19 +562,9 @@ mod tests {
             match proposer_payouts {
                 None => assert!(false, "proposers should be paid"),
                 Some(payouts) => {
-                    assert_eq!(payouts.proposers_paid_count, 50);
                     assert_eq!(payouts.paid_epoch_index, 0);
+                    assert_eq!(payouts.proposers_paid_count, 50);
                 }
-            }
-
-            // check we paid 500 to every mn identity
-            let paid_mn_identities = platform
-                .drive
-                .fetch_identities(&pro_tx_hashes, Some(&transaction))
-                .expect("expected to get identities");
-
-            for paid_mn_identity in paid_mn_identities {
-                assert_eq!(paid_mn_identity.balance, 100);
             }
         }
 
@@ -734,6 +740,10 @@ mod tests {
                 .fetch_identities(&pro_tx_hashes, Some(&transaction))
                 .expect("expected to get identities");
 
+            let total_fees = Decimal::from(storage_fees + processing_fees);
+
+            let masternode_reward = total_fees / Decimal::from(proposers_count);
+
             let shares_percentage_with_precision: u64 = share_identities_and_documents[0]
                 .1
                 .properties
@@ -744,14 +754,14 @@ mod tests {
                 .try_into()
                 .expect("percentage should be u64");
 
-            // TODO: Accomplish
-            let shares_percentage = shares_percentage_with_precision / 100;
+            let shares_percentage = Decimal::from(shares_percentage_with_precision) / dec!(10000);
 
-            let payout_credits =
-                (storage_fees + processing_fees / proposers_count as u64) / shares_percentage;
+            let payout_credits = masternode_reward * shares_percentage;
+
+            let payout_credits: i64 = payout_credits.try_into().expect("should convert to i64");
 
             for paid_mn_identity in paid_mn_identities {
-                assert_eq!(paid_mn_identity.balance, payout_credits as i64);
+                assert_eq!(paid_mn_identity.balance, payout_credits);
             }
 
             let share_identities = share_identities_and_documents

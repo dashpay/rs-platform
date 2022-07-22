@@ -15,7 +15,7 @@ impl Drive {
 
         let next_start_block_height =
             if let Some(next_start_block_height) = cached_next_epoch_start_block_height {
-                next_start_block_height // TODO: If we pay for 3 epoch ago we get cached value from current epoch not from epoch 2
+                next_start_block_height
             } else {
                 self.get_epoch_start_block_height(&next_epoch_pool, transaction)?
             };

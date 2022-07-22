@@ -20,6 +20,9 @@ impl Epoch {
         transaction: TransactionArg,
     ) -> Result<GroveDbOp, Error> {
         // update proposer's block count
+        // TODO: we already handle it few lines below. It's not a problem to do one faulty request once in 18 days
+        //  but keep logic of this function simpler and keep `is_epoch_change` branching logic only in process_block_fees module
+        //  so people can easily see what's going on
         let proposed_block_count = if is_epoch_change {
             0
         } else {
