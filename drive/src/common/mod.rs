@@ -25,6 +25,9 @@ pub fn setup_contract(
     let contract_cbor = json_document_to_cbor(path, Some(crate::drive::defaults::PROTOCOL_VERSION));
     let contract = <Contract as DriveContractExt>::from_cbor(&contract_cbor, contract_id)
         .expect("contract should be deserialized");
+    let contract_cbor =
+        DriveContractExt::to_cbor(&contract).expect("contract should be serialized");
+
     drive
         .apply_contract_cbor(contract_cbor, contract_id, 0f64, true, transaction)
         .expect("contract should be applied");

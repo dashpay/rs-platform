@@ -481,7 +481,6 @@ fn test_query_many() {
 }
 
 #[test]
-// #[ignore]
 fn test_family_basic_queries() {
     let (drive, contract, _tmp_dir) = setup_family_tests(10, true, 73509);
 
@@ -494,8 +493,8 @@ fn test_family_basic_queries() {
         .expect("there is always a root hash");
 
     let expected_app_hash = vec![
-        246, 246, 3, 22, 3, 237, 188, 54, 88, 212, 202, 248, 32, 22, 64, 252, 239, 232, 22, 224,
-        244, 154, 165, 238, 111, 106, 236, 0, 12, 1, 141, 12,
+        109, 254, 219, 245, 219, 182, 195, 213, 181, 105, 8, 245, 209, 203, 217, 5, 194, 27, 206,
+        180, 195, 67, 193, 221, 29, 63, 112, 134, 240, 90, 156, 215,
     ];
 
     assert_eq!(root_hash.as_slice(), expected_app_hash);
@@ -1660,14 +1659,13 @@ fn test_family_basic_queries() {
     assert_eq!(
         root_hash.as_slice(),
         vec![
-            185, 20, 106, 141, 77, 79, 103, 134, 39, 149, 218, 254, 186, 145, 55, 122, 76, 12, 110,
-            56, 67, 226, 22, 64, 60, 198, 124, 202, 27, 233, 240, 13
+            107, 187, 86, 121, 39, 1, 184, 111, 165, 112, 133, 90, 186, 139, 109, 120, 179, 54,
+            122, 124, 146, 170, 199, 134, 200, 157, 68, 48, 157, 117, 80, 113
         ],
     );
 }
 
 #[test]
-#[ignore]
 fn test_family_starts_at_queries() {
     let (drive, contract, _tmp_dir) = setup_family_tests(10, true, 73509);
 
@@ -1680,8 +1678,8 @@ fn test_family_starts_at_queries() {
         .expect("there is always a root hash");
 
     let expected_app_hash = vec![
-        246, 246, 3, 22, 3, 237, 188, 54, 88, 212, 202, 248, 32, 22, 64, 252, 239, 232, 22, 224,
-        244, 154, 165, 238, 111, 106, 236, 0, 12, 1, 141, 12,
+        109, 254, 219, 245, 219, 182, 195, 213, 181, 105, 8, 245, 209, 203, 217, 5, 194, 27, 206,
+        180, 195, 67, 193, 221, 29, 63, 112, 134, 240, 90, 156, 215,
     ];
 
     assert_eq!(root_hash.as_slice(), expected_app_hash);
@@ -1908,7 +1906,6 @@ fn test_family_starts_at_queries() {
 }
 
 #[test]
-#[ignore]
 fn test_family_sql_query() {
     // These tests confirm that sql statements produce the same drive query
     // as their json counterparts, tests above confirm that the json queries
@@ -2046,7 +2043,6 @@ fn test_family_sql_query() {
 }
 
 #[test]
-#[ignore]
 fn test_family_with_nulls_query() {
     let (drive, contract, _tmp_dir) = setup_family_tests_with_nulls(10, true, 30004);
 
@@ -2059,8 +2055,8 @@ fn test_family_with_nulls_query() {
         .expect("there is always a root hash");
 
     let expected_app_hash = vec![
-        70, 142, 157, 122, 57, 190, 112, 16, 73, 50, 243, 210, 194, 151, 158, 153, 10, 247, 4, 3,
-        4, 43, 133, 130, 192, 196, 60, 159, 86, 43, 212, 171,
+        186, 6, 41, 47, 237, 173, 225, 223, 42, 251, 47, 104, 252, 33, 7, 254, 74, 184, 185, 227,
+        9, 157, 179, 176, 221, 210, 74, 61, 198, 24, 90, 64,
     ];
 
     assert_eq!(root_hash.as_slice(), expected_app_hash);
@@ -2159,7 +2155,6 @@ fn test_family_with_nulls_query() {
 }
 
 #[test]
-#[ignore]
 fn test_query_with_cached_contract() {
     let (drive, contract, _tmp_dir) = setup_family_tests(10, true, 73509);
 
@@ -2172,8 +2167,8 @@ fn test_query_with_cached_contract() {
         .expect("there is always a root hash");
 
     let expected_app_hash = vec![
-        246, 246, 3, 22, 3, 237, 188, 54, 88, 212, 202, 248, 32, 22, 64, 252, 239, 232, 22, 224,
-        244, 154, 165, 238, 111, 106, 236, 0, 12, 1, 141, 12,
+        109, 254, 219, 245, 219, 182, 195, 213, 181, 105, 8, 245, 209, 203, 217, 5, 194, 27, 206,
+        180, 195, 67, 193, 221, 29, 63, 112, 134, 240, 90, 156, 215,
     ];
 
     assert_eq!(root_hash.as_slice(), expected_app_hash);
@@ -2226,7 +2221,6 @@ fn test_query_with_cached_contract() {
 }
 
 #[test]
-#[ignore]
 fn test_dpns_query() {
     let (drive, contract, _tmp_dir) = setup_dpns_tests_with_batches(10, 11456);
 
@@ -2239,8 +2233,8 @@ fn test_dpns_query() {
         .expect("there is always a root hash");
 
     let expected_app_hash = vec![
-        149, 70, 55, 248, 241, 186, 124, 33, 222, 200, 116, 130, 31, 61, 52, 121, 243, 66, 10, 177,
-        254, 6, 118, 90, 157, 239, 222, 236, 159, 225, 238, 78,
+        66, 109, 200, 149, 140, 54, 122, 244, 63, 50, 56, 78, 215, 217, 191, 224, 16, 203, 116, 38,
+        170, 134, 158, 122, 15, 11, 88, 126, 79, 171, 26, 203,
     ];
 
     assert_eq!(root_hash.as_slice(), expected_app_hash);
@@ -2626,7 +2620,6 @@ fn test_dpns_query() {
 }
 
 #[test]
-#[ignore]
 fn test_dpns_insertion_no_aliases() {
     // using ascending order with rangeTo operators
     let (drive, contract, _tmp_dir) =
@@ -2676,7 +2669,6 @@ fn test_dpns_insertion_no_aliases() {
 }
 
 #[test]
-#[ignore]
 fn test_dpns_insertion_with_aliases() {
     // using ascending order with rangeTo operators
     let (drive, contract, _tmp_dir) =
@@ -2726,7 +2718,6 @@ fn test_dpns_insertion_with_aliases() {
 }
 
 #[test]
-#[ignore]
 fn test_dpns_query_start_at() {
     // The point of this test is to test the situation where we have a start at a certain value for the DPNS query.
     let (drive, contract, _tmp_dir) = setup_dpns_tests_with_batches(10, 11456);
@@ -2740,8 +2731,8 @@ fn test_dpns_query_start_at() {
         .expect("there is always a root hash");
 
     let expected_app_hash = vec![
-        149, 70, 55, 248, 241, 186, 124, 33, 222, 200, 116, 130, 31, 61, 52, 121, 243, 66, 10, 177,
-        254, 6, 118, 90, 157, 239, 222, 236, 159, 225, 238, 78,
+        66, 109, 200, 149, 140, 54, 122, 244, 63, 50, 56, 78, 215, 217, 191, 224, 16, 203, 116, 38,
+        170, 134, 158, 122, 15, 11, 88, 126, 79, 171, 26, 203,
     ];
 
     assert_eq!(root_hash.as_slice(), expected_app_hash,);
@@ -2813,7 +2804,6 @@ fn test_dpns_query_start_at() {
 }
 
 #[test]
-#[ignore]
 fn test_dpns_query_start_after() {
     // The point of this test is to test the situation where we have a start at a certain value for the DPNS query.
     let (drive, contract, _tmp_dir) = setup_dpns_tests_with_batches(10, 11456);
@@ -2827,8 +2817,8 @@ fn test_dpns_query_start_after() {
         .expect("there is always a root hash");
 
     let expected_app_hash = vec![
-        149, 70, 55, 248, 241, 186, 124, 33, 222, 200, 116, 130, 31, 61, 52, 121, 243, 66, 10, 177,
-        254, 6, 118, 90, 157, 239, 222, 236, 159, 225, 238, 78,
+        66, 109, 200, 149, 140, 54, 122, 244, 63, 50, 56, 78, 215, 217, 191, 224, 16, 203, 116, 38,
+        170, 134, 158, 122, 15, 11, 88, 126, 79, 171, 26, 203,
     ];
 
     assert_eq!(root_hash.as_slice(), expected_app_hash);
@@ -2900,7 +2890,6 @@ fn test_dpns_query_start_after() {
 }
 
 #[test]
-#[ignore]
 fn test_dpns_query_start_at_desc() {
     // The point of this test is to test the situation where we have a start at a certain value for the DPNS query.
     let (drive, contract, _tmp_dir) = setup_dpns_tests_with_batches(10, 11456);
@@ -2914,8 +2903,8 @@ fn test_dpns_query_start_at_desc() {
         .expect("there is always a root hash");
 
     let expected_app_hash = vec![
-        149, 70, 55, 248, 241, 186, 124, 33, 222, 200, 116, 130, 31, 61, 52, 121, 243, 66, 10, 177,
-        254, 6, 118, 90, 157, 239, 222, 236, 159, 225, 238, 78,
+        66, 109, 200, 149, 140, 54, 122, 244, 63, 50, 56, 78, 215, 217, 191, 224, 16, 203, 116, 38,
+        170, 134, 158, 122, 15, 11, 88, 126, 79, 171, 26, 203,
     ];
 
     assert_eq!(root_hash.as_slice(), expected_app_hash);
@@ -2987,7 +2976,6 @@ fn test_dpns_query_start_at_desc() {
 }
 
 #[test]
-#[ignore]
 fn test_dpns_query_start_after_desc() {
     // The point of this test is to test the situation where we have a start at a certain value for the DPNS query.
     let (drive, contract, _tmp_dir) = setup_dpns_tests_with_batches(10, 11456);
@@ -3001,8 +2989,8 @@ fn test_dpns_query_start_after_desc() {
         .expect("there is always a root hash");
 
     let expected_app_hash = vec![
-        149, 70, 55, 248, 241, 186, 124, 33, 222, 200, 116, 130, 31, 61, 52, 121, 243, 66, 10, 177,
-        254, 6, 118, 90, 157, 239, 222, 236, 159, 225, 238, 78,
+        66, 109, 200, 149, 140, 54, 122, 244, 63, 50, 56, 78, 215, 217, 191, 224, 16, 203, 116, 38,
+        170, 134, 158, 122, 15, 11, 88, 126, 79, 171, 26, 203,
     ];
 
     assert_eq!(root_hash.as_slice(), expected_app_hash);
@@ -3074,7 +3062,6 @@ fn test_dpns_query_start_after_desc() {
 }
 
 #[test]
-#[ignore]
 fn test_dpns_query_start_at_with_null_id() {
     // The point of this test is to test the situation where we have a start at inside an index with a null value
     // While dpns doesn't really support this, other contracts might allow null values.
@@ -3186,8 +3173,8 @@ fn test_dpns_query_start_at_with_null_id() {
         .expect("there is always a root hash");
 
     let expected_app_hash = vec![
-        73, 58, 137, 80, 80, 0, 228, 3, 11, 13, 245, 4, 83, 11, 35, 90, 222, 88, 185, 151, 127, 16,
-        52, 89, 26, 251, 143, 84, 105, 224, 40, 231,
+        209, 215, 86, 177, 204, 107, 244, 21, 201, 139, 203, 102, 162, 235, 235, 101, 109, 10, 39,
+        73, 95, 220, 2, 211, 11, 59, 50, 25, 108, 186, 129, 43,
     ];
 
     assert_eq!(root_hash.as_slice(), expected_app_hash);
@@ -3267,7 +3254,6 @@ fn test_dpns_query_start_at_with_null_id() {
 }
 
 #[test]
-#[ignore]
 fn test_dpns_query_start_after_with_null_id() {
     // The point of this test is to test the situation where we have a start at inside an index with a null value
     // While dpns doesn't really support this, other contracts might allow null values.
@@ -3380,8 +3366,8 @@ fn test_dpns_query_start_after_with_null_id() {
         .expect("there is always a root hash");
 
     let expected_app_hash = vec![
-        73, 58, 137, 80, 80, 0, 228, 3, 11, 13, 245, 4, 83, 11, 35, 90, 222, 88, 185, 151, 127, 16,
-        52, 89, 26, 251, 143, 84, 105, 224, 40, 231,
+        209, 215, 86, 177, 204, 107, 244, 21, 201, 139, 203, 102, 162, 235, 235, 101, 109, 10, 39,
+        73, 95, 220, 2, 211, 11, 59, 50, 25, 108, 186, 129, 43,
     ];
 
     assert_eq!(root_hash.as_slice(), expected_app_hash);
@@ -3463,7 +3449,6 @@ fn test_dpns_query_start_after_with_null_id() {
 }
 
 #[test]
-#[ignore]
 fn test_dpns_query_start_after_with_null_id_desc() {
     // The point of this test is to test the situation where we have a start at inside an index with a null value
     // While dpns doesn't really support this, other contracts might allow null values.
@@ -3576,8 +3561,8 @@ fn test_dpns_query_start_after_with_null_id_desc() {
         .expect("there is always a root hash");
 
     let expected_app_hash = vec![
-        73, 58, 137, 80, 80, 0, 228, 3, 11, 13, 245, 4, 83, 11, 35, 90, 222, 88, 185, 151, 127, 16,
-        52, 89, 26, 251, 143, 84, 105, 224, 40, 231,
+        209, 215, 86, 177, 204, 107, 244, 21, 201, 139, 203, 102, 162, 235, 235, 101, 109, 10, 39,
+        73, 95, 220, 2, 211, 11, 59, 50, 25, 108, 186, 129, 43,
     ];
 
     assert_eq!(root_hash.as_slice(), expected_app_hash,);
