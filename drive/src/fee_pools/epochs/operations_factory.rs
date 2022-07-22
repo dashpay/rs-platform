@@ -15,22 +15,24 @@ impl Epoch {
     pub fn increment_proposer_block_count_operation(
         &self,
         drive: &Drive,
+        is_epoch_change: bool,
         proposer_pro_tx_hash: &[u8; 32],
         transaction: TransactionArg,
     ) -> Result<GroveDbOp, Error> {
         // update proposer's block count
-        let proposed_block_count = drive
-            .get_epochs_proposer_block_count(self, proposer_pro_tx_hash, transaction)
-            .or_else(|e| match e {
-                // Handle epoch change when proposers tree is batched but not committed yet
-                Error::GroveDB(grovedb::Error::PathKeyNotFound(_)) => Ok(0u64),
-                _ => Err(e),
-            })?;
+        let proposed_block_count = if is_epoch_change {
+            0
+        } else {
+            drive
+                .get_epochs_proposer_block_count(self, proposer_pro_tx_hash, transaction)
+                .or_else(|e| match e {
+                    Error::GroveDB(grovedb::Error::PathKeyNotFound(_)) => Ok(0u64),
+                    _ => Err(e),
+                })?
+        };
 
-        let grovedb_operation = self
-            .update_proposer_block_count_operation(proposer_pro_tx_hash, proposed_block_count + 1);
-
-        Ok(grovedb_operation)
+        Ok(self
+            .update_proposer_block_count_operation(proposer_pro_tx_hash, proposed_block_count + 1))
     }
 
     pub fn add_init_empty_operations(&self, batch: &mut GroveDbOpBatch) {
@@ -200,6 +202,7 @@ mod tests {
                 epoch
                     .increment_proposer_block_count_operation(
                         &drive,
+                        true,
                         &pro_tx_hash,
                         Some(&transaction),
                     )
@@ -250,6 +253,7 @@ mod tests {
                 epoch
                     .increment_proposer_block_count_operation(
                         &drive,
+                        true,
                         &pro_tx_hash,
                         Some(&transaction),
                     )

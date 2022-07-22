@@ -36,6 +36,7 @@ pub fn create_test_identity(drive: &Drive, id: [u8; 32], transaction: Transactio
 pub fn increment_in_epoch_each_proposers_block_count(
     drive: &Drive,
     epoch_pool: &Epoch,
+    is_epoch_change: bool,
     proposers: &Vec<[u8; 32]>,
     transaction: TransactionArg,
 ) {
@@ -43,7 +44,7 @@ pub fn increment_in_epoch_each_proposers_block_count(
 
     for proposer_pro_tx_hash in proposers {
         let op = epoch_pool
-            .increment_proposer_block_count_operation(&drive, &proposer_pro_tx_hash, transaction)
+            .increment_proposer_block_count_operation(&drive, is_epoch_change, &proposer_pro_tx_hash, transaction)
             .expect("should increment proposer block count");
         batch.push(op);
     }
@@ -61,7 +62,7 @@ pub fn create_test_masternode_identities_and_add_them_as_epoch_block_proposers(
 ) -> Vec<[u8; 32]> {
     let proposers = create_test_masternode_identities(drive, count, transaction);
 
-    increment_in_epoch_each_proposers_block_count(drive, epoch, &proposers, transaction);
+    increment_in_epoch_each_proposers_block_count(drive, epoch, true, &proposers, transaction);
 
     proposers
 }

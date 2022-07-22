@@ -102,6 +102,7 @@ impl Platform {
 
         batch.push(current_epoch.increment_proposer_block_count_operation(
             &self.drive,
+            epoch_info.is_epoch_change,
             &block_info.proposer_pro_tx_hash,
             transaction,
         )?);
