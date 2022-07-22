@@ -4,6 +4,9 @@ use crate::fee_pools::epochs::Epoch;
 use grovedb::TransactionArg;
 
 impl Drive {
+    // TODO: We should cache last paid epoch in execution logic so we don't need to do two reads from db every block
+
+    // TODO: Move to execution, it's not a storage logic
     pub fn get_oldest_unpaid_epoch_pool(
         &self,
         from_epoch_index: u16,
@@ -20,6 +23,7 @@ impl Drive {
     ) -> Result<Option<Epoch>, Error> {
         let epoch_pool = Epoch::new(epoch_index);
 
+        // TODO: It's wrong, we should use get_epoch_start_block_height to check is it a gap or not.
         if self.is_epoch_tree_exists(&epoch_pool, transaction)? {
             if self.is_epochs_proposers_tree_empty(&epoch_pool, transaction)? {
                 return if epoch_index == from_epoch_index {

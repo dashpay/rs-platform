@@ -61,6 +61,8 @@ impl Platform {
                 None
             };
 
+        // TODO: We don't handle gaps here. We should go recursively back like we do in get_oldest_unpaid_epoch_pool
+        //   It's better to get index, and block count in get_oldest_unpaid_epoch_pool instead of iterating through epochs twice
         let unpaid_epoch_block_count = self
             .drive
             .get_epoch_block_count(
@@ -140,18 +142,16 @@ impl Platform {
             }
 
             // Since balance is an integer, we collect rewards remainder
-            // and the distribute
+            // and add leftovers to the latest proposer of the chunk
             let masternode_reward_floored = masternode_reward.floor();
 
             fee_leftovers += masternode_reward - masternode_reward_floored;
 
             let masternode_reward_given = if i == proposers_len - 1 {
-                masternode_reward_floored + fee_leftovers //in the case we are at the end of the proposers
+                masternode_reward_floored + fee_leftovers
             } else {
                 masternode_reward_floored
             };
-
-            // TODO It seems we pass a value with reminder but inside we do a conversion to u64
 
             self.add_pay_reward_to_identity_operations(
                 proposer_tx_hash,
@@ -188,7 +188,7 @@ impl Platform {
         batch: &mut GroveDbOpBatch,
     ) -> Result<(), Error> {
         // Convert to integer, since identity balance is u64
-        let reward: u64 = reward.try_into().map_err(|_| {
+        let reward: u64 = reward.floor().try_into().map_err(|_| {
             Error::Execution(ExecutionError::Overflow(
                 "can't convert reward to i64 from Decimal",
             ))
@@ -209,7 +209,8 @@ impl Platform {
     pub fn add_distribute_block_fees_into_pools_operations(
         &self,
         current_epoch: &Epoch,
-        block_fees: FeesAggregate,
+        block_fees: &FeesAggregate,
+        cached_aggregated_storage_fees: Option<u64>,
         transaction: TransactionArg,
         batch: &mut GroveDbOpBatch,
     ) -> Result<FeesInPools, Error> {
@@ -232,9 +233,12 @@ impl Platform {
         );
 
         // update storage fee pool
-        let storage_distribution_credits_in_fee_pool = self
-            .drive
-            .get_aggregate_storage_fees_in_current_distribution_pool(transaction)?;
+        let storage_distribution_credits_in_fee_pool = match cached_aggregated_storage_fees {
+            None => self
+                .drive
+                .get_aggregate_storage_fees_in_current_distribution_pool(transaction)?,
+            Some(storage_fees) => storage_fees,
+        };
 
         let total_storage_fees = storage_distribution_credits_in_fee_pool + block_fees.storage_fees;
 
@@ -251,7 +255,7 @@ impl Platform {
 
 #[cfg(test)]
 mod tests {
-    mod distribute_fees_from_unpaid_pools_to_proposers {
+    mod add_distribute_fees_from_unpaid_pools_to_proposers {
         use crate::abci::messages::FeesAggregate;
         use crate::common::helpers::fee_pools::{
             create_test_masternode_share_identities_and_documents, refetch_identities,
@@ -399,11 +403,12 @@ mod tests {
             platform
                 .add_distribute_block_fees_into_pools_operations(
                     &unpaid_epoch_pool,
-                    FeesAggregate {
+                    &FeesAggregate {
                         processing_fees: 10000,
                         storage_fees: 0,
                         refunds_by_epoch: vec![],
                     },
+                    None,
                     Some(&transaction),
                     &mut batch,
                 )
@@ -820,11 +825,12 @@ mod tests {
             platform
                 .add_distribute_block_fees_into_pools_operations(
                     &current_epoch_pool,
-                    FeesAggregate {
+                    &FeesAggregate {
                         processing_fees,
                         storage_fees,
                         refunds_by_epoch: vec![],
                     },
+                    None,
                     Some(&transaction),
                     &mut batch,
                 )
@@ -877,11 +883,12 @@ mod tests {
             platform
                 .add_distribute_block_fees_into_pools_operations(
                     &current_epoch_pool,
-                    FeesAggregate {
+                    &FeesAggregate {
                         processing_fees,
                         storage_fees,
                         refunds_by_epoch: vec![],
                     },
+                    None,
                     Some(&transaction),
                     &mut batch,
                 )

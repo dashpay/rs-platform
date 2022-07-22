@@ -21,8 +21,7 @@ impl Epoch {
     ) -> Result<GroveDbOp, Error> {
         // update proposer's block count
         // TODO: we already handle it few lines below. It's not a problem to do one faulty request once in 18 days
-        //  but keep logic of this function simpler and keep `is_epoch_change` branching logic only in process_block_fees module
-        //  so people can easily see what's going on
+        //  but keep logic of this function simpler and keep `is_epoch_change` execution logic outside storage
         let proposed_block_count = if is_epoch_change {
             0
         } else {
@@ -274,4 +273,221 @@ mod tests {
             assert_eq!(stored_block_count, 2);
         }
     }
+
+    mod add_init_empty_operations {
+
+        #[test]
+        fn test_error_if_fee_pools_not_initialized() {
+            let drive = super::setup_drive();
+            let transaction = drive.grove.start_transaction();
+
+            let epoch = super::Epoch::new(1042);
+
+            let mut batch = super::GroveDbOpBatch::new();
+
+            epoch.add_init_empty_operations(&mut batch);
+
+            match drive.grove_apply_batch(batch, false, Some(&transaction)) {
+                Ok(_) => assert!(false, "should not be able to init epochs without FeePools"),
+                Err(e) => match e {
+                    super::error::Error::GroveDB(grovedb::Error::PathKeyNotFound(_)) => {
+                        assert!(true)
+                    }
+                    _ => assert!(false, "invalid error type"),
+                },
+            }
+        }
+
+        #[test]
+        fn test_values_are_set() {
+            let drive = super::setup_drive_with_initial_state_structure();
+            let transaction = drive.grove.start_transaction();
+
+            let epoch = super::Epoch::new(1042);
+
+            let mut batch = super::GroveDbOpBatch::new();
+
+            epoch.add_init_empty_operations(&mut batch);
+
+            drive
+                .grove_apply_batch(batch, false, Some(&transaction))
+                .expect("should apply batch");
+
+            let storage_fee = drive
+                .get_epoch_storage_credits_for_distribution(&epoch, Some(&transaction))
+                .expect("expected to get storage credits in epoch pool");
+
+            assert_eq!(storage_fee, 0);
+        }
+    }
+
+    mod add_init_current_operations {
+
+        #[test]
+        fn test_values_are_set() {
+            let drive = super::setup_drive_with_initial_state_structure();
+            let transaction = drive.grove.start_transaction();
+
+            let epoch = super::Epoch::new(1042);
+
+            let multiplier = 42.0;
+            let start_time = 1;
+            let start_block_height = 2;
+
+            let mut batch = super::GroveDbOpBatch::new();
+
+            epoch.add_init_empty_operations(&mut batch);
+
+            epoch.add_init_current_operations(
+                multiplier,
+                start_block_height,
+                start_time,
+                &mut batch,
+            );
+
+            drive
+                .grove_apply_batch(batch, false, Some(&transaction))
+                .expect("should apply batch");
+
+            let stored_multiplier = drive
+                .get_epoch_fee_multiplier(&epoch, Some(&transaction))
+                .expect("should get multiplier");
+
+            assert_eq!(stored_multiplier, multiplier);
+
+            let stored_start_time = drive
+                .get_epoch_start_time(&epoch, Some(&transaction))
+                .expect("should get start time");
+
+            assert_eq!(stored_start_time, start_time);
+
+            let stored_block_height = drive
+                .get_epoch_start_block_height(&epoch, Some(&transaction))
+                .expect("should get start block height");
+
+            assert_eq!(stored_block_height, start_block_height);
+
+            drive
+                .get_epoch_processing_credits_for_distribution(&epoch, Some(&transaction))
+                .expect_err("should not get processing fee");
+
+            let proposers = drive
+                .get_epoch_proposers(&epoch, 1, Some(&transaction))
+                .expect("should get proposers");
+
+            assert_eq!(proposers, vec!());
+        }
+    }
+
+    mod add_mark_as_paid_operations {
+
+        #[test]
+        fn test_values_are_deleted() {
+            let drive = super::setup_drive_with_initial_state_structure();
+            let transaction = drive.grove.start_transaction();
+
+            let epoch = super::Epoch::new(0);
+
+            let mut batch = super::GroveDbOpBatch::new();
+
+            epoch.add_init_current_operations(1.0, 2, 3, &mut batch);
+
+            // Apply init current
+            drive
+                .grove_apply_batch(batch, false, Some(&transaction))
+                .expect("should apply batch");
+
+            let mut batch = super::GroveDbOpBatch::new();
+
+            epoch.add_mark_as_paid_operations(&mut batch);
+
+            drive
+                .grove_apply_batch(batch, false, Some(&transaction))
+                .expect("should apply batch");
+
+            match drive
+                .grove
+                .get(
+                    epoch.get_path(),
+                    super::epoch_key_constants::KEY_PROPOSERS.as_slice(),
+                    Some(&transaction),
+                )
+                .unwrap()
+            {
+                Ok(_) => assert!(false, "should not be able to get proposers"),
+                Err(e) => match e {
+                    grovedb::Error::PathKeyNotFound(_) => assert!(true),
+                    _ => assert!(false, "invalid error type"),
+                },
+            }
+
+            match drive.get_epoch_processing_credits_for_distribution(&epoch, Some(&transaction)) {
+                Ok(_) => assert!(false, "should not be able to get processing fee"),
+                Err(e) => match e {
+                    super::error::Error::GroveDB(grovedb::Error::PathKeyNotFound(_)) => {
+                        assert!(true)
+                    }
+                    _ => assert!(false, "invalid error type"),
+                },
+            }
+
+            match drive.get_epoch_storage_credits_for_distribution(&epoch, Some(&transaction)) {
+                Ok(_) => assert!(false, "should not be able to get storage fee"),
+                Err(e) => match e {
+                    super::error::Error::GroveDB(grovedb::Error::PathKeyNotFound(_)) => {
+                        assert!(true)
+                    }
+                    _ => assert!(false, "invalid error type"),
+                },
+            }
+        }
+    }
+
+    #[test]
+    fn test_update_start_time() {
+        let drive = setup_drive_with_initial_state_structure();
+        let transaction = drive.grove.start_transaction();
+
+        let epoch_pool = super::Epoch::new(0);
+
+        let start_time_ms: u64 = Utc::now().timestamp_millis() as u64;
+
+        let mut batch = GroveDbOpBatch::new();
+
+        batch.push(epoch_pool.update_start_time_operation(start_time_ms));
+
+        drive
+            .grove_apply_batch(batch, false, Some(&transaction))
+            .expect("should apply batch");
+
+        let actual_start_time_ms = drive
+            .get_epoch_start_time(&epoch_pool, Some(&transaction))
+            .expect("should get start time");
+
+        assert_eq!(start_time_ms, actual_start_time_ms);
+    }
+
+    #[test]
+    fn test_update_epoch_start_block_height() {
+        let drive = setup_drive_with_initial_state_structure();
+        let transaction = drive.grove.start_transaction();
+
+        let epoch = Epoch::new(0);
+
+        let start_block_height = 1;
+
+        let op = epoch.update_start_block_height_operation(start_block_height);
+
+        drive
+            .grove_apply_operation(op, false, Some(&transaction))
+            .expect("should apply batch");
+
+        let actual_start_block_height = drive
+            .get_epoch_start_block_height(&epoch, Some(&transaction))
+            .expect("should get start block height");
+
+        assert_eq!(start_block_height, actual_start_block_height);
+    }
+
+    // TODO: Find and move all related tests here
 }

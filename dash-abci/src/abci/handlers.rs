@@ -104,7 +104,7 @@ impl TenderdashAbci for Platform {
         let process_block_fees_result = self.process_block_fees(
             &block_execution_context.block_info,
             &block_execution_context.epoch_info,
-            request.fees,
+            &request.fees,
             transaction,
         )?;
 
@@ -318,8 +318,6 @@ mod tests {
                 &proposers,
                 Some(&transaction),
             );
-
-            let mut last_distribution_pool_credits = 0;
 
             let block_interval = 86400i64.div(blocks_per_day);
 

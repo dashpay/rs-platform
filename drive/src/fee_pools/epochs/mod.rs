@@ -4,6 +4,9 @@ pub mod paths;
 
 use serde::{Deserialize, Serialize};
 
+// TODO: I would call it EpochPool because it represent pool,
+//  not just Epoch which is more abstract thing that we will probably need in future too
+
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Epoch {

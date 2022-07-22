@@ -34,3 +34,67 @@ impl Drive {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    mod get_aggregate_storage_fees_in_current_distribution_pool {
+        use crate::drive::batch::GroveDbOpBatch;
+        use crate::drive::fee_pools::pools_vec_path;
+        use crate::error::drive::DriveError;
+        use crate::error::fee::FeeError;
+        use crate::fee_pools::epochs_root_tree_key_constants::KEY_STORAGE_FEE_POOL;
+        use grovedb::Element;
+
+        #[test]
+        fn test_error_if_pool_is_not_initiated() {
+            let platform = setup_platform();
+            let transaction = platform.drive.grove.start_transaction();
+
+            match platform
+                .drive
+                .get_aggregate_storage_fees_in_current_distribution_pool(Some(&transaction))
+            {
+                Ok(_) => assert!(
+                    false,
+                    "should not be able to get genesis time on uninit fee pools"
+                ),
+                Err(e) => match e {
+                    DriveError::GroveDB(grovedb::Error::PathNotFound(_)) => assert!(true),
+                    _ => assert!(false, "invalid error type"),
+                },
+            }
+        }
+
+        #[test]
+        fn test_error_if_wrong_value_encoded() {
+            let platform = setup_platform_with_initial_state_structure();
+            let transaction = platform.drive.grove.start_transaction();
+
+            let mut batch = GroveDbOpBatch::new();
+
+            batch.add_insert(
+                pools_vec_path(),
+                KEY_STORAGE_FEE_POOL.to_vec(),
+                Element::Item(u128::MAX.to_be_bytes().to_vec(), None),
+            );
+
+            platform
+                .drive
+                .grove_apply_batch(batch, false, Some(&transaction))
+                .expect("should apply batch");
+
+            match platform
+                .drive
+                .get_aggregate_storage_fees_in_current_distribution_pool(Some(&transaction))
+            {
+                Ok(_) => assert!(false, "should not be able to decode stored value"),
+                Err(e) => match e {
+                    DriveError::Fee(FeeError::CorruptedStorageFeePoolInvalidItemLength(_)) => {
+                        assert!(true)
+                    }
+                    _ => assert!(false, "invalid error type"),
+                },
+            }
+        }
+    }
+}

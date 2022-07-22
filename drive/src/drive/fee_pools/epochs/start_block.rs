@@ -43,28 +43,6 @@ mod tests {
 
     use super::Epoch;
 
-    #[test]
-    fn test_update_epoch_start_block_height() {
-        let drive = setup_drive_with_initial_state_structure();
-        let transaction = drive.grove.start_transaction();
-
-        let epoch = Epoch::new(0);
-
-        let start_block_height = 1;
-
-        let op = epoch.update_start_block_height_operation(start_block_height);
-
-        drive
-            .grove_apply_operation(op, false, Some(&transaction))
-            .expect("should apply batch");
-
-        let actual_start_block_height = drive
-            .get_epoch_start_block_height(&epoch, Some(&transaction))
-            .expect("should get start block height");
-
-        assert_eq!(start_block_height, actual_start_block_height);
-    }
-
     mod get_epoch_start_block_height {
         #[test]
         fn test_error_if_epoch_pool_is_not_initiated() {

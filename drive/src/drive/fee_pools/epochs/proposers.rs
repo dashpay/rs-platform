@@ -7,7 +7,7 @@ use crate::error::Error;
 use crate::fee_pools::epochs::Epoch;
 
 impl Drive {
-    pub(crate) fn get_epochs_proposer_block_count(
+    pub fn get_epochs_proposer_block_count(
         &self,
         epoch_pool: &Epoch,
         proposer_tx_hash: &[u8; 32],
@@ -60,6 +60,7 @@ impl Drive {
         }
     }
 
+    // TODO: Why adding proposers in epoch but getting in Drive?
     pub fn get_epoch_proposers(
         &self,
         epoch_pool: &Epoch,
@@ -117,7 +118,7 @@ mod tests {
     use crate::drive::batch::GroveDbOpBatch;
     use crate::fee_pools::epochs::Epoch;
 
-    mod get_proposer_block_count {
+    mod get_epochs_proposer_block_count {
 
         #[test]
         fn test_error_if_value_has_invalid_length() {
@@ -208,7 +209,7 @@ mod tests {
         }
     }
 
-    mod is_empty_tree {
+    mod is_epochs_proposers_tree_empty {
         #[test]
         fn test_check_if_empty() {
             let drive = super::setup_drive_with_initial_state_structure();
@@ -224,7 +225,7 @@ mod tests {
         }
     }
 
-    mod get_proposers {
+    mod get_epoch_proposers {
         #[test]
         fn test_value() {
             let drive = super::setup_drive_with_initial_state_structure();

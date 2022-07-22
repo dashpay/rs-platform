@@ -30,3 +30,13 @@ impl Drive {
         Ok(block_count)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    mod get_epoch_block_count {
+        #[test]
+        fn test() {
+            todo!()
+        }
+    }
+}

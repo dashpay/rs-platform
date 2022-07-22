@@ -25,23 +25,28 @@ impl Platform {
         let storage_distribution_fees = self
             .drive
             .get_aggregate_storage_fees_in_current_distribution_pool(transaction)?;
-        let storage_distribution_fees_dec =
-            Decimal::from_u64(storage_distribution_fees).expect("a");
-        // a separate buffer from which we withdraw to correctly calculate fee share
-        let mut storage_distribution_leftover_credits = storage_distribution_fees;
 
         if storage_distribution_fees == 0 {
             return Ok(0);
         }
 
+        // a separate buffer from which we withdraw to correctly calculate fee share
+        let mut storage_distribution_leftover_credits = storage_distribution_fees;
+
+        let storage_distribution_fees =
+            Decimal::from_u64(storage_distribution_fees).ok_or(Error::Execution(
+                ExecutionError::Overflow("storage distribution fees are not fitting in a u64"),
+            ))?;
+
         for year in 0..FOREVER_STORAGE_YEARS {
             let distribution_for_that_year_ratio = constants::FEE_DISTRIBUTION_TABLE[year as usize];
 
-            let year_fee_share = storage_distribution_fees_dec * distribution_for_that_year_ratio;
+            let year_fee_share = storage_distribution_fees * distribution_for_that_year_ratio;
 
             let epoch_fee_share_dec = year_fee_share / EPOCHS_PER_YEAR_DEC;
+
             let epoch_fee_share = epoch_fee_share_dec
-                .round_dp_with_strategy(0, RoundingStrategy::ToZero)
+                .floor()
                 .to_u64()
                 .ok_or(Error::Execution(ExecutionError::Overflow(
                     "storage distribution fees are not fitting in a u64",
@@ -156,7 +161,7 @@ mod tests {
 
             let mut batch = GroveDbOpBatch::new();
 
-            platform
+            let leftovers = platform
                 .add_distribute_storage_fee_distribution_pool_to_epochs_operations(
                     epoch_index,
                     Some(&transaction),
@@ -170,12 +175,7 @@ mod tests {
                 .expect("should apply batch");
 
             // check leftover
-            let storage_fee_pool_leftover = platform
-                .drive
-                .get_aggregate_storage_fees_in_current_distribution_pool(Some(&transaction))
-                .expect("should get storage fee pool");
-
-            assert_eq!(storage_fee_pool_leftover, 515);
+            assert_eq!(leftovers, 515);
         }
 
         #[test]
@@ -204,7 +204,7 @@ mod tests {
 
             let mut batch = GroveDbOpBatch::new();
 
-            let storage_distribution_leftover_credits = platform
+            let leftovers = platform
                 .add_distribute_storage_fee_distribution_pool_to_epochs_operations(
                     epoch_index,
                     Some(&transaction),
@@ -218,15 +218,7 @@ mod tests {
                 .expect("should apply batch");
 
             // check leftover
-            let checked_storage_fee_pool_leftover = platform
-                .drive
-                .get_aggregate_storage_fees_in_current_distribution_pool(Some(&transaction))
-                .expect("should get storage fee pool");
-
-            assert_eq!(
-                checked_storage_fee_pool_leftover,
-                storage_distribution_leftover_credits,
-            );
+            assert_ne!(leftovers, 0,);
 
             // collect all the storage fee values of the 1000 epochs pools
             let storage_fees = get_storage_credits_for_distribution_for_epochs_in_range(
@@ -237,7 +229,7 @@ mod tests {
 
             // compare them with reference table
             #[rustfmt::skip]
-                let reference_fees: [u64; 1000] = [
+            let reference_fees: [u64; 1000] = [
                 2500, 2500, 2500, 2500, 2500, 2500, 2500, 2500, 2500, 2500, 2500, 2500, 2500, 2500,
                 2500, 2500, 2500, 2500, 2500, 2500, 2400, 2400, 2400, 2400, 2400, 2400, 2400, 2400,
                 2400, 2400, 2400, 2400, 2400, 2400, 2400, 2400, 2400, 2400, 2400, 2400, 2300, 2300,
@@ -310,10 +302,7 @@ mod tests {
 
             let total_distributed: u64 = storage_fees.iter().sum();
 
-            assert_eq!(
-                total_distributed + checked_storage_fee_pool_leftover,
-                storage_pool
-            );
+            assert_eq!(total_distributed + leftovers, storage_pool);
 
             /*
 
@@ -425,71 +414,6 @@ mod tests {
                 .expect("should get storage fee pool");
 
             assert_eq!(storage_fee, stored_storage_fee);
-        }
-    }
-
-    mod get_storage_fee_distribution_pool_fees {
-        use crate::common::helpers::setup::{
-            setup_platform, setup_platform_with_initial_state_structure,
-        };
-        use rs_drive::drive::batch::GroveDbOpBatch;
-        use rs_drive::drive::fee_pools::pools_vec_path;
-        use rs_drive::error::fee::FeeError;
-        use rs_drive::error::Error as DriveError;
-        use rs_drive::fee_pools::epochs_root_tree_key_constants::KEY_STORAGE_FEE_POOL;
-        use rs_drive::grovedb;
-        use rs_drive::grovedb::Element;
-
-        #[test]
-        fn test_error_if_pool_is_not_initiated() {
-            let platform = setup_platform();
-            let transaction = platform.drive.grove.start_transaction();
-
-            match platform
-                .drive
-                .get_aggregate_storage_fees_in_current_distribution_pool(Some(&transaction))
-            {
-                Ok(_) => assert!(
-                    false,
-                    "should not be able to get genesis time on uninit fee pools"
-                ),
-                Err(e) => match e {
-                    DriveError::GroveDB(grovedb::Error::PathNotFound(_)) => assert!(true),
-                    _ => assert!(false, "invalid error type"),
-                },
-            }
-        }
-
-        #[test]
-        fn test_error_if_wrong_value_encoded() {
-            let platform = setup_platform_with_initial_state_structure();
-            let transaction = platform.drive.grove.start_transaction();
-
-            let mut batch = GroveDbOpBatch::new();
-
-            batch.add_insert(
-                pools_vec_path(),
-                KEY_STORAGE_FEE_POOL.to_vec(),
-                Element::Item(u128::MAX.to_be_bytes().to_vec(), None),
-            );
-
-            platform
-                .drive
-                .grove_apply_batch(batch, false, Some(&transaction))
-                .expect("should apply batch");
-
-            match platform
-                .drive
-                .get_aggregate_storage_fees_in_current_distribution_pool(Some(&transaction))
-            {
-                Ok(_) => assert!(false, "should not be able to decode stored value"),
-                Err(e) => match e {
-                    DriveError::Fee(FeeError::CorruptedStorageFeePoolInvalidItemLength(_)) => {
-                        assert!(true)
-                    }
-                    _ => assert!(false, "invalid error type"),
-                },
-            }
         }
     }
 }
