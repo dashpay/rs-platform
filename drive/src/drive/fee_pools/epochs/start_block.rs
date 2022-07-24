@@ -2,13 +2,13 @@ use crate::drive::fee_pools::pools_vec_path;
 use crate::drive::Drive;
 use crate::error::fee::FeeError;
 use crate::error::Error;
-use crate::fee_pools::epochs::Epoch;
+use crate::fee_pools::epochs::{paths, Epoch};
 use grovedb::query_result_type::GetItemResults;
 use grovedb::query_result_type::QueryResultType::QueryPathKeyElementTrioResultType;
 use grovedb::{Element, PathQuery, Query, SizedQuery, TransactionArg};
 
 use crate::fee_pools::epochs::epoch_key_constants;
-use crate::fee_pools::epochs::epoch_key_constants::{EPOCH_STORAGE_OFFSET, KEY_START_BLOCK_HEIGHT};
+use crate::fee_pools::epochs::epoch_key_constants::KEY_START_BLOCK_HEIGHT;
 
 impl Drive {
     pub fn get_epoch_start_block_height(
@@ -46,8 +46,8 @@ impl Drive {
 
         let mut epochs_query = Query::new();
 
-        let from_epoch_key = from_epoch_index.to_be_bytes().to_vec();
-        let current_epoch_key = to_epoch_index.to_be_bytes().to_vec();
+        let from_epoch_key = paths::encode_key(from_epoch_index)?.to_vec();
+        let current_epoch_key = paths::encode_key(to_epoch_index)?.to_vec();
 
         epochs_query.insert_range_after_to_inclusive(from_epoch_key..=current_epoch_key);
 
@@ -66,9 +66,10 @@ impl Drive {
         if result_items.is_empty() {
             return Ok(None);
         }
+
         let first_result = &result_items.to_path_key_elements()[0];
 
-        let (path, key, element) = first_result;
+        let (path, _, element) = first_result;
 
         let next_start_block_height = if let Element::Item(item, _) = element {
             u64::from_be_bytes(item.as_slice().try_into().map_err(|_| {
@@ -84,15 +85,9 @@ impl Drive {
             .last()
             .ok_or(Error::Fee(FeeError::CorruptedStartBlockHeightItemLength()))?;
 
-        let epoch = u16::from_be_bytes(epoch_key.try_into().map_err(|_| {
-            Error::Fee(FeeError::CorruptedProposerBlockCountItemLength(
-                "item have an invalid length",
-            ))
-        })?)
-        .checked_sub(EPOCH_STORAGE_OFFSET)
-        .ok_or(Error::Fee(FeeError::Overflow("Stored Epoch too low")))?;
+        let epoch_index = paths::decode_key(epoch_key.as_slice())?;
 
-        Ok(Some((epoch, next_start_block_height)))
+        Ok(Some((epoch_index, next_start_block_height)))
     }
 }
 
@@ -108,12 +103,14 @@ mod tests {
     use super::Epoch;
 
     mod get_epoch_start_block_height {
+        use crate::fee_pools::epochs::Epoch;
+
         #[test]
         fn test_error_if_epoch_pool_is_not_initiated() {
             let drive = super::setup_drive_with_initial_state_structure();
             let transaction = drive.grove.start_transaction();
 
-            let non_initiated_epoch = super::Epoch::new(7000);
+            let non_initiated_epoch = Epoch::new(7000);
 
             match drive.get_epoch_start_block_height(&non_initiated_epoch, Some(&transaction)) {
                 Ok(_) => assert!(
@@ -206,7 +203,7 @@ mod tests {
         }
     }
 
-    mod find_next_epoch_stat_block_height {
+    mod find_next_epoch_start_block_height {
         use crate::common::helpers::identities::create_test_masternode_identities_and_add_them_as_epoch_block_proposers;
         use crate::common::helpers::setup::setup_drive_with_initial_state_structure;
         use crate::drive::batch::GroveDbOpBatch;
@@ -230,11 +227,11 @@ mod tests {
                 .grove_apply_batch(batch, false, Some(&transaction))
                 .expect("should apply batch");
 
-            let next_epoch_start_block_height = drive
-                .find_next_epoch_start_block_height(0, 4, Some(&transaction))
+            let next_epoch_start_block_height_option = drive
+                .find_next_epoch_start_block_height(0, 2, Some(&transaction))
                 .expect("should find next start_block_height");
 
-            match next_epoch_start_block_height {
+            match next_epoch_start_block_height_option {
                 None => assert!(false, "should find start_block_height"),
                 Some((epoch_index, start_block_height)) => {
                     assert_eq!(epoch_index, 1);
@@ -277,7 +274,7 @@ mod tests {
                 .expect("should apply batch");
 
             let next_epoch_start_block_height = drive
-                .find_next_epoch_start_block_height(0, 3, Some(&transaction))
+                .find_next_epoch_start_block_height(0, 2, Some(&transaction))
                 .expect("should find next start_block_height");
 
             match next_epoch_start_block_height {

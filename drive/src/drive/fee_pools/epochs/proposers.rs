@@ -13,17 +13,13 @@ use crate::fee_pools::epochs::Epoch;
 impl Drive {
     pub fn get_epochs_proposer_block_count(
         &self,
-        epoch_pool: &Epoch,
+        epoch: &Epoch,
         proposer_tx_hash: &[u8; 32],
         transaction: TransactionArg,
     ) -> Result<u64, Error> {
         let element = self
             .grove
-            .get(
-                epoch_pool.get_proposers_path(),
-                proposer_tx_hash,
-                transaction,
-            )
+            .get(epoch.get_proposers_path(), proposer_tx_hash, transaction)
             // TODO: Shouldn't we wrap all errors to Fee Pool errors?
             //  in this case we know the source of error
             .unwrap()

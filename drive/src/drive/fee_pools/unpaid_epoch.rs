@@ -6,7 +6,7 @@ use crate::fee_pools::epochs_root_tree_key_constants::KEY_EPOCH_TO_PAY;
 use grovedb::{Element, TransactionArg};
 
 impl Drive {
-    pub fn get_epoch_index_to_pay(&self, transaction: TransactionArg) -> Result<u16, Error> {
+    pub fn get_unpaid_epoch_index(&self, transaction: TransactionArg) -> Result<u16, Error> {
         let element = self
             .grove
             .get(pools_path(), KEY_EPOCH_TO_PAY, transaction)
@@ -31,7 +31,7 @@ impl Drive {
 
 #[cfg(test)]
 mod tests {
-    mod get_epoch_index_to_pay {
+    mod get_unpaid_epoch_index {
         #[test]
         fn test() {
             todo!()

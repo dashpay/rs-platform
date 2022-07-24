@@ -15,7 +15,7 @@ pub fn add_create_fee_pool_trees_operations(batch: &mut GroveDbOpBatch) {
     batch.push(update_storage_fee_distribution_pool_operation(0));
 
     // Init next epoch to pay
-    batch.push(update_epoch_index_to_pay_operation(GENESIS_EPOCH_INDEX));
+    batch.push(update_unpaid_epoch_index_operation(GENESIS_EPOCH_INDEX));
 
     // We need to insert 50 years worth of epochs,
     // with 20 epochs per year that's 1000 epochs
@@ -35,7 +35,7 @@ pub fn update_storage_fee_distribution_pool_operation(storage_fee: u64) -> Grove
     }
 }
 
-pub fn update_epoch_index_to_pay_operation(epoch_index: u16) -> GroveDbOp {
+pub fn update_unpaid_epoch_index_operation(epoch_index: u16) -> GroveDbOp {
     GroveDbOp {
         path: pools_vec_path(),
         key: KEY_EPOCH_TO_PAY.to_vec(),

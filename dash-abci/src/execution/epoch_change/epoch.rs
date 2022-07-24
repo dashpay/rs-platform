@@ -12,6 +12,7 @@ pub const EPOCH_CHANGE_TIME_MS: u64 = 1576800000;
 #[serde(rename_all = "camelCase")]
 pub struct EpochInfo {
     pub current_epoch_index: u16,
+    // Available only on epoch change
     pub previous_epoch_index: Option<u16>,
     pub is_epoch_change: bool,
 }

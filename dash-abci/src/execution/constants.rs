@@ -5,8 +5,6 @@ use rust_decimal_macros::dec;
 
 pub const DEFAULT_ORIGINAL_FEE_MULTIPLIER: f64 = 2.0;
 
-pub const EPOCHS_PER_YEAR_DEC: Decimal = dec!(EPOCHS_PER_YEAR);
-
 #[rustfmt::skip]
 pub const FEE_DISTRIBUTION_TABLE: [Decimal; FOREVER_STORAGE_YEARS as usize] = [
     dec!(0.05000), dec!(0.04800), dec!(0.04600), dec!(0.04400), dec!(0.04200),

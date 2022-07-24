@@ -1,16 +1,13 @@
 use crate::abci::messages::FeesAggregate;
 use crate::block::BlockInfo;
-use crate::error::execution::ExecutionError;
 use crate::error::Error;
-use crate::execution::constants::{
-    DEFAULT_ORIGINAL_FEE_MULTIPLIER, FOREVER_STORAGE_EPOCHS, GENESIS_EPOCH_INDEX,
-};
+use crate::execution::constants::DEFAULT_ORIGINAL_FEE_MULTIPLIER;
 use crate::execution::epoch_change::distribute_storage_pool::StorageDistributionLeftoverCredits;
 use crate::execution::epoch_change::epoch::EpochInfo;
 use crate::execution::fee_distribution::{FeesInPools, ProposerPayouts};
 use crate::platform::Platform;
 use rs_drive::drive::batch::GroveDbOpBatch;
-use rs_drive::drive::fee_pools::epochs::constants::GENESIS_EPOCH_INDEX;
+use rs_drive::drive::fee_pools::epochs::constants::{FOREVER_STORAGE_EPOCHS, GENESIS_EPOCH_INDEX};
 use rs_drive::fee_pools::epochs::Epoch;
 use rs_drive::grovedb::TransactionArg;
 use std::option::Option::None;
@@ -116,30 +113,23 @@ impl Platform {
             transaction,
         )?);
 
-        // Distribute fees from unpaid pools to proposers
-        // Since we are paying for passed epochs it's nothing to do on genesis epoch
-        let proposers_payouts = if epoch_info.current_epoch_index > GENESIS_EPOCH_INDEX {
-            let epoch_index_to_pay = self.drive.get_epoch_index_to_pay(transaction)?;
+        // Distribute fees from unpaid epoch pool to proposers
 
-            if epoch_index_to_pay < epoch_info.current_epoch_index {}
-
-            // Since start_block_height for current epoch is batched and not committed yet
-            // we pass it explicitly
-            let current_epoch_start_block_height = if epoch_info.is_epoch_change {
-                Some(block_info.block_height)
-            } else {
-                None
-            };
-
-            self.add_distribute_fees_from_unpaid_pools_to_proposers_operations(
-                epoch_info.current_epoch_index,
-                current_epoch_start_block_height,
-                transaction,
-                &mut batch,
-            )?
+        // Since start_block_height for current epoch is batched and not committed yet
+        // we pass it explicitly
+        let cached_current_epoch_start_block_height = if epoch_info.is_epoch_change {
+            Some(block_info.block_height)
         } else {
             None
         };
+
+        let payouts = self
+            .add_distribute_fees_from_oldest_unpaid_epoch_pool_to_proposers_operations(
+                epoch_info.current_epoch_index,
+                cached_current_epoch_start_block_height,
+                transaction,
+                &mut batch,
+            )?;
 
         let fees_in_pools = self.add_distribute_block_fees_into_pools_operations(
             &current_epoch,
@@ -154,7 +144,7 @@ impl Platform {
 
         Ok(ProcessedBlockFeesResult {
             fees_in_pools,
-            payouts: proposers_payouts,
+            payouts,
         })
     }
 }
@@ -163,17 +153,17 @@ impl Platform {
 mod tests {
     mod add_process_epoch_change_operations {
         use crate::common::helpers::setup::setup_platform_with_initial_state_structure;
-        use crate::execution::constants::GENESIS_EPOCH_INDEX;
         use chrono::Utc;
+        use rs_drive::drive::fee_pools::epochs::constants::GENESIS_EPOCH_INDEX;
         use rust_decimal::prelude::ToPrimitive;
 
         mod helpers {
             use crate::abci::messages::FeesAggregate;
             use crate::block::BlockInfo;
-            use crate::execution::constants::FOREVER_STORAGE_EPOCHS;
             use crate::execution::epoch_change::epoch::{EpochInfo, EPOCH_CHANGE_TIME_MS};
             use crate::platform::Platform;
             use rs_drive::drive::batch::GroveDbOpBatch;
+            use rs_drive::drive::fee_pools::epochs::constants::FOREVER_STORAGE_EPOCHS;
             use rs_drive::fee_pools::epochs::Epoch;
             use rs_drive::grovedb::TransactionArg;
 
@@ -357,18 +347,17 @@ mod tests {
 
     mod process_block_fees {
         use crate::common::helpers::setup::setup_platform_with_initial_state_structure;
-        use crate::execution::constants::GENESIS_EPOCH_INDEX;
         use chrono::Utc;
         use rs_drive::common::helpers::identities::create_test_masternode_identities;
+        use rs_drive::drive::fee_pools::epochs::constants::GENESIS_EPOCH_INDEX;
         use rust_decimal::prelude::ToPrimitive;
 
         mod helpers {
             use crate::abci::messages::FeesAggregate;
             use crate::block::BlockInfo;
-            use crate::execution::constants::{FOREVER_STORAGE_EPOCHS, GENESIS_EPOCH_INDEX};
             use crate::execution::epoch_change::epoch::{EpochInfo, EPOCH_CHANGE_TIME_MS};
             use crate::platform::Platform;
-            use rs_drive::drive::batch::GroveDbOpBatch;
+            use rs_drive::drive::fee_pools::epochs::constants::GENESIS_EPOCH_INDEX;
             use rs_drive::fee_pools::epochs::Epoch;
             use rs_drive::grovedb::TransactionArg;
 
@@ -383,7 +372,8 @@ mod tests {
             ) -> BlockInfo {
                 let current_epoch = Epoch::new(epoch_index);
 
-                let block_time_ms = genesis_time_ms + epoch_index as u64 * EPOCH_CHANGE_TIME_MS;
+                let block_time_ms =
+                    genesis_time_ms + epoch_index as u64 * EPOCH_CHANGE_TIME_MS + block_height;
 
                 let block_info = BlockInfo {
                     block_height,

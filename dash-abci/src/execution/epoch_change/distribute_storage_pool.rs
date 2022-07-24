@@ -1,16 +1,14 @@
 use crate::error::execution::ExecutionError;
 use crate::error::Error;
 use crate::execution::constants;
-use crate::execution::constants::{EPOCHS_PER_YEAR, EPOCHS_PER_YEAR_DEC, FOREVER_STORAGE_YEARS};
-use crate::execution::epoch_change::epoch::EpochInfo;
 use crate::platform::Platform;
 use rs_drive::drive::batch::GroveDbOpBatch;
+use rs_drive::drive::fee_pools::epochs::constants::{EPOCHS_PER_YEAR, FOREVER_STORAGE_YEARS};
 use rs_drive::fee_pools::epochs::Epoch;
-use rs_drive::fee_pools::update_storage_fee_distribution_pool_operation;
 use rs_drive::grovedb::TransactionArg;
 use rs_drive::{error, grovedb};
 use rust_decimal::prelude::{FromPrimitive, ToPrimitive};
-use rust_decimal::{Decimal, RoundingStrategy};
+use rust_decimal::Decimal;
 
 pub type StorageDistributionLeftoverCredits = u64;
 
@@ -38,12 +36,14 @@ impl Platform {
                 ExecutionError::Overflow("storage distribution fees are not fitting in a u64"),
             ))?;
 
+        let epochs_per_year = Decimal::from(EPOCHS_PER_YEAR);
+
         for year in 0..FOREVER_STORAGE_YEARS {
             let distribution_for_that_year_ratio = constants::FEE_DISTRIBUTION_TABLE[year as usize];
 
             let year_fee_share = storage_distribution_fees * distribution_for_that_year_ratio;
 
-            let epoch_fee_share_dec = year_fee_share / EPOCHS_PER_YEAR_DEC;
+            let epoch_fee_share_dec = year_fee_share / epochs_per_year;
 
             let epoch_fee_share = epoch_fee_share_dec
                 .floor()
