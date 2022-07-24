@@ -8,17 +8,24 @@ impl Drive {
     pub fn get_epoch_block_count(
         &self,
         epoch: &Epoch,
+        max_next_epoch_index: u16,
         cached_next_epoch_start_block_height: Option<u64>,
         transaction: TransactionArg,
     ) -> Result<u64, Error> {
-        let next_epoch_pool = Epoch::new(epoch.index + 1);
+        let next_start_block_height = if let Some(next_start_block_height) =
+            cached_next_epoch_start_block_height
+        {
+            next_start_block_height
+        } else {
+            let (_, start_block_height) = self.find_next_epoch_stat_block_height(
+                    epoch.index,
+                    max_next_epoch_index,
+                    transaction,
+                )?.ok_or(Error::Fee(FeeError::CorruptedCodeExecution("start_block_height must be present for current epoch or cached_next_epoch_start_block_height must be passed")))?;
 
-        let next_start_block_height =
-            if let Some(next_start_block_height) = cached_next_epoch_start_block_height {
-                next_start_block_height
-            } else {
-                self.get_epoch_start_block_height(&next_epoch_pool, transaction)?
-            };
+            start_block_height
+        };
+
         let current_start_block_height = self.get_epoch_start_block_height(epoch, transaction)?;
 
         let block_count = next_start_block_height

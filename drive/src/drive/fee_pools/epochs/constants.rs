@@ -1,0 +1,8 @@
+pub const GENESIS_EPOCH_INDEX: u16 = 0;
+
+pub const EPOCHS_PER_YEAR: u16 = 20;
+
+// TODO: Don't like this name
+pub const FOREVER_STORAGE_YEARS: u16 = 50;
+
+pub const FOREVER_STORAGE_EPOCHS: u16 = FOREVER_STORAGE_YEARS * EPOCHS_PER_YEAR;

@@ -10,6 +10,7 @@ use crate::execution::epoch_change::epoch::EpochInfo;
 use crate::execution::fee_distribution::{FeesInPools, ProposerPayouts};
 use crate::platform::Platform;
 use rs_drive::drive::batch::GroveDbOpBatch;
+use rs_drive::drive::fee_pools::epochs::constants::GENESIS_EPOCH_INDEX;
 use rs_drive::fee_pools::epochs::Epoch;
 use rs_drive::grovedb::TransactionArg;
 use std::option::Option::None;
@@ -100,19 +101,29 @@ impl Platform {
             None
         };
 
+        // Since epoch pool tree batched is not committed yet
+        // we pass previous block count explicitly
+        let cached_previous_block_count = if epoch_info.is_epoch_change {
+            Some(0)
+        } else {
+            None
+        };
+
         batch.push(current_epoch.increment_proposer_block_count_operation(
             &self.drive,
-            epoch_info.is_epoch_change,
             &block_info.proposer_pro_tx_hash,
+            cached_previous_block_count,
             transaction,
         )?);
 
         // Distribute fees from unpaid pools to proposers
+        // Since we are paying for passed epochs it's nothing to do on genesis epoch
         let proposers_payouts = if epoch_info.current_epoch_index > GENESIS_EPOCH_INDEX {
-            // For current epochs we pay for previous
-            let pay_starting_with_epoch_index = epoch_info.current_epoch_index - 1;
+            let epoch_index_to_pay = self.drive.get_epoch_index_to_pay(transaction)?;
 
-            // Since start_block_height is not committed for current epoch
+            if epoch_index_to_pay < epoch_info.current_epoch_index {}
+
+            // Since start_block_height for current epoch is batched and not committed yet
             // we pass it explicitly
             let current_epoch_start_block_height = if epoch_info.is_epoch_change {
                 Some(block_info.block_height)
@@ -121,7 +132,7 @@ impl Platform {
             };
 
             self.add_distribute_fees_from_unpaid_pools_to_proposers_operations(
-                pay_starting_with_epoch_index,
+                epoch_info.current_epoch_index,
                 current_epoch_start_block_height,
                 transaction,
                 &mut batch,

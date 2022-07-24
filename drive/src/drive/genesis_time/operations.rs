@@ -21,6 +21,7 @@ mod tests {
         use crate::common::helpers::setup::setup_drive;
         use crate::drive::batch::GroveDbOpBatch;
         use crate::drive::genesis_time::operations::update_genesis_time_operation;
+        use crate::error;
 
         #[test]
         fn test_error_if_fee_pools_is_not_initiated() {
@@ -38,7 +39,7 @@ mod tests {
                     "should not be able to update genesis time on uninit fee pools"
                 ),
                 Err(e) => match e {
-                    super::error::Error::GroveDB(grovedb::Error::PathKeyNotFound(_)) => {
+                    error::Error::GroveDB(grovedb::Error::PathKeyNotFound(_)) => {
                         assert!(true)
                     }
                     _ => assert!(false, "invalid error type"),
