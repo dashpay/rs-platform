@@ -4,6 +4,7 @@ use crate::error::Error;
 
 use crate::platform::Platform;
 use rs_drive::drive::batch::GroveDbOpBatch;
+use rs_drive::error::fee::FeeError;
 use rs_drive::fee_pools::epochs::Epoch;
 use rs_drive::fee_pools::update_storage_fee_distribution_pool_operation;
 use rs_drive::grovedb::TransactionArg;
@@ -21,30 +22,87 @@ pub struct FeesInPools {
     pub storage_fees: u64,
 }
 
+pub struct UnpaidEpoch {
+    epoch_index: u16,
+    start_block_height: u64,
+    end_block_height: u64,
+    proposers_limit: u16,
+}
+
+impl UnpaidEpoch {
+    fn block_count(&self) -> Result<u64, error::Error> {
+        self.end_block_height
+            .checked_sub(self.start_block_height)
+            .ok_or(error::Error::Fee(FeeError::Overflow(
+                "overflow for get_epoch_block_count",
+            )))
+    }
+}
+
 impl Platform {
+    pub fn get_unpaid_epoch(
+        &self,
+        current_epoch_index: u16,
+        cached_current_epoch_start_block_height: Option<u64>,
+        transaction: TransactionArg,
+    ) -> Result<Option<UnpaidEpoch>, Error> {
+        let unpaid_epoch_index = self.drive.get_epoch_index_to_pay(transaction)?;
+
+        if unpaid_epoch_index < current_epoch_index {
+            return Ok(None);
+        }
+
+        // Process more proposers at once if we have many unpaid epochs in past
+        let proposers_limit: u16 = if unpaid_epoch_index == current_epoch_index {
+            // TODO We never visit this branch?
+            50
+        } else {
+            (current_epoch_index - unpaid_epoch_index + 1) * 50
+        };
+
+        let current_start_block_height =
+            self.get_epoch_start_block_height(unpaid_epoch_pool, transaction)?;
+
+        // Pass cached current epoch start block height only if we pay for the previous epoch
+        let unpaid_epoch_start_block_height = if cached_current_epoch_start_block_height.is_some()
+            && unpaid_epoch_pool.index == current_epoch_index - 1
+        {
+            cached_current_epoch_start_block_height.unwrap();
+        } else {
+            let (_, start_block_height) = self.find_next_epoch_stat_block_height(
+                unpaid_epoch_pool.index,
+                current_epoch_index,
+                transaction,
+            )?.ok_or((FeeError::CorruptedCodeExecution("start_block_height must be present for current epoch or cached_next_epoch_start_block_height must be passed")))?;
+
+            start_block_height
+        };
+
+        let next_start_block_height =
+            if let Some(next_start_block_height) = cached_next_epoch_start_block_height {
+                next_start_block_height
+            } else {
+            };
+
+        let block_count = next_start_block_height
+            .checked_sub(unpaid_epoch_start_block_height)
+            .ok_or(error::Error::Fee(FeeError::Overflow(
+                "overflow for get_epoch_block_count",
+            )))?;
+
+        UnpaidEpoch {
+            epoch_index: unpaid_epoch_index,
+            proposers_limit,
+        }
+    }
+
     pub fn add_distribute_fees_from_unpaid_pools_to_proposers_operations(
         &self,
-        pay_starting_at_epoch_index: u16,
-        cached_current_epoch_start_block_height: Option<u64>,
+        unpaid_epoch_info: &UnpaidEpoch,
         transaction: TransactionArg,
         batch: &mut GroveDbOpBatch,
     ) -> Result<Option<ProposerPayouts>, Error> {
-        // Find oldest from unpaid epochs
-        let unpaid_epoch_pool = match self
-            .drive
-            .get_oldest_unpaid_epoch_pool(pay_starting_at_epoch_index, transaction)
-            .map_err(Error::Drive)?
-        {
-            Some(epoch_pool) => epoch_pool,
-            None => return Ok(None),
-        };
-
-        // Process more proposers at once if we have many unpaid epochs in past
-        let proposers_limit: u16 = if unpaid_epoch_pool.index == pay_starting_at_epoch_index {
-            50
-        } else {
-            (pay_starting_at_epoch_index - unpaid_epoch_pool.index + 1) * 50
-        };
+        let unpaid_epoch_pool = Epoch::new(epoch_index_to_pay);
 
         let total_fees = self
             .drive
@@ -53,20 +111,13 @@ impl Platform {
 
         let total_fees = Decimal::from(total_fees);
 
-        // Pass cached current epoch start block height only if we pay for the previous epoch
-        let cached_current_epoch_start_block_height =
-            if unpaid_epoch_pool.index == pay_starting_at_epoch_index {
-                cached_current_epoch_start_block_height
-            } else {
-                None
-            };
+        // Calculate block count
 
-        // TODO: We don't handle gaps here. We should go recursively back like we do in get_oldest_unpaid_epoch_pool
-        //   It's better to get index, and block count in get_oldest_unpaid_epoch_pool instead of iterating through epochs twice
         let unpaid_epoch_block_count = self
             .drive
             .get_epoch_block_count(
                 &unpaid_epoch_pool,
+                current_epoch_index,
                 cached_current_epoch_start_block_height,
                 transaction,
             )
@@ -172,6 +223,13 @@ impl Platform {
             // TODO It must be called in upper function. It's not this function
             //   responsibility to remove some keys from epoch pools, it deals only with proposers tree
             unpaid_epoch_pool.add_mark_as_paid_operations(batch);
+
+            // Update
+            self.drive.find_next_epoch_stat_block_height(
+                unpaid_epoch_pool.index,
+                current_epoch_index,
+                transaction,
+            )
         }
 
         Ok(Some(ProposerPayouts {

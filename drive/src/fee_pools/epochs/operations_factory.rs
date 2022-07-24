@@ -15,22 +15,19 @@ impl Epoch {
     pub fn increment_proposer_block_count_operation(
         &self,
         drive: &Drive,
-        is_epoch_change: bool,
         proposer_pro_tx_hash: &[u8; 32],
+        cached_previous_block_count: Option<u64>,
         transaction: TransactionArg,
     ) -> Result<GroveDbOp, Error> {
-        // update proposer's block count
-        // TODO: we already handle it few lines below. It's not a problem to do one faulty request once in 18 days
-        //  but keep logic of this function simpler and keep `is_epoch_change` execution logic outside storage
-        let proposed_block_count = if is_epoch_change {
-            0
-        } else {
-            drive
+        // get current proposer's block count
+        let proposed_block_count = match cached_previous_block_count {
+            Some(block_count) => block_count,
+            None => drive
                 .get_epochs_proposer_block_count(self, proposer_pro_tx_hash, transaction)
                 .or_else(|e| match e {
                     Error::GroveDB(grovedb::Error::PathKeyNotFound(_)) => Ok(0u64),
                     _ => Err(e),
-                })?
+                })?,
         };
 
         Ok(self
@@ -185,6 +182,7 @@ mod tests {
     use crate::common::helpers::setup::setup_drive_with_initial_state_structure;
     use crate::drive::batch::GroveDbOpBatch;
     use crate::fee_pools::epochs::Epoch;
+    use chrono::Utc;
 
     mod increment_proposer_block_count_operation {
         #[test]
@@ -204,8 +202,8 @@ mod tests {
                 epoch
                     .increment_proposer_block_count_operation(
                         &drive,
-                        true,
                         &pro_tx_hash,
+                        Some(0),
                         Some(&transaction),
                     )
                     .expect("should increment proposer block count operations"),
@@ -255,8 +253,8 @@ mod tests {
                 epoch
                     .increment_proposer_block_count_operation(
                         &drive,
-                        true,
                         &pro_tx_hash,
+                        None,
                         Some(&transaction),
                     )
                     .expect("should update proposer block count"),
@@ -275,10 +273,12 @@ mod tests {
     }
 
     mod add_init_empty_operations {
+        use crate::common::helpers::setup::setup_drive;
+        use crate::error;
 
         #[test]
         fn test_error_if_fee_pools_not_initialized() {
-            let drive = super::setup_drive();
+            let drive = setup_drive();
             let transaction = drive.grove.start_transaction();
 
             let epoch = super::Epoch::new(1042);
@@ -290,7 +290,7 @@ mod tests {
             match drive.grove_apply_batch(batch, false, Some(&transaction)) {
                 Ok(_) => assert!(false, "should not be able to init epochs without FeePools"),
                 Err(e) => match e {
-                    super::error::Error::GroveDB(grovedb::Error::PathKeyNotFound(_)) => {
+                    error::Error::GroveDB(grovedb::Error::PathKeyNotFound(_)) => {
                         assert!(true)
                     }
                     _ => assert!(false, "invalid error type"),
@@ -380,6 +380,8 @@ mod tests {
     }
 
     mod add_mark_as_paid_operations {
+        use crate::error;
+        use crate::fee_pools::epochs::epoch_key_constants;
 
         #[test]
         fn test_values_are_deleted() {
@@ -409,7 +411,7 @@ mod tests {
                 .grove
                 .get(
                     epoch.get_path(),
-                    super::epoch_key_constants::KEY_PROPOSERS.as_slice(),
+                    epoch_key_constants::KEY_PROPOSERS.as_slice(),
                     Some(&transaction),
                 )
                 .unwrap()
@@ -424,7 +426,7 @@ mod tests {
             match drive.get_epoch_processing_credits_for_distribution(&epoch, Some(&transaction)) {
                 Ok(_) => assert!(false, "should not be able to get processing fee"),
                 Err(e) => match e {
-                    super::error::Error::GroveDB(grovedb::Error::PathKeyNotFound(_)) => {
+                    error::Error::GroveDB(grovedb::Error::PathKeyNotFound(_)) => {
                         assert!(true)
                     }
                     _ => assert!(false, "invalid error type"),
@@ -434,7 +436,7 @@ mod tests {
             match drive.get_epoch_storage_credits_for_distribution(&epoch, Some(&transaction)) {
                 Ok(_) => assert!(false, "should not be able to get storage fee"),
                 Err(e) => match e {
-                    super::error::Error::GroveDB(grovedb::Error::PathKeyNotFound(_)) => {
+                    error::Error::GroveDB(grovedb::Error::PathKeyNotFound(_)) => {
                         assert!(true)
                     }
                     _ => assert!(false, "invalid error type"),

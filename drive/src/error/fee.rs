@@ -1,5 +1,6 @@
 #[derive(Debug, thiserror::Error)]
 pub enum FeeError {
+    // TODO: Revisit
     #[error("overflow error: {0}")]
     Overflow(&'static str),
 
@@ -31,6 +32,9 @@ pub enum FeeError {
     CorruptedMultiplierNotItem(&'static str),
     #[error("corrupted multiplier invalid item length error: {0}")]
     CorruptedMultiplierInvalidItemLength(&'static str),
+
+    #[error("corrupted code execution error: {0}")]
+    CorruptedCodeExecution(&'static str),
 
     #[error("decimal conversion error: {0}")]
     DecimalConversion(&'static str),
