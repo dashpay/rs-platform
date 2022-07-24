@@ -29,15 +29,15 @@ chrono = "0.4.0"
 
 [dependencies.grovedb]
 git = "https://github.com/dashevo/grovedb"
-branch = "develop"
+branch = "feat/queryReturnPath"
 
 [dependencies.storage]
 git = "https://github.com/dashevo/grovedb"
-branch = "develop"
+branch = "feat/queryReturnPath"
 
 [dependencies.costs]
 git = "https://github.com/dashevo/grovedb"
-branch = "develop"
+branch = "feat/queryReturnPath"
 
 [dependencies.dpp]
 git = "https://github.com/dashevo/rust-dpp"
