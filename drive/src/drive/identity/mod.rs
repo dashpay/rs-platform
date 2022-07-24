@@ -1,7 +1,7 @@
 use dpp::identity::Identity;
-use grovedb::{Element, PathQuery, Query, QueryItem, SizedQuery, TransactionArg};
 use grovedb::query_result_type::GetItemResults;
 use grovedb::query_result_type::QueryResultType::QueryElementResultType;
+use grovedb::{Element, PathQuery, Query, QueryItem, SizedQuery, TransactionArg};
 
 use crate::drive::batch::GroveDbOpBatch;
 use crate::drive::flags::StorageFlags;

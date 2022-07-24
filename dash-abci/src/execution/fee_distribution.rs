@@ -225,7 +225,7 @@ impl Platform {
             unpaid_epoch_pool.add_mark_as_paid_operations(batch);
 
             // Update
-            self.drive.find_next_epoch_stat_block_height(
+            self.drive.find_next_epoch_start_block_height(
                 unpaid_epoch_pool.index,
                 current_epoch_index,
                 transaction,

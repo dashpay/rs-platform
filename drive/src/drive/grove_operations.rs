@@ -18,8 +18,8 @@ use crate::error::drive::DriveError;
 use crate::error::Error;
 use crate::fee::op::DriveOperation::{CalculatedCostOperation, CostCalculationQueryOperation};
 use crate::fee::op::{DriveOperation, SizesOfQueryOperation};
-use grovedb::Error as GroveError;
 use grovedb::query_result_type::{QueryResultItems, QueryResultType};
+use grovedb::Error as GroveError;
 
 fn push_drive_operation_result<T>(
     cost_context: CostContext<Result<T, GroveError>>,
@@ -447,7 +447,8 @@ impl Drive {
         result_type: QueryResultType,
         drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<(QueryResultItems, u16), Error> {
-        let CostContext { value, cost } = self.grove.query_raw(path_query, result_type, transaction);
+        let CostContext { value, cost } =
+            self.grove.query_raw(path_query, result_type, transaction);
         drive_operations.push(CalculatedCostOperation(cost));
         value.map_err(Error::GroveDB)
     }

@@ -17,7 +17,7 @@ impl Drive {
         {
             next_start_block_height
         } else {
-            let (_, start_block_height) = self.find_next_epoch_stat_block_height(
+            let (_, start_block_height) = self.find_next_epoch_start_block_height(
                     epoch.index,
                     max_next_epoch_index,
                     transaction,

@@ -30,8 +30,8 @@ impl Drive {
 #[cfg(test)]
 mod tests {
     use crate::drive::Drive;
-    use grovedb::{PathQuery, Query, SizedQuery};
     use grovedb::query_result_type::QueryResultType::QueryElementResultType;
+    use grovedb::{PathQuery, Query, SizedQuery};
     use tempfile::TempDir;
 
     #[test]
@@ -54,7 +54,12 @@ mod tests {
         );
         let mut drive_operations = vec![];
         let (elements, _) = drive
-            .grove_get_raw_path_query(&root_path_query, None, QueryElementResultType, &mut drive_operations)
+            .grove_get_raw_path_query(
+                &root_path_query,
+                None,
+                QueryElementResultType,
+                &mut drive_operations,
+            )
             .expect("expected to get root elements");
         assert_eq!(elements.len(), 5);
     }

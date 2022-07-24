@@ -3,10 +3,12 @@ use crate::drive::Drive;
 use crate::error::fee::FeeError;
 use crate::error::Error;
 use crate::fee_pools::epochs::Epoch;
+use grovedb::query_result_type::GetItemResults;
+use grovedb::query_result_type::QueryResultType::QueryPathKeyElementTrioResultType;
 use grovedb::{Element, PathQuery, Query, SizedQuery, TransactionArg};
 
 use crate::fee_pools::epochs::epoch_key_constants;
-use crate::fee_pools::epochs::epoch_key_constants::KEY_START_BLOCK_HEIGHT;
+use crate::fee_pools::epochs::epoch_key_constants::{EPOCH_STORAGE_OFFSET, KEY_START_BLOCK_HEIGHT};
 
 impl Drive {
     pub fn get_epoch_start_block_height(
@@ -33,7 +35,7 @@ impl Drive {
         }
     }
 
-    pub fn find_next_epoch_stat_block_height(
+    pub fn find_next_epoch_start_block_height(
         &self,
         from_epoch_index: u16,
         to_epoch_index: u16,
@@ -55,17 +57,18 @@ impl Drive {
 
         let path_query = PathQuery::new(pools_vec_path(), sized_query);
 
-        let (path_key_elements, skipped) = self
+        let (result_items, _) = self
             .grove
-            .query_raw(&path_query, transaction)
+            .query_raw(&path_query, QueryPathKeyElementTrioResultType, transaction)
             .unwrap()
             .map_err(Error::GroveDB)?;
 
-        if path_key_elements.is_empty() {
+        if result_items.is_empty() {
             return Ok(None);
         }
+        let first_result = &result_items.to_path_key_elements()[0];
 
-        let (key, element) = &path_key_elements[0];
+        let (path, key, element) = first_result;
 
         let next_start_block_height = if let Element::Item(item, _) = element {
             u64::from_be_bytes(item.as_slice().try_into().map_err(|_| {
@@ -77,7 +80,19 @@ impl Drive {
             return Err(Error::Fee(FeeError::CorruptedStartBlockHeightItemLength()));
         };
 
-        Ok(Some((skipped as u16, next_start_block_height)))
+        let epoch_key = path
+            .last()
+            .ok_or(Error::Fee(FeeError::CorruptedStartBlockHeightItemLength()))?;
+
+        let epoch = u16::from_be_bytes(epoch_key.try_into().map_err(|_| {
+            Error::Fee(FeeError::CorruptedProposerBlockCountItemLength(
+                "item have an invalid length",
+            ))
+        })?)
+        .checked_sub(EPOCH_STORAGE_OFFSET)
+        .ok_or(Error::Fee(FeeError::Overflow("Stored Epoch too low")))?;
+
+        Ok(Some((epoch, next_start_block_height)))
     }
 }
 
@@ -216,7 +231,7 @@ mod tests {
                 .expect("should apply batch");
 
             let next_epoch_start_block_height = drive
-                .find_next_epoch_stat_block_height(0, 4, Some(&transaction))
+                .find_next_epoch_start_block_height(0, 4, Some(&transaction))
                 .expect("should find next start_block_height");
 
             match next_epoch_start_block_height {
@@ -234,7 +249,7 @@ mod tests {
             let transaction = drive.grove.start_transaction();
 
             let next_epoch_start_block_height = drive
-                .find_next_epoch_stat_block_height(0, 4, Some(&transaction))
+                .find_next_epoch_start_block_height(0, 4, Some(&transaction))
                 .expect("should find next start_block_height");
 
             match next_epoch_start_block_height {
@@ -262,7 +277,7 @@ mod tests {
                 .expect("should apply batch");
 
             let next_epoch_start_block_height = drive
-                .find_next_epoch_stat_block_height(0, 3, Some(&transaction))
+                .find_next_epoch_start_block_height(0, 3, Some(&transaction))
                 .expect("should find next start_block_height");
 
             match next_epoch_start_block_height {
@@ -290,7 +305,7 @@ mod tests {
                 .expect("should apply batch");
 
             let next_epoch_start_block_height = drive
-                .find_next_epoch_stat_block_height(0, 4, Some(&transaction))
+                .find_next_epoch_start_block_height(0, 4, Some(&transaction))
                 .expect("should find next start_block_height");
 
             match next_epoch_start_block_height {

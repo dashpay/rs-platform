@@ -1,6 +1,8 @@
-use grovedb::{Element, PathQuery, Query, SizedQuery, TransactionArg};
 use grovedb::query_result_type::GetItemResults;
-use grovedb::query_result_type::QueryResultType::{QueryElementResultType, QueryKeyElementPairResultType};
+use grovedb::query_result_type::QueryResultType::{
+    QueryElementResultType, QueryKeyElementPairResultType,
+};
+use grovedb::{Element, PathQuery, Query, SizedQuery, TransactionArg};
 
 use crate::drive::{Drive, RootTree};
 use crate::error::drive::DriveError;
@@ -82,9 +84,11 @@ impl Drive {
 
         let key_elements = self
             .grove
-            .query_raw(&path_query, QueryKeyElementPairResultType,  transaction)
+            .query_raw(&path_query, QueryKeyElementPairResultType, transaction)
             .unwrap()
-            .map_err(Error::GroveDB)?.0.to_key_elements();
+            .map_err(Error::GroveDB)?
+            .0
+            .to_key_elements();
 
         let result = key_elements
             .into_iter()
