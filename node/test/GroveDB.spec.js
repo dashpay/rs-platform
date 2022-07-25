@@ -1197,14 +1197,23 @@ describe('GroveDB', () => {
       ePath.push(eKey);
 
       const query2 = {
-        path: ePath,
+        path: itemTreePath,
         query: {
           query: {
             items: [
               {
-                type: 'rangeFull',
+                type: 'key',
+                key: eaKey,
               },
             ],
+            subquery: {
+              items: [
+                {
+                  type: 'rangeAfter',
+                  after: dKey,
+                },
+              ],
+            },
           },
         },
       };

@@ -220,7 +220,6 @@ mod tests {
                         fees: FeesAggregate {
                             processing_fees: 1600,
                             storage_fees: storage_fees_per_block,
-                            refunds_by_epoch: vec![(1, 100)], // we are refunding 100 credits from epoch 1
                         },
                     };
 
@@ -364,7 +363,6 @@ mod tests {
                         fees: FeesAggregate {
                             processing_fees: 1600,
                             storage_fees: storage_fees_per_block,
-                            refunds_by_epoch: vec![(1, 100)], // we are refunding 100 credits from epoch 1
                         },
                     };
 

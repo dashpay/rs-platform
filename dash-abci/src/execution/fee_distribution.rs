@@ -966,7 +966,6 @@ mod tests {
                     &FeesAggregate {
                         processing_fees,
                         storage_fees,
-                        refunds_by_epoch: vec![],
                     },
                     None,
                     Some(&transaction),
@@ -1024,7 +1023,6 @@ mod tests {
                     &FeesAggregate {
                         processing_fees,
                         storage_fees,
-                        refunds_by_epoch: vec![],
                     },
                     None,
                     Some(&transaction),

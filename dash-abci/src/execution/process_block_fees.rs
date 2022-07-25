@@ -183,7 +183,6 @@ mod tests {
                     let block_fees = FeesAggregate {
                         processing_fees: 1000,
                         storage_fees: 1000000000,
-                        refunds_by_epoch: vec![],
                     };
 
                     let mut batch = GroveDbOpBatch::new();
@@ -389,7 +388,6 @@ mod tests {
                 let block_fees = FeesAggregate {
                     processing_fees: 1000,
                     storage_fees: 10000,
-                    refunds_by_epoch: vec![],
                 };
 
                 let distribute_storage_pool_result = platform

@@ -38,7 +38,7 @@ pub type EpochRefund = (u16, u64);
 pub struct FeesAggregate {
     pub processing_fees: u64,
     pub storage_fees: u64,
-    pub refunds_by_epoch: Vec<EpochRefund>,
+    // pub refunds_by_epoch: Vec<EpochRefund>,
 }
 
 #[derive(Serialize, Deserialize)]
