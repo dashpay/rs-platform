@@ -38,7 +38,9 @@ impl Drive {
 #[cfg(test)]
 mod tests {
     mod get_aggregate_storage_fees_in_current_distribution_pool {
-        use crate::common::helpers::setup::setup_drive_with_initial_state_structure;
+        use crate::common::helpers::setup::{
+            setup_drive, setup_drive_with_initial_state_structure,
+        };
         use crate::drive::batch::GroveDbOpBatch;
         use crate::drive::fee_pools::pools_vec_path;
         use crate::error::fee::FeeError;
@@ -48,7 +50,7 @@ mod tests {
 
         #[test]
         fn test_error_if_pool_is_not_initiated() {
-            let drive = setup_drive_with_initial_state_structure();
+            let drive = setup_drive();
             let transaction = drive.grove.start_transaction();
 
             match drive.get_aggregate_storage_fees_in_current_distribution_pool(Some(&transaction))
