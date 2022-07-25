@@ -506,7 +506,7 @@ mod tests {
                 epoch_index,
                 block_height,
                 Some(block_info.block_time_ms),
-                proposers[0],
+                proposers[1],
                 Some(&transaction),
             );
 
@@ -526,7 +526,7 @@ mod tests {
                 epoch_index,
                 block_height,
                 Some(block_info.block_time_ms),
-                proposers[1],
+                proposers[2],
                 Some(&transaction),
             );
 
@@ -546,7 +546,7 @@ mod tests {
                 epoch_index,
                 block_height,
                 Some(block_info.block_time_ms),
-                proposers[2],
+                proposers[3],
                 Some(&transaction),
             );
 
