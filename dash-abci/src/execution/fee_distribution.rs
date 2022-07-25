@@ -66,12 +66,7 @@ impl Platform {
         let unpaid_epoch = unpaid_epoch.unwrap();
 
         // Process more proposers at once if we have many unpaid epochs in past
-        let proposers_limit: u16 = if unpaid_epoch.epoch_index == current_epoch_index {
-            // TODO We never visit this branch?
-            50 // TODO Use constant
-        } else {
-            (current_epoch_index - unpaid_epoch.epoch_index + 1) * 50
-        };
+        let proposers_limit: u16 = (current_epoch_index - unpaid_epoch.epoch_index + 1) * 50;
 
         let proposers_paid_count = self.add_epoch_pool_to_proposers_payout_operations(
             &unpaid_epoch,
@@ -359,10 +354,7 @@ impl Platform {
 mod tests {
     mod add_distribute_fees_from_oldest_unpaid_epoch_pool_to_proposers_operations {
         use crate::common::helpers::setup::setup_platform_with_initial_state_structure;
-        use rs_drive::common::helpers::identities::{
-            create_test_masternode_identities,
-            create_test_masternode_identities_and_add_them_as_epoch_block_proposers,
-        };
+        use rs_drive::common::helpers::identities::create_test_masternode_identities_and_add_them_as_epoch_block_proposers;
         use rs_drive::drive::batch::GroveDbOpBatch;
         use rs_drive::drive::fee_pools::epochs::constants::GENESIS_EPOCH_INDEX;
         use rs_drive::error::Error;
@@ -609,430 +601,162 @@ mod tests {
         }
 
         #[test]
-        fn test_use_cached_start_block_height_for_current_epoch_on_epoch_change() {}
+        fn test_use_cached_current_start_block_height_as_end_block_if_unpaid_epoch_is_previous() {}
 
         #[test]
-        fn test_finding_unpaid_epoch() {}
+        fn test_use_stored_start_block_height_from_current_epoch_as_end_block_if_unpaid_epoch_is_previous(
+        ) {
+        }
+
+        #[test]
+        fn test_find_next_start_block_as_end_block_if_unpaid_epoch_more_than_one_ago() {}
+
+        #[test]
+        fn test_use_cached_start_block_height_if_not_found_in_case_of_epoch_change() {}
+
+        #[test]
+        fn test_error_if_cached_start_block_height_is_not_present_and_not_found_in_case_of_epoch_change(
+        ) {
+        }
     }
 
-    mod add_epoch_pool_to_proposers_payout_operations {}
+    mod add_epoch_pool_to_proposers_payout_operations {
+        use crate::common::helpers::fee_pools::{
+            create_test_masternode_share_identities_and_documents, refetch_identities,
+        };
+        use crate::common::helpers::setup::setup_platform_with_initial_state_structure;
+        use crate::execution::fee_distribution::UnpaidEpoch;
+        use rs_drive::common::helpers::identities::create_test_masternode_identities_and_add_them_as_epoch_block_proposers;
+        use rs_drive::drive::batch::GroveDbOpBatch;
+        use rs_drive::fee_pools::epochs::Epoch;
+        use rust_decimal::Decimal;
+        use rust_decimal_macros::dec;
 
-    // mod add_distribute_fees_from_unpaid_pools_to_proposers {
-    //     use crate::abci::messages::FeesAggregate;
-    //     use crate::common::helpers::fee_pools::{
-    //         create_test_masternode_share_identities_and_documents, refetch_identities,
-    //     };
-    //     use crate::common::helpers::setup::setup_platform_with_initial_state_structure;
-    //     use crate::execution::fee_distribution::UnpaidEpoch;
-    //     use rs_drive::common::helpers::identities::create_test_masternode_identities_and_add_them_as_epoch_block_proposers;
-    //     use rs_drive::drive::batch::GroveDbOpBatch;
-    //     use rs_drive::fee_pools::epochs::epoch_key_constants::KEY_PROPOSERS;
-    //     use rs_drive::fee_pools::epochs::Epoch;
-    //     use rs_drive::grovedb;
-    //     use rust_decimal::Decimal;
-    //     use rust_decimal_macros::dec;
-    //
-    //     #[test]
-    //     fn test_payouts_for_previous_epoch_without_start_block_height_committed() {
-    //         let platform = setup_platform_with_initial_state_structure();
-    //         let transaction = platform.drive.grove.start_transaction();
-    //
-    //         // Create masternode reward shares contract
-    //         let contract = platform.create_mn_shares_contract(Some(&transaction));
-    //
-    //         let unpaid_epoch_pool = Epoch::new(0);
-    //         let current_epoch_pool = Epoch::new(1);
-    //
-    //         let proposers_count = 50;
-    //
-    //         let mut batch = GroveDbOpBatch::new();
-    //
-    //         unpaid_epoch_pool.add_init_current_operations(1.0, 1, 1, &mut batch);
-    //
-    //         // Add some fees to unpaid epoch pool
-    //         platform
-    //             .add_distribute_block_fees_into_pools_operations(
-    //                 &unpaid_epoch_pool,
-    //                 &FeesAggregate {
-    //                     processing_fees: 10000,
-    //                     storage_fees: 0,
-    //                     refunds_by_epoch: vec![],
-    //                 },
-    //                 None,
-    //                 Some(&transaction),
-    //                 &mut batch,
-    //             )
-    //             .expect("distribute fees into epochs pool");
-    //
-    //         platform
-    //             .drive
-    //             .grove_apply_batch(batch, false, Some(&transaction))
-    //             .expect("should apply batch");
-    //
-    //         // Populate proposers into unpaid epoch pool
-    //
-    //         let pro_tx_hashes =
-    //             create_test_masternode_identities_and_add_them_as_epoch_block_proposers(
-    //                 &platform.drive,
-    //                 &unpaid_epoch_pool,
-    //                 proposers_count,
-    //                 Some(&transaction),
-    //             );
-    //
-    //         create_test_masternode_share_identities_and_documents(
-    //             &platform.drive,
-    //             &contract,
-    //             &pro_tx_hashes,
-    //             Some(&transaction),
-    //         );
-    //
-    //         // emulating epochs change
-    //         let mut batch = GroveDbOpBatch::new();
-    //
-    //         let start_block_height = proposers_count as u64 + 1;
-    //
-    //         current_epoch_pool.add_init_current_operations(1.0, start_block_height, 2, &mut batch);
-    //
-    //         let pay_starting_with_epoch_index = 0;
-    //         let cached_current_epoch_start_block_height = Some(start_block_height);
-    //
-    //         let proposer_payouts = platform
-    //             .add_epoch_pool_to_proposers_payout_operations(
-    //                 pay_starting_with_epoch_index,
-    //                 cached_current_epoch_start_block_height,
-    //                 Some(&transaction),
-    //                 &mut batch,
-    //             )
-    //             .expect("should distribute fees");
-    //
-    //         platform
-    //             .drive
-    //             .grove_apply_batch(batch, false, Some(&transaction))
-    //             .expect("should apply batch");
-    //
-    //         match proposer_payouts {
-    //             None => assert!(false, "proposers should be paid"),
-    //             Some(payouts) => {
-    //                 assert_eq!(payouts.proposers_paid_count, 50);
-    //                 assert_eq!(payouts.paid_epoch_index, 0);
-    //             }
-    //         }
-    //     }
-    //
-    //     #[test]
-    //     fn test_payouts_for_two_epochs_ago_without_start_block_height_committed() {
-    //         let platform = setup_platform_with_initial_state_structure();
-    //         let transaction = platform.drive.grove.start_transaction();
-    //
-    //         // Create masternode reward shares contract
-    //         let contract = platform.create_mn_shares_contract(Some(&transaction));
-    //
-    //         let unpaid_epoch_pool_0 = Epoch::new(0);
-    //         let unpaid_epoch_pool_1 = Epoch::new(1);
-    //         let epoch_pool_2 = Epoch::new(2);
-    //
-    //         let proposers_count = 50;
-    //
-    //         let mut batch = GroveDbOpBatch::new();
-    //
-    //         unpaid_epoch_pool_0.add_init_current_operations(1.0, 1, 1, &mut batch);
-    //
-    //         batch.push(
-    //             unpaid_epoch_pool_0.update_processing_credits_for_distribution_operation(10000),
-    //         );
-    //
-    //         unpaid_epoch_pool_1.add_init_current_operations(
-    //             1.0,
-    //             proposers_count as u64 + 1,
-    //             2,
-    //             &mut batch,
-    //         );
-    //
-    //         platform
-    //             .drive
-    //             .grove_apply_batch(batch, false, Some(&transaction))
-    //             .expect("should apply batch");
-    //
-    //         // Populate proposers into unpaid epoch pools
-    //
-    //         let pro_tx_hashes =
-    //             create_test_masternode_identities_and_add_them_as_epoch_block_proposers(
-    //                 &platform.drive,
-    //                 &unpaid_epoch_pool_0,
-    //                 proposers_count,
-    //                 Some(&transaction),
-    //             );
-    //
-    //         create_test_masternode_share_identities_and_documents(
-    //             &platform.drive,
-    //             &contract,
-    //             &pro_tx_hashes,
-    //             Some(&transaction),
-    //         );
-    //
-    //         let pro_tx_hashes =
-    //             create_test_masternode_identities_and_add_them_as_epoch_block_proposers(
-    //                 &platform.drive,
-    //                 &unpaid_epoch_pool_1,
-    //                 proposers_count,
-    //                 Some(&transaction),
-    //             );
-    //
-    //         create_test_masternode_share_identities_and_documents(
-    //             &platform.drive,
-    //             &contract,
-    //             &pro_tx_hashes,
-    //             Some(&transaction),
-    //         );
-    //
-    //         // emulating epochs change
-    //         let mut batch = GroveDbOpBatch::new();
-    //
-    //         let epoch_pool_2_start_block_height = proposers_count as u64 * 2 + 1;
-    //
-    //         epoch_pool_2.add_init_current_operations(
-    //             1.0,
-    //             epoch_pool_2_start_block_height,
-    //             2,
-    //             &mut batch,
-    //         );
-    //
-    //         let pay_starting_with_epoch_index = 1;
-    //         let cached_current_epoch_start_block_height = Some(epoch_pool_2_start_block_height);
-    //
-    //         let proposer_payouts = platform
-    //             .add_distribute_fees_from_unpaid_epoch_pool_to_proposers_operations(
-    //                 pay_starting_with_epoch_index,
-    //                 cached_current_epoch_start_block_height,
-    //                 Some(&transaction),
-    //                 &mut batch,
-    //             )
-    //             .expect("should distribute fees");
-    //
-    //         platform
-    //             .drive
-    //             .grove_apply_batch(batch, false, Some(&transaction))
-    //             .expect("should apply batch");
-    //
-    //         match proposer_payouts {
-    //             None => assert!(false, "proposers should be paid"),
-    //             Some(payouts) => {
-    //                 assert_eq!(payouts.paid_epoch_index, 0);
-    //                 assert_eq!(payouts.proposers_paid_count, 50);
-    //             }
-    //         }
-    //     }
-    //
-    //     #[test]
-    //     fn test_partial_distribution() {
-    //         let platform = setup_platform_with_initial_state_structure();
-    //         let transaction = platform.drive.grove.start_transaction();
-    //
-    //         // Create masternode reward shares contract
-    //         let contract = platform.create_mn_shares_contract(Some(&transaction));
-    //
-    //         let unpaid_epoch_pool = Epoch::new(0);
-    //         let current_epoch_pool = Epoch::new(1);
-    //
-    //         let proposers_count = 60;
-    //
-    //         let mut batch = GroveDbOpBatch::new();
-    //
-    //         unpaid_epoch_pool.add_init_current_operations(1.0, 1, 1, &mut batch);
-    //
-    //         batch.push(
-    //             unpaid_epoch_pool.update_processing_credits_for_distribution_operation(10000),
-    //         );
-    //
-    //         // emulating epochs change
-    //         current_epoch_pool.add_init_current_operations(
-    //             1.0,
-    //             proposers_count as u64 + 1,
-    //             2,
-    //             &mut batch,
-    //         );
-    //
-    //         platform
-    //             .drive
-    //             .grove_apply_batch(batch, false, Some(&transaction))
-    //             .expect("should apply batch");
-    //
-    //         let pro_tx_hashes =
-    //             create_test_masternode_identities_and_add_them_as_epoch_block_proposers(
-    //                 &platform.drive,
-    //                 &unpaid_epoch_pool,
-    //                 proposers_count,
-    //                 Some(&transaction),
-    //             );
-    //
-    //         create_test_masternode_share_identities_and_documents(
-    //             &platform.drive,
-    //             &contract,
-    //             &pro_tx_hashes,
-    //             Some(&transaction),
-    //         );
-    //
-    //         let mut batch = GroveDbOpBatch::new();
-    //
-    //         let pay_starting_with_epoch_index = 0;
-    //         let cached_current_epoch_start_block_height = None;
-    //
-    //         let proposer_payouts = platform
-    //             .add_distribute_fees_from_unpaid_epoch_pool_to_proposers_operations(
-    //                 pay_starting_with_epoch_index,
-    //                 cached_current_epoch_start_block_height,
-    //                 Some(&transaction),
-    //                 &mut batch,
-    //             )
-    //             .expect("should distribute fees");
-    //
-    //         platform
-    //             .drive
-    //             .grove_apply_batch(batch, false, Some(&transaction))
-    //             .expect("should apply batch");
-    //
-    //         match proposer_payouts {
-    //             None => assert!(false, "proposers should be paid"),
-    //             Some(payouts) => {
-    //                 assert_eq!(payouts.proposers_paid_count, 50);
-    //                 assert_eq!(payouts.paid_epoch_index, 0);
-    //             }
-    //         }
-    //
-    //         // expect unpaid proposers exist
-    //         match platform
-    //             .drive
-    //             .is_epochs_proposers_tree_empty(&unpaid_epoch_pool, Some(&transaction))
-    //         {
-    //             Ok(is_empty) => assert!(!is_empty),
-    //             Err(e) => match e {
-    //                 _ => assert!(false, "should be able to get proposers tree"),
-    //             },
-    //         }
-    //     }
-    //
-    //     #[test]
-    //     fn test_complete_distribution() {
-    //         let platform = setup_platform_with_initial_state_structure();
-    //         let transaction = platform.drive.grove.start_transaction();
-    //
-    //         // Create masternode reward shares contract
-    //         let contract = platform.create_mn_shares_contract(Some(&transaction));
-    //
-    //         let proposers_count = 10;
-    //         let processing_fees = 10000;
-    //         let storage_fees = 10000;
-    //
-    //         let unpaid_epoch_pool = Epoch::new(0);
-    //         let next_epoch_pool = Epoch::new(1);
-    //
-    //         let mut batch = GroveDbOpBatch::new();
-    //
-    //         unpaid_epoch_pool.add_init_current_operations(1.0, 1, 1, &mut batch);
-    //
-    //         batch.push(
-    //             unpaid_epoch_pool
-    //                 .update_processing_credits_for_distribution_operation(processing_fees),
-    //         );
-    //
-    //         batch.push(
-    //             unpaid_epoch_pool.update_storage_credits_for_distribution_operation(storage_fees),
-    //         );
-    //
-    //         next_epoch_pool.add_init_current_operations(1.0, 11, 10, &mut batch);
-    //
-    //         platform
-    //             .drive
-    //             .grove_apply_batch(batch, false, Some(&transaction))
-    //             .expect("should apply batch");
-    //
-    //         let pro_tx_hashes =
-    //             create_test_masternode_identities_and_add_them_as_epoch_block_proposers(
-    //                 &platform.drive,
-    //                 &unpaid_epoch_pool,
-    //                 proposers_count,
-    //                 Some(&transaction),
-    //             );
-    //
-    //         let share_identities_and_documents =
-    //             create_test_masternode_share_identities_and_documents(
-    //                 &platform.drive,
-    //                 &contract,
-    //                 &pro_tx_hashes,
-    //                 Some(&transaction),
-    //             );
-    //
-    //         let mut batch = GroveDbOpBatch::new();
-    //
-    //         let pay_starting_with_epoch_index = 0;
-    //         let cached_current_epoch_start_block_height = None;
-    //
-    //         let proposer_payouts = platform
-    //             .add_distribute_fees_from_unpaid_epoch_pool_to_proposers_operations(
-    //                 pay_starting_with_epoch_index,
-    //                 cached_current_epoch_start_block_height,
-    //                 Some(&transaction),
-    //                 &mut batch,
-    //             )
-    //             .expect("should distribute fees");
-    //
-    //         platform
-    //             .drive
-    //             .grove_apply_batch(batch, false, Some(&transaction))
-    //             .expect("should apply batch");
-    //
-    //         match proposer_payouts {
-    //             None => assert!(false, "proposers should be paid"),
-    //             Some(payouts) => {
-    //                 assert_eq!(payouts.proposers_paid_count, 10);
-    //                 assert_eq!(payouts.paid_epoch_index, 0);
-    //             }
-    //         }
-    //
-    //         // check we paid 500 to every mn identity
-    //         let paid_mn_identities = platform
-    //             .drive
-    //             .fetch_identities(&pro_tx_hashes, Some(&transaction))
-    //             .expect("expected to get identities");
-    //
-    //         let total_fees = Decimal::from(storage_fees + processing_fees);
-    //
-    //         let masternode_reward = total_fees / Decimal::from(proposers_count);
-    //
-    //         let shares_percentage_with_precision: u64 = share_identities_and_documents[0]
-    //             .1
-    //             .properties
-    //             .get("percentage")
-    //             .expect("should have percentage field")
-    //             .as_integer()
-    //             .expect("percentage should an integer")
-    //             .try_into()
-    //             .expect("percentage should be u64");
-    //
-    //         let shares_percentage = Decimal::from(shares_percentage_with_precision) / dec!(10000);
-    //
-    //         let payout_credits = masternode_reward * shares_percentage;
-    //
-    //         let payout_credits: i64 = payout_credits.try_into().expect("should convert to i64");
-    //
-    //         for paid_mn_identity in paid_mn_identities {
-    //             assert_eq!(paid_mn_identity.balance, payout_credits);
-    //         }
-    //
-    //         let share_identities = share_identities_and_documents
-    //             .iter()
-    //             .map(|(identity, _)| identity)
-    //             .collect();
-    //
-    //         let refetched_share_identities =
-    //             refetch_identities(&platform.drive, share_identities, Some(&transaction))
-    //                 .expect("expected to refresh identities");
-    //
-    //         for identity in refetched_share_identities {
-    //             assert_eq!(identity.balance, payout_credits as i64);
-    //         }
-    //     }
-    // }
+        #[test]
+        fn test_payout_to_proposers() {
+            let platform = setup_platform_with_initial_state_structure();
+            let transaction = platform.drive.grove.start_transaction();
+
+            // Create masternode reward shares contract
+            let contract = platform.create_mn_shares_contract(Some(&transaction));
+
+            let proposers_count = 10u16;
+            let processing_fees = 10000;
+            let storage_fees = 10000;
+
+            let unpaid_epoch_pool = Epoch::new(0);
+            let next_epoch_pool = Epoch::new(1);
+
+            let mut batch = GroveDbOpBatch::new();
+
+            unpaid_epoch_pool.add_init_current_operations(1.0, 1, 1, &mut batch);
+
+            batch.push(
+                unpaid_epoch_pool
+                    .update_processing_credits_for_distribution_operation(processing_fees),
+            );
+
+            batch.push(
+                unpaid_epoch_pool.update_storage_credits_for_distribution_operation(storage_fees),
+            );
+
+            next_epoch_pool.add_init_current_operations(
+                1.0,
+                proposers_count as u64 + 1,
+                10,
+                &mut batch,
+            );
+
+            platform
+                .drive
+                .grove_apply_batch(batch, false, Some(&transaction))
+                .expect("should apply batch");
+
+            let pro_tx_hashes =
+                create_test_masternode_identities_and_add_them_as_epoch_block_proposers(
+                    &platform.drive,
+                    &unpaid_epoch_pool,
+                    proposers_count,
+                    Some(&transaction),
+                );
+
+            let share_identities_and_documents =
+                create_test_masternode_share_identities_and_documents(
+                    &platform.drive,
+                    &contract,
+                    &pro_tx_hashes,
+                    Some(&transaction),
+                );
+
+            let mut batch = GroveDbOpBatch::new();
+
+            let unpaid_epoch = UnpaidEpoch {
+                epoch_index: 0,
+                start_block_height: 1,
+                end_block_height: 11,
+                next_unpaid_epoch_index: 0,
+            };
+
+            let proposers_paid_count = platform
+                .add_epoch_pool_to_proposers_payout_operations(
+                    &unpaid_epoch,
+                    proposers_count,
+                    Some(&transaction),
+                    &mut batch,
+                )
+                .expect("should distribute fees");
+
+            platform
+                .drive
+                .grove_apply_batch(batch, false, Some(&transaction))
+                .expect("should apply batch");
+
+            assert_eq!(proposers_paid_count, 10);
+
+            // check we paid 500 to every mn identity
+            let paid_mn_identities = platform
+                .drive
+                .fetch_identities(&pro_tx_hashes, Some(&transaction))
+                .expect("expected to get identities");
+
+            let total_fees = Decimal::from(storage_fees + processing_fees);
+
+            let masternode_reward = total_fees / Decimal::from(proposers_count);
+
+            let shares_percentage_with_precision: u64 = share_identities_and_documents[0]
+                .1
+                .properties
+                .get("percentage")
+                .expect("should have percentage field")
+                .as_integer()
+                .expect("percentage should an integer")
+                .try_into()
+                .expect("percentage should be u64");
+
+            let shares_percentage = Decimal::from(shares_percentage_with_precision) / dec!(10000);
+
+            let payout_credits = masternode_reward * shares_percentage;
+
+            let payout_credits: i64 = payout_credits.try_into().expect("should convert to i64");
+
+            for paid_mn_identity in paid_mn_identities {
+                assert_eq!(paid_mn_identity.balance, payout_credits);
+            }
+
+            let share_identities = share_identities_and_documents
+                .iter()
+                .map(|(identity, _)| identity)
+                .collect();
+
+            let refetched_share_identities =
+                refetch_identities(&platform.drive, share_identities, Some(&transaction))
+                    .expect("expected to refresh identities");
+
+            for identity in refetched_share_identities {
+                assert_eq!(identity.balance, payout_credits as i64);
+            }
+        }
+    }
 
     mod add_distribute_block_fees_into_pools_operations {
         use crate::abci::messages::FeesAggregate;
