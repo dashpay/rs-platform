@@ -377,7 +377,7 @@ mod tests {
         assert!(serialized_document.len() < document_cbor.len());
         for _i in 0..10000 {
             let document = document_type.random_document(Some(3333));
-            let serialized_document = document
+            let _serialized_document = document
                 .serialize_consume(document_type)
                 .expect("expected to serialize");
         }
