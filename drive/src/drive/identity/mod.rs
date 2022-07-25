@@ -159,7 +159,7 @@ mod tests {
 
     #[test]
     fn test_insert_and_fetch_identity() {
-        let drive = setup_drive();
+        let drive = setup_drive(None);
 
         let transaction = drive.grove.start_transaction();
 

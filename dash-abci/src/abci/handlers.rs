@@ -55,7 +55,7 @@ impl TenderdashAbci for Platform {
         // Set genesis time
         let genesis_time_ms = if request.block_height == 1 {
             self.drive
-                .init_genesis(request.block_time_ms, transaction)?;
+                .update_genesis_time(request.block_time_ms, transaction)?;
             request.block_time_ms
         } else {
             self.drive

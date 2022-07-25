@@ -50,7 +50,7 @@ mod tests {
 
         #[test]
         fn test_error_if_pool_is_not_initiated() {
-            let drive = setup_drive();
+            let drive = setup_drive(None);
             let transaction = drive.grove.start_transaction();
 
             match drive.get_aggregate_storage_fees_in_current_distribution_pool(Some(&transaction))

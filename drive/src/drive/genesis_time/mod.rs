@@ -56,8 +56,7 @@ impl Drive {
         }
     }
 
-    // TODO init_genesis_time?
-    pub fn init_genesis(
+    pub fn update_genesis_time(
         &self,
         genesis_time_ms: u64,
         transaction: TransactionArg,
@@ -78,9 +77,11 @@ mod tests {
     use grovedb::Element;
 
     mod fetch_genesis_time {
+        use crate::common::helpers::setup::setup_drive;
+
         #[test]
-        fn test_error_if_fee_pools_is_not_initiated() {
-            let drive = super::setup_drive();
+        fn test_error_if_initial_structure_is_not_initiated() {
+            let drive = setup_drive(None);
 
             match drive.get_genesis_time(None) {
                 Ok(_) => assert!(
@@ -96,7 +97,7 @@ mod tests {
 
         #[test]
         fn test_error_if_value_has_invalid_length() {
-            let drive = super::setup_drive();
+            let drive = setup_drive(None);
 
             drive
                 .create_initial_state_structure(None)
@@ -127,10 +128,35 @@ mod tests {
         }
     }
 
-    mod init_genesis {
+    mod update_genesis_time {
+        use crate::common::helpers::setup::setup_drive_with_initial_state_structure;
+
         #[test]
-        fn test() {
-            todo!()
+        fn test_update_genesis_time() {
+            let drive = setup_drive_with_initial_state_structure();
+            let transaction = drive.grove.start_transaction();
+
+            let genesis_time_ms = 100;
+
+            drive
+                .update_genesis_time(genesis_time_ms, Some(&transaction))
+                .expect("should update genesis time");
+
+            let stored_genesis_time_ms = drive
+                .fetch_genesis_time(Some(&transaction))
+                .expect("should fetch genesis time");
+
+            match stored_genesis_time_ms {
+                Some(stored_genesis_time_ms) => assert_eq!(stored_genesis_time_ms, genesis_time_ms),
+                None => assert!(false, "should be present"),
+            }
+
+            let cache = drive.cache.borrow();
+
+            match cache.genesis_time_ms {
+                Some(stored_genesis_time_ms) => assert_eq!(stored_genesis_time_ms, genesis_time_ms),
+                None => assert!(false, "should be present"),
+            }
         }
     }
 }

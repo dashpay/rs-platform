@@ -7,6 +7,7 @@ use costs::CostContext;
 use grovedb::{Element, TransactionArg};
 
 use crate::contract::Contract;
+use crate::drive::batch::GroveDbOpBatch;
 use crate::drive::flags::StorageFlags;
 use crate::drive::object_size_info::KeyInfo::{KeyRef, KeySize};
 use crate::drive::object_size_info::KeyValueInfo::KeyRefRequest;
@@ -46,6 +47,10 @@ fn contract_keeping_history_storage_time_reference_path(
         vec![0],
         encoded_time,
     ]
+}
+
+pub fn add_init_contracts_tree_operations(batch: &mut GroveDbOpBatch) {
+    batch.add_insert_empty_tree(vec![], vec![RootTree::ContractDocuments as u8]);
 }
 
 impl Drive {

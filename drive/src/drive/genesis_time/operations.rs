@@ -25,7 +25,7 @@ mod tests {
 
         #[test]
         fn test_error_if_fee_pools_is_not_initiated() {
-            let drive = setup_drive();
+            let drive = setup_drive(None);
 
             let genesis_time: u64 = 1655396517902;
 
@@ -49,7 +49,7 @@ mod tests {
 
         #[test]
         fn test_value_is_set() {
-            let drive = setup_drive();
+            let drive = setup_drive(None);
 
             drive
                 .create_initial_state_structure(None)
