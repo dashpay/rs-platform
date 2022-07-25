@@ -6,4 +6,4 @@ pub use dpp::data_contract::{
     extra::{Index, IndexProperty},
     DataContract, DataContract as Contract,
 };
-pub use factory::RandomDocumentFactory;
+pub use factory::CreateRandomDocument;

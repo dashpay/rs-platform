@@ -348,7 +348,7 @@ impl Document {
 mod tests {
     use super::*;
     use crate::common::json_document_to_cbor;
-    use crate::contract::RandomDocumentFactory;
+    use crate::contract::CreateRandomDocument;
     use dpp::data_contract::extra::DriveContractExt;
 
     #[test]

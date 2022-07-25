@@ -501,7 +501,7 @@ impl Drive {
 
 #[cfg(test)]
 mod tests {
-    use crate::contract::RandomDocumentFactory;
+    use crate::contract::CreateRandomDocument;
     use rand::Rng;
     use std::option::Option::None;
     use tempfile::TempDir;

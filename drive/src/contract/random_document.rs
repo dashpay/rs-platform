@@ -5,7 +5,7 @@ use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 
 // TODO The factory is used in benchmark and tests. Probably it should be available under the test feature
-pub trait RandomDocumentFactory {
+pub trait CreateRandomDocument {
     fn random_documents(&self, count: u32, seed: Option<u64>) -> Vec<Document>;
     fn document_from_bytes(&self, bytes: &[u8]) -> Result<Document, Error>;
     fn random_document(&self, seed: Option<u64>) -> Document;
@@ -15,7 +15,7 @@ pub trait RandomDocumentFactory {
     fn random_filled_document_with_rng(&self, rng: &mut StdRng) -> Document;
 }
 
-impl RandomDocumentFactory for DocumentType {
+impl CreateRandomDocument for DocumentType {
     fn random_documents(&self, count: u32, seed: Option<u64>) -> Vec<Document> {
         let mut rng = match seed {
             None => StdRng::from_entropy(),
