@@ -1,10 +1,7 @@
-use grovedb::query_result_type::GetItemResults;
-use grovedb::query_result_type::QueryResultType::{
-    QueryElementResultType, QueryKeyElementPairResultType,
-};
+use grovedb::query_result_type::QueryResultType::QueryKeyElementPairResultType;
 use grovedb::{Element, PathQuery, Query, SizedQuery, TransactionArg};
 
-use crate::drive::{Drive, RootTree};
+use crate::drive::Drive;
 use crate::error::drive::DriveError;
 use crate::error::fee::FeeError;
 use crate::error::Error;

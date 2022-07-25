@@ -3,7 +3,6 @@ use crate::drive::Drive;
 use crate::error::fee::FeeError;
 use crate::error::Error;
 use crate::fee_pools::epochs::{paths, Epoch};
-use grovedb::query_result_type::GetItemResults;
 use grovedb::query_result_type::QueryResultType::QueryPathKeyElementTrioResultType;
 use grovedb::{Element, PathQuery, Query, SizedQuery, TransactionArg};
 
@@ -63,7 +62,7 @@ impl Drive {
             .unwrap()
             .map_err(Error::GroveDB)?;
 
-        if result_items.is_empty() {
+        if result_items.elements.is_empty() {
             return Ok(None);
         }
 
