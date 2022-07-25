@@ -33,7 +33,7 @@ pub struct BlockEndRequest {
 
 pub type EpochRefund = (u16, u64);
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FeesAggregate {
     pub processing_fees: u64,

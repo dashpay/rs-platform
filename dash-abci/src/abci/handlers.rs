@@ -409,7 +409,7 @@ mod tests {
 
                         assert_eq!(
                             block_end_response.proposers_paid_count.unwrap(),
-                            proposers_count
+                            blocks_per_day as u16,
                         );
                         assert_eq!(block_end_response.paid_epoch_index.unwrap(), 0);
                     } else {
