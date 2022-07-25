@@ -44,11 +44,11 @@ mod tests {
 
     use super::Epoch;
 
-    mod get_start_time {
+    mod get_epoch_start_time {
         use crate::fee_pools::epochs::epoch_key_constants::KEY_START_TIME;
 
         #[test]
-        fn test_error_if_epoch_pool_is_not_initiated() {
+        fn test_error_if_epoch_tree_is_not_initiated() {
             let drive = super::setup_drive_with_initial_state_structure();
             let transaction = drive.grove.start_transaction();
 

@@ -554,6 +554,8 @@ mod tests {
 
     mod find_oldest_epoch_needing_payment {
         use crate::common::helpers::setup::setup_platform_with_initial_state_structure;
+        use crate::error::execution::ExecutionError;
+        use crate::error::Error;
         use rs_drive::drive::batch::GroveDbOpBatch;
         use rs_drive::drive::fee_pools::epochs::constants::GENESIS_EPOCH_INDEX;
         use rs_drive::fee_pools::epochs::Epoch;
@@ -602,29 +604,201 @@ mod tests {
 
         #[test]
         fn test_use_cached_current_start_block_height_as_end_block_if_unpaid_epoch_is_previous() {
-            todo!()
+            let platform = setup_platform_with_initial_state_structure();
+            let transaction = platform.drive.grove.start_transaction();
+
+            let current_epoch_index = 1;
+
+            let epoch_0_tree = Epoch::new(GENESIS_EPOCH_INDEX);
+
+            let mut batch = GroveDbOpBatch::new();
+
+            batch.push(epoch_0_tree.update_start_block_height_operation(1));
+
+            platform
+                .drive
+                .grove_apply_batch(batch, false, Some(&transaction))
+                .expect("should apply batch");
+
+            let cached_current_epoch_start_block_height = Some(2);
+
+            let unpaid_epoch = platform
+                .find_oldest_epoch_needing_payment(
+                    current_epoch_index,
+                    cached_current_epoch_start_block_height,
+                    Some(&transaction),
+                )
+                .expect("should find nothing");
+
+            match unpaid_epoch {
+                Some(unpaid_epoch) => {
+                    assert_eq!(unpaid_epoch.epoch_index, 0);
+                    assert_eq!(unpaid_epoch.next_unpaid_epoch_index, 1);
+                    assert_eq!(unpaid_epoch.start_block_height, 1);
+                    assert_eq!(unpaid_epoch.end_block_height, 2);
+
+                    let block_count = unpaid_epoch.block_count().expect("should calculate ");
+
+                    assert_eq!(block_count, 1);
+                }
+                None => assert!(false, "unpaid epoch should be present"),
+            }
         }
 
         #[test]
         fn test_use_stored_start_block_height_from_current_epoch_as_end_block_if_unpaid_epoch_is_previous(
         ) {
-            todo!()
+            let platform = setup_platform_with_initial_state_structure();
+            let transaction = platform.drive.grove.start_transaction();
+
+            let current_epoch_index = 1;
+
+            let epoch_0_tree = Epoch::new(GENESIS_EPOCH_INDEX);
+            let epoch_1_tree = Epoch::new(current_epoch_index);
+
+            let mut batch = GroveDbOpBatch::new();
+
+            batch.push(epoch_0_tree.update_start_block_height_operation(1));
+            batch.push(epoch_1_tree.update_start_block_height_operation(2));
+
+            platform
+                .drive
+                .grove_apply_batch(batch, false, Some(&transaction))
+                .expect("should apply batch");
+
+            let unpaid_epoch = platform
+                .find_oldest_epoch_needing_payment(current_epoch_index, None, Some(&transaction))
+                .expect("should find nothing");
+
+            match unpaid_epoch {
+                Some(unpaid_epoch) => {
+                    assert_eq!(unpaid_epoch.epoch_index, 0);
+                    assert_eq!(unpaid_epoch.next_unpaid_epoch_index, 1);
+                    assert_eq!(unpaid_epoch.start_block_height, 1);
+                    assert_eq!(unpaid_epoch.end_block_height, 2);
+
+                    let block_count = unpaid_epoch.block_count().expect("should calculate ");
+
+                    assert_eq!(block_count, 1);
+                }
+                None => assert!(false, "unpaid epoch should be present"),
+            }
         }
 
         #[test]
-        fn test_find_next_start_block_as_end_block_if_unpaid_epoch_more_than_one_ago() {
-            todo!()
+        fn test_find_stored_next_start_block_as_end_block_if_unpaid_epoch_more_than_one_ago() {
+            let platform = setup_platform_with_initial_state_structure();
+            let transaction = platform.drive.grove.start_transaction();
+
+            let current_epoch_index = 2;
+
+            let epoch_0_tree = Epoch::new(GENESIS_EPOCH_INDEX);
+            let epoch_1_tree = Epoch::new(1);
+            let epoch_2_tree = Epoch::new(2);
+
+            let mut batch = GroveDbOpBatch::new();
+
+            batch.push(epoch_0_tree.update_start_block_height_operation(1));
+            batch.push(epoch_1_tree.update_start_block_height_operation(2));
+            batch.push(epoch_2_tree.update_start_block_height_operation(3));
+
+            platform
+                .drive
+                .grove_apply_batch(batch, false, Some(&transaction))
+                .expect("should apply batch");
+
+            let unpaid_epoch = platform
+                .find_oldest_epoch_needing_payment(current_epoch_index, None, Some(&transaction))
+                .expect("should find nothing");
+
+            match unpaid_epoch {
+                Some(unpaid_epoch) => {
+                    assert_eq!(unpaid_epoch.epoch_index, 0);
+                    assert_eq!(unpaid_epoch.next_unpaid_epoch_index, 1);
+                    assert_eq!(unpaid_epoch.start_block_height, 1);
+                    assert_eq!(unpaid_epoch.end_block_height, 2);
+
+                    let block_count = unpaid_epoch.block_count().expect("should calculate ");
+
+                    assert_eq!(block_count, 1);
+                }
+                None => assert!(false, "unpaid epoch should be present"),
+            }
         }
 
         #[test]
         fn test_use_cached_start_block_height_if_not_found_in_case_of_epoch_change() {
-            todo!()
+            let platform = setup_platform_with_initial_state_structure();
+            let transaction = platform.drive.grove.start_transaction();
+
+            let current_epoch_index = 2;
+
+            let epoch_0_tree = Epoch::new(GENESIS_EPOCH_INDEX);
+
+            let mut batch = GroveDbOpBatch::new();
+
+            batch.push(epoch_0_tree.update_start_block_height_operation(1));
+
+            platform
+                .drive
+                .grove_apply_batch(batch, false, Some(&transaction))
+                .expect("should apply batch");
+
+            let cached_current_epoch_start_block_height = Some(2);
+
+            let unpaid_epoch = platform
+                .find_oldest_epoch_needing_payment(
+                    current_epoch_index,
+                    cached_current_epoch_start_block_height,
+                    Some(&transaction),
+                )
+                .expect("should find nothing");
+
+            match unpaid_epoch {
+                Some(unpaid_epoch) => {
+                    assert_eq!(unpaid_epoch.epoch_index, 0);
+                    assert_eq!(unpaid_epoch.next_unpaid_epoch_index, 2);
+                    assert_eq!(unpaid_epoch.start_block_height, 1);
+                    assert_eq!(unpaid_epoch.end_block_height, 2);
+
+                    let block_count = unpaid_epoch.block_count().expect("should calculate ");
+
+                    assert_eq!(block_count, 1);
+                }
+                None => assert!(false, "unpaid epoch should be present"),
+            }
         }
 
         #[test]
         fn test_error_if_cached_start_block_height_is_not_present_and_not_found_in_case_of_epoch_change(
         ) {
-            todo!()
+            let platform = setup_platform_with_initial_state_structure();
+            let transaction = platform.drive.grove.start_transaction();
+
+            let current_epoch_index = 2;
+
+            let epoch_0_tree = Epoch::new(GENESIS_EPOCH_INDEX);
+
+            let mut batch = GroveDbOpBatch::new();
+
+            batch.push(epoch_0_tree.update_start_block_height_operation(1));
+
+            platform
+                .drive
+                .grove_apply_batch(batch, false, Some(&transaction))
+                .expect("should apply batch");
+
+            let unpaid_epoch = platform.find_oldest_epoch_needing_payment(
+                current_epoch_index,
+                None,
+                Some(&transaction),
+            );
+
+            match unpaid_epoch {
+                Ok(_) => assert!(false, "should return code execution error"),
+                Err(Error::Execution(ExecutionError::CorruptedCodeExecution(_))) => assert!(true),
+                Err(_) => assert!(false, "wrong error type"),
+            }
         }
     }
 

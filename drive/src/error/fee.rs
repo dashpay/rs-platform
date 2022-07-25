@@ -33,6 +33,12 @@ pub enum FeeError {
     #[error("corrupted multiplier invalid item length error: {0}")]
     CorruptedMultiplierInvalidItemLength(&'static str),
 
+    #[error("corrupted unpaid epoch index invalid item length error: {0}")]
+    CorruptedUnpaidEpochIndexItemLength(&'static str),
+
+    #[error("corrupted unpaid epoch index not an item error: {0}")]
+    CorruptedUnpaidEpochIndexNotItem(&'static str),
+
     #[error("corrupted code execution error: {0}")]
     CorruptedCodeExecution(&'static str),
 
