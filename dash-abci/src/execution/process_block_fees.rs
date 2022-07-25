@@ -560,7 +560,7 @@ mod tests {
             let epoch_index = 3;
             let block_height = 5;
 
-            helpers::process_and_validate_block_fees(
+            let block_info = helpers::process_and_validate_block_fees(
                 &platform,
                 genesis_time_ms,
                 epoch_index,

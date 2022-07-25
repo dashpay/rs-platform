@@ -2,6 +2,8 @@ use crate::abci::messages::FeesAggregate;
 use crate::error::execution::ExecutionError;
 use crate::error::Error;
 
+use crate::common::helpers::setup::setup_platform_with_initial_state_structure;
+use crate::error::Error::Execution;
 use crate::platform::Platform;
 use rs_drive::drive::batch::GroveDbOpBatch;
 use rs_drive::drive::fee_pools::epochs::constants::GENESIS_EPOCH_INDEX;
@@ -119,23 +121,43 @@ impl Platform {
             .drive
             .get_epoch_start_block_height(&unpaid_epoch, transaction)?;
 
-        // Use cached current epoch start block height only if we pay for the previous epoch
-        let (next_unpaid_epoch_index, end_block_height) = if cached_current_epoch_start_block_height
-            .is_some()
-            && unpaid_epoch.index == current_epoch_index - 1
+        let (next_unpaid_epoch_index, end_block_height) = if unpaid_epoch.index
+            == current_epoch_index - 1
         {
-            (
-                current_epoch_index,
-                cached_current_epoch_start_block_height.unwrap(),
-            )
+            // Use cached or committed block height for previous epoch
+            let start_block_height = match cached_current_epoch_start_block_height {
+                Some(start_block_height) => start_block_height,
+                None => {
+                    let current_epoch = Epoch::new(current_epoch_index);
+                    self.drive
+                        .get_epoch_start_block_height(&current_epoch, transaction)?
+                }
+            };
+
+            (current_epoch_index, start_block_height)
         } else {
-            // TODO: Reformat
-            self.drive.find_next_epoch_start_block_height(
+            // Find a next epoch with start block height if unpaid epoch was more than one epoch ago
+            match self.drive.find_next_epoch_start_block_height(
                 unpaid_epoch.index,
                 current_epoch_index,
                 transaction,
-            )?.unwrap_or((current_epoch_index, cached_current_epoch_start_block_height.ok_or(error::Error::Fee(FeeError::CorruptedCodeExecution("start_block_height must be present for current epoch or cached_next_epoch_start_block_height must be passed")))?))
+            )? {
+                // Only possible on epoch change of current epoch, when we have start_block_height batched but not committed yet
+                None => match cached_current_epoch_start_block_height {
+                    None => {
+                        return Err(Execution(ExecutionError::CorruptedCodeExecution(
+                            "start_block_height must be present in current epoch or cached_next_epoch_start_block_height must be passed",
+                        )));
+                    }
+                    Some(cached_current_epoch_start_block_height) => {
+                        (current_epoch_index, cached_current_epoch_start_block_height)
+                    }
+                },
+                Some(next_start_block_info) => next_start_block_info,
+            }
         };
+
+        // Use cached current epoch start block height only if we pay for the previous epoch
 
         Ok(Some(UnpaidEpoch {
             epoch_index: unpaid_epoch_index,
