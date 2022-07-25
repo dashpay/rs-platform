@@ -4,7 +4,6 @@ use crate::error::Error;
 use crate::fee_pools::epochs::Epoch;
 use grovedb::TransactionArg;
 
-pub mod block_count;
 pub mod constants;
 pub mod credit_distribution_pools;
 pub mod proposers;
