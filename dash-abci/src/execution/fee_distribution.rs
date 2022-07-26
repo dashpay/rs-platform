@@ -1,9 +1,7 @@
 use crate::abci::messages::FeesAggregate;
 use crate::error::execution::ExecutionError;
-use crate::error::Error;
 
-use crate::common::helpers::setup::setup_platform_with_initial_state_structure;
-use crate::error::Error::Execution;
+use crate::error::Error;
 use crate::platform::Platform;
 use rs_drive::drive::batch::GroveDbOpBatch;
 use rs_drive::drive::fee_pools::epochs::constants::GENESIS_EPOCH_INDEX;
@@ -102,7 +100,7 @@ impl Platform {
         cached_current_epoch_start_block_height: Option<u64>,
         transaction: TransactionArg,
     ) -> Result<Option<UnpaidEpoch>, Error> {
-        // Since we are paying for passed epochs it's nothing to do on genesis epoch
+        // Since we are paying for passed epochs there is nothing to do on genesis epoch
         if current_epoch_index == GENESIS_EPOCH_INDEX {
             return Ok(None);
         }
@@ -136,15 +134,17 @@ impl Platform {
             (current_epoch_index, start_block_height)
         } else {
             // Find a next epoch with start block height if unpaid epoch was more than one epoch ago
-            match self.drive.find_next_epoch_start_block_height(
-                unpaid_epoch.index,
-                current_epoch_index,
-                transaction,
-            )? {
+            match self
+                .drive
+                .get_first_epoch_start_block_height_between_epochs(
+                    unpaid_epoch.index,
+                    current_epoch_index,
+                    transaction,
+                )? {
                 // Only possible on epoch change of current epoch, when we have start_block_height batched but not committed yet
                 None => match cached_current_epoch_start_block_height {
                     None => {
-                        return Err(Execution(ExecutionError::CorruptedCodeExecution(
+                        return Err(Error::Execution(ExecutionError::CorruptedCodeExecution(
                             "start_block_height must be present in current epoch or cached_next_epoch_start_block_height must be passed",
                         )));
                     }
@@ -244,6 +244,12 @@ impl Platform {
                 // update masternode reward that would be paid later
                 masternode_reward -= reward_floored;
 
+                let reward_floored: u64 = reward_floored.try_into().map_err(|_| {
+                    Error::Execution(ExecutionError::Overflow(
+                        "can't convert reward to i64 from Decimal",
+                    ))
+                })?;
+
                 self.add_pay_reward_to_identity_operations(
                     pay_to_id,
                     reward_floored,
@@ -263,6 +269,14 @@ impl Platform {
             } else {
                 masternode_reward_floored
             };
+
+            // Convert to integer, since identity balance is u64
+            let masternode_reward_given: u64 =
+                masternode_reward_given.floor().try_into().map_err(|_| {
+                    Error::Execution(ExecutionError::Overflow(
+                        "can't convert reward to i64 from Decimal",
+                    ))
+                })?;
 
             self.add_pay_reward_to_identity_operations(
                 proposer_tx_hash,
@@ -284,17 +298,10 @@ impl Platform {
     fn add_pay_reward_to_identity_operations(
         &self,
         id: &[u8],
-        reward: Decimal,
+        reward: u64,
         transaction: TransactionArg,
         batch: &mut GroveDbOpBatch,
     ) -> Result<(), Error> {
-        // Convert to integer, since identity balance is u64
-        let reward: u64 = reward.floor().try_into().map_err(|_| {
-            Error::Execution(ExecutionError::Overflow(
-                "can't convert reward to i64 from Decimal",
-            ))
-        })?;
-
         // We don't need additional verification, since we ensure an identity
         // existence in the data contract triggers in DPP
         let (mut identity, storage_flags) = self.drive.fetch_identity(id, transaction)?;

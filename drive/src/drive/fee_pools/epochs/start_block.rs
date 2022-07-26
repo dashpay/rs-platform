@@ -34,7 +34,7 @@ impl Drive {
         }
     }
 
-    pub fn find_next_epoch_start_block_height(
+    pub fn get_first_epoch_start_block_height_between_epochs(
         &self,
         from_epoch_index: u16,
         to_epoch_index: u16,
@@ -202,7 +202,7 @@ mod tests {
         }
     }
 
-    mod find_next_epoch_start_block_height {
+    mod get_first_epoch_start_block_height_between_epochs {
         use crate::common::helpers::identities::create_test_masternode_identities_and_add_them_as_epoch_block_proposers;
         use crate::common::helpers::setup::setup_drive_with_initial_state_structure;
         use crate::drive::batch::GroveDbOpBatch;
@@ -227,7 +227,7 @@ mod tests {
                 .expect("should apply batch");
 
             let next_epoch_start_block_height_option = drive
-                .find_next_epoch_start_block_height(0, 2, Some(&transaction))
+                .get_first_epoch_start_block_height_between_epochs(0, 2, Some(&transaction))
                 .expect("should find next start_block_height");
 
             match next_epoch_start_block_height_option {
@@ -245,7 +245,7 @@ mod tests {
             let transaction = drive.grove.start_transaction();
 
             let next_epoch_start_block_height = drive
-                .find_next_epoch_start_block_height(0, 4, Some(&transaction))
+                .get_first_epoch_start_block_height_between_epochs(0, 4, Some(&transaction))
                 .expect("should find next start_block_height");
 
             match next_epoch_start_block_height {
@@ -273,7 +273,7 @@ mod tests {
                 .expect("should apply batch");
 
             let next_epoch_start_block_height = drive
-                .find_next_epoch_start_block_height(0, 2, Some(&transaction))
+                .get_first_epoch_start_block_height_between_epochs(0, 2, Some(&transaction))
                 .expect("should find next start_block_height");
 
             match next_epoch_start_block_height {
@@ -301,7 +301,7 @@ mod tests {
                 .expect("should apply batch");
 
             let next_epoch_start_block_height = drive
-                .find_next_epoch_start_block_height(0, 4, Some(&transaction))
+                .get_first_epoch_start_block_height_between_epochs(0, 4, Some(&transaction))
                 .expect("should find next start_block_height");
 
             match next_epoch_start_block_height {
