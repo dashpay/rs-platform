@@ -4,7 +4,7 @@ use crate::error::Error;
 use crate::execution::constants::DEFAULT_ORIGINAL_FEE_MULTIPLIER;
 use crate::execution::epoch_change::distribute_storage_pool::StorageDistributionLeftoverCredits;
 use crate::execution::epoch_change::epoch::EpochInfo;
-use crate::execution::fee_distribution::{FeesInPools, ProposerPayouts};
+use crate::execution::fee_distribution::{FeesInPools, ProposersPayouts};
 use crate::platform::Platform;
 use rs_drive::drive::batch::GroveDbOpBatch;
 use rs_drive::drive::fee_pools::epochs::constants::{FOREVER_STORAGE_EPOCHS, GENESIS_EPOCH_INDEX};
@@ -27,7 +27,7 @@ use std::option::Option::None;
 
 pub struct ProcessedBlockFeesResult {
     pub fees_in_pools: FeesInPools,
-    pub payouts: Option<ProposerPayouts>,
+    pub payouts: Option<ProposersPayouts>,
 }
 
 impl Platform {

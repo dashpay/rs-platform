@@ -15,7 +15,7 @@ use rs_drive::{error, grovedb};
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 
-pub struct ProposerPayouts {
+pub struct ProposersPayouts {
     pub proposers_paid_count: u16,
     pub paid_epoch_index: u16,
 }
@@ -50,7 +50,7 @@ impl Platform {
         cached_current_epoch_start_block_height: Option<u64>,
         transaction: TransactionArg,
         batch: &mut GroveDbOpBatch,
-    ) -> Result<Option<ProposerPayouts>, Error> {
+    ) -> Result<Option<ProposersPayouts>, Error> {
         let unpaid_epoch = self.find_oldest_epoch_needing_payment(
             current_epoch_index,
             cached_current_epoch_start_block_height,
@@ -88,7 +88,7 @@ impl Platform {
             ));
         }
 
-        Ok(Some(ProposerPayouts {
+        Ok(Some(ProposersPayouts {
             proposers_paid_count,
             paid_epoch_index: unpaid_epoch.epoch_index,
         }))
