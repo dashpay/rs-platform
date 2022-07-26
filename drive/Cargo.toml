@@ -29,7 +29,7 @@ nohash-hasher = "0.2.0"
 
 [dependencies.dpp]
 git = "https://github.com/dashevo/rust-dpp"
-branch = "merge-with-rs-drive"
+branch = "dev"
 
 [dependencies.grovedb]
 git = "https://github.com/dashevo/grovedb"
