@@ -257,8 +257,6 @@ mod tests {
 
                     assert_eq!(block_end_response.is_epoch_change, epoch_change);
 
-                    dbg!(epoch_index, block_height);
-
                     // Should pay to all proposers for epoch 0, when epochs 1 started
                     if epoch_index != 0 && epoch_change {
                         assert!(block_end_response.proposers_paid_count.is_some());

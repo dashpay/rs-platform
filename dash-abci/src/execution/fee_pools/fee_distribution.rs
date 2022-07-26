@@ -84,6 +84,12 @@ impl Platform {
             ));
         }
 
+        // We paid to all epoch proposers last block. Since proposers paid count
+        // was equal to proposers limit, we paid to 0 proposers this block
+        if proposers_paid_count == 0 {
+            return Ok(None);
+        }
+
         Ok(Some(ProposersPayouts {
             proposers_paid_count,
             paid_epoch_index: unpaid_epoch.epoch_index,
@@ -705,6 +711,117 @@ mod tests {
                     assert_eq!(payouts.paid_epoch_index, 0);
                 }
             }
+
+            let next_unpaid_epoch_index = platform
+                .drive
+                .get_unpaid_epoch_index(Some(&transaction))
+                .expect("should get unpaid epoch index");
+
+            assert_eq!(next_unpaid_epoch_index, current_epoch.index);
+
+            // check we've removed proposers tree
+            match platform.drive.get_epochs_proposer_block_count(
+                &unpaid_epoch,
+                &proposers[0],
+                Some(&transaction),
+            ) {
+                Ok(_) => assert!(false, "expect tree not exists"),
+                Err(e) => match e {
+                    Error::GroveDB(grovedb::Error::PathNotFound(_)) => assert!(true),
+                    _ => assert!(false, "invalid error type"),
+                },
+            }
+        }
+
+        #[test]
+        fn test_mark_epoch_as_paid_and_update_next_update_epoch_index_if_all_50_proposers_were_paid_last_block() {
+            let platform = setup_platform_with_initial_state_structure();
+            let transaction = platform.drive.grove.start_transaction();
+
+            // Create masternode reward shares contract
+            platform.create_mn_shares_contract(Some(&transaction));
+
+            let proposers_count = 50;
+            let processing_fees = 10000;
+            let storage_fees = 10000;
+
+            let unpaid_epoch = Epoch::new(0);
+            let current_epoch = Epoch::new(1);
+
+            let mut batch = GroveDbOpBatch::new();
+
+            unpaid_epoch.add_init_current_operations(1.0, 1, 1, &mut batch);
+
+            batch.push(
+                unpaid_epoch.update_processing_credits_for_distribution_operation(processing_fees),
+            );
+
+            batch
+                .push(unpaid_epoch.update_storage_credits_for_distribution_operation(storage_fees));
+
+            current_epoch.add_init_current_operations(1.0, 2, 2, &mut batch);
+
+            platform
+                .drive
+                .grove_apply_batch(batch, false, Some(&transaction))
+                .expect("should apply batch");
+
+            let proposers = create_test_masternode_identities_and_add_them_as_epoch_block_proposers(
+                &platform.drive,
+                &unpaid_epoch,
+                proposers_count,
+                Some(&transaction),
+            );
+
+            let mut batch = GroveDbOpBatch::new();
+
+            let proposer_payouts = platform
+                .add_distribute_fees_from_oldest_unpaid_epoch_pool_to_proposers_operations(
+                    current_epoch.index,
+                    None,
+                    Some(&transaction),
+                    &mut batch,
+                )
+                .expect("should distribute fees");
+
+            platform
+                .drive
+                .grove_apply_batch(batch, false, Some(&transaction))
+                .expect("should apply batch");
+
+            match proposer_payouts {
+                None => assert!(false, "proposers should be paid"),
+                Some(payouts) => {
+                    assert_eq!(payouts.proposers_paid_count, proposers_count);
+                    assert_eq!(payouts.paid_epoch_index, 0);
+                }
+            }
+
+            // The Epoch 0 should still not marked as paid because proposers count == proposers limit
+            let next_unpaid_epoch_index = platform
+                .drive
+                .get_unpaid_epoch_index(Some(&transaction))
+                .expect("should get unpaid epoch index");
+
+            assert_eq!(next_unpaid_epoch_index, unpaid_epoch.index);
+
+            // Process one more block
+
+            let mut batch = GroveDbOpBatch::new();
+
+            let proposer_payouts = platform
+                .add_distribute_fees_from_oldest_unpaid_epoch_pool_to_proposers_operations(
+                    current_epoch.index,
+                    None,
+                    Some(&transaction),
+                    &mut batch,
+                )
+                .expect("should distribute fees");
+
+            platform
+                .drive
+                .grove_apply_batch(batch, false, Some(&transaction))
+                .expect("should apply batch");
 
             let next_unpaid_epoch_index = platform
                 .drive
