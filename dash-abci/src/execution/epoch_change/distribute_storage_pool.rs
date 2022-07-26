@@ -218,7 +218,7 @@ mod tests {
                 .expect("should apply batch");
 
             // check leftover
-            assert_ne!(leftovers, 0,);
+            assert_eq!(leftovers, 180);
 
             // collect all the storage fee values of the 1000 epochs pools
             let storage_fees = get_storage_credits_for_distribution_for_epochs_in_range(
