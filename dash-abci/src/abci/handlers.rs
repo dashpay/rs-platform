@@ -277,7 +277,7 @@ mod tests {
 
         #[test]
         fn test_chain_halt_for_36_days() {
-            // TODO refactor
+            // TODO refactor to remove code duplication
 
             let platform = setup_platform();
             let transaction = platform.drive.grove.start_transaction();
@@ -294,11 +294,9 @@ mod tests {
 
             let genesis_time = Utc::now();
 
-            let epoch_2_start_day = 18 * 2;
+            let epoch_2_start_day = 37;
 
-            let blocks_per_day = 1i64;
-
-            let epoch_2_start_block = 13;
+            let blocks_per_day = 50i64;
 
             let proposers_count = 50u16;
 
@@ -323,7 +321,7 @@ mod tests {
             let mut previous_block_time_ms: Option<u64> = None;
 
             // process blocks
-            for day in [0, 37] {
+            for day in [0, 1, 2, 3, 37] {
                 for block_num in 0..blocks_per_day {
                     let block_time = if day == 0 && block_num == 0 {
                         genesis_time
@@ -380,12 +378,8 @@ mod tests {
                     previous_block_time_ms = Some(block_time_ms);
 
                     // Should calculate correct current epochs
-                    let (epoch_index, epoch_change) = if day > epoch_2_start_day {
-                        (2, true)
-                    } else if day == epoch_2_start_day {
-                        if block_num < epoch_2_start_block {
-                            (1, false)
-                        } else if block_num == epoch_2_start_block {
+                    let (epoch_index, epoch_change) = if day == epoch_2_start_day {
+                        if block_num == 0 {
                             (2, true)
                         } else {
                             (2, false)
@@ -395,6 +389,11 @@ mod tests {
                     } else {
                         (0, false)
                     };
+
+                    dbg!(epoch_index);
+                    dbg!(block_num);
+                    dbg!(block_height);
+                    dbg!(day);
 
                     assert_eq!(block_end_response.current_epoch_index, epoch_index);
 
