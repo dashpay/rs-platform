@@ -49,7 +49,7 @@ fn contract_keeping_history_storage_time_reference_path(
     ]
 }
 
-pub fn add_init_contracts_tree_operations(batch: &mut GroveDbOpBatch) {
+pub fn add_init_contracts_structure_operations(batch: &mut GroveDbOpBatch) {
     batch.add_insert_empty_tree(vec![], vec![RootTree::ContractDocuments as u8]);
 }
 

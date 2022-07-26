@@ -56,12 +56,13 @@ impl Drive {
         }
     }
 
-    pub fn update_genesis_time(
+    pub fn init_genesis_time(
         &self,
         genesis_time_ms: u64,
         transaction: TransactionArg,
     ) -> Result<(), Error> {
         self.cache.borrow_mut().genesis_time_ms = Some(genesis_time_ms);
+
         let op = update_genesis_time_operation(genesis_time_ms);
 
         self.grove_apply_operation(op, false, transaction)
@@ -139,7 +140,7 @@ mod tests {
             let genesis_time_ms = 100;
 
             drive
-                .update_genesis_time(genesis_time_ms, Some(&transaction))
+                .init_genesis_time(genesis_time_ms, Some(&transaction))
                 .expect("should update genesis time");
 
             let stored_genesis_time_ms = drive

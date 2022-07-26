@@ -17,7 +17,7 @@ use rs_drive::common::{cbor_inner_bytes_value, setup_contract};
 use rs_drive::contract::{document::Document, Contract};
 use rs_drive::drive::batch::GroveDbOpBatch;
 use rs_drive::drive::config::DriveConfig;
-use rs_drive::drive::contract::add_init_contracts_tree_operations;
+use rs_drive::drive::contract::add_init_contracts_structure_operations;
 use rs_drive::drive::flags::StorageFlags;
 use rs_drive::drive::object_size_info::DocumentAndContractInfo;
 use rs_drive::drive::object_size_info::DocumentInfo::DocumentAndSerialization;
@@ -130,7 +130,7 @@ pub fn setup_family_tests(count: u32, with_batching: bool, seed: u64) -> (Drive,
     // Create contracts tree
     let mut batch = GroveDbOpBatch::new();
 
-    add_init_contracts_tree_operations(&mut batch);
+    add_init_contracts_structure_operations(&mut batch);
 
     drive
         .grove_apply_batch(batch, false, Some(&db_transaction))
@@ -204,7 +204,7 @@ pub fn setup_family_tests_with_nulls(
     // Create contracts tree
     let mut batch = GroveDbOpBatch::new();
 
-    add_init_contracts_tree_operations(&mut batch);
+    add_init_contracts_structure_operations(&mut batch);
 
     drive
         .grove_apply_batch(batch, false, Some(&db_transaction))
@@ -361,7 +361,7 @@ pub fn setup_dpns_tests_with_batches(count: u32, seed: u64) -> (Drive, Contract)
     // Create contracts tree
     let mut batch = GroveDbOpBatch::new();
 
-    add_init_contracts_tree_operations(&mut batch);
+    add_init_contracts_structure_operations(&mut batch);
 
     drive
         .grove_apply_batch(batch, false, Some(&db_transaction))
@@ -393,7 +393,7 @@ pub fn setup_dpns_test_with_data(path: &str) -> (Drive, Contract) {
     // Create contracts tree
     let mut batch = GroveDbOpBatch::new();
 
-    add_init_contracts_tree_operations(&mut batch);
+    add_init_contracts_structure_operations(&mut batch);
 
     drive
         .grove_apply_batch(batch, false, Some(&db_transaction))

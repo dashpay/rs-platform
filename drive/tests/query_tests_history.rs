@@ -13,7 +13,7 @@ use rs_drive::common::helpers::setup::setup_drive;
 use rs_drive::contract::{document::Document, Contract};
 use rs_drive::drive::batch::GroveDbOpBatch;
 use rs_drive::drive::config::DriveConfig;
-use rs_drive::drive::contract::add_init_contracts_tree_operations;
+use rs_drive::drive::contract::add_init_contracts_structure_operations;
 use rs_drive::drive::flags::StorageFlags;
 use rs_drive::drive::object_size_info::DocumentAndContractInfo;
 use rs_drive::drive::object_size_info::DocumentInfo::DocumentAndSerialization;
@@ -132,7 +132,7 @@ pub fn setup(
     // Create contracts tree
     let mut batch = GroveDbOpBatch::new();
 
-    add_init_contracts_tree_operations(&mut batch);
+    add_init_contracts_structure_operations(&mut batch);
 
     drive
         .grove_apply_batch(batch, false, Some(&db_transaction))

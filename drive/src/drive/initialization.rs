@@ -1,5 +1,5 @@
 use crate::drive::batch::GroveDbOpBatch;
-use crate::drive::contract::add_init_contracts_tree_operations;
+use crate::drive::contract::add_init_contracts_structure_operations;
 use crate::drive::{Drive, RootTree};
 use crate::error::Error;
 use crate::fee_pools::add_create_fee_pool_trees_operations;
@@ -11,7 +11,7 @@ impl Drive {
 
         batch.add_insert_empty_tree(vec![], vec![RootTree::Identities as u8]);
 
-        add_init_contracts_tree_operations(&mut batch);
+        add_init_contracts_structure_operations(&mut batch);
 
         batch.add_insert_empty_tree(vec![], vec![RootTree::PublicKeyHashesToIdentities as u8]);
 
