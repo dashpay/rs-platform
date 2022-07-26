@@ -390,11 +390,6 @@ mod tests {
                         (0, false)
                     };
 
-                    dbg!(epoch_index);
-                    dbg!(block_num);
-                    dbg!(block_height);
-                    dbg!(day);
-
                     assert_eq!(block_end_response.current_epoch_index, epoch_index);
 
                     assert_eq!(block_end_response.is_epoch_change, epoch_change);

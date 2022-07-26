@@ -433,9 +433,6 @@ mod tests {
 
                 // Should pay for previous epoch
 
-                dbg!(epoch_info.current_epoch_index, epoch_index);
-                dbg!(block_height);
-
                 if epoch_info.is_epoch_change && epoch_index > GENESIS_EPOCH_INDEX {
                     assert!(distribute_storage_pool_result.payouts.is_some());
                 } else {
