@@ -9,13 +9,13 @@ use crate::fee_pools::epochs::epoch_key_constants;
 impl Drive {
     pub fn get_epoch_start_time(
         &self,
-        epoch_pool: &Epoch,
+        epoch_tree: &Epoch,
         transaction: TransactionArg,
     ) -> Result<u64, Error> {
         let element = self
             .grove
             .get(
-                epoch_pool.get_path(),
+                epoch_tree.get_path(),
                 epoch_key_constants::KEY_START_TIME.as_slice(),
                 transaction,
             )
@@ -52,9 +52,9 @@ mod tests {
             let drive = super::setup_drive_with_initial_state_structure();
             let transaction = drive.grove.start_transaction();
 
-            let non_initiated_epoch_pool = super::Epoch::new(7000);
+            let non_initiated_epoch_tree = super::Epoch::new(7000);
 
-            match drive.get_epoch_start_time(&non_initiated_epoch_pool, Some(&transaction)) {
+            match drive.get_epoch_start_time(&non_initiated_epoch_tree, Some(&transaction)) {
                 Ok(_) => assert!(
                     false,
                     "should not be able to get start time on uninit epochs pool"
@@ -71,9 +71,9 @@ mod tests {
             let drive = super::setup_drive_with_initial_state_structure();
             let transaction = drive.grove.start_transaction();
 
-            let epoch_pool = super::Epoch::new(0);
+            let epoch_tree = super::Epoch::new(0);
 
-            match drive.get_epoch_start_time(&epoch_pool, Some(&transaction)) {
+            match drive.get_epoch_start_time(&epoch_tree, Some(&transaction)) {
                 Ok(_) => assert!(false, "must be an error"),
                 Err(e) => match e {
                     super::error::Error::GroveDB(_) => assert!(true),
@@ -116,12 +116,12 @@ mod tests {
             let drive = super::setup_drive_with_initial_state_structure();
             let transaction = drive.grove.start_transaction();
 
-            let epoch_pool = super::Epoch::new(0);
+            let epoch_tree = super::Epoch::new(0);
 
             drive
                 .grove
                 .insert(
-                    epoch_pool.get_path(),
+                    epoch_tree.get_path(),
                     KEY_START_TIME.as_slice(),
                     super::Element::Item(u128::MAX.to_be_bytes().to_vec(), None),
                     Some(&transaction),
@@ -129,7 +129,7 @@ mod tests {
                 .unwrap()
                 .expect("should insert invalid data");
 
-            match drive.get_epoch_start_time(&epoch_pool, Some(&transaction)) {
+            match drive.get_epoch_start_time(&epoch_tree, Some(&transaction)) {
                 Ok(_) => assert!(false, "must be an error"),
                 Err(e) => match e {
                     super::error::Error::Fee(super::FeeError::CorruptedStartTimeLength()) => {

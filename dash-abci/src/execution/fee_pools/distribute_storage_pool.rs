@@ -55,11 +55,11 @@ impl Platform {
             let year_start_epoch_index = current_epoch_index + EPOCHS_PER_YEAR * year;
 
             for index in year_start_epoch_index..year_start_epoch_index + EPOCHS_PER_YEAR {
-                let epoch_pool = Epoch::new(index);
+                let epoch_tree = Epoch::new(index);
 
                 let current_epoch_pool_storage_credits = self
                     .drive
-                    .get_epoch_storage_credits_for_distribution(&epoch_pool, transaction)
+                    .get_epoch_storage_credits_for_distribution(&epoch_tree, transaction)
                     .or_else(|e| match e {
                         // In case if we have a gap between current and previous epochs
                         // multiple future epochs could be created in the current batch
@@ -71,7 +71,7 @@ impl Platform {
                 //  and sometimes you pass batch inside to add operations. Also, in future a single operation function
                 //  could become a multiple operations function so you need to change many code. Also, you can't use helpers which batch provides
                 batch.push(
-                    epoch_pool.update_storage_credits_for_distribution_operation(
+                    epoch_tree.update_storage_credits_for_distribution_operation(
                         current_epoch_pool_storage_credits + epoch_fee_share,
                     ),
                 );

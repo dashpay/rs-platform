@@ -37,12 +37,12 @@ impl Drive {
 
     pub fn is_epochs_proposers_tree_empty(
         &self,
-        epoch_pool: &Epoch,
+        epoch_tree: &Epoch,
         transaction: TransactionArg,
     ) -> Result<bool, Error> {
         match self
             .grove
-            .is_empty_tree(epoch_pool.get_proposers_path(), transaction)
+            .is_empty_tree(epoch_tree.get_proposers_path(), transaction)
             .unwrap()
         {
             Ok(result) => Ok(result),
@@ -57,11 +57,11 @@ impl Drive {
 
     pub fn get_epoch_proposers(
         &self,
-        epoch_pool: &Epoch,
+        epoch_tree: &Epoch,
         limit: u16,
         transaction: TransactionArg,
     ) -> Result<Vec<(Vec<u8>, u64)>, Error> {
-        let path_as_vec: Vec<Vec<u8>> = epoch_pool
+        let path_as_vec: Vec<Vec<u8>> = epoch_tree
             .get_proposers_path()
             .iter()
             .map(|slice| slice.to_vec())
@@ -153,7 +153,7 @@ mod tests {
         }
 
         #[test]
-        fn test_error_if_epoch_pool_is_not_initiated() {
+        fn test_error_if_epoch_tree_is_not_initiated() {
             let drive = super::setup_drive_with_initial_state_structure();
             let transaction = drive.grove.start_transaction();
 

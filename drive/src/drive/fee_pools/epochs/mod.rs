@@ -13,11 +13,11 @@ pub mod start_time;
 impl Drive {
     pub fn is_epoch_tree_exists(
         &self,
-        epoch_pool: &Epoch,
+        epoch_tree: &Epoch,
         transaction: TransactionArg,
     ) -> Result<bool, Error> {
         self.grove
-            .has_raw(pools_path(), &epoch_pool.key, transaction)
+            .has_raw(pools_path(), &epoch_tree.key, transaction)
             .unwrap()
             .map_err(Error::GroveDB)
     }

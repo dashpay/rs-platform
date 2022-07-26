@@ -175,11 +175,11 @@ impl Platform {
         transaction: TransactionArg,
         batch: &mut GroveDbOpBatch,
     ) -> Result<u16, Error> {
-        let unpaid_epoch_pool = Epoch::new(unpaid_epoch.epoch_index);
+        let unpaid_epoch_tree = Epoch::new(unpaid_epoch.epoch_index);
 
         let total_fees = self
             .drive
-            .get_epoch_total_credits_for_distribution(&unpaid_epoch_pool, transaction)
+            .get_epoch_total_credits_for_distribution(&unpaid_epoch_tree, transaction)
             .map_err(Error::Drive)?;
 
         let total_fees = Decimal::from(total_fees);
@@ -189,7 +189,7 @@ impl Platform {
 
         let proposers = self
             .drive
-            .get_epoch_proposers(&unpaid_epoch_pool, proposers_limit, transaction)
+            .get_epoch_proposers(&unpaid_epoch_tree, proposers_limit, transaction)
             .map_err(Error::Drive)?;
 
         let proposers_len = proposers.len() as u16;
@@ -291,7 +291,7 @@ impl Platform {
         let proposer_pro_tx_hashes: Vec<Vec<u8>> =
             proposers.iter().map(|(hash, _)| hash.clone()).collect();
 
-        unpaid_epoch_pool.add_delete_proposers_operations(proposer_pro_tx_hashes, batch);
+        unpaid_epoch_tree.add_delete_proposers_operations(proposer_pro_tx_hashes, batch);
 
         Ok(proposers_len)
     }
@@ -403,23 +403,23 @@ mod tests {
 
             // Create epochs
 
-            let unpaid_epoch_pool_0 = Epoch::new(GENESIS_EPOCH_INDEX);
+            let unpaid_epoch_tree_0 = Epoch::new(GENESIS_EPOCH_INDEX);
 
             let current_epoch_index = GENESIS_EPOCH_INDEX + 1;
 
-            let epoch_pool_1 = Epoch::new(current_epoch_index);
+            let epoch_tree_1 = Epoch::new(current_epoch_index);
 
             let mut batch = GroveDbOpBatch::new();
 
-            unpaid_epoch_pool_0.add_init_current_operations(1.0, 1, 1, &mut batch);
+            unpaid_epoch_tree_0.add_init_current_operations(1.0, 1, 1, &mut batch);
 
             batch.push(
-                unpaid_epoch_pool_0.update_processing_credits_for_distribution_operation(10000),
+                unpaid_epoch_tree_0.update_processing_credits_for_distribution_operation(10000),
             );
 
             let proposers_count = 100u16;
 
-            epoch_pool_1.add_init_current_operations(
+            epoch_tree_1.add_init_current_operations(
                 1.0,
                 proposers_count as u64 + 1,
                 2,
@@ -433,7 +433,7 @@ mod tests {
 
             create_test_masternode_identities_and_add_them_as_epoch_block_proposers(
                 &platform.drive,
-                &unpaid_epoch_pool_0,
+                &unpaid_epoch_tree_0,
                 proposers_count,
                 Some(&transaction),
             );
@@ -473,31 +473,31 @@ mod tests {
 
             // Create epochs
 
-            let unpaid_epoch_pool_0 = Epoch::new(GENESIS_EPOCH_INDEX);
-            let unpaid_epoch_pool_1 = Epoch::new(GENESIS_EPOCH_INDEX + 1);
+            let unpaid_epoch_tree_0 = Epoch::new(GENESIS_EPOCH_INDEX);
+            let unpaid_epoch_tree_1 = Epoch::new(GENESIS_EPOCH_INDEX + 1);
 
             let current_epoch_index = GENESIS_EPOCH_INDEX + 2;
 
-            let epoch_pool_2 = Epoch::new(current_epoch_index);
+            let epoch_tree_2 = Epoch::new(current_epoch_index);
 
             let mut batch = GroveDbOpBatch::new();
 
-            unpaid_epoch_pool_0.add_init_current_operations(1.0, 1, 1, &mut batch);
+            unpaid_epoch_tree_0.add_init_current_operations(1.0, 1, 1, &mut batch);
 
             batch.push(
-                unpaid_epoch_pool_0.update_processing_credits_for_distribution_operation(10000),
+                unpaid_epoch_tree_0.update_processing_credits_for_distribution_operation(10000),
             );
 
             let proposers_count = 100u16;
 
-            unpaid_epoch_pool_1.add_init_current_operations(
+            unpaid_epoch_tree_1.add_init_current_operations(
                 1.0,
                 proposers_count as u64 + 1,
                 2,
                 &mut batch,
             );
 
-            epoch_pool_2.add_init_current_operations(
+            epoch_tree_2.add_init_current_operations(
                 1.0,
                 proposers_count as u64 * 2 + 1,
                 3,
@@ -511,14 +511,14 @@ mod tests {
 
             create_test_masternode_identities_and_add_them_as_epoch_block_proposers(
                 &platform.drive,
-                &unpaid_epoch_pool_0,
+                &unpaid_epoch_tree_0,
                 proposers_count,
                 Some(&transaction),
             );
 
             create_test_masternode_identities_and_add_them_as_epoch_block_proposers(
                 &platform.drive,
-                &unpaid_epoch_pool_1,
+                &unpaid_epoch_tree_1,
                 proposers_count,
                 Some(&transaction),
             );
@@ -558,39 +558,39 @@ mod tests {
 
             // Create epochs
 
-            let unpaid_epoch_pool_0 = Epoch::new(GENESIS_EPOCH_INDEX);
-            let unpaid_epoch_pool_1 = Epoch::new(GENESIS_EPOCH_INDEX + 1);
-            let unpaid_epoch_pool_2 = Epoch::new(GENESIS_EPOCH_INDEX + 2);
+            let unpaid_epoch_tree_0 = Epoch::new(GENESIS_EPOCH_INDEX);
+            let unpaid_epoch_tree_1 = Epoch::new(GENESIS_EPOCH_INDEX + 1);
+            let unpaid_epoch_tree_2 = Epoch::new(GENESIS_EPOCH_INDEX + 2);
 
             let current_epoch_index = GENESIS_EPOCH_INDEX + 3;
 
-            let epoch_pool_3 = Epoch::new(current_epoch_index);
+            let epoch_tree_3 = Epoch::new(current_epoch_index);
 
             let mut batch = GroveDbOpBatch::new();
 
-            unpaid_epoch_pool_0.add_init_current_operations(1.0, 1, 1, &mut batch);
+            unpaid_epoch_tree_0.add_init_current_operations(1.0, 1, 1, &mut batch);
 
             batch.push(
-                unpaid_epoch_pool_0.update_processing_credits_for_distribution_operation(10000),
+                unpaid_epoch_tree_0.update_processing_credits_for_distribution_operation(10000),
             );
 
             let proposers_count = 200u16;
 
-            unpaid_epoch_pool_1.add_init_current_operations(
+            unpaid_epoch_tree_1.add_init_current_operations(
                 1.0,
                 proposers_count as u64 + 1,
                 2,
                 &mut batch,
             );
 
-            unpaid_epoch_pool_2.add_init_current_operations(
+            unpaid_epoch_tree_2.add_init_current_operations(
                 1.0,
                 proposers_count as u64 * 2 + 1,
                 3,
                 &mut batch,
             );
 
-            epoch_pool_3.add_init_current_operations(
+            epoch_tree_3.add_init_current_operations(
                 1.0,
                 proposers_count as u64 * 3 + 1,
                 3,
@@ -604,21 +604,21 @@ mod tests {
 
             create_test_masternode_identities_and_add_them_as_epoch_block_proposers(
                 &platform.drive,
-                &unpaid_epoch_pool_0,
+                &unpaid_epoch_tree_0,
                 proposers_count,
                 Some(&transaction),
             );
 
             create_test_masternode_identities_and_add_them_as_epoch_block_proposers(
                 &platform.drive,
-                &unpaid_epoch_pool_1,
+                &unpaid_epoch_tree_1,
                 proposers_count,
                 Some(&transaction),
             );
 
             create_test_masternode_identities_and_add_them_as_epoch_block_proposers(
                 &platform.drive,
-                &unpaid_epoch_pool_2,
+                &unpaid_epoch_tree_2,
                 proposers_count,
                 Some(&transaction),
             );
@@ -1123,23 +1123,23 @@ mod tests {
             let processing_fees = 10000;
             let storage_fees = 10000;
 
-            let unpaid_epoch_pool = Epoch::new(0);
-            let next_epoch_pool = Epoch::new(1);
+            let unpaid_epoch_tree = Epoch::new(0);
+            let next_epoch_tree = Epoch::new(1);
 
             let mut batch = GroveDbOpBatch::new();
 
-            unpaid_epoch_pool.add_init_current_operations(1.0, 1, 1, &mut batch);
+            unpaid_epoch_tree.add_init_current_operations(1.0, 1, 1, &mut batch);
 
             batch.push(
-                unpaid_epoch_pool
+                unpaid_epoch_tree
                     .update_processing_credits_for_distribution_operation(processing_fees),
             );
 
             batch.push(
-                unpaid_epoch_pool.update_storage_credits_for_distribution_operation(storage_fees),
+                unpaid_epoch_tree.update_storage_credits_for_distribution_operation(storage_fees),
             );
 
-            next_epoch_pool.add_init_current_operations(
+            next_epoch_tree.add_init_current_operations(
                 1.0,
                 proposers_count as u64 + 1,
                 10,
@@ -1154,7 +1154,7 @@ mod tests {
             let pro_tx_hashes =
                 create_test_masternode_identities_and_add_them_as_epoch_block_proposers(
                     &platform.drive,
-                    &unpaid_epoch_pool,
+                    &unpaid_epoch_tree,
                     proposers_count,
                     Some(&transaction),
                 );
@@ -1248,18 +1248,18 @@ mod tests {
             let platform = setup_platform_with_initial_state_structure();
             let transaction = platform.drive.grove.start_transaction();
 
-            let current_epoch_pool = Epoch::new(1);
+            let current_epoch_tree = Epoch::new(1);
 
             let mut batch = GroveDbOpBatch::new();
 
-            current_epoch_pool.add_init_current_operations(1.0, 1, 1, &mut batch);
+            current_epoch_tree.add_init_current_operations(1.0, 1, 1, &mut batch);
 
             let processing_fees = 1000000;
             let storage_fees = 2000000;
 
             platform
                 .add_distribute_block_fees_into_pools_operations(
-                    &current_epoch_pool,
+                    &current_epoch_tree,
                     &FeesAggregate {
                         processing_fees,
                         storage_fees,
@@ -1278,7 +1278,7 @@ mod tests {
             let stored_processing_fee_credits = platform
                 .drive
                 .get_epoch_processing_credits_for_distribution(
-                    &current_epoch_pool,
+                    &current_epoch_tree,
                     Some(&transaction),
                 )
                 .expect("should get processing fees");
@@ -1297,11 +1297,11 @@ mod tests {
             let platform = setup_platform_with_initial_state_structure();
             let transaction = platform.drive.grove.start_transaction();
 
-            let current_epoch_pool = Epoch::new(1);
+            let current_epoch_tree = Epoch::new(1);
 
             let mut batch = GroveDbOpBatch::new();
 
-            current_epoch_pool.add_init_current_operations(1.0, 1, 1, &mut batch);
+            current_epoch_tree.add_init_current_operations(1.0, 1, 1, &mut batch);
 
             // Apply new pool structure
             platform
@@ -1316,7 +1316,7 @@ mod tests {
 
             platform
                 .add_distribute_block_fees_into_pools_operations(
-                    &current_epoch_pool,
+                    &current_epoch_tree,
                     &FeesAggregate {
                         processing_fees,
                         storage_fees,
@@ -1335,7 +1335,7 @@ mod tests {
             let stored_processing_fee_credits = platform
                 .drive
                 .get_epoch_processing_credits_for_distribution(
-                    &current_epoch_pool,
+                    &current_epoch_tree,
                     Some(&transaction),
                 )
                 .expect("should get processing fees");

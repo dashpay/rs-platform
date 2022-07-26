@@ -45,7 +45,7 @@ mod tests {
         }
 
         #[test]
-        fn test_epoch_pools_are_created() {
+        fn test_epoch_trees_are_created() {
             let drive = super::setup_drive_with_initial_state_structure();
             let transaction = drive.grove.start_transaction();
 

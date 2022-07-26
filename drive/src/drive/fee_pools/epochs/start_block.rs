@@ -12,13 +12,13 @@ use crate::fee_pools::epochs::epoch_key_constants::KEY_START_BLOCK_HEIGHT;
 impl Drive {
     pub fn get_epoch_start_block_height(
         &self,
-        epoch_pool: &Epoch,
+        epoch_tree: &Epoch,
         transaction: TransactionArg,
     ) -> Result<u64, Error> {
         let element = self
             .grove
             .get(
-                epoch_pool.get_path(),
+                epoch_tree.get_path(),
                 epoch_key_constants::KEY_START_BLOCK_HEIGHT.as_slice(),
                 transaction,
             )
@@ -105,7 +105,7 @@ mod tests {
         use crate::fee_pools::epochs::Epoch;
 
         #[test]
-        fn test_error_if_epoch_pool_is_not_initiated() {
+        fn test_error_if_epoch_tree_is_not_initiated() {
             let drive = super::setup_drive_with_initial_state_structure();
             let transaction = drive.grove.start_transaction();
 
@@ -213,13 +213,13 @@ mod tests {
             let drive = setup_drive_with_initial_state_structure();
             let transaction = drive.grove.start_transaction();
 
-            let epoch_pool_0 = Epoch::new(0);
-            let epoch_pool_1 = Epoch::new(1);
+            let epoch_tree_0 = Epoch::new(0);
+            let epoch_tree_1 = Epoch::new(1);
 
             let mut batch = GroveDbOpBatch::new();
 
-            batch.push(epoch_pool_0.update_start_block_height_operation(1));
-            batch.push(epoch_pool_1.update_start_block_height_operation(2));
+            batch.push(epoch_tree_0.update_start_block_height_operation(1));
+            batch.push(epoch_tree_1.update_start_block_height_operation(2));
 
             // Apply proposers tree
             drive
@@ -259,13 +259,13 @@ mod tests {
             let drive = setup_drive_with_initial_state_structure();
             let transaction = drive.grove.start_transaction();
 
-            let epoch_pool_0 = Epoch::new(0);
-            let epoch_pool_3 = Epoch::new(3);
+            let epoch_tree_0 = Epoch::new(0);
+            let epoch_tree_3 = Epoch::new(3);
 
             let mut batch = GroveDbOpBatch::new();
 
-            batch.push(epoch_pool_0.update_start_block_height_operation(1));
-            batch.push(epoch_pool_3.update_start_block_height_operation(3));
+            batch.push(epoch_tree_0.update_start_block_height_operation(1));
+            batch.push(epoch_tree_3.update_start_block_height_operation(3));
 
             // Apply proposers tree
             drive
@@ -287,13 +287,13 @@ mod tests {
             let drive = setup_drive_with_initial_state_structure();
             let transaction = drive.grove.start_transaction();
 
-            let epoch_pool_0 = Epoch::new(0);
-            let epoch_pool_3 = Epoch::new(3);
+            let epoch_tree_0 = Epoch::new(0);
+            let epoch_tree_3 = Epoch::new(3);
 
             let mut batch = GroveDbOpBatch::new();
 
-            batch.push(epoch_pool_0.update_start_block_height_operation(1));
-            batch.push(epoch_pool_3.update_start_block_height_operation(2));
+            batch.push(epoch_tree_0.update_start_block_height_operation(1));
+            batch.push(epoch_tree_3.update_start_block_height_operation(2));
 
             // Apply proposers tree
             drive

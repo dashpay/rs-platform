@@ -35,14 +35,14 @@ pub fn create_test_identity(drive: &Drive, id: [u8; 32], transaction: Transactio
 
 pub fn increment_in_epoch_each_proposers_block_count(
     drive: &Drive,
-    epoch_pool: &Epoch,
+    epoch_tree: &Epoch,
     proposers: &Vec<[u8; 32]>,
     transaction: TransactionArg,
 ) {
     let mut batch = GroveDbOpBatch::new();
 
     for proposer_pro_tx_hash in proposers {
-        let op = epoch_pool
+        let op = epoch_tree
             .increment_proposer_block_count_operation(
                 &drive,
                 &proposer_pro_tx_hash,
@@ -76,15 +76,15 @@ pub fn create_test_masternode_identities(
     count: u16,
     transaction: TransactionArg,
 ) -> Vec<[u8; 32]> {
-    let mut identities: Vec<[u8; 32]> = Vec::with_capacity(count as usize);
+    let mut identity_ids: Vec<[u8; 32]> = Vec::with_capacity(count as usize);
 
     for _ in 0..count {
         let proposer_pro_tx_hash: [u8; 32] = rand::random();
 
         create_test_identity(drive, proposer_pro_tx_hash, transaction);
 
-        identities.push(proposer_pro_tx_hash);
+        identity_ids.push(proposer_pro_tx_hash);
     }
 
-    identities
+    identity_ids
 }
