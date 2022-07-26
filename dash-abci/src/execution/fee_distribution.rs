@@ -402,9 +402,10 @@ mod tests {
 
             // Create epochs
 
-            let current_epoch_index = 1;
-
             let unpaid_epoch_pool_0 = Epoch::new(GENESIS_EPOCH_INDEX);
+
+            let current_epoch_index = GENESIS_EPOCH_INDEX + 1;
+
             let epoch_pool_1 = Epoch::new(current_epoch_index);
 
             let mut batch = GroveDbOpBatch::new();
@@ -471,10 +472,11 @@ mod tests {
 
             // Create epochs
 
-            let current_epoch_index = 2;
-
             let unpaid_epoch_pool_0 = Epoch::new(GENESIS_EPOCH_INDEX);
-            let unpaid_epoch_pool_1 = Epoch::new(1);
+            let unpaid_epoch_pool_1 = Epoch::new(GENESIS_EPOCH_INDEX + 1);
+
+            let current_epoch_index = GENESIS_EPOCH_INDEX + 2;
+
             let epoch_pool_2 = Epoch::new(current_epoch_index);
 
             let mut batch = GroveDbOpBatch::new();
@@ -657,9 +659,10 @@ mod tests {
             let platform = setup_platform_with_initial_state_structure();
             let transaction = platform.drive.grove.start_transaction();
 
-            let current_epoch_index = 1;
-
             let epoch_0_tree = Epoch::new(GENESIS_EPOCH_INDEX);
+
+            let current_epoch_index = GENESIS_EPOCH_INDEX + 1;
+
             let epoch_1_tree = Epoch::new(current_epoch_index);
 
             let mut batch = GroveDbOpBatch::new();
@@ -686,9 +689,9 @@ mod tests {
             let platform = setup_platform_with_initial_state_structure();
             let transaction = platform.drive.grove.start_transaction();
 
-            let current_epoch_index = 1;
-
             let epoch_0_tree = Epoch::new(GENESIS_EPOCH_INDEX);
+
+            let current_epoch_index = GENESIS_EPOCH_INDEX + 1;
 
             let mut batch = GroveDbOpBatch::new();
 
@@ -730,9 +733,10 @@ mod tests {
             let platform = setup_platform_with_initial_state_structure();
             let transaction = platform.drive.grove.start_transaction();
 
-            let current_epoch_index = 1;
-
             let epoch_0_tree = Epoch::new(GENESIS_EPOCH_INDEX);
+
+            let current_epoch_index = GENESIS_EPOCH_INDEX + 1;
+
             let epoch_1_tree = Epoch::new(current_epoch_index);
 
             let mut batch = GroveDbOpBatch::new();
@@ -769,11 +773,12 @@ mod tests {
             let platform = setup_platform_with_initial_state_structure();
             let transaction = platform.drive.grove.start_transaction();
 
-            let current_epoch_index = 2;
-
             let epoch_0_tree = Epoch::new(GENESIS_EPOCH_INDEX);
-            let epoch_1_tree = Epoch::new(1);
-            let epoch_2_tree = Epoch::new(2);
+            let epoch_1_tree = Epoch::new(GENESIS_EPOCH_INDEX + 1);
+
+            let current_epoch_index = GENESIS_EPOCH_INDEX + 2;
+
+            let epoch_2_tree = Epoch::new(current_epoch_index);
 
             let mut batch = GroveDbOpBatch::new();
 
@@ -810,9 +815,9 @@ mod tests {
             let platform = setup_platform_with_initial_state_structure();
             let transaction = platform.drive.grove.start_transaction();
 
-            let current_epoch_index = 2;
-
             let epoch_0_tree = Epoch::new(GENESIS_EPOCH_INDEX);
+
+            let current_epoch_index = GENESIS_EPOCH_INDEX + 2;
 
             let mut batch = GroveDbOpBatch::new();
 
@@ -854,9 +859,9 @@ mod tests {
             let platform = setup_platform_with_initial_state_structure();
             let transaction = platform.drive.grove.start_transaction();
 
-            let current_epoch_index = 2;
-
             let epoch_0_tree = Epoch::new(GENESIS_EPOCH_INDEX);
+
+            let current_epoch_index = GENESIS_EPOCH_INDEX + 2;
 
             let mut batch = GroveDbOpBatch::new();
 
