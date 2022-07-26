@@ -7,9 +7,9 @@ use dash_abci::abci::messages::{
     BlockBeginRequest, BlockEndRequest, InitChainRequest, Serializable,
 };
 use dash_abci::platform::Platform;
-use dpp::identity::Identity;
 use neon::prelude::*;
 use neon::types::JsDate;
+use rs_drive::dpp::identity::Identity;
 use rs_drive::drive::flags::StorageFlags;
 use rs_drive::grovedb::{PathQuery, Transaction, TransactionArg};
 

@@ -1,4 +1,3 @@
-use crate::common::encode::encode_float;
 use grovedb::{Element, TransactionArg};
 use std::collections::HashSet;
 
@@ -32,6 +31,9 @@ use crate::error::Error;
 use crate::fee::calculate_fee;
 use crate::fee::op::DriveOperation;
 
+use dpp::data_contract::extra::encode_float;
+use dpp::data_contract::extra::DriveContractExt;
+
 impl Drive {
     // If a document isn't sent to this function then we are just calling to know the query and
     // insert operations
@@ -47,8 +49,10 @@ impl Drive {
         //let mut base_operations : EnumMap<Op, u64> = EnumMap::default();
         let contract = document_and_contract_info.contract;
         let document_type = document_and_contract_info.document_type;
-        let primary_key_path =
-            contract_documents_primary_key_path(&contract.id, document_type.name.as_str());
+        let primary_key_path = contract_documents_primary_key_path(
+            contract.id().as_bytes(),
+            document_type.name.as_str(),
+        );
         if document_type.documents_keep_history {
             let (path_key_info, storage_flags) =
                 if let DocumentAndSerialization((document, _, storage_flags)) =
@@ -85,7 +89,7 @@ impl Drive {
                     );
                     let document_id_in_primary_path =
                         contract_documents_keeping_history_primary_key_path_for_document_id(
-                            &contract.id,
+                            contract.id().as_bytes(),
                             document_type.name.as_str(),
                             document.id.as_slice(),
                         );
@@ -102,7 +106,7 @@ impl Drive {
                         Element::Item(serialized_document, storage_flags.to_element_flags());
                     let document_id_in_primary_path =
                         contract_documents_keeping_history_primary_key_path_for_document_id(
-                            &contract.id,
+                            contract.id.as_bytes(),
                             document_type.name.as_str(),
                             document.id.as_slice(),
                         );
@@ -134,13 +138,13 @@ impl Drive {
                     // todo: we could construct this only once
                     let document_id_in_primary_path =
                         contract_documents_keeping_history_primary_key_path_for_document_id(
-                            &contract.id,
+                            contract.id.as_bytes(),
                             document_type.name.as_str(),
                             document.id.as_slice(),
                         );
                     let contract_storage_path =
                         contract_documents_keeping_history_storage_time_reference_path(
-                            &contract.id,
+                            contract.id.as_bytes(),
                             document_type.name.as_str(),
                             document.id.as_slice(),
                             encoded_time,
@@ -243,7 +247,7 @@ impl Drive {
         storage_flags: StorageFlags,
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
-        let contract = Contract::from_cbor(serialized_contract, None)?;
+        let contract = <Contract as DriveContractExt>::from_cbor(serialized_contract, None)?;
 
         let document = Document::from_cbor(serialized_document, None, owner_id)?;
 
@@ -336,12 +340,12 @@ impl Drive {
         //  * Contract ID recovered from document
         //  * 0 to signify Documents and not Contract
         let contract_document_type_path = contract_document_type_path(
-            &document_and_contract_info.contract.id,
+            document_and_contract_info.contract.id.as_bytes(),
             document_and_contract_info.document_type.name.as_str(),
         );
 
         let primary_key_path = contract_documents_primary_key_path(
-            &document_and_contract_info.contract.id,
+            document_and_contract_info.contract.id.as_bytes(),
             document_and_contract_info.document_type.name.as_str(),
         );
         if override_document
@@ -609,6 +613,7 @@ impl Drive {
 mod tests {
     use std::option::Option::None;
 
+    use super::*;
     use rand::Rng;
     use tempfile::TempDir;
 
