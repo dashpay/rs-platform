@@ -44,35 +44,11 @@ mod tests {
 
     use super::Epoch;
 
-    #[test]
-    fn test_update_start_time() {
-        let drive = setup_drive_with_initial_state_structure();
-        let transaction = drive.grove.start_transaction();
-
-        let epoch_pool = super::Epoch::new(0);
-
-        let start_time_ms: u64 = Utc::now().timestamp_millis() as u64;
-
-        let mut batch = GroveDbOpBatch::new();
-
-        batch.push(epoch_pool.update_start_time_operation(start_time_ms));
-
-        drive
-            .grove_apply_batch(batch, false, Some(&transaction))
-            .expect("should apply batch");
-
-        let actual_start_time_ms = drive
-            .get_epoch_start_time(&epoch_pool, Some(&transaction))
-            .expect("should get start time");
-
-        assert_eq!(start_time_ms, actual_start_time_ms);
-    }
-
-    mod get_start_time {
+    mod get_epoch_start_time {
         use crate::fee_pools::epochs::epoch_key_constants::KEY_START_TIME;
 
         #[test]
-        fn test_error_if_epoch_pool_is_not_initiated() {
+        fn test_error_if_epoch_tree_is_not_initiated() {
             let drive = super::setup_drive_with_initial_state_structure();
             let transaction = drive.grove.start_transaction();
 

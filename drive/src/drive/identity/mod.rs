@@ -1,4 +1,5 @@
 use dpp::identity::Identity;
+use grovedb::query_result_type::QueryResultType::QueryElementResultType;
 use grovedb::{Element, PathQuery, Query, QueryItem, SizedQuery, TransactionArg};
 
 use crate::drive::batch::GroveDbOpBatch;
@@ -121,16 +122,17 @@ impl Drive {
                 offset: None,
             },
         };
-        let (elements, _) = self
+        let (result_items, _) = self
             .grove
-            .query_raw(&path_query, transaction)
+            .query_raw(&path_query, QueryElementResultType, transaction)
             .unwrap()
             .map_err(Error::GroveDB)?;
 
-        elements
+        result_items
+            .to_elements()
             .into_iter()
-            .map(|key_element_pair| {
-                if let Element::Item(identity_cbor, element_flags) = key_element_pair.1 {
+            .map(|element| {
+                if let Element::Item(identity_cbor, element_flags) = element {
                     let identity =
                         Identity::from_buffer(identity_cbor.as_slice()).map_err(|_| {
                             Error::Identity(IdentityError::IdentitySerialization(
@@ -157,7 +159,7 @@ mod tests {
 
     #[test]
     fn test_insert_and_fetch_identity() {
-        let drive = setup_drive();
+        let drive = setup_drive(None);
 
         let transaction = drive.grove.start_transaction();
 

@@ -932,6 +932,7 @@ impl DriveWrapper {
                 channel.send(move |mut task_context| {
                     let callback = js_callback.into_inner(&mut task_context);
                     let this = task_context.undefined();
+
                     let callback_arguments: Vec<Handle<JsValue>> = match result {
                         Ok(_) => vec![task_context.null().upcast()],
                         Err(err) => vec![task_context.error(err.to_string())?.upcast()],

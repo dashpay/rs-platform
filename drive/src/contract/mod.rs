@@ -39,7 +39,7 @@ pub mod types;
 //               - unique
 
 // Struct Definitions
-#[derive(Serialize, Deserialize, Debug, PartialEq, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 pub struct Contract {
     pub id: [u8; 32],
     pub document_types: BTreeMap<String, DocumentType>,
@@ -49,7 +49,7 @@ pub struct Contract {
     pub documents_mutable_contract_default: bool,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 pub struct DocumentType {
     pub name: String,
     pub indices: Vec<Index>,

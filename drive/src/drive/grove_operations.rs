@@ -18,6 +18,7 @@ use crate::error::drive::DriveError;
 use crate::error::Error;
 use crate::fee::op::DriveOperation::{CalculatedCostOperation, CostCalculationQueryOperation};
 use crate::fee::op::{DriveOperation, SizesOfQueryOperation};
+use grovedb::query_result_type::{QueryResultElements, QueryResultType};
 use grovedb::Error as GroveError;
 
 fn push_drive_operation_result<T>(
@@ -387,7 +388,7 @@ impl Drive {
             let cost_context = self.grove.delete(path_iter, key, transaction);
             push_drive_operation_result(cost_context, drive_operations)
         } else {
-            //todo: this is wrong
+            // TODO this is wrong
             drive_operations.push(DriveOperation::for_delete_path_key_value_size(
                 path,
                 key.len() as u16,
@@ -443,9 +444,11 @@ impl Drive {
         &self,
         path_query: &PathQuery,
         transaction: TransactionArg,
+        result_type: QueryResultType,
         drive_operations: &mut Vec<DriveOperation>,
-    ) -> Result<(Vec<(Vec<u8>, Element)>, u16), Error> {
-        let CostContext { value, cost } = self.grove.query_raw(path_query, transaction);
+    ) -> Result<(QueryResultElements, u16), Error> {
+        let CostContext { value, cost } =
+            self.grove.query_raw(path_query, result_type, transaction);
         drive_operations.push(CalculatedCostOperation(cost));
         value.map_err(Error::GroveDB)
     }

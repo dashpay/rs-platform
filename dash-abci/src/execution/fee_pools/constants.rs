@@ -1,23 +1,13 @@
+use rs_drive::drive::fee_pools::epochs::constants::PERPETUAL_STORAGE_YEARS;
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 
-pub const GENESIS_EPOCH_INDEX: u16 = 0;
-
 pub const DEFAULT_ORIGINAL_FEE_MULTIPLIER: f64 = 2.0;
 
-// TODO: Don't like this name
-pub const FOREVER_STORAGE_YEARS: u16 = 50;
-
-pub const EPOCHS_PER_YEAR: u16 = 20;
-
-pub const FOREVER_STORAGE_EPOCHS: u16 = FOREVER_STORAGE_YEARS * EPOCHS_PER_YEAR;
-
-pub const EPOCHS_PER_YEAR_F64: f64 = 20.0;
-
-pub const EPOCHS_PER_YEAR_DEC: Decimal = dec!(20);
+// TODO: Should be updated from the doc
 
 #[rustfmt::skip]
-pub const FEE_DISTRIBUTION_TABLE: [Decimal; FOREVER_STORAGE_YEARS as usize] = [
+pub const FEE_DISTRIBUTION_TABLE: [Decimal; PERPETUAL_STORAGE_YEARS as usize] = [
     dec!(0.05000), dec!(0.04800), dec!(0.04600), dec!(0.04400), dec!(0.04200),
     dec!(0.04000), dec!(0.03850), dec!(0.03700), dec!(0.03550), dec!(0.03400),
     dec!(0.03250), dec!(0.03100), dec!(0.02950), dec!(0.02850), dec!(0.02750),

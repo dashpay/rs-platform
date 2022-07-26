@@ -2,7 +2,7 @@ use crate::drive::flags::StorageFlags;
 use grovedb::batch::{GroveDbOp, Op};
 use grovedb::Element;
 
-//todo: move to GroveDB
+// TODO move to GroveDB
 #[derive(Debug)]
 pub struct GroveDbOpBatch {
     pub(crate) operations: Vec<GroveDbOp>,

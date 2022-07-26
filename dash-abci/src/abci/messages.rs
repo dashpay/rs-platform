@@ -1,7 +1,7 @@
 use crate::error::serialization::SerializationError;
 use crate::error::Error;
-use crate::execution::epoch_change::epoch::EpochInfo;
-use crate::execution::process_block_fees::ProcessedBlockFeesResult;
+use crate::execution::fee_pools::epoch::EpochInfo;
+use crate::execution::fee_pools::process_block_fees::ProcessedBlockFeesResult;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
@@ -38,7 +38,7 @@ pub type EpochRefund = (u16, u64);
 pub struct FeesAggregate {
     pub processing_fees: u64,
     pub storage_fees: u64,
-    pub refunds_by_epoch: Vec<EpochRefund>,
+    // pub refunds_by_epoch: Vec<EpochRefund>,
 }
 
 #[derive(Serialize, Deserialize)]

@@ -1,15 +1,15 @@
 use crate::abci::messages::FeesAggregate;
 use crate::block::BlockInfo;
-use crate::error::execution::ExecutionError;
 use crate::error::Error;
-use crate::execution::constants::{
-    DEFAULT_ORIGINAL_FEE_MULTIPLIER, FOREVER_STORAGE_EPOCHS, GENESIS_EPOCH_INDEX,
-};
-use crate::execution::epoch_change::distribute_storage_pool::StorageDistributionLeftoverCredits;
-use crate::execution::epoch_change::epoch::EpochInfo;
-use crate::execution::fee_distribution::{FeesInPools, ProposersPayouts};
+use crate::execution::fee_pools::constants::DEFAULT_ORIGINAL_FEE_MULTIPLIER;
+use crate::execution::fee_pools::distribute_storage_pool::StorageDistributionLeftoverCredits;
+use crate::execution::fee_pools::epoch::EpochInfo;
+use crate::execution::fee_pools::fee_distribution::{FeesInPools, ProposersPayouts};
 use crate::platform::Platform;
 use rs_drive::drive::batch::GroveDbOpBatch;
+use rs_drive::drive::fee_pools::epochs::constants::{
+    GENESIS_EPOCH_INDEX, PERPETUAL_STORAGE_EPOCHS,
+};
 use rs_drive::fee_pools::epochs::Epoch;
 use rs_drive::grovedb::TransactionArg;
 use std::option::Option::None;
@@ -48,7 +48,7 @@ impl Platform {
             .map_or(GENESIS_EPOCH_INDEX, |i| i + 1);
 
         for epoch_index in last_initiated_epoch_index..=epoch_info.current_epoch_index {
-            let next_thousandth_epoch = Epoch::new(epoch_index + FOREVER_STORAGE_EPOCHS);
+            let next_thousandth_epoch = Epoch::new(epoch_index + PERPETUAL_STORAGE_EPOCHS);
             next_thousandth_epoch.add_init_empty_operations(batch);
         }
 
@@ -67,7 +67,7 @@ impl Platform {
             return Ok(None);
         }
 
-        // Distribute accumulated storage fees from previous epoch
+        // Distribute storage fees accumulated during previous epoch
         let storage_distribution_leftover_credits = self
             .add_distribute_storage_fee_distribution_pool_to_epochs_operations(
                 current_epoch.index,
@@ -82,7 +82,7 @@ impl Platform {
         &self,
         block_info: &BlockInfo,
         epoch_info: &EpochInfo,
-        block_fees: FeesAggregate,
+        block_fees: &FeesAggregate,
         transaction: TransactionArg,
     ) -> Result<ProcessedBlockFeesResult, Error> {
         let current_epoch = Epoch::new(epoch_info.current_epoch_index);
@@ -100,56 +100,44 @@ impl Platform {
             None
         };
 
-        batch.push(current_epoch.increment_proposer_block_count_operation(
-            &self.drive,
-            &block_info.proposer_pro_tx_hash,
-            transaction,
-        )?);
-
-        // Distribute fees from unpaid pools to proposers
-        let proposers_payouts = if epoch_info.current_epoch_index > GENESIS_EPOCH_INDEX {
-            // For current epochs we pay for previous
-            let pay_starting_with_epoch_index = epoch_info.current_epoch_index - 1;
-
-            // Since start_block_height is not committed for current epoch
-            // we pass it explicitly
-            let current_epoch_start_block_height = if epoch_info.is_epoch_change {
-                Some(block_info.block_height)
-            } else {
-                None
-            };
-
-            self.add_distribute_fees_from_unpaid_pools_to_proposers_operations(
-                pay_starting_with_epoch_index,
-                current_epoch_start_block_height,
-                transaction,
-                &mut batch,
-            )?
+        // Since epoch pool tree batched is not committed yet
+        // we pass previous block count explicitly
+        let cached_previous_block_count = if epoch_info.is_epoch_change {
+            Some(0)
         } else {
             None
         };
 
-        // Add leftovers after storage fee pool distribution to the current block storage fees
-        let block_fees_with_leftovers = match storage_distribution_leftover_credits {
-            Some(leftovers) => {
-                let storage_fees_with_leftovers = block_fees
-                    .storage_fees
-                    .checked_add(leftovers)
-                    .ok_or(Error::Execution(ExecutionError::Overflow(
-                        "overflow combining storage with leftovers",
-                    )))?;
+        batch.push(current_epoch.increment_proposer_block_count_operation(
+            &self.drive,
+            &block_info.proposer_pro_tx_hash,
+            cached_previous_block_count,
+            transaction,
+        )?);
 
-                FeesAggregate {
-                    storage_fees: storage_fees_with_leftovers,
-                    ..block_fees
-                }
-            }
-            None => block_fees,
+        // Distribute fees from unpaid epoch pool to proposers
+
+        // Since start_block_height for current epoch is batched and not committed yet
+        // we pass it explicitly
+        let cached_current_epoch_start_block_height = if epoch_info.is_epoch_change {
+            Some(block_info.block_height)
+        } else {
+            None
         };
+
+        let payouts = self
+            .add_distribute_fees_from_oldest_unpaid_epoch_pool_to_proposers_operations(
+                epoch_info.current_epoch_index,
+                cached_current_epoch_start_block_height,
+                transaction,
+                &mut batch,
+            )?;
 
         let fees_in_pools = self.add_distribute_block_fees_into_pools_operations(
             &current_epoch,
-            block_fees_with_leftovers,
+            block_fees,
+            // Add leftovers after storage fee pool distribution to the current block storage fees
+            storage_distribution_leftover_credits,
             transaction,
             &mut batch,
         )?;
@@ -158,7 +146,7 @@ impl Platform {
 
         Ok(ProcessedBlockFeesResult {
             fees_in_pools,
-            payouts: proposers_payouts,
+            payouts,
         })
     }
 }
@@ -167,17 +155,17 @@ impl Platform {
 mod tests {
     mod add_process_epoch_change_operations {
         use crate::common::helpers::setup::setup_platform_with_initial_state_structure;
-        use crate::execution::constants::GENESIS_EPOCH_INDEX;
         use chrono::Utc;
+        use rs_drive::drive::fee_pools::epochs::constants::GENESIS_EPOCH_INDEX;
         use rust_decimal::prelude::ToPrimitive;
 
         mod helpers {
             use crate::abci::messages::FeesAggregate;
             use crate::block::BlockInfo;
-            use crate::execution::constants::FOREVER_STORAGE_EPOCHS;
-            use crate::execution::epoch_change::epoch::{EpochInfo, EPOCH_CHANGE_TIME_MS};
+            use crate::execution::fee_pools::epoch::{EpochInfo, EPOCH_CHANGE_TIME_MS};
             use crate::platform::Platform;
             use rs_drive::drive::batch::GroveDbOpBatch;
+            use rs_drive::drive::fee_pools::epochs::constants::PERPETUAL_STORAGE_EPOCHS;
             use rs_drive::fee_pools::epochs::Epoch;
             use rs_drive::grovedb::TransactionArg;
 
@@ -197,7 +185,6 @@ mod tests {
                     let block_fees = FeesAggregate {
                         processing_fees: 1000,
                         storage_fees: 1000000000,
-                        refunds_by_epoch: vec![],
                     };
 
                     let mut batch = GroveDbOpBatch::new();
@@ -205,7 +192,8 @@ mod tests {
                     platform
                         .add_distribute_block_fees_into_pools_operations(
                             &current_epoch,
-                            block_fees,
+                            &block_fees,
+                            None,
                             transaction,
                             &mut batch,
                         )
@@ -252,7 +240,7 @@ mod tests {
                     .expect("should apply batch");
 
                 // Next thousandth epoch should be created
-                let next_thousandth_epoch = Epoch::new(epoch_index + FOREVER_STORAGE_EPOCHS);
+                let next_thousandth_epoch = Epoch::new(epoch_index + PERPETUAL_STORAGE_EPOCHS);
 
                 let is_epoch_tree_exists = platform
                     .drive
@@ -360,17 +348,17 @@ mod tests {
 
     mod process_block_fees {
         use crate::common::helpers::setup::setup_platform_with_initial_state_structure;
-        use crate::execution::constants::GENESIS_EPOCH_INDEX;
         use chrono::Utc;
+        use rs_drive::common::helpers::identities::create_test_masternode_identities;
+        use rs_drive::drive::fee_pools::epochs::constants::GENESIS_EPOCH_INDEX;
         use rust_decimal::prelude::ToPrimitive;
 
         mod helpers {
             use crate::abci::messages::FeesAggregate;
             use crate::block::BlockInfo;
-            use crate::execution::constants::FOREVER_STORAGE_EPOCHS;
-            use crate::execution::epoch_change::epoch::{EpochInfo, EPOCH_CHANGE_TIME_MS};
+            use crate::execution::fee_pools::epoch::{EpochInfo, EPOCH_CHANGE_TIME_MS};
             use crate::platform::Platform;
-            use rs_drive::drive::batch::GroveDbOpBatch;
+            use rs_drive::drive::fee_pools::epochs::constants::GENESIS_EPOCH_INDEX;
             use rs_drive::fee_pools::epochs::Epoch;
             use rs_drive::grovedb::TransactionArg;
 
@@ -380,17 +368,13 @@ mod tests {
                 epoch_index: u16,
                 block_height: u64,
                 previous_block_time_ms: Option<u64>,
-                should_change_epoch: bool,
+                proposer_pro_tx_hash: [u8; 32],
                 transaction: TransactionArg,
             ) -> BlockInfo {
                 let current_epoch = Epoch::new(epoch_index);
 
-                let proposer_pro_tx_hash: [u8; 32] = [
-                    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-                    1, 1, 1, 1, 1, 1,
-                ];
-
-                let block_time_ms = genesis_time_ms + epoch_index as u64 * EPOCH_CHANGE_TIME_MS;
+                let block_time_ms =
+                    genesis_time_ms + epoch_index as u64 * EPOCH_CHANGE_TIME_MS + block_height;
 
                 let block_info = BlockInfo {
                     block_height,
@@ -406,31 +390,80 @@ mod tests {
                 let block_fees = FeesAggregate {
                     processing_fees: 1000,
                     storage_fees: 10000,
-                    refunds_by_epoch: vec![],
                 };
 
                 let distribute_storage_pool_result = platform
-                    .process_block_fees(&block_info, &epoch_info, block_fees, transaction)
+                    .process_block_fees(&block_info, &epoch_info, &block_fees, transaction)
                     .expect("should process block fees");
 
-                // TODO epoch change or not
+                // Should process epoch change
+                // and distribute aggregated storage fees into pools on epoch > 0
 
-                // TODO increment_proposer_block_count
+                let aggregated_storage_fees = platform
+                    .drive
+                    .get_aggregate_storage_fees_from_distribution_pool(transaction)
+                    .expect("should get storage fees from distribution pool");
 
-                // TODO add_distribute_fees_from_unpaid_pools_to_proposers_operations
+                if epoch_info.is_epoch_change {
+                    if epoch_info.current_epoch_index == GENESIS_EPOCH_INDEX {
+                        assert_eq!(aggregated_storage_fees, block_fees.storage_fees);
+                    } else {
+                        // Assuming leftovers
+                        assert!(
+                            block_fees.storage_fees <= aggregated_storage_fees
+                                && aggregated_storage_fees < block_fees.storage_fees + 1000
+                        );
+                    };
+                } else {
+                    assert!(aggregated_storage_fees > block_fees.storage_fees);
+                }
 
-                // TODO add_distribute_block_fees_into_pools_operations
+                // Should increment proposer block count
+
+                let proposers_block_count = platform
+                    .drive
+                    .get_epochs_proposer_block_count(
+                        &current_epoch,
+                        &proposer_pro_tx_hash,
+                        transaction,
+                    )
+                    .expect("should get proposers");
+
+                assert_ne!(proposers_block_count, 0);
+
+                // Should pay for previous epoch
+
+                dbg!(epoch_info.current_epoch_index, epoch_index);
+                dbg!(block_height);
+
+                if epoch_info.is_epoch_change && epoch_index > GENESIS_EPOCH_INDEX {
+                    assert!(distribute_storage_pool_result.payouts.is_some());
+                } else {
+                    assert!(distribute_storage_pool_result.payouts.is_none());
+                }
+
+                // Should distribute block fees into pools
+
+                let processing_fees = platform
+                    .drive
+                    .get_epoch_processing_credits_for_distribution(&current_epoch, transaction)
+                    .expect("should get processing credits");
+
+                assert_ne!(processing_fees, 0);
 
                 block_info
             }
         }
 
         #[test]
-        fn test_process_block_fees_for_block_1_and_2() {
-            todo!();
-
+        fn test_process_3_block_fees_from_different_epochs() {
             let platform = setup_platform_with_initial_state_structure();
             let transaction = platform.drive.grove.start_transaction();
+
+            platform.create_mn_shares_contract(Some(&transaction));
+
+            let proposers =
+                create_test_masternode_identities(&platform.drive, 6, Some(&transaction));
 
             let genesis_time_ms = Utc::now()
                 .timestamp_millis()
@@ -438,9 +471,9 @@ mod tests {
                 .expect("block time can not be before 1970");
 
             /*
-            Process genesis
+            Process first block of epoch 0 (genesis epoch)
 
-            Should change epoch
+            Should change epoch to 0
             Should not pay to proposers
              */
 
@@ -453,18 +486,18 @@ mod tests {
                 epoch_index,
                 block_height,
                 None,
-                false,
+                proposers[0],
                 Some(&transaction),
             );
 
             /*
-            Process next block of genesis epoch
+            Process second block of epoch 0
 
             Should not change epoch
             Should not pay to proposers
              */
 
-            let epoch_index = 1;
+            let epoch_index = GENESIS_EPOCH_INDEX;
             let block_height = 2;
 
             let block_info = helpers::process_and_validate_block_fees(
@@ -473,19 +506,19 @@ mod tests {
                 epoch_index,
                 block_height,
                 Some(block_info.block_time_ms),
-                true,
+                proposers[1],
                 Some(&transaction),
             );
 
             /*
             Process first block of epoch 1
 
-            Should change epoch
-            Should pay to proposers
+            Should change epoch to 1
+            Should pay to proposers from epoch 0
              */
 
             let epoch_index = 1;
-            let block_height = 2;
+            let block_height = 3;
 
             let block_info = helpers::process_and_validate_block_fees(
                 &platform,
@@ -493,7 +526,67 @@ mod tests {
                 epoch_index,
                 block_height,
                 Some(block_info.block_time_ms),
-                true,
+                proposers[2],
+                Some(&transaction),
+            );
+
+            /*
+            Process second block of epoch 1
+
+            Should change epoch to 1
+            Should not pay to proposers 0
+             */
+
+            let epoch_index = 1;
+            let block_height = 4;
+
+            let block_info = helpers::process_and_validate_block_fees(
+                &platform,
+                genesis_time_ms,
+                epoch_index,
+                block_height,
+                Some(block_info.block_time_ms),
+                proposers[3],
+                Some(&transaction),
+            );
+
+            /*
+            Process first block of epoch 3, skipping epoch 2 (i.e. chain halt)
+
+            Should change epoch to
+            Should pay to proposers for epoch 1
+             */
+
+            let epoch_index = 3;
+            let block_height = 5;
+
+            let block_info = helpers::process_and_validate_block_fees(
+                &platform,
+                genesis_time_ms,
+                epoch_index,
+                block_height,
+                Some(block_info.block_time_ms),
+                proposers[3],
+                Some(&transaction),
+            );
+
+            /*
+            Process second block of epoch 3
+
+            Should not change epoch to
+            Should not pay to proposers
+             */
+
+            let epoch_index = 3;
+            let block_height = 6;
+
+            helpers::process_and_validate_block_fees(
+                &platform,
+                genesis_time_ms,
+                epoch_index,
+                block_height,
+                Some(block_info.block_time_ms),
+                proposers[4],
                 Some(&transaction),
             );
         }

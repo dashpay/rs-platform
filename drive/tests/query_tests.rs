@@ -12,9 +12,12 @@ use serde_json::json;
 use tempfile::TempDir;
 
 use rs_drive::common;
+use rs_drive::common::helpers::setup::setup_drive;
 use rs_drive::common::{cbor_inner_bytes_value, setup_contract};
 use rs_drive::contract::{document::Document, Contract};
+use rs_drive::drive::batch::GroveDbOpBatch;
 use rs_drive::drive::config::DriveConfig;
+use rs_drive::drive::contract::add_init_contracts_structure_operations;
 use rs_drive::drive::flags::StorageFlags;
 use rs_drive::drive::object_size_info::DocumentAndContractInfo;
 use rs_drive::drive::object_size_info::DocumentInfo::DocumentAndSerialization;
@@ -113,21 +116,25 @@ impl PersonWithOptionalValues {
     }
 }
 
-pub fn setup_family_tests(count: u32, batching: bool, seed: u64) -> (Drive, Contract, TempDir) {
-    let tmp_dir = TempDir::new().unwrap();
-    let drive_config = if batching {
-        Some(DriveConfig::default_with_batches())
+pub fn setup_family_tests(count: u32, with_batching: bool, seed: u64) -> (Drive, Contract) {
+    let drive_config = if with_batching {
+        DriveConfig::default_with_batches()
     } else {
-        Some(DriveConfig::default_without_batches())
+        DriveConfig::default_without_batches()
     };
-    let drive: Drive =
-        Drive::open(&tmp_dir, drive_config).expect("expected to open Drive successfully");
+
+    let drive = setup_drive(Some(drive_config));
 
     let db_transaction = drive.grove.start_transaction();
 
+    // Create contracts tree
+    let mut batch = GroveDbOpBatch::new();
+
+    add_init_contracts_structure_operations(&mut batch);
+
     drive
-        .create_initial_state_structure(Some(&db_transaction))
-        .expect("expected to create root tree successfully");
+        .grove_apply_batch(batch, false, Some(&db_transaction))
+        .expect("expected to create contracts tree successfully");
 
     // setup code
     let contract = common::setup_contract(
@@ -175,28 +182,33 @@ pub fn setup_family_tests(count: u32, batching: bool, seed: u64) -> (Drive, Cont
         .commit_transaction(db_transaction)
         .unwrap()
         .expect("transaction should be committed");
-    (drive, contract, tmp_dir)
+
+    (drive, contract)
 }
 
 pub fn setup_family_tests_with_nulls(
     count: u32,
-    batching: bool,
+    with_batching: bool,
     seed: u64,
-) -> (Drive, Contract, TempDir) {
-    let tmp_dir = TempDir::new().unwrap();
-    let drive_config = if batching {
-        Some(DriveConfig::default_with_batches())
+) -> (Drive, Contract) {
+    let drive_config = if with_batching {
+        DriveConfig::default_with_batches()
     } else {
-        Some(DriveConfig::default_without_batches())
+        DriveConfig::default_without_batches()
     };
-    let drive: Drive =
-        Drive::open(&tmp_dir, drive_config).expect("expected to open Drive successfully");
+
+    let drive = setup_drive(Some(drive_config));
 
     let db_transaction = drive.grove.start_transaction();
 
+    // Create contracts tree
+    let mut batch = GroveDbOpBatch::new();
+
+    add_init_contracts_structure_operations(&mut batch);
+
     drive
-        .create_initial_state_structure(Some(&db_transaction))
-        .expect("expected to create root tree successfully");
+        .grove_apply_batch(batch, false, Some(&db_transaction))
+        .expect("expected to create contracts tree successfully");
 
     // setup code
     let contract = common::setup_contract(
@@ -243,7 +255,8 @@ pub fn setup_family_tests_with_nulls(
         .commit_transaction(db_transaction)
         .unwrap()
         .expect("transaction should be committed");
-    (drive, contract, tmp_dir)
+
+    (drive, contract)
 }
 
 #[derive(Serialize, Deserialize)]
@@ -340,16 +353,19 @@ pub fn add_domains_to_contract(
     }
 }
 
-pub fn setup_dpns_tests_with_batches(count: u32, seed: u64) -> (Drive, Contract, TempDir) {
-    let tmp_dir = TempDir::new().unwrap();
-    let drive: Drive = Drive::open(&tmp_dir, Some(DriveConfig::default_with_batches()))
-        .expect("expected to open Drive successfully");
+pub fn setup_dpns_tests_with_batches(count: u32, seed: u64) -> (Drive, Contract) {
+    let drive = setup_drive(Some(DriveConfig::default_with_batches()));
 
     let db_transaction = drive.grove.start_transaction();
 
+    // Create contracts tree
+    let mut batch = GroveDbOpBatch::new();
+
+    add_init_contracts_structure_operations(&mut batch);
+
     drive
-        .create_initial_state_structure(Some(&db_transaction))
-        .expect("expected to create root tree successfully");
+        .grove_apply_batch(batch, false, Some(&db_transaction))
+        .expect("expected to create contracts tree successfully");
 
     // setup code
     let contract = setup_contract(
@@ -365,18 +381,23 @@ pub fn setup_dpns_tests_with_batches(count: u32, seed: u64) -> (Drive, Contract,
         .commit_transaction(db_transaction)
         .unwrap()
         .expect("transaction should be committed");
-    (drive, contract, tmp_dir)
+
+    (drive, contract)
 }
 
-pub fn setup_dpns_test_with_data(path: &str) -> (Drive, Contract, TempDir) {
-    let tmp_dir = TempDir::new().unwrap();
-    let drive: Drive = Drive::open(&tmp_dir, None).expect("expected to open Drive successfully");
+pub fn setup_dpns_test_with_data(path: &str) -> (Drive, Contract) {
+    let drive = setup_drive(None);
 
     let db_transaction = drive.grove.start_transaction();
 
+    // Create contracts tree
+    let mut batch = GroveDbOpBatch::new();
+
+    add_init_contracts_structure_operations(&mut batch);
+
     drive
-        .create_initial_state_structure(Some(&db_transaction))
-        .expect("expected to create root tree successfully");
+        .grove_apply_batch(batch, false, Some(&db_transaction))
+        .expect("expected to create contracts tree successfully");
 
     let contract = setup_contract(
         &drive,
@@ -431,14 +452,16 @@ pub fn setup_dpns_test_with_data(path: &str) -> (Drive, Contract, TempDir) {
         .commit_transaction(db_transaction)
         .unwrap()
         .expect("transaction should be committed");
-    (drive, contract, tmp_dir)
+
+    (drive, contract)
 }
 
 #[test]
 #[ignore]
 fn test_query_many() {
-    let (drive, contract, _tmp_dir) = setup_family_tests(1600, true, 73509);
+    let (drive, contract) = setup_family_tests(1600, true, 73509);
     let db_transaction = drive.grove.start_transaction();
+
     let people = Person::random_people(10, 73409);
     for person in people {
         let value = serde_json::to_value(&person).expect("serialized person");
@@ -480,7 +503,7 @@ fn test_query_many() {
 
 #[test]
 fn test_family_basic_queries() {
-    let (drive, contract, _tmp_dir) = setup_family_tests(10, true, 73509);
+    let (drive, contract) = setup_family_tests(10, true, 73509);
 
     let db_transaction = drive.grove.start_transaction();
 
@@ -491,8 +514,8 @@ fn test_family_basic_queries() {
         .expect("there is always a root hash");
 
     let expected_app_hash = vec![
-        232, 7, 232, 41, 119, 242, 13, 28, 68, 33, 95, 195, 64, 85, 5, 185, 117, 93, 167, 217, 17,
-        11, 250, 239, 39, 21, 216, 146, 123, 5, 57, 151,
+        25, 64, 187, 169, 51, 20, 193, 193, 55, 86, 125, 179, 23, 202, 238, 71, 117, 68, 0, 29,
+        126, 98, 10, 240, 119, 142, 230, 78, 106, 38, 0, 0,
     ];
 
     assert_eq!(root_hash.as_slice(), expected_app_hash);
@@ -1655,18 +1678,19 @@ fn test_family_basic_queries() {
         .root_hash(Some(&db_transaction))
         .unwrap()
         .expect("there is always a root hash");
+
     assert_eq!(
         root_hash.as_slice(),
         vec![
-            123, 217, 4, 12, 204, 137, 136, 164, 152, 171, 194, 21, 132, 54, 73, 150, 255, 43, 214,
-            50, 246, 62, 50, 116, 164, 48, 5, 7, 143, 137, 49, 143,
+            129, 170, 161, 95, 54, 121, 242, 59, 3, 46, 167, 209, 30, 250, 251, 98, 12, 120, 113,
+            104, 24, 234, 107, 214, 250, 234, 145, 119, 66, 181, 245, 96
         ],
     );
 }
 
 #[test]
 fn test_family_starts_at_queries() {
-    let (drive, contract, _tmp_dir) = setup_family_tests(10, true, 73509);
+    let (drive, contract) = setup_family_tests(10, true, 73509);
 
     let db_transaction = drive.grove.start_transaction();
 
@@ -1677,8 +1701,8 @@ fn test_family_starts_at_queries() {
         .expect("there is always a root hash");
 
     let expected_app_hash = vec![
-        232, 7, 232, 41, 119, 242, 13, 28, 68, 33, 95, 195, 64, 85, 5, 185, 117, 93, 167, 217, 17,
-        11, 250, 239, 39, 21, 216, 146, 123, 5, 57, 151,
+        25, 64, 187, 169, 51, 20, 193, 193, 55, 86, 125, 179, 23, 202, 238, 71, 117, 68, 0, 29,
+        126, 98, 10, 240, 119, 142, 230, 78, 106, 38, 0, 0,
     ];
 
     assert_eq!(root_hash.as_slice(), expected_app_hash);
@@ -1909,7 +1933,7 @@ fn test_family_sql_query() {
     // These helpers confirm that sql statements produce the same drive query
     // as their json counterparts, helpers above confirm that the json queries
     // produce the correct result set
-    let (_, contract, _tmp_dir) = setup_family_tests(10, true, 73509);
+    let (_, contract) = setup_family_tests(10, true, 73509);
     let person_document_type = contract
         .document_types
         .get("person")
@@ -2043,7 +2067,7 @@ fn test_family_sql_query() {
 
 #[test]
 fn test_family_with_nulls_query() {
-    let (drive, contract, _tmp_dir) = setup_family_tests_with_nulls(10, true, 30004);
+    let (drive, contract) = setup_family_tests_with_nulls(10, true, 30004);
 
     let db_transaction = drive.grove.start_transaction();
 
@@ -2054,8 +2078,8 @@ fn test_family_with_nulls_query() {
         .expect("there is always a root hash");
 
     let expected_app_hash = vec![
-        168, 127, 27, 50, 178, 75, 152, 55, 191, 227, 129, 69, 15, 204, 195, 55, 50, 251, 0, 190,
-        115, 239, 222, 106, 36, 121, 53, 64, 99, 114, 106, 253,
+        59, 5, 99, 120, 171, 182, 126, 178, 10, 214, 204, 138, 167, 199, 32, 177, 104, 206, 184,
+        219, 252, 219, 247, 1, 245, 87, 158, 109, 154, 31, 2, 230,
     ];
 
     assert_eq!(root_hash.as_slice(), expected_app_hash);
@@ -2155,7 +2179,7 @@ fn test_family_with_nulls_query() {
 
 #[test]
 fn test_query_with_cached_contract() {
-    let (drive, contract, _tmp_dir) = setup_family_tests(10, true, 73509);
+    let (drive, contract) = setup_family_tests(10, true, 73509);
 
     let db_transaction = drive.grove.start_transaction();
 
@@ -2166,8 +2190,8 @@ fn test_query_with_cached_contract() {
         .expect("there is always a root hash");
 
     let expected_app_hash = vec![
-        232, 7, 232, 41, 119, 242, 13, 28, 68, 33, 95, 195, 64, 85, 5, 185, 117, 93, 167, 217, 17,
-        11, 250, 239, 39, 21, 216, 146, 123, 5, 57, 151,
+        25, 64, 187, 169, 51, 20, 193, 193, 55, 86, 125, 179, 23, 202, 238, 71, 117, 68, 0, 29,
+        126, 98, 10, 240, 119, 142, 230, 78, 106, 38, 0, 0,
     ];
 
     assert_eq!(root_hash.as_slice(), expected_app_hash);
@@ -2221,7 +2245,7 @@ fn test_query_with_cached_contract() {
 
 #[test]
 fn test_dpns_query() {
-    let (drive, contract, _tmp_dir) = setup_dpns_tests_with_batches(10, 11456);
+    let (drive, contract) = setup_dpns_tests_with_batches(10, 11456);
 
     let db_transaction = drive.grove.start_transaction();
 
@@ -2232,8 +2256,8 @@ fn test_dpns_query() {
         .expect("there is always a root hash");
 
     let expected_app_hash = vec![
-        134, 34, 13, 108, 112, 110, 180, 6, 28, 16, 148, 17, 145, 217, 252, 50, 148, 226, 205, 202,
-        102, 179, 55, 177, 150, 158, 152, 204, 3, 237, 182, 81,
+        25, 234, 44, 155, 226, 58, 192, 86, 245, 155, 137, 65, 16, 14, 187, 89, 57, 66, 166, 157,
+        65, 50, 122, 66, 188, 107, 51, 236, 43, 106, 105, 105,
     ];
 
     assert_eq!(root_hash.as_slice(), expected_app_hash);
@@ -2621,7 +2645,7 @@ fn test_dpns_query() {
 #[test]
 fn test_dpns_insertion_no_aliases() {
     // using ascending order with rangeTo operators
-    let (drive, contract, _tmp_dir) =
+    let (drive, contract) =
         setup_dpns_test_with_data("tests/supporting_files/contract/dpns/domains-no-alias.json");
 
     let db_transaction = drive.grove.start_transaction();
@@ -2670,7 +2694,7 @@ fn test_dpns_insertion_no_aliases() {
 #[test]
 fn test_dpns_insertion_with_aliases() {
     // using ascending order with rangeTo operators
-    let (drive, contract, _tmp_dir) =
+    let (drive, contract) =
         setup_dpns_test_with_data("tests/supporting_files/contract/dpns/domains.json");
 
     let db_transaction = drive.grove.start_transaction();
@@ -2719,7 +2743,7 @@ fn test_dpns_insertion_with_aliases() {
 #[test]
 fn test_dpns_query_start_at() {
     // The point of this test is to test the situation where we have a start at a certain value for the DPNS query.
-    let (drive, contract, _tmp_dir) = setup_dpns_tests_with_batches(10, 11456);
+    let (drive, contract) = setup_dpns_tests_with_batches(10, 11456);
 
     let db_transaction = drive.grove.start_transaction();
 
@@ -2730,8 +2754,8 @@ fn test_dpns_query_start_at() {
         .expect("there is always a root hash");
 
     let expected_app_hash = vec![
-        134, 34, 13, 108, 112, 110, 180, 6, 28, 16, 148, 17, 145, 217, 252, 50, 148, 226, 205, 202,
-        102, 179, 55, 177, 150, 158, 152, 204, 3, 237, 182, 81,
+        25, 234, 44, 155, 226, 58, 192, 86, 245, 155, 137, 65, 16, 14, 187, 89, 57, 66, 166, 157,
+        65, 50, 122, 66, 188, 107, 51, 236, 43, 106, 105, 105,
     ];
 
     assert_eq!(root_hash.as_slice(), expected_app_hash,);
@@ -2805,7 +2829,7 @@ fn test_dpns_query_start_at() {
 #[test]
 fn test_dpns_query_start_after() {
     // The point of this test is to test the situation where we have a start at a certain value for the DPNS query.
-    let (drive, contract, _tmp_dir) = setup_dpns_tests_with_batches(10, 11456);
+    let (drive, contract) = setup_dpns_tests_with_batches(10, 11456);
 
     let db_transaction = drive.grove.start_transaction();
 
@@ -2816,8 +2840,8 @@ fn test_dpns_query_start_after() {
         .expect("there is always a root hash");
 
     let expected_app_hash = vec![
-        134, 34, 13, 108, 112, 110, 180, 6, 28, 16, 148, 17, 145, 217, 252, 50, 148, 226, 205, 202,
-        102, 179, 55, 177, 150, 158, 152, 204, 3, 237, 182, 81,
+        25, 234, 44, 155, 226, 58, 192, 86, 245, 155, 137, 65, 16, 14, 187, 89, 57, 66, 166, 157,
+        65, 50, 122, 66, 188, 107, 51, 236, 43, 106, 105, 105,
     ];
 
     assert_eq!(root_hash.as_slice(), expected_app_hash);
@@ -2891,7 +2915,7 @@ fn test_dpns_query_start_after() {
 #[test]
 fn test_dpns_query_start_at_desc() {
     // The point of this test is to test the situation where we have a start at a certain value for the DPNS query.
-    let (drive, contract, _tmp_dir) = setup_dpns_tests_with_batches(10, 11456);
+    let (drive, contract) = setup_dpns_tests_with_batches(10, 11456);
 
     let db_transaction = drive.grove.start_transaction();
 
@@ -2902,8 +2926,8 @@ fn test_dpns_query_start_at_desc() {
         .expect("there is always a root hash");
 
     let expected_app_hash = vec![
-        134, 34, 13, 108, 112, 110, 180, 6, 28, 16, 148, 17, 145, 217, 252, 50, 148, 226, 205, 202,
-        102, 179, 55, 177, 150, 158, 152, 204, 3, 237, 182, 81,
+        25, 234, 44, 155, 226, 58, 192, 86, 245, 155, 137, 65, 16, 14, 187, 89, 57, 66, 166, 157,
+        65, 50, 122, 66, 188, 107, 51, 236, 43, 106, 105, 105,
     ];
 
     assert_eq!(root_hash.as_slice(), expected_app_hash);
@@ -2977,7 +3001,7 @@ fn test_dpns_query_start_at_desc() {
 #[test]
 fn test_dpns_query_start_after_desc() {
     // The point of this test is to test the situation where we have a start at a certain value for the DPNS query.
-    let (drive, contract, _tmp_dir) = setup_dpns_tests_with_batches(10, 11456);
+    let (drive, contract) = setup_dpns_tests_with_batches(10, 11456);
 
     let db_transaction = drive.grove.start_transaction();
 
@@ -2988,8 +3012,8 @@ fn test_dpns_query_start_after_desc() {
         .expect("there is always a root hash");
 
     let expected_app_hash = vec![
-        134, 34, 13, 108, 112, 110, 180, 6, 28, 16, 148, 17, 145, 217, 252, 50, 148, 226, 205, 202,
-        102, 179, 55, 177, 150, 158, 152, 204, 3, 237, 182, 81,
+        25, 234, 44, 155, 226, 58, 192, 86, 245, 155, 137, 65, 16, 14, 187, 89, 57, 66, 166, 157,
+        65, 50, 122, 66, 188, 107, 51, 236, 43, 106, 105, 105,
     ];
 
     assert_eq!(root_hash.as_slice(), expected_app_hash);
@@ -3065,7 +3089,7 @@ fn test_dpns_query_start_at_with_null_id() {
     // The point of this test is to test the situation where we have a start at inside an index with a null value
     // While dpns doesn't really support this, other contracts might allow null values.
     // We are just using the DPNS contract because it is handy.
-    let (drive, contract, _tmp_dir) = setup_dpns_tests_with_batches(10, 11456);
+    let (drive, contract) = setup_dpns_tests_with_batches(10, 11456);
 
     let document_type = contract
         .document_type_for_name("domain")
@@ -3172,8 +3196,8 @@ fn test_dpns_query_start_at_with_null_id() {
         .expect("there is always a root hash");
 
     let expected_app_hash = vec![
-        49, 158, 39, 246, 176, 72, 69, 78, 141, 163, 140, 1, 167, 52, 219, 155, 82, 114, 243, 76,
-        52, 34, 39, 184, 7, 119, 226, 43, 249, 123, 2, 160,
+        37, 201, 22, 251, 215, 96, 206, 227, 175, 242, 145, 251, 194, 243, 24, 220, 65, 208, 27,
+        196, 90, 100, 203, 190, 20, 184, 152, 89, 84, 233, 93, 166,
     ];
 
     assert_eq!(root_hash.as_slice(), expected_app_hash);
@@ -3257,7 +3281,7 @@ fn test_dpns_query_start_after_with_null_id() {
     // The point of this test is to test the situation where we have a start at inside an index with a null value
     // While dpns doesn't really support this, other contracts might allow null values.
     // We are just using the DPNS contract because it is handy.
-    let (drive, contract, _tmp_dir) = setup_dpns_tests_with_batches(10, 11456);
+    let (drive, contract) = setup_dpns_tests_with_batches(10, 11456);
 
     let document_type = contract
         .document_type_for_name("domain")
@@ -3365,8 +3389,8 @@ fn test_dpns_query_start_after_with_null_id() {
         .expect("there is always a root hash");
 
     let expected_app_hash = vec![
-        49, 158, 39, 246, 176, 72, 69, 78, 141, 163, 140, 1, 167, 52, 219, 155, 82, 114, 243, 76,
-        52, 34, 39, 184, 7, 119, 226, 43, 249, 123, 2, 160,
+        37, 201, 22, 251, 215, 96, 206, 227, 175, 242, 145, 251, 194, 243, 24, 220, 65, 208, 27,
+        196, 90, 100, 203, 190, 20, 184, 152, 89, 84, 233, 93, 166,
     ];
 
     assert_eq!(root_hash.as_slice(), expected_app_hash);
@@ -3452,7 +3476,7 @@ fn test_dpns_query_start_after_with_null_id_desc() {
     // The point of this test is to test the situation where we have a start at inside an index with a null value
     // While dpns doesn't really support this, other contracts might allow null values.
     // We are just using the DPNS contract because it is handy.
-    let (drive, contract, _tmp_dir) = setup_dpns_tests_with_batches(10, 11456);
+    let (drive, contract) = setup_dpns_tests_with_batches(10, 11456);
 
     let document_type = contract
         .document_type_for_name("domain")
@@ -3560,8 +3584,8 @@ fn test_dpns_query_start_after_with_null_id_desc() {
         .expect("there is always a root hash");
 
     let expected_app_hash = vec![
-        49, 158, 39, 246, 176, 72, 69, 78, 141, 163, 140, 1, 167, 52, 219, 155, 82, 114, 243, 76,
-        52, 34, 39, 184, 7, 119, 226, 43, 249, 123, 2, 160,
+        37, 201, 22, 251, 215, 96, 206, 227, 175, 242, 145, 251, 194, 243, 24, 220, 65, 208, 27,
+        196, 90, 100, 203, 190, 20, 184, 152, 89, 84, 233, 93, 166,
     ];
 
     assert_eq!(root_hash.as_slice(), expected_app_hash,);

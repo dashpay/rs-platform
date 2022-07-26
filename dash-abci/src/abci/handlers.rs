@@ -5,7 +5,7 @@ use crate::abci::messages::{
     InitChainResponse,
 };
 use crate::block::{BlockExecutionContext, BlockInfo};
-use crate::execution::epoch_change::epoch::EpochInfo;
+use crate::execution::fee_pools::epoch::EpochInfo;
 use rs_drive::grovedb::TransactionArg;
 
 use crate::error::execution::ExecutionError;
@@ -55,7 +55,7 @@ impl TenderdashAbci for Platform {
         // Set genesis time
         let genesis_time_ms = if request.block_height == 1 {
             self.drive
-                .init_genesis(request.block_time_ms, transaction)?;
+                .init_genesis_time(request.block_time_ms, transaction)?;
             request.block_time_ms
         } else {
             self.drive
@@ -104,7 +104,7 @@ impl TenderdashAbci for Platform {
         let process_block_fees_result = self.process_block_fees(
             &block_execution_context.block_info,
             &block_execution_context.epoch_info,
-            request.fees,
+            &request.fees,
             transaction,
         )?;
 
@@ -220,7 +220,6 @@ mod tests {
                         fees: FeesAggregate {
                             processing_fees: 1600,
                             storage_fees: storage_fees_per_block,
-                            refunds_by_epoch: vec![(1, 100)], // we are refunding 100 credits from epoch 1
                         },
                     };
 
@@ -257,6 +256,8 @@ mod tests {
                     assert_eq!(block_end_response.current_epoch_index, epoch_index);
 
                     assert_eq!(block_end_response.is_epoch_change, epoch_change);
+
+                    dbg!(epoch_index, block_height);
 
                     // Should pay to all proposers for epoch 0, when epochs 1 started
                     if epoch_index != 0 && epoch_change {
@@ -319,8 +320,6 @@ mod tests {
                 Some(&transaction),
             );
 
-            let mut last_distribution_pool_credits = 0;
-
             let block_interval = 86400i64.div(blocks_per_day);
 
             let mut previous_block_time_ms: Option<u64> = None;
@@ -366,7 +365,6 @@ mod tests {
                         fees: FeesAggregate {
                             processing_fees: 1600,
                             storage_fees: storage_fees_per_block,
-                            refunds_by_epoch: vec![(1, 100)], // we are refunding 100 credits from epoch 1
                         },
                     };
 
@@ -411,7 +409,7 @@ mod tests {
 
                         assert_eq!(
                             block_end_response.proposers_paid_count.unwrap(),
-                            proposers_count
+                            blocks_per_day as u16,
                         );
                         assert_eq!(block_end_response.paid_epoch_index.unwrap(), 0);
                     } else {

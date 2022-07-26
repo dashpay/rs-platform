@@ -56,13 +56,13 @@ impl Drive {
         }
     }
 
-    // TODO init_genesis_time?
-    pub fn init_genesis(
+    pub fn init_genesis_time(
         &self,
         genesis_time_ms: u64,
         transaction: TransactionArg,
     ) -> Result<(), Error> {
         self.cache.borrow_mut().genesis_time_ms = Some(genesis_time_ms);
+
         let op = update_genesis_time_operation(genesis_time_ms);
 
         self.grove_apply_operation(op, false, transaction)
@@ -77,10 +77,12 @@ mod tests {
     use crate::error;
     use grovedb::Element;
 
-    mod get_genesis_time {
+    mod fetch_genesis_time {
+        use crate::common::helpers::setup::setup_drive;
+
         #[test]
-        fn test_error_if_fee_pools_is_not_initiated() {
-            let drive = super::setup_drive();
+        fn test_error_if_initial_structure_is_not_initiated() {
+            let drive = setup_drive(None);
 
             match drive.get_genesis_time(None) {
                 Ok(_) => assert!(
@@ -96,7 +98,7 @@ mod tests {
 
         #[test]
         fn test_error_if_value_has_invalid_length() {
-            let drive = super::setup_drive();
+            let drive = setup_drive(None);
 
             drive
                 .create_initial_state_structure(None)
@@ -128,56 +130,34 @@ mod tests {
     }
 
     mod update_genesis_time {
-        use crate::common::helpers::setup::setup_drive;
-        use crate::drive::batch::GroveDbOpBatch;
-        use crate::drive::genesis_time::operations::update_genesis_time_operation;
+        use crate::common::helpers::setup::setup_drive_with_initial_state_structure;
 
         #[test]
-        fn test_error_if_fee_pools_is_not_initiated() {
-            let drive = setup_drive();
+        fn test_update_genesis_time() {
+            let drive = setup_drive_with_initial_state_structure();
+            let transaction = drive.grove.start_transaction();
 
-            let genesis_time: u64 = 1655396517902;
+            let genesis_time_ms = 100;
 
-            let mut batch = GroveDbOpBatch::new();
+            drive
+                .init_genesis_time(genesis_time_ms, Some(&transaction))
+                .expect("should update genesis time");
 
-            batch.push(update_genesis_time_operation(genesis_time));
+            let stored_genesis_time_ms = drive
+                .fetch_genesis_time(Some(&transaction))
+                .expect("should fetch genesis time");
 
-            match drive.grove_apply_batch(batch, false, None) {
-                Ok(_) => assert!(
-                    false,
-                    "should not be able to update genesis time on uninit fee pools"
-                ),
-                Err(e) => match e {
-                    super::error::Error::GroveDB(grovedb::Error::PathKeyNotFound(_)) => {
-                        assert!(true)
-                    }
-                    _ => assert!(false, "invalid error type"),
-                },
+            match stored_genesis_time_ms {
+                Some(stored_genesis_time_ms) => assert_eq!(stored_genesis_time_ms, genesis_time_ms),
+                None => assert!(false, "should be present"),
             }
-        }
 
-        #[test]
-        fn test_value_is_set() {
-            let drive = setup_drive();
+            let cache = drive.cache.borrow();
 
-            drive
-                .create_initial_state_structure(None)
-                .expect("expected to create root tree successfully");
-
-            let genesis_time: u64 = 1655396517902;
-
-            let op = update_genesis_time_operation(genesis_time);
-
-            drive
-                .grove_apply_operation(op, false, None)
-                .expect("should apply batch");
-
-            let stored_genesis_time = drive
-                .get_genesis_time(None)
-                .expect("should not have an error getting genesis time")
-                .expect("should have a genesis time");
-
-            assert_eq!(stored_genesis_time, genesis_time);
+            match cache.genesis_time_ms {
+                Some(stored_genesis_time_ms) => assert_eq!(stored_genesis_time_ms, genesis_time_ms),
+                None => assert!(false, "should be present"),
+            }
         }
     }
 }

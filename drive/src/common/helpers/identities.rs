@@ -43,7 +43,12 @@ pub fn increment_in_epoch_each_proposers_block_count(
 
     for proposer_pro_tx_hash in proposers {
         let op = epoch_pool
-            .increment_proposer_block_count_operation(&drive, &proposer_pro_tx_hash, transaction)
+            .increment_proposer_block_count_operation(
+                &drive,
+                &proposer_pro_tx_hash,
+                None,
+                transaction,
+            )
             .expect("should increment proposer block count");
         batch.push(op);
     }

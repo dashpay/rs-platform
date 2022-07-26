@@ -337,8 +337,8 @@ class Drive {
 /**
  * @typedef BlockBeginRequest
  * @property {number} blockHeight
- * @property {number} blockTime - timestamp in milliseconds
- * @property {number} [previousBlockTime] - timestamp in milliseconds
+ * @property {number} blockTimeMs - timestamp in milliseconds
+ * @property {number} [previousBlockTimeMs] - timestamp in milliseconds
  * @property {Buffer} proposerProTxHash
  */
 
@@ -355,15 +355,14 @@ class Drive {
  * @typedef Fees
  * @property {number} processingFees
  * @property {number} storageFees
- * @property {number} feeMultiplier
  */
 
 /**
  * @typedef BlockEndResponse
- * @property {number} masternodesPaidCount
- * @property {number} [paidEpochIndex]
  * @property {number} currentEpochIndex
  * @property {boolean} isEpochChange
+ * @property {number} [proposersPaidCount]
+ * @property {number} [paidEpochIndex]
  */
 
 module.exports = Drive;
