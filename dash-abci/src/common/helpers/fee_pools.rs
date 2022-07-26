@@ -1,11 +1,12 @@
 use std::collections::BTreeMap;
 
 use ciborium::value::Value;
-use dpp::identity::Identity;
+use rs_drive::dpp::identity::Identity;
 
 use rs_drive::common::helpers::identities::create_test_identity;
 use rs_drive::contract::document::Document;
 use rs_drive::contract::Contract;
+use rs_drive::dpp::data_contract::extra::DriveContractExt;
 use rs_drive::drive::flags::StorageFlags;
 use rs_drive::drive::object_size_info::DocumentAndContractInfo;
 use rs_drive::drive::object_size_info::DocumentInfo::DocumentAndSerialization;

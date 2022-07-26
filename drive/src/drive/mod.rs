@@ -29,6 +29,8 @@ pub mod initialization;
 pub mod object_size_info;
 pub mod query;
 
+use dpp::data_contract::extra::DriveContractExt;
+
 pub struct DriveCache {
     pub cached_contracts: Cache<[u8; 32], Arc<Contract>>,
     pub genesis_time_ms: Option<u64>,
