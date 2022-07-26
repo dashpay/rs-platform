@@ -5,7 +5,7 @@ use crate::abci::messages::{
     InitChainResponse,
 };
 use crate::block::{BlockExecutionContext, BlockInfo};
-use crate::execution::epoch_change::epoch::EpochInfo;
+use crate::execution::fee_pools::epoch::EpochInfo;
 use rs_drive::grovedb::TransactionArg;
 
 use crate::error::execution::ExecutionError;
@@ -256,6 +256,8 @@ mod tests {
                     assert_eq!(block_end_response.current_epoch_index, epoch_index);
 
                     assert_eq!(block_end_response.is_epoch_change, epoch_change);
+
+                    dbg!(epoch_index, block_height);
 
                     // Should pay to all proposers for epoch 0, when epochs 1 started
                     if epoch_index != 0 && epoch_change {
