@@ -295,7 +295,7 @@ impl Platform {
         // existence in the data contract triggers in DPP
         let (mut identity, storage_flags) = self.drive.fetch_identity(id, transaction)?;
 
-        //todo balance should be a u64
+        // TODO balance should be a u64
         identity.balance += reward as i64;
 
         self.drive
@@ -325,7 +325,6 @@ impl Platform {
 
         batch.push(
             current_epoch
-                // TODO Why update processing fees in Epoch but get function in Drive?
                 .update_processing_credits_for_distribution_operation(total_processing_fees),
         );
 

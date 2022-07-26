@@ -388,7 +388,7 @@ impl Drive {
             let cost_context = self.grove.delete(path_iter, key, transaction);
             push_drive_operation_result(cost_context, drive_operations)
         } else {
-            //todo: this is wrong
+            // TODO this is wrong
             drive_operations.push(DriveOperation::for_delete_path_key_value_size(
                 path,
                 key.len() as u16,
