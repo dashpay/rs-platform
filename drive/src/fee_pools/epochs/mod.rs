@@ -17,7 +17,7 @@ pub struct Epoch {
 
 impl Epoch {
     pub fn new(index: u16) -> Self {
-        let key = paths::encode_key(index).expect("epoch index is too high");
+        let key = paths::encode_epoch_index_key(index).expect("epoch index is too high");
 
         Self { index, key }
     }

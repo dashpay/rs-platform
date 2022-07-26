@@ -45,8 +45,8 @@ impl Drive {
 
         let mut epochs_query = Query::new();
 
-        let from_epoch_key = paths::encode_key(from_epoch_index)?.to_vec();
-        let current_epoch_key = paths::encode_key(to_epoch_index)?.to_vec();
+        let from_epoch_key = paths::encode_epoch_index_key(from_epoch_index)?.to_vec();
+        let current_epoch_key = paths::encode_epoch_index_key(to_epoch_index)?.to_vec();
 
         epochs_query.insert_range_after_to_inclusive(from_epoch_key..=current_epoch_key);
 
@@ -84,7 +84,7 @@ impl Drive {
             .last()
             .ok_or(Error::Fee(FeeError::CorruptedStartBlockHeightItemLength()))?;
 
-        let epoch_index = paths::decode_key(epoch_key.as_slice())?;
+        let epoch_index = paths::decode_epoch_index_key(epoch_key.as_slice())?;
 
         Ok(Some((epoch_index, next_start_block_height)))
     }

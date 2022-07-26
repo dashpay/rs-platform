@@ -1,5 +1,5 @@
 use crate::drive::batch::GroveDbOpBatch;
-use crate::drive::fee_pools::epochs::constants::{FOREVER_STORAGE_EPOCHS, GENESIS_EPOCH_INDEX};
+use crate::drive::fee_pools::epochs::constants::{GENESIS_EPOCH_INDEX, PERPETUAL_STORAGE_EPOCHS};
 use crate::drive::fee_pools::pools_vec_path;
 use crate::fee_pools::epochs::Epoch;
 use crate::fee_pools::epochs_root_tree_key_constants::{
@@ -21,7 +21,7 @@ pub fn add_create_fee_pool_trees_operations(batch: &mut GroveDbOpBatch) {
 
     // We need to insert 50 years worth of epochs,
     // with 20 epochs per year that's 1000 epochs
-    for i in GENESIS_EPOCH_INDEX..FOREVER_STORAGE_EPOCHS {
+    for i in GENESIS_EPOCH_INDEX..PERPETUAL_STORAGE_EPOCHS {
         let epoch = Epoch::new(i);
         epoch.add_init_empty_operations(batch);
     }

@@ -3,7 +3,7 @@ use crate::error::Error;
 use crate::execution::constants;
 use crate::platform::Platform;
 use rs_drive::drive::batch::GroveDbOpBatch;
-use rs_drive::drive::fee_pools::epochs::constants::{EPOCHS_PER_YEAR, FOREVER_STORAGE_YEARS};
+use rs_drive::drive::fee_pools::epochs::constants::{EPOCHS_PER_YEAR, PERPETUAL_STORAGE_YEARS};
 use rs_drive::fee_pools::epochs::Epoch;
 use rs_drive::grovedb::TransactionArg;
 use rs_drive::{error, grovedb};
@@ -38,7 +38,7 @@ impl Platform {
 
         let epochs_per_year = Decimal::from(EPOCHS_PER_YEAR);
 
-        for year in 0..FOREVER_STORAGE_YEARS {
+        for year in 0..PERPETUAL_STORAGE_YEARS {
             let distribution_for_that_year_ratio = constants::FEE_DISTRIBUTION_TABLE[year as usize];
 
             let year_fee_share = storage_distribution_fees * distribution_for_that_year_ratio;

@@ -35,7 +35,7 @@ mod tests {
     mod is_epoch_tree_exists {
         use crate::common::helpers::setup::setup_drive_with_initial_state_structure;
         use crate::drive::fee_pools::epochs::constants::{
-            FOREVER_STORAGE_EPOCHS, GENESIS_EPOCH_INDEX,
+            GENESIS_EPOCH_INDEX, PERPETUAL_STORAGE_EPOCHS,
         };
         use crate::fee_pools::epochs::Epoch;
 
@@ -58,7 +58,7 @@ mod tests {
             let drive = setup_drive_with_initial_state_structure();
             let transaction = drive.grove.start_transaction();
 
-            let epoch_tree = Epoch::new(FOREVER_STORAGE_EPOCHS + 1);
+            let epoch_tree = Epoch::new(PERPETUAL_STORAGE_EPOCHS + 1);
 
             let is_exist = drive
                 .is_epoch_tree_exists(&epoch_tree, Some(&transaction))

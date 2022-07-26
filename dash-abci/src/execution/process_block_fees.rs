@@ -7,7 +7,9 @@ use crate::execution::epoch_change::epoch::EpochInfo;
 use crate::execution::fee_distribution::{FeesInPools, ProposersPayouts};
 use crate::platform::Platform;
 use rs_drive::drive::batch::GroveDbOpBatch;
-use rs_drive::drive::fee_pools::epochs::constants::{FOREVER_STORAGE_EPOCHS, GENESIS_EPOCH_INDEX};
+use rs_drive::drive::fee_pools::epochs::constants::{
+    GENESIS_EPOCH_INDEX, PERPETUAL_STORAGE_EPOCHS,
+};
 use rs_drive::fee_pools::epochs::Epoch;
 use rs_drive::grovedb::TransactionArg;
 use std::option::Option::None;
@@ -46,7 +48,7 @@ impl Platform {
             .map_or(GENESIS_EPOCH_INDEX, |i| i + 1);
 
         for epoch_index in last_initiated_epoch_index..=epoch_info.current_epoch_index {
-            let next_thousandth_epoch = Epoch::new(epoch_index + FOREVER_STORAGE_EPOCHS);
+            let next_thousandth_epoch = Epoch::new(epoch_index + PERPETUAL_STORAGE_EPOCHS);
             next_thousandth_epoch.add_init_empty_operations(batch);
         }
 
@@ -163,7 +165,7 @@ mod tests {
             use crate::execution::epoch_change::epoch::{EpochInfo, EPOCH_CHANGE_TIME_MS};
             use crate::platform::Platform;
             use rs_drive::drive::batch::GroveDbOpBatch;
-            use rs_drive::drive::fee_pools::epochs::constants::FOREVER_STORAGE_EPOCHS;
+            use rs_drive::drive::fee_pools::epochs::constants::PERPETUAL_STORAGE_EPOCHS;
             use rs_drive::fee_pools::epochs::Epoch;
             use rs_drive::grovedb::TransactionArg;
 
@@ -238,7 +240,7 @@ mod tests {
                     .expect("should apply batch");
 
                 // Next thousandth epoch should be created
-                let next_thousandth_epoch = Epoch::new(epoch_index + FOREVER_STORAGE_EPOCHS);
+                let next_thousandth_epoch = Epoch::new(epoch_index + PERPETUAL_STORAGE_EPOCHS);
 
                 let is_epoch_tree_exists = platform
                     .drive
