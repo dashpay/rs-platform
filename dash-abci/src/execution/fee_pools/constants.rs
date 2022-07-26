@@ -1,9 +1,10 @@
-use rs_drive::drive::fee_pools::epochs::constants::EPOCHS_PER_YEAR;
 use rs_drive::drive::fee_pools::epochs::constants::PERPETUAL_STORAGE_YEARS;
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 
 pub const DEFAULT_ORIGINAL_FEE_MULTIPLIER: f64 = 2.0;
+
+// TODO: Should be updated from the doc
 
 #[rustfmt::skip]
 pub const FEE_DISTRIBUTION_TABLE: [Decimal; PERPETUAL_STORAGE_YEARS as usize] = [

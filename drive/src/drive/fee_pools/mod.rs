@@ -38,7 +38,7 @@ mod tests {
             let transaction = drive.grove.start_transaction();
 
             let storage_fee_pool = drive
-                .get_aggregate_storage_fees_in_current_distribution_pool(Some(&transaction))
+                .get_aggregate_storage_fees_from_distribution_pool(Some(&transaction))
                 .expect("should get storage fee pool");
 
             assert_eq!(storage_fee_pool, 0u64);

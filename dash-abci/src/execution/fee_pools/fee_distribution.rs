@@ -216,8 +216,7 @@ impl Platform {
                         "payToId property type is not bytes",
                     )))?;
 
-                // TODO this shouldn't be a percentage
-                //  Answer: it's already percentage but converted to integer with bigger precision like in ProRegTx
+                // TODO this shouldn't be a percentage we need to update masternode share contract
                 let share_percentage_integer: i64 = document
                     .properties
                     .get("percentage")
@@ -343,7 +342,7 @@ impl Platform {
         let storage_distribution_credits_in_fee_pool = match cached_aggregated_storage_fees {
             None => self
                 .drive
-                .get_aggregate_storage_fees_in_current_distribution_pool(transaction)?,
+                .get_aggregate_storage_fees_from_distribution_pool(transaction)?,
             Some(storage_fees) => storage_fees,
         };
 
@@ -463,7 +462,7 @@ mod tests {
         }
 
         #[test]
-        fn test_increased_proposers_limit_for_two_unpaid_epochs() {
+        fn test_increased_proposers_limit_to_100_for_two_unpaid_epochs() {
             let platform = setup_platform_with_initial_state_structure();
             let transaction = platform.drive.grove.start_transaction();
 
@@ -542,6 +541,106 @@ mod tests {
                 None => assert!(false, "proposers should be paid"),
                 Some(payouts) => {
                     assert_eq!(payouts.proposers_paid_count, 100);
+                    assert_eq!(payouts.paid_epoch_index, 0);
+                }
+            }
+        }
+
+        #[test]
+        fn test_increased_proposers_limit_to_150_for_three_unpaid_epochs() {
+            let platform = setup_platform_with_initial_state_structure();
+            let transaction = platform.drive.grove.start_transaction();
+
+            // Create masternode reward shares contract
+            platform.create_mn_shares_contract(Some(&transaction));
+
+            // Create epochs
+
+            let unpaid_epoch_pool_0 = Epoch::new(GENESIS_EPOCH_INDEX);
+            let unpaid_epoch_pool_1 = Epoch::new(GENESIS_EPOCH_INDEX + 1);
+            let unpaid_epoch_pool_2 = Epoch::new(GENESIS_EPOCH_INDEX + 2);
+
+            let current_epoch_index = GENESIS_EPOCH_INDEX + 3;
+
+            let epoch_pool_3 = Epoch::new(current_epoch_index);
+
+            let mut batch = GroveDbOpBatch::new();
+
+            unpaid_epoch_pool_0.add_init_current_operations(1.0, 1, 1, &mut batch);
+
+            batch.push(
+                unpaid_epoch_pool_0.update_processing_credits_for_distribution_operation(10000),
+            );
+
+            let proposers_count = 200u16;
+
+            unpaid_epoch_pool_1.add_init_current_operations(
+                1.0,
+                proposers_count as u64 + 1,
+                2,
+                &mut batch,
+            );
+
+            unpaid_epoch_pool_2.add_init_current_operations(
+                1.0,
+                proposers_count as u64 * 2 + 1,
+                3,
+                &mut batch,
+            );
+
+            epoch_pool_3.add_init_current_operations(
+                1.0,
+                proposers_count as u64 * 3 + 1,
+                3,
+                &mut batch,
+            );
+
+            platform
+                .drive
+                .grove_apply_batch(batch, false, Some(&transaction))
+                .expect("should apply batch");
+
+            create_test_masternode_identities_and_add_them_as_epoch_block_proposers(
+                &platform.drive,
+                &unpaid_epoch_pool_0,
+                proposers_count,
+                Some(&transaction),
+            );
+
+            create_test_masternode_identities_and_add_them_as_epoch_block_proposers(
+                &platform.drive,
+                &unpaid_epoch_pool_1,
+                proposers_count,
+                Some(&transaction),
+            );
+
+            create_test_masternode_identities_and_add_them_as_epoch_block_proposers(
+                &platform.drive,
+                &unpaid_epoch_pool_2,
+                proposers_count,
+                Some(&transaction),
+            );
+
+            let mut batch = GroveDbOpBatch::new();
+
+            let proposer_payouts = platform
+                .add_distribute_fees_from_oldest_unpaid_epoch_pool_to_proposers_operations(
+                    current_epoch_index,
+                    None,
+                    Some(&transaction),
+                    &mut batch,
+                )
+                .expect("should distribute fees");
+
+            platform
+                .drive
+                .grove_apply_batch(batch, false, Some(&transaction))
+                .expect("should apply batch");
+
+            match proposer_payouts {
+                None => assert!(false, "proposers should be paid"),
+                Some(payouts) => {
+                    assert_eq!(payouts.proposers_paid_count, 150);
                     assert_eq!(payouts.paid_epoch_index, 0);
                 }
             }
@@ -891,7 +990,7 @@ mod tests {
             create_test_masternode_share_identities_and_documents, refetch_identities,
         };
         use crate::common::helpers::setup::setup_platform_with_initial_state_structure;
-        use crate::execution::fee_distribution::UnpaidEpoch;
+        use crate::execution::fee_pools::fee_distribution::UnpaidEpoch;
         use rs_drive::common::helpers::identities::create_test_masternode_identities_and_add_them_as_epoch_block_proposers;
         use rs_drive::drive::batch::GroveDbOpBatch;
         use rs_drive::fee_pools::epochs::Epoch;
@@ -1072,7 +1171,7 @@ mod tests {
 
             let stored_storage_fee_credits = platform
                 .drive
-                .get_aggregate_storage_fees_in_current_distribution_pool(Some(&transaction))
+                .get_aggregate_storage_fees_from_distribution_pool(Some(&transaction))
                 .expect("should get storage fee pool");
 
             assert_eq!(stored_processing_fee_credits, processing_fees);
@@ -1129,7 +1228,7 @@ mod tests {
 
             let stored_storage_fee_credits = platform
                 .drive
-                .get_aggregate_storage_fees_in_current_distribution_pool(Some(&transaction))
+                .get_aggregate_storage_fees_from_distribution_pool(Some(&transaction))
                 .expect("should get storage fee pool");
 
             assert_eq!(stored_processing_fee_credits, processing_fees);

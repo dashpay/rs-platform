@@ -2,7 +2,6 @@ pub mod epoch_key_constants;
 pub mod operations_factory;
 pub mod paths;
 
-use crate::error::Error;
 use serde::{Deserialize, Serialize};
 
 // TODO: I would call it EpochTree because it represent pool,

@@ -1,6 +1,6 @@
 use crate::error::execution::ExecutionError;
 use crate::error::Error;
-use crate::execution::constants;
+use crate::execution::fee_pools::constants;
 use crate::platform::Platform;
 use rs_drive::drive::batch::GroveDbOpBatch;
 use rs_drive::drive::fee_pools::epochs::constants::{EPOCHS_PER_YEAR, PERPETUAL_STORAGE_YEARS};
@@ -22,7 +22,7 @@ impl Platform {
     ) -> Result<StorageDistributionLeftoverCredits, Error> {
         let storage_distribution_fees = self
             .drive
-            .get_aggregate_storage_fees_in_current_distribution_pool(transaction)?;
+            .get_aggregate_storage_fees_from_distribution_pool(transaction)?;
 
         if storage_distribution_fees == 0 {
             return Ok(0);
@@ -69,7 +69,7 @@ impl Platform {
 
                 // TODO: It's not convenient and confusing when in once case you should push operation to batch
                 //  and sometimes you pass batch inside to add operations. Also, in future a single operation function
-                //  could become a multiple operations function so you need to change many code
+                //  could become a multiple operations function so you need to change many code. Also, you can't use helpers which batch provides
                 batch.push(
                     epoch_pool.update_storage_credits_for_distribution_operation(
                         current_epoch_pool_storage_credits + epoch_fee_share,
@@ -93,7 +93,6 @@ mod tests {
 
     mod distribute_storage_fee_distribution_pool {
         use crate::common::helpers::setup::setup_platform_with_initial_state_structure;
-        use crate::execution::epoch_change::epoch::EpochInfo;
         use rs_drive::common::helpers::epoch::get_storage_credits_for_distribution_for_epochs_in_range;
         use rs_drive::drive::batch::GroveDbOpBatch;
         use rs_drive::error::drive::DriveError;
@@ -410,7 +409,7 @@ mod tests {
 
             let stored_storage_fee = platform
                 .drive
-                .get_aggregate_storage_fees_in_current_distribution_pool(Some(&transaction))
+                .get_aggregate_storage_fees_from_distribution_pool(Some(&transaction))
                 .expect("should get storage fee pool");
 
             assert_eq!(storage_fee, stored_storage_fee);

@@ -6,8 +6,6 @@ use serde::{Deserialize, Serialize};
 
 pub const EPOCH_CHANGE_TIME_MS: u64 = 1576800000;
 
-// TODO: Not sure that parent module "epoch_change" fits here. Should we rename to just epoch?
-
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EpochInfo {
@@ -92,7 +90,7 @@ impl EpochInfo {
 mod test {
 
     mod calculate {
-        use crate::execution::epoch_change::epoch::EpochInfo;
+        use crate::execution::fee_pools::epoch::EpochInfo;
 
         #[test]
         fn test_epoch_change_to_0_epoch() {

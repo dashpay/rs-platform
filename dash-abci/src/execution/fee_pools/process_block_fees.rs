@@ -1,10 +1,10 @@
 use crate::abci::messages::FeesAggregate;
 use crate::block::BlockInfo;
 use crate::error::Error;
-use crate::execution::constants::DEFAULT_ORIGINAL_FEE_MULTIPLIER;
-use crate::execution::epoch_change::distribute_storage_pool::StorageDistributionLeftoverCredits;
-use crate::execution::epoch_change::epoch::EpochInfo;
-use crate::execution::fee_distribution::{FeesInPools, ProposersPayouts};
+use crate::execution::fee_pools::constants::DEFAULT_ORIGINAL_FEE_MULTIPLIER;
+use crate::execution::fee_pools::distribute_storage_pool::StorageDistributionLeftoverCredits;
+use crate::execution::fee_pools::epoch::EpochInfo;
+use crate::execution::fee_pools::fee_distribution::{FeesInPools, ProposersPayouts};
 use crate::platform::Platform;
 use rs_drive::drive::batch::GroveDbOpBatch;
 use rs_drive::drive::fee_pools::epochs::constants::{
@@ -162,7 +162,7 @@ mod tests {
         mod helpers {
             use crate::abci::messages::FeesAggregate;
             use crate::block::BlockInfo;
-            use crate::execution::epoch_change::epoch::{EpochInfo, EPOCH_CHANGE_TIME_MS};
+            use crate::execution::fee_pools::epoch::{EpochInfo, EPOCH_CHANGE_TIME_MS};
             use crate::platform::Platform;
             use rs_drive::drive::batch::GroveDbOpBatch;
             use rs_drive::drive::fee_pools::epochs::constants::PERPETUAL_STORAGE_EPOCHS;
@@ -356,7 +356,7 @@ mod tests {
         mod helpers {
             use crate::abci::messages::FeesAggregate;
             use crate::block::BlockInfo;
-            use crate::execution::epoch_change::epoch::{EpochInfo, EPOCH_CHANGE_TIME_MS};
+            use crate::execution::fee_pools::epoch::{EpochInfo, EPOCH_CHANGE_TIME_MS};
             use crate::platform::Platform;
             use rs_drive::drive::fee_pools::epochs::constants::GENESIS_EPOCH_INDEX;
             use rs_drive::fee_pools::epochs::Epoch;
@@ -401,7 +401,7 @@ mod tests {
 
                 let aggregated_storage_fees = platform
                     .drive
-                    .get_aggregate_storage_fees_in_current_distribution_pool(transaction)
+                    .get_aggregate_storage_fees_from_distribution_pool(transaction)
                     .expect("should get storage fees from distribution pool");
 
                 if epoch_info.is_epoch_change {
