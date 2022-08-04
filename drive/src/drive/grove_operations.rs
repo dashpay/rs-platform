@@ -2,8 +2,6 @@ use crate::drive::batch::GroveDbOpBatch;
 use costs::CostContext;
 use grovedb::batch::{BatchApplyOptions, GroveDbOp, Op};
 use grovedb::{Element, PathQuery, TransactionArg};
-use nohash_hasher::IntMap;
-use std::collections::HashMap;
 
 use crate::drive::flags::StorageFlags;
 use crate::drive::object_size_info::KeyInfo::{Key, KeyRef, KeySize};
@@ -20,7 +18,9 @@ use crate::error::drive::DriveError;
 use crate::error::Error;
 use crate::fee::op::DriveOperation::{CalculatedCostOperation, CostCalculationQueryOperation};
 use crate::fee::op::{DriveOperation, SizesOfQueryOperation};
+use grovedb::query_result_type::{QueryResultElements, QueryResultType};
 use grovedb::Error as GroveError;
+use crate::drive::defaults::SOME_TREE_SIZE;
 
 fn push_drive_operation_result<T>(
     cost_context: CostContext<Result<T, GroveError>>,
@@ -389,7 +389,7 @@ impl Drive {
             let cost_context = self.grove.delete(path_iter, key, transaction);
             push_drive_operation_result(cost_context, drive_operations)
         } else {
-            //todo: this is wrong
+            // TODO this is wrong
             drive_operations.push(DriveOperation::for_delete_path_key_value_size(
                 path,
                 key.len() as u16,
@@ -452,9 +452,11 @@ impl Drive {
         &self,
         path_query: &PathQuery,
         transaction: TransactionArg,
+        result_type: QueryResultType,
         drive_operations: &mut Vec<DriveOperation>,
-    ) -> Result<(Vec<(Vec<u8>, Element)>, u16), Error> {
-        let CostContext { value, cost } = self.grove.query_raw(path_query, transaction);
+    ) -> Result<(QueryResultElements, u16), Error> {
+        let CostContext { value, cost } =
+            self.grove.query_raw(path_query, result_type, transaction);
         drive_operations.push(CalculatedCostOperation(cost));
         value.map_err(Error::GroveDB)
     }
@@ -474,7 +476,7 @@ impl Drive {
         &self,
         path: P,
         key: &'p [u8],
-        apply: bool,
+        stateless_query_for_costs_with_max_value_size: Option<u16>,
         transaction: TransactionArg,
         drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<bool, Error>
@@ -482,16 +484,14 @@ impl Drive {
         P: IntoIterator<Item = &'p [u8]>,
         <P as IntoIterator>::IntoIter: ExactSizeIterator + DoubleEndedIterator + Clone,
     {
-        let CostContext { value, cost } = if apply {
-            if self.config.has_raw_enabled {
-                self.grove.has_raw(path, key, transaction)
-            } else {
-                self.grove
-                    .get_raw(path, key, transaction)
-                    .map(|r| r.map(|_e| true))
-            }
+        let CostContext { value, cost } = if let Some(max_value_size) = stateless_query_for_costs_with_max_value_size {
+            self.grove.worst_case_for_has_raw(path, key, max_value_size as u32)
+        } else if self.config.has_raw_enabled {
+            self.grove.has_raw(path, key, transaction)
         } else {
-            self.grove.worst_case_for_has_raw(path, key)
+            self.grove
+                .get_raw(path, key, transaction)
+                .map(|r| r.map(|_e| true))
         };
         drive_operations.push(CalculatedCostOperation(cost));
         match value {
@@ -547,10 +547,11 @@ impl Drive {
         match path_key_info {
             PathKeyRef((path, key)) => {
                 let path_iter: Vec<&[u8]> = path.iter().map(|x| x.as_slice()).collect();
+                let stateless = !apply;
                 let has_raw = self.grove_has_raw(
                     path_iter.clone(),
                     key,
-                    apply,
+                    if apply { None } else {SOME_TREE_SIZE},
                     transaction,
                     drive_operations,
                 )?;
@@ -580,7 +581,7 @@ impl Drive {
                 let has_raw = self.grove_has_raw(
                     path_iter.clone(),
                     key.as_slice(),
-                    apply,
+                    if apply { None } else {SOME_TREE_SIZE},
                     transaction,
                     drive_operations,
                 )?;
@@ -597,7 +598,7 @@ impl Drive {
                 let has_raw = self.grove_has_raw(
                     path.clone(),
                     key.as_slice(),
-                    apply,
+                    if apply { None } else {SOME_TREE_SIZE},
                     transaction,
                     drive_operations,
                 )?;
@@ -613,7 +614,7 @@ impl Drive {
             }
             PathFixedSizeKeyRef((path, key)) => {
                 let has_raw =
-                    self.grove_has_raw(path.clone(), key, apply, transaction, drive_operations)?;
+                    self.grove_has_raw(path.clone(), key, if apply { None } else {SOME_TREE_SIZE}, transaction, drive_operations)?;
                 if !has_raw {
                     let path_items: Vec<Vec<u8>> = path.into_iter().map(Vec::from).collect();
                     drive_operations.push(DriveOperation::for_empty_tree(
@@ -664,7 +665,7 @@ impl Drive {
     pub(crate) fn batch_insert_if_not_exists<'a, 'c, const N: usize>(
         &'a self,
         path_key_element_info: PathKeyElementInfo<'c, N>,
-        apply: bool,
+        stateless_query_for_costs_with_max_value_size: Option<u16>,
         transaction: TransactionArg,
         drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<bool, Error> {
@@ -674,7 +675,7 @@ impl Drive {
                 let has_raw = self.grove_has_raw(
                     path_iter.clone(),
                     key,
-                    apply,
+                    stateless_query_for_costs_with_max_value_size,
                     transaction,
                     drive_operations,
                 )?;
@@ -689,7 +690,7 @@ impl Drive {
             }
             PathFixedSizeKeyElement((path, key, element)) => {
                 let has_raw =
-                    self.grove_has_raw(path, key, apply, transaction, drive_operations)?;
+                    self.grove_has_raw(path, key, stateless_query_for_costs_with_max_value_size, transaction, drive_operations)?;
                 if !has_raw {
                     let path_items: Vec<Vec<u8>> = path.into_iter().map(Vec::from).collect();
                     drive_operations.push(DriveOperation::for_path_key_element(

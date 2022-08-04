@@ -1,10 +1,10 @@
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
+use dpp::data_contract::extra::DriveContractExt;
 use rs_drive::common::json_document_to_cbor;
 use rs_drive::contract::document::Document;
 use rs_drive::contract::Contract;
+use rs_drive::contract::CreateRandomDocument;
 use serde::Serialize;
-
-
 
 criterion_main!(serialization, deserialization);
 criterion_group!(serialization, test_drive_10_serialization);
@@ -15,7 +15,7 @@ fn test_drive_10_serialization(c: &mut Criterion) {
         "tests/supporting_files/contract/dashpay/dashpay-contract.json",
         Some(1),
     );
-    let contract = Contract::from_cbor(&dashpay_cbor, None).unwrap();
+    let contract = <Contract as DriveContractExt>::from_cbor(&dashpay_cbor, None).unwrap();
 
     let document_type = contract
         .document_type_for_name("contactRequest")
@@ -67,7 +67,7 @@ fn test_drive_10_deserialization(c: &mut Criterion) {
         "tests/supporting_files/contract/dashpay/dashpay-contract.json",
         Some(1),
     );
-    let contract = Contract::from_cbor(&dashpay_cbor, None).unwrap();
+    let contract = <Contract as DriveContractExt>::from_cbor(&dashpay_cbor, None).unwrap();
 
     let document_type = contract
         .document_type_for_name("contactRequest")

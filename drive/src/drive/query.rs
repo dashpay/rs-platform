@@ -1,13 +1,15 @@
 use grovedb::TransactionArg;
 
 use crate::contract::{Contract};
-use crate::contract::document_type::DocumentType;
+use dpp::data_contract::extra::DocumentType;
 use crate::drive::Drive;
 use crate::error::query::QueryError;
 use crate::error::Error;
 use crate::fee::calculate_fee;
 use crate::fee::op::DriveOperation;
 use crate::query::DriveQuery;
+
+use dpp::data_contract::extra::DriveContractExt;
 
 impl Drive {
     pub fn query_documents(
@@ -43,7 +45,7 @@ impl Drive {
         transaction: TransactionArg,
     ) -> Result<(Vec<Vec<u8>>, u16, u64), Error> {
         let mut drive_operations: Vec<DriveOperation> = vec![];
-        let contract = Contract::from_cbor(contract_cbor, None)?;
+        let contract = <Contract as DriveContractExt>::from_cbor(contract_cbor, None)?;
         //todo cbor cost
         let document_type = contract.document_type_for_name(document_type_name.as_str())?;
 
@@ -123,7 +125,7 @@ impl Drive {
         transaction: TransactionArg,
     ) -> Result<(Vec<u8>, u64), Error> {
         let mut drive_operations: Vec<DriveOperation> = vec![];
-        let contract = Contract::from_cbor(contract_cbor, None)?;
+        let contract = <Contract as DriveContractExt>::from_cbor(contract_cbor, None)?;
 
         let document_type = contract.document_type_for_name(document_type_name.as_str())?;
 

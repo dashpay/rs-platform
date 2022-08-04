@@ -2,14 +2,14 @@ mod converter;
 
 use std::{option::Option::None, path::Path, sync::mpsc, thread};
 
-use dash_abci::abci::handlers::{TenderdashAbci};
+use dash_abci::abci::handlers::TenderdashAbci;
 use dash_abci::abci::messages::{
     BlockBeginRequest, BlockEndRequest, InitChainRequest, Serializable,
 };
 use dash_abci::platform::Platform;
-use dpp::identity::Identity;
 use neon::prelude::*;
 use neon::types::JsDate;
+use rs_drive::dpp::identity::Identity;
 use rs_drive::drive::flags::StorageFlags;
 use rs_drive::grovedb::{PathQuery, Transaction, TransactionArg};
 
@@ -932,6 +932,7 @@ impl DriveWrapper {
                 channel.send(move |mut task_context| {
                     let callback = js_callback.into_inner(&mut task_context);
                     let this = task_context.undefined();
+
                     let callback_arguments: Vec<Handle<JsValue>> = match result {
                         Ok(_) => vec![task_context.null().upcast()],
                         Err(err) => vec![task_context.error(err.to_string())?.upcast()],

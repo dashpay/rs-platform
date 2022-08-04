@@ -27,21 +27,21 @@ moka = "0.8.1"
 nohash-hasher = "0.2.0"
 chrono = "0.4.0"
 
+[dependencies.dpp]
+git = "https://github.com/dashevo/rust-dpp"
+branch = "dev"
+
 [dependencies.grovedb]
 git = "https://github.com/dashevo/grovedb"
-branch = "worst-case-costs-improvements"
+branch = "feat/worst-case-costs"
 
 [dependencies.storage]
 git = "https://github.com/dashevo/grovedb"
-branch = "worst-case-costs-improvements"
+branch = "feat/worst-case-costs"
 
 [dependencies.costs]
 git = "https://github.com/dashevo/grovedb"
-branch = "worst-case-costs-improvements"
-
-[dependencies.dpp]
-git = "https://github.com/dashevo/rust-dpp"
-rev = "ee4daa16a7aaa8d46f075f830af9e63b10f54628"
+branch = "feat/worst-case-costs"
 
 [dev-dependencies]
 criterion = "0.3.5"

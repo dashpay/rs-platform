@@ -38,14 +38,14 @@ mod tests {
             let transaction = drive.grove.start_transaction();
 
             let storage_fee_pool = drive
-                .get_aggregate_storage_fees_in_current_distribution_pool(Some(&transaction))
+                .get_aggregate_storage_fees_from_distribution_pool(Some(&transaction))
                 .expect("should get storage fee pool");
 
             assert_eq!(storage_fee_pool, 0u64);
         }
 
         #[test]
-        fn test_epoch_pools_are_created() {
+        fn test_epoch_trees_are_created() {
             let drive = super::setup_drive_with_initial_state_structure();
             let transaction = drive.grove.start_transaction();
 
@@ -68,62 +68,6 @@ mod tests {
                     _ => assert!(false, "invalid error type"),
                 },
             }
-        }
-    }
-
-    mod shift_current_epoch_pool {
-        #[test]
-        fn test_values_are_set() {
-            let drive = super::setup_drive_with_initial_state_structure();
-            let transaction = drive.grove.start_transaction();
-
-            let current_epoch_pool = super::Epoch::new(0);
-
-            let start_block_height = 10;
-            let start_block_time = 1655396517912;
-            let multiplier = 42.0;
-
-            let mut batch = super::GroveDbOpBatch::new();
-
-            current_epoch_pool.shift_to_new_epoch_operations(
-                start_block_height,
-                start_block_time,
-                multiplier,
-                &mut batch,
-            );
-
-            drive
-                .grove_apply_batch(batch, false, Some(&transaction))
-                .expect("should apply batch");
-
-            let next_thousandth_epoch = super::Epoch::new(1000);
-
-            let storage_fee_pool = drive
-                .get_epoch_storage_credits_for_distribution(
-                    &next_thousandth_epoch,
-                    Some(&transaction),
-                )
-                .expect("should get storage fee");
-
-            assert_eq!(storage_fee_pool, 0);
-
-            let stored_start_block_height = drive
-                .get_epoch_start_block_height(&current_epoch_pool, Some(&transaction))
-                .expect("should get start block height");
-
-            assert_eq!(stored_start_block_height, start_block_height);
-
-            let stored_start_block_time = drive
-                .get_epoch_start_time(&current_epoch_pool, Some(&transaction))
-                .expect("should get start time");
-
-            assert_eq!(stored_start_block_time, start_block_time);
-
-            let stored_multiplier = drive
-                .get_epoch_fee_multiplier(&current_epoch_pool, Some(&transaction))
-                .expect("should get fee multiplier");
-
-            assert_eq!(stored_multiplier, multiplier);
         }
     }
 }

@@ -10,7 +10,7 @@ use WhereOperator::{
 };
 
 use crate::contract::{document::Document};
-use crate::contract::document_type::DocumentType;
+use dpp::data_contract::extra::DocumentType;
 use crate::error::query::QueryError;
 use crate::error::Error;
 

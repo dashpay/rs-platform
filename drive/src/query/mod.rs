@@ -2,9 +2,13 @@ use std::collections::BTreeMap;
 use std::ops::BitXor;
 
 use ciborium::value::Value;
-use grovedb::{
+use dpp::data_contract::extra::{encode_float, Index, IndexProperty};
+use dpp::data_contract::extra::ContractError;
+use dpp::data_contract::extra::DriveContractExt;
+pub use grovedb::{
     Element, Error as GroveError, GroveDb, PathQuery, Query, QueryItem, SizedQuery, TransactionArg,
 };
+
 use indexmap::IndexMap;
 use sqlparser::ast;
 use sqlparser::ast::TableFactor::Table;
@@ -19,8 +23,7 @@ pub use ordering::OrderClause;
 
 use crate::common::bytes_for_system_value;
 use crate::contract::{document::Document, Contract};
-use crate::contract::document_type::DocumentType;
-use crate::contract::index::{Index, IndexProperty};
+use dpp::data_contract::extra::DocumentType;
 use crate::drive::object_size_info::KeyValueInfo;
 use crate::drive::Drive;
 use crate::error::drive::DriveError;
@@ -374,12 +377,13 @@ impl<'a> DriveQuery<'a> {
             "Issue parsing sql: invalid from value",
         )))?;
 
-        let document_type = contract
-            .document_types
-            .get(document_type_name)
-            .ok_or(Error::Query(QueryError::DocumentTypeNotFound(
-                "document type not found in contract",
-            )))?;
+        let document_type =
+            contract
+                .document_types()
+                .get(document_type_name)
+                .ok_or(Error::Query(QueryError::DocumentTypeNotFound(
+                    "document type not found in contract",
+                )))?;
 
         // Restrictions
         // only binary where clauses are supported
@@ -524,7 +528,7 @@ impl<'a> DriveQuery<'a> {
             if self.document_type.documents_keep_history {
                 // if the documents keep history then we should insert a subquery
                 if let Some(block_time) = self.block_time {
-                    let encoded_block_time = crate::common::encode::encode_float(block_time)?;
+                    let encoded_block_time = encode_float(block_time)?;
                     let mut sub_query = Query::new_with_direction(false);
                     sub_query.insert_range_to_inclusive(..=encoded_block_time);
                     query.set_subquery(sub_query);
@@ -981,7 +985,7 @@ impl<'a> DriveQuery<'a> {
                         }
                     }
                 })
-                .collect::<Result<Vec<Vec<u8>>, Error>>()?;
+                .collect::<Result<Vec<Vec<u8>>, ContractError>>()?;
 
         let final_query = match last_clause {
             None => {
@@ -1231,7 +1235,9 @@ mod tests {
     use crate::drive::Drive;
     use crate::query::DriveQuery;
     use serde_json::Value::Null;
-    use crate::contract::document_type::DocumentType;
+    use dpp::data_contract::extra::DocumentType;
+
+    use dpp::data_contract::extra::DriveContractExt;
 
     fn setup_family_contract() -> (Drive, Contract) {
         let tmp_dir = TempDir::new().unwrap();
@@ -1245,7 +1251,7 @@ mod tests {
 
         // let's construct the grovedb structure for the dashpay data contract
         let contract_cbor = json_document_to_cbor(contract_path, Some(1));
-        let contract = Contract::from_cbor(&contract_cbor, None)
+        let contract = <Contract as DriveContractExt>::from_cbor(&contract_cbor, None)
             .expect("expected to deserialize the contract");
         let storage_flags = StorageFlags { epoch: 0 };
         drive
@@ -1275,7 +1281,7 @@ mod tests {
 
         // let's construct the grovedb structure for the dashpay data contract
         let contract_cbor = json_document_to_cbor(contract_path, Some(1));
-        let contract = Contract::from_cbor(&contract_cbor, None)
+        let contract = <Contract as DriveContractExt>::from_cbor(&contract_cbor, None)
             .expect("expected to deserialize the contract");
         let storage_flags = StorageFlags { epoch: 0 };
         drive

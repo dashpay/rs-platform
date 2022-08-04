@@ -414,7 +414,7 @@ describe('Drive', () => {
       it('should process a block without previous block time', async () => {
         const request = {
           blockHeight: 1,
-          blockTime: (new Date()).getTime(),
+          blockTimeMs: (new Date()).getTime(),
           proposerProTxHash: Buffer.alloc(32, 1),
         };
 
@@ -424,14 +424,20 @@ describe('Drive', () => {
       });
 
       it('should process a block with previous block time', async () => {
-        const request = {
-          blockHeight: 1,
-          blockTime: (new Date()).getTime(),
-          proposerProTxHash: Buffer.alloc(32, 1),
-          previousBlockTime: (new Date()).getTime() - 100,
-        };
+        const blockTimeMs = (new Date()).getTime();
 
-        const response = await drive.getAbci().blockBegin(request);
+        await drive.getAbci().blockBegin({
+          blockHeight: 1,
+          blockTimeMs,
+          proposerProTxHash: Buffer.alloc(32, 1),
+        });
+
+        const response = await drive.getAbci().blockBegin({
+          blockHeight: 2,
+          blockTimeMs: blockTimeMs + 100,
+          proposerProTxHash: Buffer.alloc(32, 1),
+          previousBlockTimeMs: blockTimeMs,
+        });
 
         expect(response).to.be.empty('object');
       });
@@ -442,7 +448,7 @@ describe('Drive', () => {
         await drive.getAbci().initChain({});
         await drive.getAbci().blockBegin({
           blockHeight: 1,
-          blockTime: (new Date()).getTime(),
+          blockTimeMs: (new Date()).getTime(),
           proposerProTxHash: Buffer.alloc(32, 1),
         });
       });
@@ -452,7 +458,6 @@ describe('Drive', () => {
           fees: {
             storageFees: 100,
             processingFees: 100,
-            feeMultiplier: 2,
           },
         };
 
@@ -460,7 +465,7 @@ describe('Drive', () => {
 
         expect(response).to.have.property('currentEpochIndex');
         expect(response).to.have.property('isEpochChange');
-        expect(response).to.have.property('masternodesPaidCount');
+        expect(response).to.have.property('proposersPaidCount');
         expect(response).to.have.property('paidEpochIndex');
       });
     });

@@ -1,7 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 use ciborium::value::Value;
 use crate::common::{btree_map_inner_bool_value, btree_map_inner_btree_map, btree_map_inner_map_value, btree_map_inner_size_value, btree_map_inner_text_value, bytes_for_system_value, cbor_inner_array_of_strings, cbor_inner_array_value, cbor_inner_bool_value_with_default, cbor_inner_btree_map, cbor_inner_text_value, cbor_map_to_btree_map};
-use crate::contract::index::{Index, IndexProperty};
 use crate::contract::types::{DocumentField, DocumentFieldType};
 use crate::drive::defaults::{DEFAULT_HASH_SIZE, MAX_INDEX_SIZE};
 use crate::error::contract::ContractError;

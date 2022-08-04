@@ -1,5 +1,5 @@
 pub mod fee_pools;
-pub(crate) mod setup;
+pub mod setup;
 
 #[cfg(test)]
 mod tests {

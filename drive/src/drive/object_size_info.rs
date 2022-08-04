@@ -10,12 +10,13 @@ use PathKeyInfo::{PathFixedSizeKey, PathFixedSizeKeyRef, PathKey, PathKeyRef, Pa
 
 use crate::contract::document::Document;
 use crate::contract::{Contract};
-use crate::contract::document_type::DocumentType;
+use dpp::data_contract::extra::DocumentType;
 use crate::drive::defaults::DEFAULT_HASH_SIZE;
 use crate::drive::flags::StorageFlags;
-use crate::error::contract::ContractError;
 use crate::error::drive::DriveError;
 use crate::error::Error;
+
+use dpp::data_contract::extra::ContractError;
 
 #[derive(Clone)]
 pub enum PathInfo<'a, const N: usize> {
@@ -419,7 +420,7 @@ impl<'a> DocumentInfo<'a> {
                             "document type must have a max size",
                         ))
                     })?;
-                    Ok(Some(KeySize(max_size)))
+                    Ok(Some(KeySize(max_size as usize)))
                 }
             },
         }

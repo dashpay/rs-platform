@@ -12,6 +12,7 @@ use crate::error::drive::DriveError;
 use crate::error::Error;
 use crate::fee::calculate_fee;
 use crate::fee::op::DriveOperation;
+use dpp::data_contract::extra::DriveContractExt;
 
 impl Drive {
     pub fn delete_document_for_contract(
@@ -46,7 +47,7 @@ impl Drive {
         apply: bool,
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
-        let contract = Contract::from_cbor(contract_cbor, None)?;
+        let contract = <Contract as DriveContractExt>::from_cbor(contract_cbor, None)?;
         self.delete_document_for_contract(
             document_id,
             &contract,
@@ -82,7 +83,7 @@ impl Drive {
         //  * Contract ID recovered from document
         //  * 0 to signify Documents and not Contract
         let contract_documents_primary_key_path =
-            contract_documents_primary_key_path(&contract.id, document_type_name);
+            contract_documents_primary_key_path(contract.id.as_bytes(), document_type_name);
 
         let stateless = !apply;
         let query_stateless_max_value_size = if stateless { Some(document_type.max_size()) } else { None };
@@ -128,7 +129,7 @@ impl Drive {
         )?;
 
         let contract_document_type_path =
-            contract_document_type_path(&contract.id, document_type_name);
+            contract_document_type_path(contract.id.as_bytes(), document_type_name);
 
         // fourth we need delete all references to the document
         // to do this we need to go through each index
@@ -224,6 +225,7 @@ mod tests {
     use std::option::Option::None;
     use tempfile::TempDir;
 
+    use super::*;
     use crate::common::{
         cbor_from_hex, json_document_to_cbor, setup_contract, setup_contract_from_hex,
         value_to_cbor,
@@ -991,7 +993,7 @@ mod tests {
         let (results, _, _) = drive
             .query_documents_from_contract(
                 &contract,
-                contract.document_types.get("niceDocument").unwrap(),
+                contract.document_types().get("niceDocument").unwrap(),
                 query_cbor.as_slice(),
                 None,
             )
@@ -1023,7 +1025,7 @@ mod tests {
         let (results, _, _) = drive
             .query_documents_from_contract(
                 &contract,
-                contract.document_types.get("niceDocument").unwrap(),
+                contract.document_types().get("niceDocument").unwrap(),
                 query_cbor.as_slice(),
                 Some(&db_transaction),
             )

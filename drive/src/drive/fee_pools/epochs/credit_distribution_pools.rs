@@ -10,13 +10,13 @@ use crate::fee_pools::epochs::epoch_key_constants;
 impl Drive {
     pub fn get_epoch_storage_credits_for_distribution(
         &self,
-        epoch_pool: &Epoch,
+        epoch_tree: &Epoch,
         transaction: TransactionArg,
     ) -> Result<u64, Error> {
         let element = self
             .grove
             .get(
-                epoch_pool.get_path(),
+                epoch_tree.get_path(),
                 epoch_key_constants::KEY_POOL_STORAGE_FEES.as_slice(),
                 transaction,
             )
@@ -40,13 +40,13 @@ impl Drive {
 
     pub fn get_epoch_processing_credits_for_distribution(
         &self,
-        epoch_pool: &Epoch,
+        epoch_tree: &Epoch,
         transaction: TransactionArg,
     ) -> Result<u64, Error> {
         let element = self
             .grove
             .get(
-                epoch_pool.get_path(),
+                epoch_tree.get_path(),
                 epoch_key_constants::KEY_POOL_PROCESSING_FEES.as_slice(),
                 transaction,
             )
@@ -70,13 +70,13 @@ impl Drive {
 
     pub(crate) fn get_epoch_fee_multiplier(
         &self,
-        epoch_pool: &Epoch,
+        epoch_tree: &Epoch,
         transaction: TransactionArg,
     ) -> Result<f64, Error> {
         let element = self
             .grove
             .get(
-                epoch_pool.get_path(),
+                epoch_tree.get_path(),
                 epoch_key_constants::KEY_FEE_MULTIPLIER.as_slice(),
                 transaction,
             )
@@ -100,14 +100,14 @@ impl Drive {
 
     pub fn get_epoch_total_credits_for_distribution(
         &self,
-        epoch_pool: &Epoch,
+        epoch_tree: &Epoch,
         transaction: TransactionArg,
     ) -> Result<u64, Error> {
         let storage_pool_credits =
-            self.get_epoch_storage_credits_for_distribution(epoch_pool, transaction)?;
+            self.get_epoch_storage_credits_for_distribution(epoch_tree, transaction)?;
 
         let processing_pool_credits =
-            self.get_epoch_processing_credits_for_distribution(epoch_pool, transaction)?;
+            self.get_epoch_processing_credits_for_distribution(epoch_tree, transaction)?;
 
         storage_pool_credits
             .checked_add(processing_pool_credits)
@@ -127,59 +127,11 @@ mod tests {
     use crate::fee_pools::epochs::Epoch;
     use grovedb::Element;
 
-    mod update_epoch_storage_credits_for_distribution {
-
-        #[test]
-        fn test_error_if_epoch_pool_is_not_initiated() {
-            let drive = super::setup_drive_with_initial_state_structure();
-            let transaction = drive.grove.start_transaction();
-
-            let epoch = super::Epoch::new(7000);
-
-            let op = epoch.update_storage_credits_for_distribution_operation(42);
-
-            match drive.grove_apply_operation(op, false, Some(&transaction)) {
-                Ok(_) => assert!(
-                    false,
-                    "should not be able to update storage fee on uninit epochs pool"
-                ),
-                Err(e) => match e {
-                    super::error::Error::GroveDB(grovedb::Error::PathKeyNotFound(_)) => {
-                        assert!(true)
-                    }
-                    _ => assert!(false, "invalid error type"),
-                },
-            }
-        }
-
-        #[test]
-        fn test_value_is_set() {
-            let drive = super::setup_drive_with_initial_state_structure();
-            let transaction = drive.grove.start_transaction();
-
-            let epoch = super::Epoch::new(0);
-
-            let storage_fee = 42;
-
-            let op = epoch.update_storage_credits_for_distribution_operation(storage_fee);
-
-            drive
-                .grove_apply_operation(op, false, Some(&transaction))
-                .expect("should apply batch");
-
-            let stored_storage_fee = drive
-                .get_epoch_storage_credits_for_distribution(&epoch, Some(&transaction))
-                .expect("should get storage fee");
-
-            assert_eq!(stored_storage_fee, storage_fee);
-        }
-    }
-
     mod get_epoch_storage_credits_for_distribution {
         use crate::fee_pools::epochs_root_tree_key_constants::KEY_STORAGE_FEE_POOL;
 
         #[test]
-        fn test_error_if_epoch_pool_is_not_initiated() {
+        fn test_error_if_epoch_tree_is_not_initiated() {
             let drive = super::setup_drive_with_initial_state_structure();
             let transaction = drive.grove.start_transaction();
 
@@ -226,53 +178,6 @@ mod tests {
                     _ => assert!(false, "invalid error type"),
                 },
             }
-        }
-    }
-
-    mod update_epoch_processing_credits_for_distribution {
-        #[test]
-        fn test_error_if_epoch_pool_is_not_initiated() {
-            let drive = super::setup_drive_with_initial_state_structure();
-            let transaction = drive.grove.start_transaction();
-
-            let epoch = super::Epoch::new(7000);
-
-            let op = epoch.update_processing_credits_for_distribution_operation(42);
-
-            match drive.grove_apply_operation(op, false, Some(&transaction)) {
-                Ok(_) => assert!(
-                    false,
-                    "should not be able to update processing fee on uninit epochs pool"
-                ),
-                Err(e) => match e {
-                    super::error::Error::GroveDB(grovedb::Error::PathKeyNotFound(_)) => {
-                        assert!(true)
-                    }
-                    _ => assert!(false, "invalid error type"),
-                },
-            }
-        }
-
-        #[test]
-        fn test_value_is_set() {
-            let drive = super::setup_drive_with_initial_state_structure();
-            let transaction = drive.grove.start_transaction();
-
-            let epoch = super::Epoch::new(0);
-
-            let processing_fee: u64 = 42;
-
-            let op = epoch.update_processing_credits_for_distribution_operation(42);
-
-            drive
-                .grove_apply_operation(op, false, Some(&transaction))
-                .expect("should apply batch");
-
-            let stored_processing_fee = drive
-                .get_epoch_processing_credits_for_distribution(&epoch, Some(&transaction))
-                .expect("should get processing fee");
-
-            assert_eq!(stored_processing_fee, processing_fee);
         }
     }
 
@@ -338,7 +243,7 @@ mod tests {
 
     mod fee_multiplier {
         #[test]
-        fn test_error_if_epoch_pool_is_not_initiated() {
+        fn test_error_if_epoch_tree_is_not_initiated() {
             let drive = super::setup_drive_with_initial_state_structure();
             let transaction = drive.grove.start_transaction();
 

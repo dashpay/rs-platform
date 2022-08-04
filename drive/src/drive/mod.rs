@@ -15,7 +15,6 @@ use crate::error::Error;
 use crate::fee::op::DriveOperation;
 use crate::fee::op::DriveOperation::GroveOperation;
 
-
 pub mod batch;
 pub mod config;
 pub mod defaults;
@@ -29,6 +28,8 @@ pub mod initialization;
 pub mod object_size_info;
 pub mod query;
 pub mod contract;
+
+use dpp::data_contract::extra::DriveContractExt;
 
 pub struct DriveCache {
     pub cached_contracts: Cache<[u8; 32], Arc<Contract>>,

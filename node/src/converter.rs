@@ -1,4 +1,3 @@
-
 use neon::prelude::*;
 use neon::types::buffer::TypedArray;
 use rs_drive::drive::flags::StorageFlags;
@@ -21,7 +20,7 @@ pub fn js_object_to_element<'a, C: Context<'a>>(
 
     let element_type: String = js_element_type.value(cx);
 
-    let js_element_epoch: Handle<JsNumber> = js_object.get(cx, "epochs")?;
+    let js_element_epoch: Handle<JsNumber> = js_object.get(cx, "epoch")?;
 
     let epoch = u16::try_from(js_element_epoch.value(cx) as i64)
         .or_else(|_| cx.throw_range_error("`epochs` must fit in u16"))?;
