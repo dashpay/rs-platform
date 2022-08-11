@@ -1,13 +1,16 @@
-pub mod errors;
-use dpp::document::Document;
 use std::convert::TryInto;
+
+use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
+
+use dpp::document::Document;
 
 use crate::errors::{from_dpp_err, RustConversionError};
 use crate::identifier::IdentifierWrapper;
 use crate::with_js_error;
 use crate::{DataContractWasm, MetadataWasm};
-use serde::{Deserialize, Serialize};
+
+pub mod errors;
 
 #[wasm_bindgen(js_name=Document)]
 #[derive(Debug, Clone, Serialize, Deserialize)]

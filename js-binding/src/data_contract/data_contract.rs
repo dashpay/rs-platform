@@ -1,17 +1,19 @@
 #![allow(clippy::from_over_into)]
 
-use crate::errors::{from_dpp_err, RustConversionError};
-use crate::{bail_js, with_js_error};
-use dpp::data_contract::DataContract;
-use dpp::util::string_encoding::Encoding;
-pub use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use std::collections::BTreeMap;
 use std::convert::{TryFrom, TryInto};
+
+pub use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use wasm_bindgen::prelude::*;
 
+use dpp::data_contract::DataContract;
+use dpp::util::string_encoding::Encoding;
+
+use crate::errors::{from_dpp_err, RustConversionError};
 use crate::identifier::IdentifierWrapper;
 use crate::metadata::MetadataWasm;
+use crate::{bail_js, with_js_error};
 
 #[wasm_bindgen(js_name=DataContract)]
 #[derive(Debug, Clone)]
