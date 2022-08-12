@@ -1,7 +1,9 @@
-use dpp::identity::IdentityPublicKey;
-use dpp::identity::{AssetLockProof, Identity, KeyID};
-use dpp::metadata::Metadata;
 use wasm_bindgen::prelude::*;
+
+use dpp::identity::state_transition::asset_lock_proof::AssetLockProof;
+use dpp::identity::IdentityPublicKey;
+use dpp::identity::{Identity, KeyID};
+use dpp::metadata::Metadata;
 
 use crate::identifier::IdentifierWrapper;
 use crate::IdentityPublicKeyWasm;
@@ -58,12 +60,12 @@ impl IdentityWasm {
     }
 
     #[wasm_bindgen(js_name=getBalance)]
-    pub fn get_balance(&self) -> i64 {
+    pub fn get_balance(&self) -> u64 {
         self.0.get_balance()
     }
 
     #[wasm_bindgen(js_name=setBalance)]
-    pub fn set_balance(mut self, balance: i64) -> Self {
+    pub fn set_balance(mut self, balance: u64) -> Self {
         self.0 = self.0.set_balance(balance);
         self
     }

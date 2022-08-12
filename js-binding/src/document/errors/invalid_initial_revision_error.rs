@@ -1,6 +1,8 @@
-use super::*;
-use crate::DocumentWasm;
 use thiserror::Error;
+
+use crate::DocumentWasm;
+
+use super::*;
 
 #[wasm_bindgen]
 #[derive(Error, Debug)]

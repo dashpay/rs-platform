@@ -1,5 +1,6 @@
-use super::*;
 use thiserror::Error;
+
+use super::*;
 
 #[wasm_bindgen]
 #[derive(Error, Debug)]

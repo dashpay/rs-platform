@@ -1,8 +1,8 @@
 //! This module contains data structures that are left to be implemented
 
-use dpp::document::document_transition::DocumentTransition;
 use wasm_bindgen::prelude::*;
 
+use dpp::document::document_transition::DocumentTransition;
 use dpp::errors::consensus::ConsensusError as DPPConsensusError;
 
 #[wasm_bindgen]
