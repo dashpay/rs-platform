@@ -210,6 +210,7 @@ impl SizesOfDeleteOperation {
             Element::Item(item, _) => item.len(),
             Element::Reference(path, _) => path.iter().map(|inner| inner.len()).sum(),
             Element::Tree(..) => 32,
+            Element::SumTree(..) => 40,
         } as u32;
         SizesOfDeleteOperation::for_key_value_size(path_size, key_size, value_size, multiplier)
     }

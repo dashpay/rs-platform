@@ -52,6 +52,31 @@ impl GroveDbOpBatch {
         })
     }
 
+    pub fn add_insert_empty_sum_tree(&mut self, path: Vec<Vec<u8>>, key: Vec<u8>) {
+        self.operations.push(GroveDbOp {
+            path,
+            key,
+            op: Op::Insert {
+                element: Element::empty_sum_tree(),
+            },
+        })
+    }
+
+    pub fn add_insert_empty_sum_tree_with_flags(
+        &mut self,
+        path: Vec<Vec<u8>>,
+        key: Vec<u8>,
+        storage_flags: &StorageFlags,
+    ) {
+        self.operations.push(GroveDbOp {
+            path,
+            key,
+            op: Op::Insert {
+                element: Element::empty_sum_tree_with_flags(storage_flags.to_element_flags()),
+            },
+        })
+    }
+
     pub fn add_delete(&mut self, path: Vec<Vec<u8>>, key: Vec<u8>) {
         self.operations.push(GroveDbOp {
             path,

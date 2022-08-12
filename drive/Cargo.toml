@@ -34,15 +34,15 @@ rev = "bf81f6839c95bea8bfd409f32b79b3a01f5c8c63"
 
 [dependencies.grovedb]
 git = "https://github.com/dashevo/grovedb"
-branch = "develop"
+branch = "feat/SumTreesWithEd"
 
 [dependencies.storage]
 git = "https://github.com/dashevo/grovedb"
-branch = "develop"
+branch = "feat/SumTreesWithEd"
 
 [dependencies.costs]
 git = "https://github.com/dashevo/grovedb"
-branch = "develop"
+branch = "feat/SumTreesWithEd"
 
 [dev-dependencies]
 criterion = "0.3.5"
