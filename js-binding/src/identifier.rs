@@ -1,8 +1,8 @@
-use dpp::identifier;
-
 pub use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
+
+use dpp::identifier;
 
 #[derive(Serialize, Deserialize, PartialEq, Eq)]
 enum IdentifierSource {
