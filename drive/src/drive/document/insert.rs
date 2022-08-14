@@ -1,5 +1,6 @@
 use grovedb::{Element, TransactionArg};
 use std::collections::HashSet;
+
 use std::option::Option::None;
 
 use crate::contract::document::Document;
