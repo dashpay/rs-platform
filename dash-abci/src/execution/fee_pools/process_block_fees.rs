@@ -108,12 +108,14 @@ impl Platform {
             None
         };
 
-        batch.push(current_epoch.increment_proposer_block_count_operation(
-            &self.drive,
-            &block_info.proposer_pro_tx_hash,
-            cached_previous_block_count,
-            transaction,
-        )?);
+        if !block_fees.is_nil() {
+            batch.push(current_epoch.increment_proposer_block_count_operation(
+                &self.drive,
+                &block_info.proposer_pro_tx_hash,
+                cached_previous_block_count,
+                transaction,
+            )?);
+        }
 
         // Distribute fees from unpaid epoch pool to proposers
 
@@ -153,21 +155,19 @@ impl Platform {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     mod add_process_epoch_change_operations {
+        use super::*;
+
         use crate::common::helpers::setup::setup_platform_with_initial_state_structure;
         use chrono::Utc;
-        use rs_drive::drive::fee_pools::epochs::constants::GENESIS_EPOCH_INDEX;
         use rust_decimal::prelude::ToPrimitive;
 
         mod helpers {
-            use crate::abci::messages::FeesAggregate;
-            use crate::block::BlockInfo;
-            use crate::execution::fee_pools::epoch::{EpochInfo, EPOCH_CHANGE_TIME_MS};
-            use crate::platform::Platform;
-            use rs_drive::drive::batch::GroveDbOpBatch;
-            use rs_drive::drive::fee_pools::epochs::constants::PERPETUAL_STORAGE_EPOCHS;
-            use rs_drive::fee_pools::epochs::Epoch;
-            use rs_drive::grovedb::TransactionArg;
+            use super::*;
+
+            use crate::execution::fee_pools::epoch::EPOCH_CHANGE_TIME_MS;
 
             pub fn process_and_validate_epoch_change(
                 platform: &Platform,
@@ -347,20 +347,17 @@ mod tests {
     }
 
     mod process_block_fees {
+        use super::*;
         use crate::common::helpers::setup::setup_platform_with_initial_state_structure;
         use chrono::Utc;
         use rs_drive::common::helpers::identities::create_test_masternode_identities;
-        use rs_drive::drive::fee_pools::epochs::constants::GENESIS_EPOCH_INDEX;
+        use rs_drive::query::GroveError;
         use rust_decimal::prelude::ToPrimitive;
 
         mod helpers {
-            use crate::abci::messages::FeesAggregate;
-            use crate::block::BlockInfo;
-            use crate::execution::fee_pools::epoch::{EpochInfo, EPOCH_CHANGE_TIME_MS};
-            use crate::platform::Platform;
-            use rs_drive::drive::fee_pools::epochs::constants::GENESIS_EPOCH_INDEX;
-            use rs_drive::fee_pools::epochs::Epoch;
-            use rs_drive::grovedb::TransactionArg;
+            use super::*;
+
+            use crate::execution::fee_pools::epoch::EPOCH_CHANGE_TIME_MS;
 
             pub fn process_and_validate_block_fees(
                 platform: &Platform,
@@ -586,6 +583,62 @@ mod tests {
                 proposers[4],
                 Some(&transaction),
             );
+        }
+
+        #[test]
+        fn test_do_not_increment_proposer_block_count_with_nil_fees() {
+            let platform = setup_platform_with_initial_state_structure();
+            let transaction = platform.drive.grove.start_transaction();
+
+            let proposer_pro_tx_hash = [
+                1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                1, 1, 1, 1,
+            ];
+
+            let genesis_time_ms = Utc::now()
+                .timestamp_millis()
+                .to_u64()
+                .expect("block time can not be before 1970");
+
+            let epoch_index = GENESIS_EPOCH_INDEX;
+            let block_height = 1;
+
+            let current_epoch = Epoch::new(epoch_index);
+
+            let block_info = BlockInfo {
+                block_height,
+                block_time_ms: genesis_time_ms,
+                previous_block_time_ms: None,
+                proposer_pro_tx_hash,
+            };
+
+            let epoch_info =
+                EpochInfo::from_genesis_time_and_block_info(genesis_time_ms, &block_info)
+                    .expect("should calculate epoch info");
+
+            let block_fees = FeesAggregate {
+                processing_fees: 0,
+                storage_fees: 0,
+            };
+
+            platform
+                .process_block_fees(&block_info, &epoch_info, &block_fees, Some(&transaction))
+                .expect("should process block fees");
+
+            // Should not increment proposer block count
+
+            let result = platform.drive.get_epochs_proposer_block_count(
+                &current_epoch,
+                &proposer_pro_tx_hash,
+                Some(&transaction),
+            );
+
+            assert!(matches!(
+                result,
+                Err(rs_drive::error::Error::GroveDB(
+                    GroveError::PathKeyNotFound(message)
+                )) if message == "key not found in Merk: 0101010101010101010101010101010101010101010101010101010101010101"
+            ));
         }
     }
 }

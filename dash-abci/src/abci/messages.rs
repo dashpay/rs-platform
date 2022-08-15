@@ -41,6 +41,12 @@ pub struct FeesAggregate {
     // pub refunds_by_epoch: Vec<EpochRefund>,
 }
 
+impl FeesAggregate {
+    pub fn is_nil(&self) -> bool {
+        self.storage_fees == 0 && self.processing_fees == 0
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BlockEndResponse {
