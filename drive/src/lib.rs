@@ -1,3 +1,9 @@
+#![cfg_attr(docsrs, feature(doc_cfg))]
+
+// Coding conventions
+#![forbid(unsafe_code)]
+#![deny(missing_docs)]
+
 pub mod common;
 pub mod contract;
 pub mod drive;
