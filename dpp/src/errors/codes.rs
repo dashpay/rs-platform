@@ -138,6 +138,11 @@ impl ErrorWithCode for IndexError {
 
 impl ErrorWithCode for SignatureError {
     fn get_code(&self) -> u32 {
-        todo!()
+        match *self {
+            Self::IdentityNotFoundError { .. } => 2000,
+            Self::InvalidIdentityPublicKeyTypeError { .. } => 2001,
+            Self::InvalidStateTransitionSignatureError => 2002,
+            Self::MissingPublicKeyError { .. } => 2003,
+        }
     }
 }
