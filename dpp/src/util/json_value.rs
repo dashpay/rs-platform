@@ -3,6 +3,7 @@ use std::{collections::BTreeMap, convert::TryInto};
 use anyhow::{anyhow, bail};
 use log::trace;
 use serde::de::DeserializeOwned;
+use serde::Deserialize;
 use serde_json::{Number, Value as JsonValue};
 
 use crate::util::deserializer;

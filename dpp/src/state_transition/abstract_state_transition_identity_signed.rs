@@ -100,6 +100,17 @@ where
         &self,
         public_key: &IdentityPublicKey,
     ) -> Result<(), ProtocolError> {
+        // If state transition requires MASTER security level it must be signed only with
+        // a MASTER key
+        if public_key.is_master() && self.get_security_level_requirement() != SecurityLevel::MASTER
+        {
+            return Err(ProtocolError::InvalidSignaturePublicKeySecurityLevelError {
+                public_key_security_level: public_key.get_security_level(),
+                required_security_level: self.get_security_level_requirement(),
+            });
+        }
+
+        // Otherwise, key security level should be less than MASTER but more or equal than required
         if self.get_security_level_requirement() < public_key.get_security_level() {
             return Err(ProtocolError::PublicKeySecurityLevelNotMetError {
                 public_key_security_level: public_key.get_security_level(),
@@ -116,8 +127,10 @@ where
         Ok(())
     }
 
+    /// Returns minimal key security level that can be used to sign this ST.
+    /// Override this method if the ST requires a different security level.
     fn get_security_level_requirement(&self) -> SecurityLevel {
-        SecurityLevel::MASTER
+        SecurityLevel::HIGH
     }
 }
 
