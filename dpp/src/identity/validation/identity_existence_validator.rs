@@ -23,7 +23,7 @@ pub async fn validate_identity_existence(
         }
     }
 
-    return Ok(result);
+    Ok(result)
 }
 
 #[cfg(test)]
@@ -33,9 +33,7 @@ mod test {
         state_repository::MockStateRepositoryLike,
         tests::{
             fixtures::identity_fixture_raw_object,
-            utils::{
-                get_basic_error, get_basic_error_from_result, get_signature_error_from_result,
-            },
+            utils::{get_basic_error_from_result, get_signature_error_from_result},
         },
     };
 

@@ -16,6 +16,7 @@ pub trait StateTransitionIdentitySigned
 where
     Self: StateTransitionLike,
 {
+    fn get_owner_id(&self) -> &Identifier;
     fn get_signature_public_key_id(&self) -> KeyID;
     fn set_signature_public_key_id(&mut self, key_id: KeyID);
 
@@ -159,6 +160,8 @@ mod test {
     use serde_json::json;
 
     use crate::document::DocumentsBatchTransition;
+    use crate::tests::utils::generate_random_identifier_struct;
+    use crate::util::string_encoding::Encoding;
     use crate::{
         assert_error_contains,
         identity::{KeyID, SecurityLevel},
@@ -178,6 +181,7 @@ mod test {
         pub signature: Vec<u8>,
         pub signature_public_key_id: KeyID,
         pub transition_type: StateTransitionType,
+        pub owner_id: Identifier,
     }
 
     impl StateTransitionConvert for ExampleStateTransition {
@@ -218,6 +222,9 @@ mod test {
     }
 
     impl StateTransitionIdentitySigned for ExampleStateTransition {
+        fn get_owner_id(&self) -> &Identifier {
+            &self.owner_id
+        }
         fn get_security_level_requirement(&self) -> SecurityLevel {
             SecurityLevel::MASTER
         }
@@ -232,11 +239,17 @@ mod test {
     }
 
     fn get_mock_state_transition() -> ExampleStateTransition {
+        let owner_id = Identifier::from_string(
+            "AX5o22ARWFYZE9JZTA5SSeyvprtetBcvbQLSBZ7cR7Gw",
+            Encoding::Base58,
+        )
+        .unwrap();
         ExampleStateTransition {
             protocol_version: 1,
             transition_type: StateTransitionType::DocumentsBatch,
             signature: Default::default(),
             signature_public_key_id: 1,
+            owner_id,
         }
     }
 
@@ -320,6 +333,7 @@ mod test {
                 "signature": "",
                 "signaturePublicKeyId": 1,
                 "transitionType" : 1,
+                "ownerId" : "AX5o22ARWFYZE9JZTA5SSeyvprtetBcvbQLSBZ7cR7Gw"
             })
         );
     }
@@ -329,7 +343,7 @@ mod test {
         let st = get_mock_state_transition();
         let hash = st.hash(false).unwrap();
         assert_eq!(
-            "86a734f974cb260d528079d2b47050891afce203c56077d603f9896a40044223",
+            "be27201d895364e9543f0c4c6a372bb2e262af891296fbdc4cef09b3224d9b51",
             hex::encode(hash)
         )
     }
@@ -340,7 +354,7 @@ mod test {
         let hash = st.to_buffer(false).unwrap();
         let result = hex::encode(hash);
 
-        assert_eq!(108, result.len());
+        assert_eq!(216, result.len());
         assert!(result.starts_with("01000000"))
     }
 
@@ -350,8 +364,8 @@ mod test {
         let hash = st.to_buffer(true).unwrap();
         let result = hex::encode(hash);
 
-        assert_eq!(42, result.len());
-        assert_eq!("01000000a16e7472616e736974696f6e5479706501", result);
+        assert_eq!(150, result.len());
+        assert_eq!("01000000a26e7472616e736974696f6e5479706501676f776e65724964782c4158356f323241525746595a45394a5a5441355353657976707274657442637662514c53425a376352374777", result);
     }
 
     #[test]
