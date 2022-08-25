@@ -66,7 +66,7 @@ impl Epoch {
     }
 
     pub fn update_start_time_operation(&self, time_ms: u64) -> GroveDbOp {
-        GroveDbOp {
+        GroveDbOp::RunOp {
             path: self.get_vec_path(),
             key: KEY_START_TIME.to_vec(),
             op: Insert {
@@ -76,7 +76,7 @@ impl Epoch {
     }
 
     pub fn update_start_block_height_operation(&self, start_block_height: u64) -> GroveDbOp {
-        GroveDbOp {
+        GroveDbOp::RunOp {
             path: self.get_vec_path(),
             key: KEY_START_BLOCK_HEIGHT.to_vec(),
             op: Insert {
@@ -86,7 +86,7 @@ impl Epoch {
     }
 
     pub fn update_fee_multiplier_operation(&self, multiplier: f64) -> GroveDbOp {
-        GroveDbOp {
+        GroveDbOp::RunOp {
             path: self.get_vec_path(),
             key: KEY_FEE_MULTIPLIER.to_vec(),
             op: Insert {
@@ -99,7 +99,7 @@ impl Epoch {
         &self,
         processing_fee: u64,
     ) -> GroveDbOp {
-        GroveDbOp {
+        GroveDbOp::RunOp {
             path: self.get_vec_path(),
             key: KEY_POOL_PROCESSING_FEES.to_vec(),
             op: Insert {
@@ -109,7 +109,7 @@ impl Epoch {
     }
 
     pub fn delete_processing_credits_for_distribution_operation(&self) -> GroveDbOp {
-        GroveDbOp {
+        GroveDbOp::RunOp {
             path: self.get_vec_path(),
             key: KEY_POOL_PROCESSING_FEES.to_vec(),
             op: Op::Delete,
@@ -117,7 +117,7 @@ impl Epoch {
     }
 
     pub fn update_storage_credits_for_distribution_operation(&self, storage_fee: u64) -> GroveDbOp {
-        GroveDbOp {
+        GroveDbOp::RunOp {
             path: self.get_vec_path(),
             key: KEY_POOL_STORAGE_FEES.to_vec(),
             op: Insert {
@@ -127,7 +127,7 @@ impl Epoch {
     }
 
     pub fn delete_storage_credits_for_distribution_operation(&self) -> GroveDbOp {
-        GroveDbOp {
+        GroveDbOp::RunOp {
             path: self.get_vec_path(),
             key: KEY_POOL_STORAGE_FEES.to_vec(),
             op: Op::Delete,
@@ -139,7 +139,7 @@ impl Epoch {
         proposer_pro_tx_hash: &[u8; 32],
         block_count: u64,
     ) -> GroveDbOp {
-        GroveDbOp {
+        GroveDbOp::RunOp {
             path: self.get_proposers_vec_path(),
             key: proposer_pro_tx_hash.to_vec(),
             op: Insert {
@@ -149,7 +149,7 @@ impl Epoch {
     }
 
     pub fn init_proposers_tree_operation(&self) -> GroveDbOp {
-        GroveDbOp {
+        GroveDbOp::RunOp {
             path: self.get_vec_path(),
             key: epoch_key_constants::KEY_PROPOSERS.to_vec(),
             op: Insert {
@@ -159,7 +159,7 @@ impl Epoch {
     }
 
     pub fn delete_proposers_tree_operation(&self) -> GroveDbOp {
-        GroveDbOp {
+        GroveDbOp::RunOp {
             path: self.get_vec_path(),
             key: epoch_key_constants::KEY_PROPOSERS.to_vec(),
             op: Op::Delete,

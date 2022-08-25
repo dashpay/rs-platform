@@ -4,7 +4,7 @@ use grovedb::batch::{GroveDbOp, Op};
 use grovedb::Element;
 
 pub(super) fn update_genesis_time_operation(genesis_time_ms: u64) -> GroveDbOp {
-    GroveDbOp {
+    GroveDbOp::RunOp {
         path: vec![vec![RootTree::Pools as u8]],
         key: KEY_GENESIS_TIME.to_vec(),
         // TODO make this into a Op::Replace

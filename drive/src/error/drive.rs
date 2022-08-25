@@ -20,6 +20,8 @@ pub enum DriveError {
 
     #[error("deleting document that does not exist error: {0}")]
     DeletingDocumentThatDoesNotExist(&'static str),
+    #[error("updating document that did not already exist error: {0}")]
+    UpdatingDocumentThatDoesNotExist(&'static str),
 
     #[error("changing contract to readonly error: {0}")]
     ChangingContractToReadOnly(&'static str),

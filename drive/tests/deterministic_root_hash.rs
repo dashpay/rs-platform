@@ -13,7 +13,7 @@ use tempfile::TempDir;
 use rs_drive::drive::config::DriveConfig;
 use rs_drive::drive::flags::StorageFlags;
 use rs_drive::drive::object_size_info::DocumentAndContractInfo;
-use rs_drive::drive::object_size_info::DocumentInfo::DocumentAndSerialization;
+use rs_drive::drive::object_size_info::DocumentInfo::DocumentRefAndSerialization;
 use rs_drive::drive::{Drive, RootTree};
 
 use dpp::data_contract::extra::DriveContractExt;
@@ -94,7 +94,7 @@ pub fn add_domains_to_contract(
         drive
             .add_document_for_contract(
                 DocumentAndContractInfo {
-                    document_info: DocumentAndSerialization((
+                    document_info: DocumentRefAndSerialization((
                         &document,
                         &document_cbor,
                         &storage_flags,

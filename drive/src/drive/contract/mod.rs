@@ -11,7 +11,7 @@ use grovedb::{Element, TransactionArg};
 use crate::contract::Contract;
 use crate::drive::batch::GroveDbOpBatch;
 use crate::drive::flags::StorageFlags;
-use crate::drive::object_size_info::KeyInfo::{KeyRef, KeySize};
+use crate::drive::object_size_info::DriveKeyInfo::{KeyRef, KeySize};
 use crate::drive::object_size_info::KeyValueInfo::KeyRefRequest;
 use crate::drive::object_size_info::PathKeyElementInfo::{
     PathFixedSizeKeyElement, PathKeyElementSize,
@@ -97,7 +97,7 @@ impl Drive {
                 PathFixedSizeKeyElement((
                     contract_keeping_history_storage_path,
                     &[0],
-                    Element::Reference(contract_storage_path, element_flags),
+                    Element::Reference(contract_storage_path, Some(1), element_flags),
                 ))
             } else {
                 PathKeyElementSize((
@@ -456,7 +456,8 @@ impl Drive {
         
         let query_state_less_max_value_size = if apply { None } else { Some(CONTRACT_MAX_SERIALIZED_SIZE) };
 
-        if let Ok(Some(stored_element)) = self.grove_get(
+        // We can do a get direct because there are no references involved
+        if let Ok(Some(stored_element)) = self.grove_get_direct(
             contract_root_path(contract.id.as_bytes()),
             KeyRefRequest(&[0]),
             query_state_less_max_value_size,
@@ -637,7 +638,7 @@ mod tests {
         drive
             .add_document_for_contract(
                 DocumentAndContractInfo {
-                    document_info: DocumentInfo::DocumentAndSerialization((
+                    document_info: DocumentInfo::DocumentRefAndSerialization((
                         &document,
                         document.to_cbor().as_slice(),
                         &storage_flags,
@@ -674,7 +675,7 @@ mod tests {
         drive
             .add_document_for_contract(
                 DocumentAndContractInfo {
-                    document_info: DocumentInfo::DocumentAndSerialization((
+                    document_info: DocumentInfo::DocumentRefAndSerialization((
                         &document,
                         document.to_cbor().as_slice(),
                         &storage_flags,

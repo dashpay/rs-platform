@@ -7,12 +7,14 @@ use crate::drive::document::{contract_document_type_path, contract_documents_pri
 use crate::drive::object_size_info::KeyValueInfo::KeyRefRequest;
 use crate::drive::Drive;
 use crate::drive::flags::StorageFlags;
-use crate::drive::object_size_info::DocumentInfo::{DocumentAndSerialization, DocumentSize};
+use crate::drive::object_size_info::DocumentInfo::{DocumentRefAndSerialization, DocumentSize};
 use crate::error::drive::DriveError;
 use crate::error::Error;
 use crate::fee::calculate_fee;
 use crate::fee::op::DriveOperation;
 use dpp::data_contract::extra::DriveContractExt;
+use crate::drive::object_size_info::DriveKeyInfo;
+use crate::drive::object_size_info::DriveKeyInfo::Key;
 
 impl Drive {
     pub fn delete_document_for_contract(
@@ -89,7 +91,7 @@ impl Drive {
         let query_stateless_max_value_size = if stateless { Some(document_type.max_size()) } else { None };
 
         // next we need to get the document from storage
-        let document_element: Option<Element> = self.grove_get(
+        let document_element: Option<Element> = self.grove_get_direct(
             contract_documents_primary_key_path,
             KeyRefRequest(document_id),
             query_stateless_max_value_size,
@@ -97,15 +99,13 @@ impl Drive {
             &mut batch_operations,
         )?;
 
-        let mut document : Document;
-        let mut storage_flags : StorageFlags;
         let document_info = if let Some(max_value_size) = query_stateless_max_value_size {
             DocumentSize(max_value_size as u32)
         } else if let Some(document_element) = &document_element {
             if let Element::Item(data, element_flags) = document_element {
-                document = Document::from_cbor(data.as_slice(), None, owner_id)?;
-                storage_flags = StorageFlags::from_element_flags(element_flags.clone())?;
-                DocumentAndSerialization((&document, data.as_slice(), &storage_flags))
+                let document = Document::from_cbor(data.as_slice(), None, owner_id)?;
+                let storage_flags = StorageFlags::from_element_flags(element_flags.clone())?;
+                DocumentRefAndSerialization((&document, data.as_slice(), &storage_flags))
             } else {
                 return Err(Error::Drive(DriveError::CorruptedDocumentNotItem(
                     "document being deleted is not an item",
@@ -137,14 +137,14 @@ impl Drive {
             // at this point the contract path is to the contract documents
             // for each index the top index component will already have been added
             // when the contract itself was created
-            let mut index_path: Vec<Vec<u8>> = contract_document_type_path
+            let mut index_path: Vec<DriveKeyInfo> = contract_document_type_path
                 .iter()
-                .map(|&x| Vec::from(x))
+                .map(|&x| Key(Vec::from(x)))
                 .collect();
             let top_index_property = index.properties.get(0).ok_or(Error::Drive(
                 DriveError::CorruptedContractIndexes("invalid contract indices"),
             ))?;
-            index_path.push(Vec::from(top_index_property.name.as_bytes()));
+            index_path.push(Key(Vec::from(top_index_property.name.as_bytes())));
 
             // with the example of the dashpay contract's first index
             // the index path is now something like Contracts/ContractID/Documents(1)/$ownerId
@@ -165,15 +165,14 @@ impl Drive {
                     DriveError::CorruptedContractIndexes("invalid contract indices"),
                 ))?;
 
-                index_path.push(Vec::from(index_property.name.as_bytes()));
+                index_path.push(Key(Vec::from(index_property.name.as_bytes())));
                 // Iteration 1. the index path is now something like Contracts/ContractID/Documents(1)/$ownerId/<ownerId>/toUserId
                 // Iteration 2. the index path is now something like Contracts/ContractID/Documents(1)/$ownerId/<ownerId>/toUserId/<ToUserId>/accountReference
 
-                let document_top_field: Vec<u8> = document
-                    .get_raw_for_contract(
+                let document_top_field = document_info
+                    .get_raw_for_document_type(
                         &index_property.name,
-                        document_type_name,
-                        contract,
+                        document_type,
                         owner_id,
                     )?
                     .unwrap_or_default();
@@ -187,28 +186,24 @@ impl Drive {
             // unique indexes will be stored under key "0"
             // non unique indices should have a tree at key "0" that has all elements based off of primary key
             if !index.unique {
-                index_path.push(vec![0]);
-
-                let index_path_slices: Vec<&[u8]> =
-                    index_path.iter().map(|x| x.as_slice()).collect();
+                index_path.push(Key(vec![0]));
 
                 // here we should return an error if the element already exists
                 self.batch_delete_up_tree_while_empty(
-                    index_path_slices,
+                    index_path,
                     document_id,
                     Some(CONTRACT_DOCUMENTS_PATH_HEIGHT),
+                    apply,
                     transaction,
                     &mut batch_operations,
                 )?;
             } else {
-                let index_path_slices: Vec<&[u8]> =
-                    index_path.iter().map(|x| x.as_slice()).collect();
-
                 // here we should return an error if the element already exists
                 self.batch_delete_up_tree_while_empty(
-                    index_path_slices,
+                    index_path,
                     &[0],
                     Some(CONTRACT_DOCUMENTS_PATH_HEIGHT),
+                    apply,
                     transaction,
                     &mut batch_operations,
                 )?;
@@ -234,7 +229,7 @@ mod tests {
     use crate::drive::document::tests::setup_dashpay;
     use crate::drive::flags::StorageFlags;
     use crate::drive::object_size_info::DocumentAndContractInfo;
-    use crate::drive::object_size_info::DocumentInfo::DocumentAndSerialization;
+    use crate::drive::object_size_info::DocumentInfo::DocumentRefAndSerialization;
     use crate::drive::Drive;
     use crate::query::DriveQuery;
 
@@ -274,7 +269,7 @@ mod tests {
         drive
             .add_document_for_contract(
                 DocumentAndContractInfo {
-                    document_info: DocumentAndSerialization((
+                    document_info: DocumentRefAndSerialization((
                         &document,
                         &person_serialized_document,
                         &storage_flags,
@@ -365,7 +360,7 @@ mod tests {
         drive
             .add_document_for_contract(
                 DocumentAndContractInfo {
-                    document_info: DocumentAndSerialization((
+                    document_info: DocumentRefAndSerialization((
                         &document,
                         &person_serialized_document,
                         &storage_flags,
@@ -472,7 +467,7 @@ mod tests {
         drive
             .add_document_for_contract(
                 DocumentAndContractInfo {
-                    document_info: DocumentAndSerialization((
+                    document_info: DocumentRefAndSerialization((
                         &document,
                         &person_serialized_document,
                         &storage_flags,
@@ -508,7 +503,7 @@ mod tests {
         drive
             .add_document_for_contract(
                 DocumentAndContractInfo {
-                    document_info: DocumentAndSerialization((
+                    document_info: DocumentRefAndSerialization((
                         &document,
                         &person_serialized_document,
                         &storage_flags,
@@ -645,7 +640,7 @@ mod tests {
         drive
             .add_document_for_contract(
                 DocumentAndContractInfo {
-                    document_info: DocumentAndSerialization((
+                    document_info: DocumentRefAndSerialization((
                         &document,
                         &person_serialized_document,
                         &storage_flags,
@@ -681,7 +676,7 @@ mod tests {
         drive
             .add_document_for_contract(
                 DocumentAndContractInfo {
-                    document_info: DocumentAndSerialization((
+                    document_info: DocumentRefAndSerialization((
                         &document,
                         &person_serialized_document,
                         &storage_flags,
@@ -749,7 +744,7 @@ mod tests {
         drive
             .add_document_for_contract(
                 DocumentAndContractInfo {
-                    document_info: DocumentAndSerialization((
+                    document_info: DocumentRefAndSerialization((
                         &document,
                         &person_serialized_document,
                         &storage_flags,
@@ -954,7 +949,7 @@ mod tests {
                 drive
                     .add_document_for_contract(
                         DocumentAndContractInfo {
-                            document_info: DocumentAndSerialization((
+                            document_info: DocumentRefAndSerialization((
                                 &document,
                                 &serialized_document,
                                 &storage_flags,

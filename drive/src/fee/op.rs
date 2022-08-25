@@ -208,7 +208,7 @@ impl SizesOfDeleteOperation {
     pub fn for_key_value(path_size: u32, key_size: u16, element: &Element, multiplier: u8) -> Self {
         let value_size = match element {
             Element::Item(item, _) => item.len(),
-            Element::Reference(path, _) => path.iter().map(|inner| inner.len()).sum(),
+            Element::Reference(path, _, _) => path.iter().map(|inner| inner.len()).sum(),
             Element::Tree(..) => 32,
         } as u32;
         SizesOfDeleteOperation::for_key_value_size(path_size, key_size, value_size, multiplier)
@@ -339,7 +339,7 @@ impl DriveOperation {
     }
 
     pub fn for_path_key_element(path: Vec<Vec<u8>>, key: Vec<u8>, element: Element) -> Self {
-        GroveOperation(GroveDbOp::insert(path, key, element))
+        GroveOperation(GroveDbOp::insert_run_op(path, key, element))
     }
 
     pub fn for_insert_path_key_value_size(path_size: u32, key_size: u16, value_size: u32) -> Self {

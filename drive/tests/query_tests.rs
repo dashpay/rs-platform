@@ -20,7 +20,7 @@ use rs_drive::drive::config::DriveConfig;
 use rs_drive::drive::contract::add_init_contracts_structure_operations;
 use rs_drive::drive::flags::StorageFlags;
 use rs_drive::drive::object_size_info::DocumentAndContractInfo;
-use rs_drive::drive::object_size_info::DocumentInfo::DocumentAndSerialization;
+use rs_drive::drive::object_size_info::DocumentInfo::DocumentRefAndSerialization;
 use rs_drive::drive::Drive;
 use rs_drive::error::{query::QueryError, Error};
 use rs_drive::query::DriveQuery;
@@ -163,7 +163,7 @@ pub fn setup_family_tests(count: u32, with_batching: bool, seed: u64) -> (Drive,
         drive
             .add_document_for_contract(
                 DocumentAndContractInfo {
-                    document_info: DocumentAndSerialization((
+                    document_info: DocumentRefAndSerialization((
                         &document,
                         &document_cbor,
                         &storage_flags,
@@ -236,7 +236,7 @@ pub fn setup_family_tests_with_nulls(
         drive
             .add_document_for_contract(
                 DocumentAndContractInfo {
-                    document_info: DocumentAndSerialization((
+                    document_info: DocumentRefAndSerialization((
                         &document,
                         &document_cbor,
                         &storage_flags,
@@ -337,7 +337,7 @@ pub fn add_domains_to_contract(
         drive
             .add_document_for_contract(
                 DocumentAndContractInfo {
-                    document_info: DocumentAndSerialization((
+                    document_info: DocumentRefAndSerialization((
                         &document,
                         &document_cbor,
                         &storage_flags,
@@ -432,7 +432,7 @@ pub fn setup_dpns_test_with_data(path: &str) -> (Drive, Contract) {
             drive
                 .add_document_for_contract(
                     DocumentAndContractInfo {
-                        document_info: DocumentAndSerialization((
+                        document_info: DocumentRefAndSerialization((
                             &domain,
                             &domain_cbor,
                             &storage_flags,
@@ -480,7 +480,7 @@ fn test_query_many() {
         drive
             .add_document_for_contract(
                 DocumentAndContractInfo {
-                    document_info: DocumentAndSerialization((
+                    document_info: DocumentRefAndSerialization((
                         &document,
                         &document_cbor,
                         &storage_flags,
@@ -1268,7 +1268,7 @@ fn test_family_basic_queries() {
     drive
         .add_document_for_contract(
             DocumentAndContractInfo {
-                document_info: DocumentAndSerialization((&document, &person_cbor, &storage_flags)),
+                document_info: DocumentRefAndSerialization((&document, &person_cbor, &storage_flags)),
                 contract: &contract,
                 document_type,
                 owner_id: None,
@@ -1311,7 +1311,7 @@ fn test_family_basic_queries() {
     drive
         .add_document_for_contract(
             DocumentAndContractInfo {
-                document_info: DocumentAndSerialization((&document, &person_cbor, &storage_flags)),
+                document_info: DocumentRefAndSerialization((&document, &person_cbor, &storage_flags)),
                 contract: &contract,
                 document_type,
                 owner_id: None,
@@ -3126,7 +3126,7 @@ fn test_dpns_query_start_at_with_null_id() {
     drive
         .add_document_for_contract(
             DocumentAndContractInfo {
-                document_info: DocumentAndSerialization((
+                document_info: DocumentRefAndSerialization((
                     &document0,
                     &document_cbor0,
                     &storage_flags,
@@ -3167,7 +3167,7 @@ fn test_dpns_query_start_at_with_null_id() {
     drive
         .add_document_for_contract(
             DocumentAndContractInfo {
-                document_info: DocumentAndSerialization((
+                document_info: DocumentRefAndSerialization((
                     &document1,
                     &document_cbor1,
                     &storage_flags,
@@ -3318,7 +3318,7 @@ fn test_dpns_query_start_after_with_null_id() {
     drive
         .add_document_for_contract(
             DocumentAndContractInfo {
-                document_info: DocumentAndSerialization((
+                document_info: DocumentRefAndSerialization((
                     &document0,
                     &document_cbor0,
                     &storage_flags,
@@ -3360,7 +3360,7 @@ fn test_dpns_query_start_after_with_null_id() {
     drive
         .add_document_for_contract(
             DocumentAndContractInfo {
-                document_info: DocumentAndSerialization((
+                document_info: DocumentRefAndSerialization((
                     &document1,
                     &document_cbor1,
                     &storage_flags,
@@ -3513,7 +3513,7 @@ fn test_dpns_query_start_after_with_null_id_desc() {
     drive
         .add_document_for_contract(
             DocumentAndContractInfo {
-                document_info: DocumentAndSerialization((
+                document_info: DocumentRefAndSerialization((
                     &document0,
                     &document_cbor0,
                     &storage_flags,
@@ -3555,7 +3555,7 @@ fn test_dpns_query_start_after_with_null_id_desc() {
     drive
         .add_document_for_contract(
             DocumentAndContractInfo {
-                document_info: DocumentAndSerialization((
+                document_info: DocumentRefAndSerialization((
                     &document1,
                     &document_cbor1,
                     &storage_flags,

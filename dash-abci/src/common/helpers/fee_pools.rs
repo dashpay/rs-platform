@@ -9,7 +9,7 @@ use rs_drive::contract::Contract;
 use rs_drive::dpp::data_contract::extra::DriveContractExt;
 use rs_drive::drive::flags::StorageFlags;
 use rs_drive::drive::object_size_info::DocumentAndContractInfo;
-use rs_drive::drive::object_size_info::DocumentInfo::DocumentAndSerialization;
+use rs_drive::drive::object_size_info::DocumentInfo::DocumentRefAndSerialization;
 use rs_drive::drive::Drive;
 use rs_drive::grovedb::TransactionArg;
 
@@ -51,7 +51,7 @@ fn create_test_mn_share_document(
     drive
         .add_document_for_contract(
             DocumentAndContractInfo {
-                document_info: DocumentAndSerialization((
+                document_info: DocumentRefAndSerialization((
                     &document,
                     &document_cbor,
                     &storage_flags,

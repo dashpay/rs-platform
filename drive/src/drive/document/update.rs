@@ -12,10 +12,10 @@ use crate::drive::document::{
     contract_documents_primary_key_path,
 };
 use crate::drive::flags::StorageFlags;
-use crate::drive::object_size_info::DocumentInfo::{DocumentAndSerialization, DocumentSize};
+use crate::drive::object_size_info::DocumentInfo::{DocumentRefAndSerialization, DocumentSize, DocumentWithoutSerialization};
 use crate::drive::object_size_info::KeyValueInfo::KeyRefRequest;
 use crate::drive::object_size_info::PathKeyElementInfo::PathKeyElement;
-use crate::drive::object_size_info::{DocumentAndContractInfo, PathKeyInfo};
+use crate::drive::object_size_info::{DocumentAndContractInfo, DocumentInfo, DriveKeyInfo, PathKeyInfo};
 use crate::drive::Drive;
 use crate::error::drive::DriveError;
 use crate::error::Error;
@@ -96,7 +96,7 @@ impl Drive {
         let document_type = contract.document_type_for_name(document_type_name)?;
 
         let document_info = if apply {
-            DocumentAndSerialization((document, serialized_document, &storage_flags))
+            DocumentRefAndSerialization((document, serialized_document, &storage_flags))
         } else {
             let element_size = Element::Item(
                 serialized_document.to_vec(),
@@ -159,7 +159,7 @@ impl Drive {
         let document_type = document_and_contract_info.document_type;
         let owner_id = document_and_contract_info.owner_id;
 
-        if let DocumentAndSerialization((document, _serialized_document, storage_flags)) =
+        if let DocumentRefAndSerialization((document, _serialized_document, storage_flags)) =
             document_and_contract_info.document_info
         {
             // we need to construct the path for documents on the contract
@@ -186,35 +186,38 @@ impl Drive {
                 reference_path.push(vec![0]);
             }
             let document_reference =
-                Element::Reference(reference_path, storage_flags.to_element_flags());
+                Element::Reference(reference_path, Some(1), storage_flags.to_element_flags());
 
             let query_stateless_max_value_size = if apply { None } else { Some(document_type.max_size()) };
 
             // next we need to get the old document from storage
-            let old_document_element: Element = if document_type.documents_keep_history {
+            let old_document_element = if document_type.documents_keep_history {
                 let contract_documents_keeping_history_primary_key_path_for_document_id =
                     contract_documents_keeping_history_primary_key_path_for_document_id(
                         contract.id.as_bytes(),
                         document_type.name.as_str(),
                         document.id.as_slice(),
                     );
+                // When keeping document history the 0 is a reference that points to the current value
+                // O is just on one byte, so we have at most one hop of size 1 (1 byte)
+                let query_stateless_with_max_value_size_and_max_reference_sizes =
+                    query_stateless_max_value_size.map(|vs| (vs, vec![1]));
                 self.grove_get(
                     contract_documents_keeping_history_primary_key_path_for_document_id,
                     KeyRefRequest(&[0]),
-                    query_stateless_max_value_size,
+                    query_stateless_with_max_value_size_and_max_reference_sizes,
                     transaction,
                     &mut batch_operations,
                 )?
             } else {
-                self.grove_get(
+                self.grove_get_direct(
                     contract_documents_primary_key_path,
                     KeyRefRequest(document.id.as_slice()),
                     query_stateless_max_value_size,
                     transaction,
                     &mut batch_operations,
                 )?
-            }
-            .unwrap();
+            };
 
             // we need to store the document for it's primary key
             // we should be overriding if the document_type does not have history enabled
@@ -227,18 +230,27 @@ impl Drive {
                 &mut batch_operations,
             )?;
 
-            let old_document =
-                if let Element::Item(old_serialized_document, _) = old_document_element {
-                    Ok(Document::from_cbor(
+            let old_document_info = if let Some(old_document_element) = old_document_element {
+                if let Element::Item(old_serialized_document, element_flags) = old_document_element {
+                    let document = Document::from_cbor(
                         old_serialized_document.as_slice(),
                         None,
                         owner_id,
-                    )?)
+                    )?;
+                    Ok(DocumentWithoutSerialization((document, StorageFlags::from_element_flags(element_flags)?)))
                 } else {
                     Err(Error::Drive(DriveError::CorruptedDocumentNotItem(
                         "old document is not an item",
                     )))
-                }?;
+                }?
+            } else if let Some(max_value_size) = query_stateless_max_value_size {
+                DocumentSize(max_value_size as u32)
+            } else {
+                return Err(Error::Drive(DriveError::UpdatingDocumentThatDoesNotExist(
+                    "document being updated does not exist",
+                )));
+            };
+
 
             let mut batch_insertion_cache: HashSet<Vec<Vec<u8>>> = HashSet::new();
             // fourth we need to store a reference to the document for each index
@@ -258,24 +270,31 @@ impl Drive {
                 // with the example of the dashpay contract's first index
                 // the index path is now something like Contracts/ContractID/Documents(1)/$ownerId
                 let document_top_field = document
-                    .get_raw_for_contract(
+                    .get_raw_for_document_type(
                         &top_index_property.name,
-                        document_type.name.as_str(),
-                        contract,
+                        document_type,
                         owner_id,
                     )?
                     .unwrap_or_default();
 
-                let old_document_top_field = old_document
-                    .get_raw_for_contract(
+                let old_document_top_field = old_document_info
+                    .get_raw_for_document_type(
                         &top_index_property.name,
-                        document_type.name.as_str(),
-                        contract,
+                        document_type,
                         owner_id,
                     )?
                     .unwrap_or_default();
 
-                let mut change_occurred_on_index = document_top_field != old_document_top_field;
+                // if we are not applying that means we are trying to get worst case costs
+                // which would entail a change on every index
+                let mut change_occurred_on_index = match &old_document_top_field {
+                    DriveKeyInfo::Key(k) => { &document_top_field != k}
+                    DriveKeyInfo::KeyRef(k) => { document_top_field.as_slice() != *k}
+                    DriveKeyInfo::KeySize(_) => {
+                        // we should assume true in this worst case cost scenario
+                        true
+                    }
+                };
 
                 if change_occurred_on_index {
                     // here we are inserting an empty tree that will have a subtree of all other index properties
@@ -301,7 +320,7 @@ impl Drive {
 
                 let mut all_fields_null = document_top_field.is_empty();
 
-                let mut old_index_path = index_path.clone();
+                let mut old_index_path : Vec<DriveKeyInfo> = index_path.iter().map(|path_item| DriveKeyInfo::Key(path_item.clone())).collect();
                 // we push the actual value of the index path
                 index_path.push(document_top_field);
                 // the index path is now something like Contracts/ContractID/Documents(1)/$ownerId/<ownerId>
@@ -314,24 +333,31 @@ impl Drive {
                     ))?;
 
                     let document_index_field = document
-                        .get_raw_for_contract(
+                        .get_raw_for_document_type(
                             &index_property.name,
-                            document_type.name.as_str(),
-                            contract,
+                            document_type,
                             owner_id,
                         )?
                         .unwrap_or_default();
 
-                    let old_document_index_field = old_document
-                        .get_raw_for_contract(
+                    let old_document_index_field = old_document_info
+                        .get_raw_for_document_type(
                             &index_property.name,
-                            document_type.name.as_str(),
-                            contract,
+                            document_type,
                             owner_id,
                         )?
                         .unwrap_or_default();
 
-                    change_occurred_on_index |= document_index_field != old_document_index_field;
+                    // if we are not applying that means we are trying to get worst case costs
+                    // which would entail a change on every index
+                    change_occurred_on_index |= match &old_document_index_field {
+                        DriveKeyInfo::Key(k) => { &document_top_field != k}
+                        DriveKeyInfo::KeyRef(k) => { &document_top_field != *k}
+                        DriveKeyInfo::KeySize(_) => {
+                            // we should assume true in this worst case cost scenario
+                            true
+                        }
+                    };
 
                     if change_occurred_on_index {
                         // here we are inserting an empty tree that will have a subtree of all other index properties
@@ -357,7 +383,7 @@ impl Drive {
                     }
 
                     index_path.push(Vec::from(index_property.name.as_bytes()));
-                    old_index_path.push(Vec::from(index_property.name.as_bytes()));
+                    old_index_path.push(DriveKeyInfo::Key(Vec::from(index_property.name.as_bytes())));
 
                     // Iteration 1. the index path is now something like Contracts/ContractID/Documents(1)/$ownerId/<ownerId>/toUserId
                     // Iteration 2. the index path is now something like Contracts/ContractID/Documents(1)/$ownerId/<ownerId>/toUserId/<ToUserId>/accountReference
@@ -399,28 +425,24 @@ impl Drive {
                     // unique indexes will be stored under key "0"
                     // non unique indices should have a tree at key "0" that has all elements based off of primary key
                     if !index.unique {
-                        old_index_path.push(vec![0]);
-
-                        let old_index_path_slices: Vec<&[u8]> =
-                            old_index_path.iter().map(|x| x.as_slice()).collect();
+                        old_index_path.push(DriveKeyInfo::Key(vec![0]));
 
                         // here we should return an error if the element already exists
                         self.batch_delete_up_tree_while_empty(
-                            old_index_path_slices,
+                            old_index_path,
                             document.id.as_slice(),
                             Some(CONTRACT_DOCUMENTS_PATH_HEIGHT),
+                            apply,
                             transaction,
                             &mut batch_operations,
                         )?;
                     } else {
-                        let old_index_path_slices: Vec<&[u8]> =
-                            old_index_path.iter().map(|x| x.as_slice()).collect();
-
                         // here we should return an error if the element already exists
                         self.batch_delete_up_tree_while_empty(
-                            old_index_path_slices,
+                            old_index_path,
                             &[0],
                             Some(CONTRACT_DOCUMENTS_PATH_HEIGHT),
+                            apply,
                             transaction,
                             &mut batch_operations,
                         )?;
@@ -486,7 +508,7 @@ mod tests {
     use crate::drive::config::{DriveConfig, DriveEncoding};
     use crate::drive::flags::StorageFlags;
     use crate::drive::object_size_info::DocumentAndContractInfo;
-    use crate::drive::object_size_info::DocumentInfo::DocumentAndSerialization;
+    use crate::drive::object_size_info::DocumentInfo::DocumentRefAndSerialization;
     use crate::drive::{defaults, Drive};
     use crate::query::DriveQuery;
 
@@ -590,7 +612,7 @@ mod tests {
         drive
             .add_document_for_contract(
                 DocumentAndContractInfo {
-                    document_info: DocumentAndSerialization((
+                    document_info: DocumentRefAndSerialization((
                         &alice_profile,
                         alice_profile_cbor.as_slice(),
                         &storage_flags,
@@ -681,7 +703,7 @@ mod tests {
         drive
             .add_document_for_contract(
                 DocumentAndContractInfo {
-                    document_info: DocumentAndSerialization((
+                    document_info: DocumentRefAndSerialization((
                         &alice_profile,
                         alice_profile_cbor.as_slice(),
                         &storage_flags,
@@ -792,7 +814,7 @@ mod tests {
         drive
             .add_document_for_contract(
                 DocumentAndContractInfo {
-                    document_info: DocumentAndSerialization((
+                    document_info: DocumentRefAndSerialization((
                         &alice_profile,
                         alice_profile_cbor.as_slice(),
                         &storage_flags,
@@ -1168,7 +1190,7 @@ mod tests {
         drive
             .add_document_for_contract(
                 DocumentAndContractInfo {
-                    document_info: DocumentAndSerialization((
+                    document_info: DocumentRefAndSerialization((
                         &document,
                         &document_cbor,
                         &storage_flags,

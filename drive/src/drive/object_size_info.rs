@@ -2,7 +2,7 @@ use grovedb::Element;
 use std::collections::HashSet;
 use std::ops::AddAssign;
 
-use KeyInfo::{Key, KeyRef, KeySize};
+use DriveKeyInfo::{Key, KeyRef, KeySize};
 use KeyValueInfo::{KeyRefRequest, KeyValueMaxSize};
 use PathInfo::{PathFixedSizeIterator, PathIterator, PathSize};
 use PathKeyElementInfo::{PathFixedSizeKeyElement, PathKeyElement, PathKeyElementSize};
@@ -51,7 +51,7 @@ impl<'a, const N: usize> PathInfo<'a, N> {
         }
     }
 
-    pub fn push(&mut self, key_info: KeyInfo<'a>) -> Result<(), Error> {
+    pub fn push(&mut self, key_info: DriveKeyInfo<'a>) -> Result<(), Error> {
         match self {
             PathFixedSizeIterator(_) => {
                 return Err(Error::Drive(DriveError::CorruptedCodeExecution(
@@ -78,7 +78,7 @@ impl<'a, const N: usize> PathInfo<'a, N> {
 }
 
 #[derive(Clone)]
-pub enum KeyInfo<'a> {
+pub enum DriveKeyInfo<'a> {
     /// A key
     Key(Vec<u8>),
     /// A key by reference
@@ -87,13 +87,13 @@ pub enum KeyInfo<'a> {
     KeySize(usize),
 }
 
-impl<'a> Default for KeyInfo<'a> {
+impl<'a> Default for DriveKeyInfo<'a> {
     fn default() -> Self {
         Key(vec![])
     }
 }
 
-impl<'a> KeyInfo<'a> {
+impl<'a> DriveKeyInfo<'a> {
     pub fn len(&'a self) -> usize {
         match self {
             Key(key) => key.len(),
@@ -361,10 +361,12 @@ pub struct DocumentAndContractInfo<'a> {
 
 #[derive(Clone)]
 pub enum DocumentInfo<'a> {
-    /// The document and it's serialized form
-    DocumentAndSerialization((&'a Document, &'a [u8], &'a StorageFlags)),
+    /// The borrowed document and it's serialized form
+    DocumentRefAndSerialization((&'a Document, &'a [u8], &'a StorageFlags)),
+    /// The borrowed document without it's serialized form
+    DocumentRefWithoutSerialization((&'a Document, &'a StorageFlags)),
     /// The document without it's serialized form
-    DocumentWithoutSerialization((&'a Document, &'a StorageFlags)),
+    DocumentWithoutSerialization((Document, StorageFlags)),
     /// An element size
     DocumentSize(u32),
 }
@@ -372,14 +374,15 @@ pub enum DocumentInfo<'a> {
 impl<'a> DocumentInfo<'a> {
     pub fn is_document_and_serialization(&self) -> bool {
         match self {
-            DocumentInfo::DocumentAndSerialization(_) => true,
+            DocumentInfo::DocumentRefAndSerialization(..)  => true,
             _ => false,
         }
     }
 
     pub fn id_key_value_info(&self) -> KeyValueInfo {
         match self {
-            DocumentInfo::DocumentAndSerialization((document, _, _)) => {
+            DocumentInfo::DocumentRefAndSerialization((document, _, _))
+            | DocumentInfo::DocumentRefWithoutSerialization((document, _))=> {
                 KeyRefRequest(document.id.as_slice())
             }
             DocumentInfo::DocumentWithoutSerialization((document, _)) => {
@@ -396,10 +399,18 @@ impl<'a> DocumentInfo<'a> {
         key_path: &str,
         document_type: &DocumentType,
         owner_id: Option<&[u8]>,
-    ) -> Result<Option<KeyInfo>, Error> {
+    ) -> Result<Option<DriveKeyInfo>, Error> {
         match self {
-            DocumentInfo::DocumentAndSerialization((document, _, _))
-            | DocumentInfo::DocumentWithoutSerialization((document, _)) => {
+            DocumentInfo::DocumentRefAndSerialization((document, _, _))
+            | DocumentInfo::DocumentRefWithoutSerialization((document, _)) => {
+                let raw_value =
+                    document.get_raw_for_document_type(key_path, document_type, owner_id)?;
+                match raw_value {
+                    None => Ok(None),
+                    Some(value) => Ok(Some(Key(value))),
+                }
+            }
+            DocumentInfo::DocumentWithoutSerialization((document, _)) => {
                 let raw_value =
                     document.get_raw_for_document_type(key_path, document_type, owner_id)?;
                 match raw_value {
@@ -427,9 +438,12 @@ impl<'a> DocumentInfo<'a> {
     }
 
     pub fn get_storage_flags(&self) -> StorageFlags {
-        match *self {
-            DocumentInfo::DocumentAndSerialization((_, _, storage_flags))
-            | DocumentInfo::DocumentWithoutSerialization((_, storage_flags)) => {
+        match self {
+            DocumentInfo::DocumentRefAndSerialization((_, _, &storage_flags))
+            | DocumentInfo::DocumentRefWithoutSerialization((_, &storage_flags)) => {
+                storage_flags.clone()
+            }
+            DocumentInfo::DocumentWithoutSerialization((_, storage_flags)) => {
                 storage_flags.clone()
             }
             DocumentInfo::DocumentSize(_) => StorageFlags::default(),
@@ -446,6 +460,15 @@ pub enum KeyValueInfo<'a> {
 }
 
 impl<'a> KeyValueInfo<'a> {
+    pub fn as_key_ref_request(&'a self) -> Result<&'a [u8], Error> {
+        match self {
+            KeyRefRequest(key) => Ok(key),
+            KeyValueMaxSize((_, _)) => Err(Error::Drive(DriveError::CorruptedCodeExecution(
+                "requesting KeyValueInfo as key ref request however it is a key value max size",
+            )))
+        }
+    }
+
     pub fn key_len(&'a self) -> u16 {
         match self {
             KeyRefRequest(key) => key.len() as u16,

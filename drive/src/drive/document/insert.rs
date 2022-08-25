@@ -17,10 +17,10 @@ use crate::drive::document::{
 };
 use crate::drive::flags::StorageFlags;
 use crate::drive::object_size_info::DocumentInfo::{
-    DocumentAndSerialization, DocumentSize, DocumentWithoutSerialization,
+    DocumentRefAndSerialization, DocumentSize, DocumentRefWithoutSerialization,
 };
 use crate::drive::object_size_info::KeyElementInfo::{KeyElement, KeyElementSize};
-use crate::drive::object_size_info::KeyInfo::{Key, KeyRef};
+use crate::drive::object_size_info::DriveKeyInfo::{Key, KeyRef};
 use crate::drive::object_size_info::PathKeyElementInfo::{
     PathFixedSizeKeyElement, PathKeyElementSize,
 };
@@ -56,7 +56,7 @@ impl Drive {
         );
         if document_type.documents_keep_history {
             let (path_key_info, storage_flags) =
-                if let DocumentAndSerialization((document, _, storage_flags)) =
+                if let DocumentRefAndSerialization((document, _, storage_flags)) =
                     document_and_contract_info.document_info
                 {
                     (
@@ -83,7 +83,7 @@ impl Drive {
             )?;
             let encoded_time = encode_float(block_time)?;
             let path_key_element_info = match document_and_contract_info.document_info {
-                DocumentAndSerialization((document, serialized_document, storage_flags)) => {
+                DocumentRefAndSerialization((document, serialized_document, storage_flags)) => {
                     let element = Element::Item(
                         Vec::from(serialized_document),
                         storage_flags.to_element_flags(),
@@ -100,7 +100,7 @@ impl Drive {
                         element,
                     ))
                 }
-                DocumentWithoutSerialization((document, storage_flags)) => {
+                DocumentRefWithoutSerialization((document, storage_flags)) => {
                     let serialized_document =
                         document.serialize(document_and_contract_info.document_type)?;
                     let element =
@@ -132,7 +132,7 @@ impl Drive {
             self.batch_insert(path_key_element_info, drive_operations)?;
 
             let path_key_element_info =
-                if let DocumentAndSerialization((document, _, storage_flags)) =
+                if let DocumentRefAndSerialization((document, _, storage_flags)) =
                     document_and_contract_info.document_info
                 {
                     // we should also insert a reference at 0 to the current value
@@ -153,7 +153,7 @@ impl Drive {
                     PathFixedSizeKeyElement((
                         document_id_in_primary_path,
                         &[0],
-                        Element::Reference(contract_storage_path, storage_flags.to_element_flags()),
+                        Element::Reference(contract_storage_path, Some(2), storage_flags.to_element_flags()),
                     ))
                 } else {
                     let path_max_length =
@@ -174,14 +174,14 @@ impl Drive {
             self.batch_insert(path_key_element_info, drive_operations)?;
         } else if insert_without_check {
             let path_key_element_info = match document_and_contract_info.document_info {
-                DocumentAndSerialization((document, serialized_document, storage_flags)) => {
+                DocumentRefAndSerialization((document, serialized_document, storage_flags)) => {
                     let element = Element::Item(
                         Vec::from(serialized_document),
                         storage_flags.to_element_flags(),
                     );
                     PathFixedSizeKeyElement((primary_key_path, document.id.as_slice(), element))
                 }
-                DocumentWithoutSerialization((document, storage_flags)) => {
+                DocumentRefWithoutSerialization((document, storage_flags)) => {
                     let serialized_document =
                         document.serialize(document_and_contract_info.document_type)?;
                     let element =
@@ -197,14 +197,14 @@ impl Drive {
             self.batch_insert(path_key_element_info, drive_operations)?;
         } else {
             let path_key_element_info = match document_and_contract_info.document_info {
-                DocumentAndSerialization((document, serialized_document, storage_flags)) => {
+                DocumentRefAndSerialization((document, serialized_document, storage_flags)) => {
                     let element = Element::Item(
                         Vec::from(serialized_document),
                         storage_flags.to_element_flags(),
                     );
                     PathFixedSizeKeyElement((primary_key_path, document.id.as_slice(), element))
                 }
-                DocumentWithoutSerialization((document, storage_flags)) => {
+                DocumentRefWithoutSerialization((document, storage_flags)) => {
                     let serialized_document =
                         document.serialize(document_and_contract_info.document_type)?;
                     let element =
@@ -253,7 +253,7 @@ impl Drive {
         let document = Document::from_cbor(serialized_document, None, owner_id)?;
 
         let document_info =
-            DocumentAndSerialization((&document, serialized_document, &storage_flags));
+            DocumentRefAndSerialization((&document, serialized_document, &storage_flags));
 
         let document_type = contract.document_type_for_name(document_type_name)?;
 
@@ -286,7 +286,7 @@ impl Drive {
         let document = Document::from_cbor(serialized_document, None, owner_id)?;
 
         let document_info =
-            DocumentAndSerialization((&document, serialized_document, &storage_flags));
+            DocumentRefAndSerialization((&document, serialized_document, &storage_flags));
 
         let document_type = contract.document_type_for_name(document_type_name)?;
 
@@ -350,24 +350,24 @@ impl Drive {
             document_and_contract_info.document_type.name.as_str(),
         );
 
-        // Apply means statefull query
+        // Apply means stateful query
         let query_stateless_with_max_value_size = if apply { None } else {
             Some(document_and_contract_info.document_type.max_size())
         };
 
         if override_document
+            && document_and_contract_info
+            .document_info
+            .is_document_and_serialization()
             && self
-                .grove_get(
+                .grove_has_raw(
                     primary_key_path,
-                    document_and_contract_info.document_info.id_key_value_info(),
+                    document_and_contract_info.document_info.id_key_value_info().as_key_ref_request()?,
                     query_stateless_with_max_value_size,
                     transaction,
                     &mut batch_operations,
                 )
                 .is_ok()
-            && document_and_contract_info
-                .document_info
-                .is_document_and_serialization()
         {
             self.update_document_for_contract_operations(
                 document_and_contract_info,
@@ -532,7 +532,7 @@ impl Drive {
                 if document_type.documents_keep_history {
                     reference_path.push(vec![0]);
                 }
-                Element::Reference(reference_path, storage_flags.to_element_flags())
+                Element::Reference(reference_path, Some(1), storage_flags.to_element_flags())
             }
 
             // unique indexes will be stored under key "0"
@@ -553,8 +553,8 @@ impl Drive {
                 index_path_info.push(Key(vec![0]))?;
 
                 let key_element_info = match &document_and_contract_info.document_info {
-                    DocumentAndSerialization((document, _, storage_flags))
-                    | DocumentWithoutSerialization((document, storage_flags)) => {
+                    DocumentRefAndSerialization((document, _, storage_flags))
+                    | DocumentRefWithoutSerialization((document, storage_flags)) => {
                         let document_reference = make_document_reference(
                             primary_key_path,
                             document,
@@ -578,8 +578,8 @@ impl Drive {
                 self.batch_insert(path_key_element_info, &mut batch_operations)?;
             } else {
                 let key_element_info = match &document_and_contract_info.document_info {
-                    DocumentAndSerialization((document, _, storage_flags))
-                    | DocumentWithoutSerialization((document, storage_flags)) => {
+                    DocumentRefAndSerialization((document, _, storage_flags))
+                    | DocumentRefWithoutSerialization((document, storage_flags)) => {
                         let document_reference = make_document_reference(
                             primary_key_path,
                             document,
@@ -630,7 +630,7 @@ mod tests {
     use crate::drive::document::tests::setup_dashpay;
     use crate::drive::flags::StorageFlags;
     use crate::drive::object_size_info::DocumentAndContractInfo;
-    use crate::drive::object_size_info::DocumentInfo::DocumentAndSerialization;
+    use crate::drive::object_size_info::DocumentInfo::DocumentRefAndSerialization;
     use crate::drive::Drive;
     use crate::fee::op::DriveOperation;
 
@@ -886,7 +886,7 @@ mod tests {
         let storage_flags = StorageFlags { epoch: 0 };
 
         let document_info =
-            DocumentAndSerialization((&document, &dashpay_cr_serialized_document, &storage_flags));
+            DocumentRefAndSerialization((&document, &dashpay_cr_serialized_document, &storage_flags));
 
         let document_type = contract
             .document_type_for_name("contactRequest")
@@ -982,7 +982,7 @@ mod tests {
         drive
             .add_document_for_contract(
                 DocumentAndContractInfo {
-                    document_info: DocumentAndSerialization((
+                    document_info: DocumentRefAndSerialization((
                         &document,
                         &dpns_domain_serialized_document,
                         &storage_flags,

@@ -28,7 +28,7 @@ pub fn add_create_fee_pool_trees_operations(batch: &mut GroveDbOpBatch) {
 }
 
 pub fn update_storage_fee_distribution_pool_operation(storage_fee: u64) -> GroveDbOp {
-    GroveDbOp {
+    GroveDbOp::RunOp {
         path: pools_vec_path(),
         key: KEY_STORAGE_FEE_POOL.to_vec(),
         op: Insert {
@@ -38,7 +38,7 @@ pub fn update_storage_fee_distribution_pool_operation(storage_fee: u64) -> Grove
 }
 
 pub fn update_unpaid_epoch_index_operation(epoch_index: u16) -> GroveDbOp {
-    GroveDbOp {
+    GroveDbOp::RunOp {
         path: pools_vec_path(),
         key: KEY_UNPAID_EPOCH_INDEX.to_vec(),
         op: Insert {
