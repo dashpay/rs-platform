@@ -40,7 +40,7 @@ pub fn js_object_to_element<'a, C: Context<'a>>(
             ))
         }
         "reference" => {
-            let js_object: Handle<JsArray> = js_object.get(cx, "value")?;
+            let js_object: Handle<JsObject> = js_object.get(cx, "value")?;
             let reference = js_object_to_reference(js_object, cx)?;
 
             Ok(Element::new_reference_with_flags(
@@ -67,7 +67,7 @@ pub fn js_object_to_element<'a, C: Context<'a>>(
 }
 
 fn js_object_to_reference<'a, C: Context<'a>>(
-    js_object: Handle<JsArray>,
+    js_object: Handle<JsObject>,
     cx: &mut C,
 ) -> NeonResult<ReferencePathType> {
     let js_reference_type: Handle<JsString> = js_object.get(cx, "type")?;
