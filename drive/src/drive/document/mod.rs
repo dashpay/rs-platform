@@ -80,6 +80,15 @@ fn make_document_reference(
         max_reference_hops += 1;
     }
     // 2 because the contract could allow for history
+    // 4 because
+    // - ContractDocumentsTree
+    // - Contract ID
+    // - 1 Documents in Contract
+    // - DocumentType
+    // We add 2 or 3
+    // - 0 Storage
+    // - Document id
+    // -(Optional) 0 (means latest) in the case of documents_keep_history
     Element::Reference(
         UpstreamRootHeightReference(4, reference_path),
         Some(max_reference_hops),
