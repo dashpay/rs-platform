@@ -55,9 +55,8 @@ pub struct IdentityUpdateTransition {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub disable_public_keys: Vec<KeyID>,
 
-    /// Timestamps when keys were disabled
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub public_keys_disabled_at: Vec<TimestampMillis>,
+    /// Timestamp when keys were disabled
+    pub public_keys_disabled_at: TimestampMillis,
 }
 
 impl Default for IdentityUpdateTransition {
@@ -98,7 +97,7 @@ impl IdentityUpdateTransition {
         let disable_public_keys =
             get_list_of_public_key_ids(&mut raw_object, property_names::DISABLE_PUBLIC_KEYS)?;
         let public_keys_disabled_at =
-            get_list_of_timestamps(&mut raw_object, property_names::PUBLIC_KEYS_DISABLED_AT)?;
+            raw_object.remove_u32(property_names::PUBLIC_KEYS_DISABLED_AT)? as u64;
 
         Ok(IdentityUpdateTransition {
             protocol_version,
@@ -130,7 +129,7 @@ impl IdentityUpdateTransition {
         self.revision = revision;
     }
 
-    fn get_revision(&mut self) -> u64 {
+    fn get_revision(&self) -> u64 {
         self.revision
     }
 
@@ -138,7 +137,7 @@ impl IdentityUpdateTransition {
         self.add_public_keys = add_public_keys;
     }
 
-    fn get_add_public_keys(&mut self) -> &[IdentityPublicKey] {
+    fn get_add_public_keys(&self) -> &[IdentityPublicKey] {
         &self.add_public_keys
     }
 
@@ -146,16 +145,16 @@ impl IdentityUpdateTransition {
         self.disable_public_keys = disable_public_keys;
     }
 
-    fn get_disable_public_keys(&mut self) -> &[KeyID] {
+    fn get_disable_public_keys(&self) -> &[KeyID] {
         &self.disable_public_keys
     }
 
-    fn set_public_keys_disabled_at(&mut self, public_keys_disabled_at: Vec<KeyID>) {
+    fn set_public_keys_disabled_at(&mut self, public_keys_disabled_at: TimestampMillis) {
         self.public_keys_disabled_at = public_keys_disabled_at;
     }
 
-    fn get_public_keys_disabled_at(&mut self) -> &[KeyID] {
-        &self.public_keys_disabled_at
+    fn get_public_keys_disabled_at(&self) -> TimestampMillis {
+        self.public_keys_disabled_at
     }
 }
 
@@ -301,9 +300,16 @@ impl StateTransitionIdentitySigned for IdentityUpdateTransition {
 
 #[cfg(test)]
 mod test {
-    use crate::tests::{
-        fixtures::identity_fixture,
-        utils::{generate_random_identifier, generate_random_identifier_struct},
+    use chrono::Utc;
+    use serde_json::json;
+
+    use crate::{
+        identity::{KeyType, Purpose},
+        tests::{
+            fixtures::{get_identity_update_transition_fixture, identity_fixture},
+            utils::{generate_random_identifier, generate_random_identifier_struct},
+        },
+        util::string_encoding::Encoding,
     };
 
     use super::*;
@@ -349,7 +355,7 @@ mod test {
 
         let result = transition
             .to_object(false)
-            .expect("conversion to json shouldn't fail");
+            .expect("conversion to raw object shouldn't fail");
 
         assert!(matches!(
             result[property_names::IDENTITY_ID],
@@ -363,5 +369,207 @@ mod test {
             result[property_names::ADD_PUBLIC_KEYS][0]["data"],
             JsonValue::Array(_)
         ));
+    }
+
+    struct TestData {
+        transition: IdentityUpdateTransition,
+        raw_transition: JsonValue,
+    }
+    fn setup_test() -> TestData {
+        let transition = get_identity_update_transition_fixture();
+        let raw_transition = transition.to_object(false).unwrap();
+        TestData {
+            transition,
+            raw_transition,
+        }
+    }
+
+    #[test]
+    fn get_type() {
+        let TestData { transition, .. } = setup_test();
+        assert_eq!(StateTransitionType::IdentityUpdate, transition.get_type());
+    }
+
+    #[test]
+    fn set_identity_id() {
+        let TestData { mut transition, .. } = setup_test();
+        let id = generate_random_identifier_struct();
+        transition.set_identity_id(id.clone());
+        assert_eq!(&id, transition.get_identity_id());
+    }
+
+    #[test]
+    fn get_revision() {
+        let TestData { transition, .. } = setup_test();
+        assert_eq!(0, transition.get_revision());
+    }
+
+    #[test]
+    fn set_revision() {
+        let TestData { mut transition, .. } = setup_test();
+        transition.set_revision(42);
+        assert_eq!(42, transition.get_revision());
+    }
+
+    #[test]
+    fn get_owner_id() {
+        let TestData { transition, .. } = setup_test();
+        assert_eq!(&transition.identity_id, transition.get_owner_id());
+    }
+
+    #[test]
+    fn get_public_keys_to_add() {
+        let TestData { transition, .. } = setup_test();
+        assert_eq!(
+            &transition.add_public_keys,
+            transition.get_add_public_keys()
+        );
+    }
+
+    #[test]
+    fn set_public_keys_to_add() {
+        let TestData { mut transition, .. } = setup_test();
+        let id_public_key = IdentityPublicKey {
+            id : 0,
+            key_type: KeyType::BLS12_381,
+            purpose: Purpose::AUTHENTICATION,
+            security_level : SecurityLevel::CRITICAL,
+            read_only: true,
+            data: hex::decode("01fac99ca2c8f39c286717c213e190aba4b7af76db320ec43f479b7d9a2012313a0ae59ca576edf801444bc694686694").unwrap(),
+        };
+        transition.set_add_public_keys(vec![id_public_key.clone()]);
+
+        assert_eq!(vec![id_public_key], transition.get_add_public_keys());
+    }
+
+    #[test]
+    fn get_disable_public_keys() {
+        let TestData { transition, .. } = setup_test();
+        assert_eq!(
+            transition.disable_public_keys,
+            transition.get_disable_public_keys()
+        );
+    }
+
+    #[test]
+    fn set_disable_public_keys() {
+        let TestData { mut transition, .. } = setup_test();
+        let id_to_disable = vec![1, 2];
+        transition.set_disable_public_keys(id_to_disable.clone());
+
+        assert_eq!(&id_to_disable, transition.get_disable_public_keys());
+    }
+
+    #[test]
+    fn get_public_key_disabled_at() {
+        let TestData { transition, .. } = setup_test();
+        assert_eq!(
+            transition.public_keys_disabled_at,
+            transition.get_public_keys_disabled_at()
+        );
+    }
+
+    #[test]
+    fn set_public_key_disabled_at() {
+        let TestData { mut transition, .. } = setup_test();
+        let now = Utc::now().timestamp_millis() as u64;
+        transition.set_public_keys_disabled_at(now);
+
+        assert_eq!(now, transition.get_public_keys_disabled_at());
+    }
+
+    #[test]
+    fn to_object() {
+        let TestData { transition, .. } = setup_test();
+        let result = transition
+            .to_object(false)
+            .expect("conversion to object shouldn't fail");
+
+        let expected_raw_state_transition = json!({
+            "protocolVersion" : 1,
+            "type" : 5,
+            "signature" : [],
+            "signaturePublicKeyId": 0,
+            "identityId" : transition.identity_id.to_buffer(),
+            "revision": 0,
+            "disablePublicKeys" : [0],
+            "publicKeysDisabledAt" : 1234567,
+            "addPublicKeys" : [
+                {
+
+                    "id" : 3,
+                    "purpose" : 0,
+                    "type": 0,
+                    "securityLevel" : 0,
+                    "data" :base64::decode("AkVuTKyF3YgKLAQlLEtaUL2HTditwGILfWUVqjzYnIgH").unwrap(),
+                    "readOnly" : false
+                }
+            ]
+        });
+
+        assert_eq!(expected_raw_state_transition, result);
+    }
+
+    #[test]
+    fn to_object_with_signature_skipped() {
+        let TestData { transition, .. } = setup_test();
+        let result = transition
+            .to_object(true)
+            .expect("conversion to object shouldn't fail");
+
+        let expected_raw_state_transition = json!({
+            "protocolVersion" : 1,
+            "type" : 5,
+            "signaturePublicKeyId": 0,
+            "identityId" : transition.identity_id.to_buffer(),
+            "revision": 0,
+            "disablePublicKeys" : [0],
+            "publicKeysDisabledAt" : 1234567,
+            "addPublicKeys" : [
+                {
+
+                    "id" : 3,
+                    "purpose" : 0,
+                    "type": 0,
+                    "securityLevel" : 0,
+                    "data" :base64::decode("AkVuTKyF3YgKLAQlLEtaUL2HTditwGILfWUVqjzYnIgH").unwrap(),
+                    "readOnly" : false
+                }
+            ]
+        });
+
+        assert_eq!(expected_raw_state_transition, result);
+    }
+
+    #[test]
+    fn to_json() {
+        let TestData { transition, .. } = setup_test();
+        let result = transition
+            .to_json()
+            .expect("conversion to json shouldn't fail");
+
+        let expected_raw_state_transition = json!({
+            "protocolVersion" : 1,
+            "type" : 5,
+            "signature" : "",
+            "signaturePublicKeyId": 0,
+            "identityId" : transition.identity_id.to_string(Encoding::Base58),
+            "revision": 0,
+            "disablePublicKeys" : [0],
+            "publicKeysDisabledAt" : 1234567,
+            "addPublicKeys" : [
+                {
+
+                    "id" : 3,
+                    "purpose" : 0,
+                    "type": 0,
+                    "securityLevel" : 0,
+                    "data" : "AkVuTKyF3YgKLAQlLEtaUL2HTditwGILfWUVqjzYnIgH",
+                    "readOnly" : false
+                }
+            ]
+        });
+
+        assert_eq!(expected_raw_state_transition, result);
     }
 }

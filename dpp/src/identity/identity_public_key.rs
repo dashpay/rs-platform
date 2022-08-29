@@ -168,7 +168,7 @@ lazy_static! {
     };
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct IdentityPublicKey {
     pub id: KeyID,
