@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 
-pub use abstract_state_transition::{StateTransitionConvert, StateTransitionLike};
+pub use abstract_state_transition::{
+    state_transition_helpers, StateTransitionConvert, StateTransitionLike,
+};
 pub use abstract_state_transition_identity_signed::StateTransitionIdentitySigned;
 pub use state_transition_types::*;
 
