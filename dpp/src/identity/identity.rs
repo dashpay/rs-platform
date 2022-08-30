@@ -80,6 +80,16 @@ impl Identity {
         self.public_keys.iter().find(|i| i.id == key_id)
     }
 
+    // Returns a public key for a given id
+    pub fn get_public_key_by_id_mut(&mut self, key_id: KeyID) -> Option<&mut IdentityPublicKey> {
+        self.public_keys.iter_mut().find(|i| i.id == key_id)
+    }
+
+    /// Add identity public keys
+    pub fn add_public_keys(&mut self, keys: impl IntoIterator<Item = IdentityPublicKey>) {
+        self.public_keys.extend(keys);
+    }
+
     /// Returns balance
     pub fn get_balance(&self) -> u64 {
         self.balance

@@ -18,6 +18,7 @@ use crate::util::vec;
 use crate::SerdeParsingError;
 
 pub type KeyID = u64;
+pub type TimestampMillis = u64;
 
 #[allow(non_camel_case_types)]
 #[repr(u8)]
@@ -178,6 +179,9 @@ pub struct IdentityPublicKey {
     pub key_type: KeyType,
     pub data: Vec<u8>,
     pub read_only: bool,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub disabled_at: Option<TimestampMillis>,
 }
 
 //? do we really need that???
@@ -272,6 +276,17 @@ impl IdentityPublicKey {
         self
     }
 
+    /// Get disabledAt
+    pub fn get_disabled_at(&self) -> Option<TimestampMillis> {
+        self.disabled_at
+    }
+
+    /// Set disabledAt
+    pub fn set_disabled_at(mut self, timestamp_millis: u64) -> Self {
+        self.disabled_at = Some(timestamp_millis);
+        self
+    }
+
     /// Checks if public key security level is MASTER
     pub fn is_master(&self) -> bool {
         self.security_level == SecurityLevel::MASTER
@@ -349,6 +364,7 @@ impl IdentityPublicKey {
             key_type: key_type.try_into()?,
             data: public_key_bytes,
             read_only: readonly,
+            disabled_at: None,
         })
     }
 

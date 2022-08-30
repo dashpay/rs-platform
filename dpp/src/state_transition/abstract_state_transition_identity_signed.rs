@@ -297,6 +297,7 @@ mod test {
             security_level: SecurityLevel::MASTER,
             data: ec_public_compressed_bytes.try_into().unwrap(),
             read_only: false,
+            disabled_at: None,
         };
 
         Keys {

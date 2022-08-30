@@ -113,47 +113,47 @@ impl IdentityUpdateTransition {
     }
 
     /// Get State Transition Type
-    fn get_type(&self) -> StateTransitionType {
+    pub fn get_type(&self) -> StateTransitionType {
         self.transition_type
     }
 
-    fn set_identity_id(&mut self, id: Identifier) {
+    pub fn set_identity_id(&mut self, id: Identifier) {
         self.identity_id = id;
     }
 
-    fn get_identity_id(&mut self) -> &Identifier {
+    pub fn get_identity_id(&self) -> &Identifier {
         &self.identity_id
     }
 
-    fn set_revision(&mut self, revision: u64) {
+    pub fn set_revision(&mut self, revision: u64) {
         self.revision = revision;
     }
 
-    fn get_revision(&self) -> u64 {
+    pub fn get_revision(&self) -> u64 {
         self.revision
     }
 
-    fn set_add_public_keys(&mut self, add_public_keys: Vec<IdentityPublicKey>) {
+    pub fn set_add_public_keys(&mut self, add_public_keys: Vec<IdentityPublicKey>) {
         self.add_public_keys = add_public_keys;
     }
 
-    fn get_add_public_keys(&self) -> &[IdentityPublicKey] {
+    pub fn get_add_public_keys(&self) -> &[IdentityPublicKey] {
         &self.add_public_keys
     }
 
-    fn set_disable_public_keys(&mut self, disable_public_keys: Vec<KeyID>) {
+    pub fn set_disable_public_keys(&mut self, disable_public_keys: Vec<KeyID>) {
         self.disable_public_keys = disable_public_keys;
     }
 
-    fn get_disable_public_keys(&self) -> &[KeyID] {
+    pub fn get_disable_public_keys(&self) -> &[KeyID] {
         &self.disable_public_keys
     }
 
-    fn set_public_keys_disabled_at(&mut self, public_keys_disabled_at: TimestampMillis) {
+    pub fn set_public_keys_disabled_at(&mut self, public_keys_disabled_at: TimestampMillis) {
         self.public_keys_disabled_at = public_keys_disabled_at;
     }
 
-    fn get_public_keys_disabled_at(&self) -> TimestampMillis {
+    pub fn get_public_keys_disabled_at(&self) -> TimestampMillis {
         self.public_keys_disabled_at
     }
 }
@@ -436,6 +436,7 @@ mod test {
             security_level : SecurityLevel::CRITICAL,
             read_only: true,
             data: hex::decode("01fac99ca2c8f39c286717c213e190aba4b7af76db320ec43f479b7d9a2012313a0ae59ca576edf801444bc694686694").unwrap(),
+            disabled_at : None,
         };
         transition.set_add_public_keys(vec![id_public_key.clone()]);
 

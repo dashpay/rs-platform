@@ -1,1 +1,3 @@
 pub mod identity_update_transition;
+pub mod validate_identity_update_transition_basic_factory;
+pub mod validate_identity_update_transition_state_factory;
