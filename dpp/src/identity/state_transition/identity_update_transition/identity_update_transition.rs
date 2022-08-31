@@ -4,7 +4,7 @@ use serde_json::Value as JsonValue;
 
 use crate::{
     identity::{KeyID, SecurityLevel},
-    prelude::{Identifier, IdentityPublicKey},
+    prelude::{Identifier, IdentityPublicKey, TimestampMillis},
     state_transition::{
         state_transition_helpers, StateTransitionConvert, StateTransitionIdentitySigned,
         StateTransitionLike, StateTransitionType,
@@ -24,8 +24,6 @@ pub mod property_names {
     pub const SIGNATURE: &str = "signature";
     pub const SIGNATURE_PUBLIC_KEY_ID: &str = "signaturePublicKeyId";
 }
-
-type TimestampMillis = u64;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -137,7 +135,7 @@ impl IdentityUpdateTransition {
         self.add_public_keys = add_public_keys;
     }
 
-    pub fn get_add_public_keys(&self) -> &[IdentityPublicKey] {
+    pub fn get_public_keys_to_add(&self) -> &[IdentityPublicKey] {
         &self.add_public_keys
     }
 
@@ -145,7 +143,7 @@ impl IdentityUpdateTransition {
         self.disable_public_keys = disable_public_keys;
     }
 
-    pub fn get_disable_public_keys(&self) -> &[KeyID] {
+    pub fn get_public_key_ids_to_disable(&self) -> &[KeyID] {
         &self.disable_public_keys
     }
 
@@ -422,7 +420,7 @@ mod test {
         let TestData { transition, .. } = setup_test();
         assert_eq!(
             &transition.add_public_keys,
-            transition.get_add_public_keys()
+            transition.get_public_keys_to_add()
         );
     }
 
@@ -440,7 +438,7 @@ mod test {
         };
         transition.set_add_public_keys(vec![id_public_key.clone()]);
 
-        assert_eq!(vec![id_public_key], transition.get_add_public_keys());
+        assert_eq!(vec![id_public_key], transition.get_public_keys_to_add());
     }
 
     #[test]
@@ -448,7 +446,7 @@ mod test {
         let TestData { transition, .. } = setup_test();
         assert_eq!(
             transition.disable_public_keys,
-            transition.get_disable_public_keys()
+            transition.get_public_key_ids_to_disable()
         );
     }
 
@@ -458,7 +456,7 @@ mod test {
         let id_to_disable = vec![1, 2];
         transition.set_disable_public_keys(id_to_disable.clone());
 
-        assert_eq!(&id_to_disable, transition.get_disable_public_keys());
+        assert_eq!(&id_to_disable, transition.get_public_key_ids_to_disable());
     }
 
     #[test]

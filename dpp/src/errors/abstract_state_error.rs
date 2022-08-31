@@ -82,7 +82,7 @@ pub enum StateError {
     InvalidIdentityPublicKeyIdError { id: KeyID },
 
     #[error("Identity cannot contain more than {max_items} public keys")]
-    MaxIdentityPublicKeyLimitReached { max_items: u32 },
+    MaxIdentityPublicKeyLimitReached { max_items: usize },
 }
 
 impl From<DataTriggerError> for StateError {

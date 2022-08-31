@@ -148,7 +148,7 @@ impl PublicKeysValidator {
     }
 }
 
-fn duplicated_keys(public_keys: &[IdentityPublicKey]) -> Vec<u64> {
+pub(crate) fn duplicated_keys(public_keys: &[IdentityPublicKey]) -> Vec<u64> {
     let mut keys_count = HashMap::<Vec<u8>, usize>::new();
     let mut duplicated_key_ids = vec![];
 
@@ -166,7 +166,7 @@ fn duplicated_keys(public_keys: &[IdentityPublicKey]) -> Vec<u64> {
     duplicated_key_ids
 }
 
-fn duplicated_key_ids(public_keys: &[IdentityPublicKey]) -> Vec<u64> {
+pub(crate) fn duplicated_key_ids(public_keys: &[IdentityPublicKey]) -> Vec<u64> {
     let mut duplicated_ids = Vec::<u64>::new();
     let mut ids_count = HashMap::<u64, usize>::new();
 

@@ -46,4 +46,5 @@ pub mod prelude {
     pub use crate::validation::ValidationResult;
 
     pub use super::convertible::Convertible;
+    pub type TimestampMillis = u64;
 }

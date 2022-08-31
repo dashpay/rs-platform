@@ -66,7 +66,7 @@ where
             return Ok(validation_result);
         }
 
-        for key_id in state_transition.get_disable_public_keys().iter() {
+        for key_id in state_transition.get_public_key_ids_to_disable().iter() {
             match identity.get_public_key_by_id(*key_id) {
                 None => {
                     validation_result
@@ -86,7 +86,7 @@ where
         }
 
         // Keys can only be disabled if another valid key is enabled in the same security level
-        for key_id in state_transition.get_disable_public_keys().iter() {
+        for key_id in state_transition.get_public_key_ids_to_disable().iter() {
             // the `unwrap()` can be used as the presence if of `key_id` is guaranteed by previous
             // validation
             identity
@@ -122,8 +122,8 @@ where
             .map(|pk| pk.to_raw_json_object())
             .collect::<Result<_, SerdeParsingError>>()?;
 
-        if !state_transition.get_add_public_keys().is_empty() {
-            identity.add_public_keys(state_transition.get_add_public_keys().iter().cloned());
+        if !state_transition.get_public_keys_to_add().is_empty() {
+            identity.add_public_keys(state_transition.get_public_keys_to_add().iter().cloned());
 
             let result = self.public_keys_validator.validate_keys(&raw_public_keys)?;
             if !result.is_valid() {
