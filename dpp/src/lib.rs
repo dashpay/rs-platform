@@ -47,4 +47,5 @@ pub mod prelude {
 
     pub use super::convertible::Convertible;
     pub type TimestampMillis = u64;
+    pub type Revision = u64;
 }

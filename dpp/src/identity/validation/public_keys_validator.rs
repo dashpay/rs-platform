@@ -13,11 +13,15 @@ use crate::identity::{IdentityPublicKey, KeyType, ALLOWED_SECURITY_LEVELS};
 use crate::validation::{JsonSchemaValidator, ValidationResult};
 use crate::{DashPlatformProtocolInitError, NonConsensusError, PublicKeyValidationError};
 
+#[cfg(test)]
+use mockall::{automock, predicate::*};
+
 lazy_static! {
     static ref PUBLIC_KEY_SCHEMA: serde_json::Value =
         serde_json::from_str(include_str!("./../../schema/identity/publicKey.json")).unwrap();
 }
 
+#[cfg_attr(test, automock)]
 pub trait TPublicKeysValidator {
     fn validate_keys(
         &self,

@@ -25,12 +25,12 @@ pub async fn apply_identity_update_transition<SR>(
         Some(id) => id,
     };
 
-    identity.revision = state_transition.get_revision() as i64;
+    identity.revision = state_transition.get_revision();
 
     if !state_transition.get_public_key_ids_to_disable().is_empty() {
         for id in state_transition.get_public_key_ids_to_disable() {
             if let Some(ref mut public_key) = identity.get_public_key_by_id_mut(*id) {
-                public_key.disabled_at = Some(state_transition.get_public_keys_disabled_at());
+                public_key.disabled_at = state_transition.get_public_keys_disabled_at();
             }
         }
     }

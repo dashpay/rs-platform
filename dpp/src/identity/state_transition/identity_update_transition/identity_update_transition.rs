@@ -4,7 +4,7 @@ use serde_json::Value as JsonValue;
 
 use crate::{
     identity::{KeyID, SecurityLevel},
-    prelude::{Identifier, IdentityPublicKey, TimestampMillis},
+    prelude::{Identifier, IdentityPublicKey, Revision, TimestampMillis},
     state_transition::{
         state_transition_helpers, StateTransitionConvert, StateTransitionIdentitySigned,
         StateTransitionLike, StateTransitionType,
@@ -42,7 +42,7 @@ pub struct IdentityUpdateTransition {
     pub identity_id: Identifier,
 
     /// Identity Update revision number
-    pub revision: u64,
+    pub revision: Revision,
 
     /// Public Keys to add to the Identity
     // we want to skip serialization of transitions, as we does it manually in `to_object()`  and `to_json()`
@@ -54,7 +54,7 @@ pub struct IdentityUpdateTransition {
     pub disable_public_keys: Vec<KeyID>,
 
     /// Timestamp when keys were disabled
-    pub public_keys_disabled_at: TimestampMillis,
+    pub public_keys_disabled_at: Option<TimestampMillis>,
 }
 
 impl Default for IdentityUpdateTransition {
@@ -89,13 +89,13 @@ impl IdentityUpdateTransition {
         let identity_id =
             Identifier::from_bytes(&raw_object.get_bytes(property_names::IDENTITY_ID)?)?;
         let revision = raw_object.get_u64(property_names::REVISION)?;
-
         let add_public_keys =
             get_list_of_public_keys(&mut raw_object, property_names::ADD_PUBLIC_KEYS)?;
         let disable_public_keys =
             get_list_of_public_key_ids(&mut raw_object, property_names::DISABLE_PUBLIC_KEYS)?;
-        let public_keys_disabled_at =
-            raw_object.remove_u32(property_names::PUBLIC_KEYS_DISABLED_AT)? as u64;
+        let public_keys_disabled_at = raw_object
+            .remove_into::<u64>(property_names::PUBLIC_KEYS_DISABLED_AT)
+            .ok();
 
         Ok(IdentityUpdateTransition {
             protocol_version,
@@ -123,15 +123,15 @@ impl IdentityUpdateTransition {
         &self.identity_id
     }
 
-    pub fn set_revision(&mut self, revision: u64) {
+    pub fn set_revision(&mut self, revision: Revision) {
         self.revision = revision;
     }
 
-    pub fn get_revision(&self) -> u64 {
+    pub fn get_revision(&self) -> Revision {
         self.revision
     }
 
-    pub fn set_add_public_keys(&mut self, add_public_keys: Vec<IdentityPublicKey>) {
+    pub fn set_public_keys_to_add(&mut self, add_public_keys: Vec<IdentityPublicKey>) {
         self.add_public_keys = add_public_keys;
     }
 
@@ -139,7 +139,11 @@ impl IdentityUpdateTransition {
         &self.add_public_keys
     }
 
-    pub fn set_disable_public_keys(&mut self, disable_public_keys: Vec<KeyID>) {
+    pub fn get_public_keys_to_add_mut(&mut self) -> &mut [IdentityPublicKey] {
+        &mut self.add_public_keys
+    }
+
+    pub fn set_public_key_ids_to_disable(&mut self, disable_public_keys: Vec<KeyID>) {
         self.disable_public_keys = disable_public_keys;
     }
 
@@ -147,11 +151,14 @@ impl IdentityUpdateTransition {
         &self.disable_public_keys
     }
 
-    pub fn set_public_keys_disabled_at(&mut self, public_keys_disabled_at: TimestampMillis) {
+    pub fn set_public_keys_disabled_at(
+        &mut self,
+        public_keys_disabled_at: Option<TimestampMillis>,
+    ) {
         self.public_keys_disabled_at = public_keys_disabled_at;
     }
 
-    pub fn get_public_keys_disabled_at(&self) -> TimestampMillis {
+    pub fn get_public_keys_disabled_at(&self) -> Option<TimestampMillis> {
         self.public_keys_disabled_at
     }
 }
@@ -436,7 +443,7 @@ mod test {
             data: hex::decode("01fac99ca2c8f39c286717c213e190aba4b7af76db320ec43f479b7d9a2012313a0ae59ca576edf801444bc694686694").unwrap(),
             disabled_at : None,
         };
-        transition.set_add_public_keys(vec![id_public_key.clone()]);
+        transition.set_public_keys_to_add(vec![id_public_key.clone()]);
 
         assert_eq!(vec![id_public_key], transition.get_public_keys_to_add());
     }
@@ -454,7 +461,7 @@ mod test {
     fn set_disable_public_keys() {
         let TestData { mut transition, .. } = setup_test();
         let id_to_disable = vec![1, 2];
-        transition.set_disable_public_keys(id_to_disable.clone());
+        transition.set_public_key_ids_to_disable(id_to_disable.clone());
 
         assert_eq!(&id_to_disable, transition.get_public_key_ids_to_disable());
     }
@@ -472,9 +479,9 @@ mod test {
     fn set_public_key_disabled_at() {
         let TestData { mut transition, .. } = setup_test();
         let now = Utc::now().timestamp_millis() as u64;
-        transition.set_public_keys_disabled_at(now);
+        transition.set_public_keys_disabled_at(Some(now));
 
-        assert_eq!(now, transition.get_public_keys_disabled_at());
+        assert_eq!(Some(now), transition.get_public_keys_disabled_at());
     }
 
     #[test]

@@ -2,8 +2,8 @@ use crate::prelude::TimestampMillis;
 
 use super::validation_result::TimeWindowValidationResult;
 
-const BLOCK_TIME_WINDOW_MINUTES: u64 = 5;
-const BLOCK_TIME_WINDOW_MILLIS: u64 = BLOCK_TIME_WINDOW_MINUTES * 60 * 1000;
+pub const BLOCK_TIME_WINDOW_MINUTES: u64 = 5;
+pub const BLOCK_TIME_WINDOW_MILLIS: u64 = BLOCK_TIME_WINDOW_MINUTES * 60 * 1000;
 
 pub fn validate_time_in_block_time_window(
     last_block_header_time_millis: TimestampMillis,

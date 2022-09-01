@@ -25,7 +25,7 @@ pub fn get_identity_update_transition_fixture() -> IdentityUpdateTransition {
             disabled_at: None,
         }],
         disable_public_keys: vec![0],
-        public_keys_disabled_at: 1234567,
+        public_keys_disabled_at: Some(1234567),
         ..Default::default()
     }
 }
