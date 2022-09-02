@@ -16,6 +16,7 @@ use crate::{
 
 pub mod property_names {
     pub const PROTOCOL_VERSION: &str = "protocolVersion";
+    pub const TYPE: &str = "type";
     pub const IDENTITY_ID: &str = "identityId";
     pub const REVISION: &str = "revision";
     pub const ADD_PUBLIC_KEYS: &str = "addPublicKeys";
@@ -46,14 +47,15 @@ pub struct IdentityUpdateTransition {
 
     /// Public Keys to add to the Identity
     // we want to skip serialization of transitions, as we does it manually in `to_object()`  and `to_json()`
-    #[serde(skip)]
+    #[serde(skip, default)]
     pub add_public_keys: Vec<IdentityPublicKey>,
 
     /// Identity Public Keys ID's to disable for the Identity
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub disable_public_keys: Vec<KeyID>,
 
     /// Timestamp when keys were disabled
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub public_keys_disabled_at: Option<TimestampMillis>,
 }
 
