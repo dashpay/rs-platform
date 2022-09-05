@@ -1,3 +1,36 @@
+// MIT LICENSE
+//
+// Copyright (c) 2021 Dash Core Group
+// 
+// Permission is hereby granted, free of charge, to any
+// person obtaining a copy of this software and associated
+// documentation files (the "Software"), to deal in the
+// Software without restriction, including without
+// limitation the rights to use, copy, modify, merge,
+// publish, distribute, sublicense, and/or sell copies of
+// the Software, and to permit persons to whom the Software
+// is furnished to do so, subject to the following
+// conditions:
+//
+// The above copyright notice and this permission notice
+// shall be included in all copies or substantial portions
+// of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+// ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+// TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+// PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+// SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+// CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+// OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+// IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+// DEALINGS IN THE SOFTWARE.
+//
+
+//! 
+//! 
+//! 
+
 pub mod encode;
 pub mod helpers;
 
@@ -20,6 +53,7 @@ use crate::error::Error;
 
 use dpp::data_contract::extra::DriveContractExt;
 
+/// Serializes to CBOR and applies to Drive a JSON contract from the file system.
 pub fn setup_contract(
     drive: &Drive,
     path: &str,
@@ -45,6 +79,7 @@ pub fn setup_contract(
     contract
 }
 
+/// Serializes to CBOR and applies to Drive a contract from hex string format.
 pub fn setup_contract_from_hex(
     drive: &Drive,
     hex_string: String,
@@ -66,6 +101,7 @@ pub fn setup_contract_from_hex(
     contract
 }
 
+/// Reads a JSON file and converts it to CBOR.
 pub fn json_document_to_cbor(path: impl AsRef<Path>, protocol_version: Option<u32>) -> Vec<u8> {
     let file = File::open(path).expect("file not found");
     let reader = BufReader::new(file);
@@ -73,6 +109,7 @@ pub fn json_document_to_cbor(path: impl AsRef<Path>, protocol_version: Option<u3
     value_to_cbor(json, protocol_version)
 }
 
+/// Serializes a JSON value to CBOR.
 pub fn value_to_cbor(value: serde_json::Value, protocol_version: Option<u32>) -> Vec<u8> {
     let mut buffer: Vec<u8> = Vec::new();
     if let Some(protocol_version) = protocol_version {
@@ -84,16 +121,19 @@ pub fn value_to_cbor(value: serde_json::Value, protocol_version: Option<u32>) ->
     buffer
 }
 
+/// Serializes a hex string to CBOR.
 pub fn cbor_from_hex(hex_string: String) -> Vec<u8> {
     hex::decode(hex_string).expect("Decoding failed")
 }
 
+/// Takes a file and returns the lines as a list of strings.
 pub fn text_file_strings(path: impl AsRef<Path>) -> Vec<String> {
     let file = File::open(path).expect("file not found");
     let reader = io::BufReader::new(file).lines();
     reader.into_iter().map(|a| a.unwrap()).collect()
 }
 
+/// Retrieves the value of a key from a CBOR map.
 pub fn get_key_from_cbor_map<'a>(
     cbor_map: &'a [(Value, Value)],
     key: &'a str,
@@ -110,6 +150,7 @@ pub fn get_key_from_cbor_map<'a>(
     None
 }
 
+/// Converts a CBOR map to a BTree map.
 pub fn cbor_map_to_btree_map(cbor_map: &[(Value, Value)]) -> BTreeMap<String, &Value> {
     cbor_map
         .iter()
@@ -117,6 +158,7 @@ pub fn cbor_map_to_btree_map(cbor_map: &[(Value, Value)]) -> BTreeMap<String, &V
         .collect::<BTreeMap<String, &Value>>()
 }
 
+/// Converts the keys which are dynamic CBOR strings from a CBOR map to a BTree map.
 pub fn cbor_owned_map_to_btree_map(cbor_map: Vec<(Value, Value)>) -> BTreeMap<String, Value> {
     cbor_map
         .into_iter()
@@ -130,6 +172,7 @@ pub fn cbor_owned_map_to_btree_map(cbor_map: Vec<(Value, Value)>) -> BTreeMap<St
         .collect::<BTreeMap<String, Value>>()
 }
 
+/// 
 pub fn cbor_inner_array_value<'a>(
     document_type: &'a [(Value, Value)],
     key: &'a str,
@@ -141,6 +184,7 @@ pub fn cbor_inner_array_value<'a>(
     None
 }
 
+/// 
 pub fn cbor_inner_array_of_strings<'a>(
     document_type: &'a [(Value, Value)],
     key: &'a str,
@@ -164,6 +208,7 @@ pub fn cbor_inner_array_of_strings<'a>(
     }
 }
 
+/// 
 pub fn cbor_inner_map_value<'a>(
     document_type: &'a [(Value, Value)],
     key: &'a str,
@@ -175,6 +220,7 @@ pub fn cbor_inner_map_value<'a>(
     None
 }
 
+/// 
 pub fn cbor_inner_btree_map<'a>(
     document_type: &'a [(Value, Value)],
     key: &'a str,

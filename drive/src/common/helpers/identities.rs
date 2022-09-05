@@ -27,7 +27,9 @@
 // DEALINGS IN THE SOFTWARE.
 //
 
+//! Drive Identity Helpers.
 //! 
+//! This module defines helper functions pertinent to identities in Drive.
 //! 
 
 use crate::drive::batch::GroveDbOpBatch;
@@ -38,6 +40,7 @@ use dpp::identifier::Identifier;
 use dpp::identity::{Identity, IdentityPublicKey, KeyType};
 use grovedb::TransactionArg;
 
+/// Creates a test identity from an id and inserts it into Drive.
 pub fn create_test_identity(drive: &Drive, id: [u8; 32], transaction: TransactionArg) -> Identity {
     let identity_key = IdentityPublicKey {
         id: 1,
@@ -65,6 +68,7 @@ pub fn create_test_identity(drive: &Drive, id: [u8; 32], transaction: Transactio
     identity
 }
 
+/// Increments each proposer in the list given's block count by 1.
 pub fn increment_in_epoch_each_proposers_block_count(
     drive: &Drive,
     epoch_tree: &Epoch,
@@ -90,6 +94,7 @@ pub fn increment_in_epoch_each_proposers_block_count(
         .expect("should apply batch");
 }
 
+/// Creates test masternode identities and adds them as epoch block proposers.
 pub fn create_test_masternode_identities_and_add_them_as_epoch_block_proposers(
     drive: &Drive,
     epoch: &Epoch,
@@ -103,6 +108,7 @@ pub fn create_test_masternode_identities_and_add_them_as_epoch_block_proposers(
     proposers
 }
 
+/// Creates a list of test Masternode identities of size `count` with random data
 pub fn create_test_masternode_identities(
     drive: &Drive,
     count: u16,
