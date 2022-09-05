@@ -302,10 +302,28 @@ impl IdentityPublicKey {
             return Ok(self.data.clone());
         }
 
-        let public_key = vec::vec_to_array::<65>(&self.data)
-            .map_err(|e| ProtocolError::ParsingError(e.to_string()))?;
-        let original_key = PublicKey::from_slice(&public_key)
-            .map_err(|e| anyhow!("unable to create pub key - {}", e))?;
+        let original_key = match self.data.len() {
+            65 => {
+                let public_key = vec::vec_to_array::<65>(&self.data)
+                    .map_err(|e| ProtocolError::ParsingError(e.to_string()))?;
+
+                PublicKey::from_slice(&public_key)
+                    .map_err(|e| anyhow!("unable to create pub key - {}", e))?
+            }
+
+            33 => {
+                let public_key = vec::vec_to_array::<33>(&self.data)
+                    .map_err(|e| ProtocolError::ParsingError(e.to_string()))?;
+                PublicKey::from_slice(&public_key)
+                    .map_err(|e| anyhow!("unable to create pub key - {}", e))?
+            }
+            _ => {
+                return Err(ProtocolError::ParsingError(format!(
+                    "the key length is invalid: {} Allowed sizes: 33 or 65 bytes",
+                    self.data.len()
+                )));
+            }
+        };
         Ok(original_key.pubkey_hash().to_vec())
     }
 
