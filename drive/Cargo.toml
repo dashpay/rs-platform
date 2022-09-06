@@ -25,20 +25,20 @@ enum-map = "2.0.3"
 thiserror = "1.0.30"
 moka = "0.8.1"
 nohash-hasher = "0.2.0"
-chrono = "0.4.0"
+chrono = "0.4.20"
 dpp = { path = "../dpp" }
 
 [dependencies.grovedb]
 git = "https://github.com/dashevo/grovedb"
-branch = "feat/worst-case-costs-additions"
+branch = "feat/worst-case-costs"
 
 [dependencies.storage]
 git = "https://github.com/dashevo/grovedb"
-branch = "feat/worst-case-costs-additions"
+branch = "feat/worst-case-costs"
 
 [dependencies.costs]
 git = "https://github.com/dashevo/grovedb"
-branch = "feat/worst-case-costs-additions"
+branch = "feat/worst-case-costs"
 
 [dev-dependencies]
 criterion = "0.3.5"

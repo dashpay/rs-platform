@@ -1,6 +1,5 @@
 use grovedb::{Element, TransactionArg};
 use std::collections::HashSet;
-
 use std::option::Option::None;
 
 use crate::contract::document::Document;
@@ -11,21 +10,18 @@ use crate::drive::document::{
     contract_document_type_path,
     contract_documents_keeping_history_primary_key_path_for_document_id,
     contract_documents_keeping_history_primary_key_path_for_document_id_size,
-    contract_documents_keeping_history_storage_time_reference_path,
     contract_documents_keeping_history_storage_time_reference_path_size,
-    contract_documents_primary_key_path,
+    contract_documents_primary_key_path, make_document_reference,
 };
 use crate::drive::flags::StorageFlags;
-use crate::drive::object_size_info::DocumentInfo::{
-    DocumentRefAndSerialization, DocumentSize, DocumentRefWithoutSerialization,
-};
+use crate::drive::object_size_info::DocumentInfo::{DocumentRefAndSerialization, DocumentSize, DocumentRefWithoutSerialization, DocumentWithoutSerialization};
 use crate::drive::object_size_info::KeyElementInfo::{KeyElement, KeyElementSize};
 use crate::drive::object_size_info::DriveKeyInfo::{Key, KeyRef};
 use crate::drive::object_size_info::PathKeyElementInfo::{
     PathFixedSizeKeyElement, PathKeyElementSize,
 };
 use crate::drive::object_size_info::PathKeyInfo::{PathFixedSizeKeyRef, PathKeySize};
-use crate::drive::object_size_info::{DocumentAndContractInfo, PathInfo, PathKeyElementInfo};
+use crate::drive::object_size_info::{DocumentAndContractInfo, DocumentInfo, PathInfo, PathKeyElementInfo};
 use crate::drive::{defaults, Drive};
 use crate::error::drive::DriveError;
 use crate::error::Error;
@@ -143,17 +139,14 @@ impl Drive {
                             document_type.name.as_str(),
                             document.id.as_slice(),
                         );
-                    let contract_storage_path =
-                        contract_documents_keeping_history_storage_time_reference_path(
-                            contract.id.as_bytes(),
-                            document_type.name.as_str(),
-                            document.id.as_slice(),
-                            encoded_time,
-                        );
                     PathFixedSizeKeyElement((
                         document_id_in_primary_path,
                         &[0],
-                        Element::Reference(contract_storage_path, Some(2), storage_flags.to_element_flags()),
+                        Element::Reference(
+                            SiblingReference(encoded_time),
+                            Some(1),
+                            storage_flags.to_element_flags(),
+                        ),
                     ))
                 } else {
                     let path_max_length =
@@ -554,7 +547,8 @@ impl Drive {
 
                 let key_element_info = match &document_and_contract_info.document_info {
                     DocumentRefAndSerialization((document, _, storage_flags))
-                    | DocumentRefWithoutSerialization((document, storage_flags)) => {
+                    | DocumentRefWithoutSerialization((document, storage_flags))
+                    | DocumentWithoutSerialization((document, storage_flags)) => {
                         let document_reference = make_document_reference(
                             primary_key_path,
                             document,
@@ -581,7 +575,6 @@ impl Drive {
                     DocumentRefAndSerialization((document, _, storage_flags))
                     | DocumentRefWithoutSerialization((document, storage_flags)) => {
                         let document_reference = make_document_reference(
-                            primary_key_path,
                             document,
                             document_and_contract_info.document_type,
                             storage_flags,

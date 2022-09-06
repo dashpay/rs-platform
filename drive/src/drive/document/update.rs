@@ -9,7 +9,7 @@ use crate::drive::defaults::{CONTRACT_DOCUMENTS_PATH_HEIGHT, SOME_OPTIMIZED_DOCU
 use crate::drive::document::{
     contract_document_type_path,
     contract_documents_keeping_history_primary_key_path_for_document_id,
-    contract_documents_primary_key_path,
+    contract_documents_primary_key_path, make_document_reference,
 };
 use crate::drive::flags::StorageFlags;
 use crate::drive::object_size_info::DocumentInfo::{DocumentRefAndSerialization, DocumentSize, DocumentWithoutSerialization};
@@ -175,19 +175,11 @@ impl Drive {
                 document_type.name.as_str(),
             );
 
-            // we need to construct the reference to the original document
-            let mut reference_path = contract_documents_primary_key_path
-                .iter()
-                .map(|x| x.to_vec())
-                .collect::<Vec<Vec<u8>>>();
-            reference_path.push(Vec::from(document.id));
-            if document_type.documents_keep_history {
-                // if the document keeps history the value will at 0 will always point to the most recent version
-                reference_path.push(vec![0]);
-            }
-            let document_reference =
-                Element::Reference(reference_path, Some(1), storage_flags.to_element_flags());
-
+            let document_reference = make_document_reference(
+                document,
+                document_and_contract_info.document_type,
+                storage_flags,
+            );
             let query_stateless_max_value_size = if apply { None } else { Some(document_type.max_size()) };
 
             // next we need to get the old document from storage

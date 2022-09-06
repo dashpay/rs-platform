@@ -2,11 +2,15 @@ on:
   workflow_dispatch:
   pull_request:
 
+defaults:
+  run:
+    working-directory: ./dpp
+
 concurrency:
   group: ${{ github.head_ref }}
   cancel-in-progress: true
 
-name: Rust
+name: Dpp
 
 jobs:
   wasm-errors:
@@ -18,7 +22,7 @@ jobs:
         with:
           toolchain: stable
           target: wasm32-unknown-unknown
-      - run: cargo check --lib --release --target wasm32-unknown-unknown  -p js-binding
+      - run: cargo +stable check --lib --release --target wasm32-unknown-unknown  -p js-binding
 
   test:
     name: Tests
@@ -37,13 +41,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
           default: true
           components: clippy
-
+          override: true
       - uses: actions-rs/clippy-check@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -81,7 +84,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-
       - uses: actions-rs/audit-check@v1
+
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
