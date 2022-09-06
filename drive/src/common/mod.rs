@@ -27,8 +27,9 @@
 // DEALINGS IN THE SOFTWARE.
 //
 
+//! Common functions.
 //! 
-//! 
+//! This module defines general, commonly used functions in Drive.
 //! 
 
 pub mod encode;
@@ -172,7 +173,7 @@ pub fn cbor_owned_map_to_btree_map(cbor_map: Vec<(Value, Value)>) -> BTreeMap<St
         .collect::<BTreeMap<String, Value>>()
 }
 
-/// 
+/// Retrieves the value of a key from a CBOR map if it's an array.
 pub fn cbor_inner_array_value<'a>(
     document_type: &'a [(Value, Value)],
     key: &'a str,
@@ -184,7 +185,7 @@ pub fn cbor_inner_array_value<'a>(
     None
 }
 
-/// 
+/// Retrieves the value of a key from a CBOR map if it's an array of strings.
 pub fn cbor_inner_array_of_strings<'a>(
     document_type: &'a [(Value, Value)],
     key: &'a str,
@@ -208,7 +209,7 @@ pub fn cbor_inner_array_of_strings<'a>(
     }
 }
 
-/// 
+/// Retrieves the value of a key from a CBOR map if it's a map itself.
 pub fn cbor_inner_map_value<'a>(
     document_type: &'a [(Value, Value)],
     key: &'a str,
@@ -220,7 +221,8 @@ pub fn cbor_inner_map_value<'a>(
     None
 }
 
-/// 
+/// Retrieves the value of a key from a CBOR map, and if it's a map itself,
+/// returns it as a B-tree map.
 pub fn cbor_inner_btree_map<'a>(
     document_type: &'a [(Value, Value)],
     key: &'a str,
@@ -232,6 +234,8 @@ pub fn cbor_inner_btree_map<'a>(
     None
 }
 
+/// Retrieves the value of a key from a B-tree map, and if it's a map itself,
+/// returns it as a B-tree map.
 pub fn btree_map_inner_btree_map<'a>(
     document_type: &'a BTreeMap<String, &'a Value>,
     key: &'a str,
@@ -243,6 +247,7 @@ pub fn btree_map_inner_btree_map<'a>(
     None
 }
 
+/// Retrieves the value of a key from a B-tree map if it's a map itself.
 pub fn btree_map_inner_map_value<'a>(
     document_type: &'a BTreeMap<String, &'a Value>,
     key: &'a str,
@@ -254,6 +259,7 @@ pub fn btree_map_inner_map_value<'a>(
     None
 }
 
+/// Retrieves the value of a key from a CBOR map if it's a string.
 pub fn cbor_inner_text_value<'a>(
     document_type: &'a [(Value, Value)],
     key: &'a str,
@@ -265,6 +271,7 @@ pub fn cbor_inner_text_value<'a>(
     None
 }
 
+/// Retrieves the value of a key from a B-tree map if it's a string.
 pub fn btree_map_inner_text_value<'a>(
     document_type: &'a BTreeMap<String, &'a Value>,
     key: &'a str,
@@ -276,6 +283,7 @@ pub fn btree_map_inner_text_value<'a>(
     None
 }
 
+/// Retrieves the value of a key from a CBOR map if it's a byte array.
 pub fn cbor_inner_bytes_value<'a>(
     document_type: &'a [(Value, Value)],
     key: &'a str,
@@ -307,6 +315,7 @@ pub fn cbor_inner_bytes_value<'a>(
     }
 }
 
+/// Retrieves the value of a key from a CBOR map if it's a boolean.
 pub fn cbor_inner_bool_value(document_type: &[(Value, Value)], key: &str) -> Option<bool> {
     let key_value = get_key_from_cbor_map(document_type, key)?;
     if let Value::Bool(bool_value) = key_value {
@@ -315,6 +324,7 @@ pub fn cbor_inner_bool_value(document_type: &[(Value, Value)], key: &str) -> Opt
     None
 }
 
+/// Retrieves the value of a key from a B-tree map if it's a boolean.
 pub fn btree_map_inner_bool_value(
     document_type: &BTreeMap<String, &Value>,
     key: &str,
@@ -326,6 +336,7 @@ pub fn btree_map_inner_bool_value(
     None
 }
 
+/// Retrieves the value of a key from a CBOR map if it's a u8 value.
 pub fn cbor_inner_size_value(document_type: &[(Value, Value)], key: &str) -> Option<usize> {
     let key_value = get_key_from_cbor_map(document_type, key)?;
     if let Value::Integer(integer) = key_value {
@@ -341,6 +352,7 @@ pub fn cbor_inner_size_value(document_type: &[(Value, Value)], key: &str) -> Opt
     }
 }
 
+/// Retrieves the value of a key from a B-tree map if it's a u8 value.
 pub fn btree_map_inner_size_value(
     document_type: &BTreeMap<String, &Value>,
     key: &str,
@@ -359,6 +371,7 @@ pub fn btree_map_inner_size_value(
     }
 }
 
+/// Retrieves the value of a key from a CBOR map if it's a boolean otherwise returns a default boolean.
 pub fn cbor_inner_bool_value_with_default(
     document_type: &[(Value, Value)],
     key: &str,
@@ -367,6 +380,7 @@ pub fn cbor_inner_bool_value_with_default(
     cbor_inner_bool_value(document_type, key).unwrap_or(default)
 }
 
+/// Takes a value (should be a system value) and returns it as a byte array if possible.
 pub fn bytes_for_system_value(value: &Value) -> Result<Option<Vec<u8>>, Error> {
     match value {
         Value::Bytes(bytes) => Ok(Some(bytes.clone())),
@@ -394,6 +408,8 @@ pub fn bytes_for_system_value(value: &Value) -> Result<Option<Vec<u8>>, Error> {
     }
 }
 
+/// Takes a B-tree map and a key and returns the corresponding value (should be a system value) 
+/// as a byte array if possible.
 pub fn bytes_for_system_value_from_tree_map(
     document: &BTreeMap<String, Value>,
     key: &str,
@@ -406,6 +422,8 @@ pub fn bytes_for_system_value_from_tree_map(
     }
 }
 
+/// Takes a B-tree map, a key, and a default bool values and returns the corresponding 
+/// value (should be a system value) from the key if it's a boolean, otherwise returns the default.
 pub fn bool_for_system_value_from_tree_map(
     document: &BTreeMap<String, Value>,
     key: &str,
@@ -425,6 +443,7 @@ pub fn bool_for_system_value_from_tree_map(
     }
 }
 
+/// Retrieves the value of a key from a CBOR map if it's a u64. 
 pub(crate) fn cbor_inner_u64_value<'a>(
     document_type: &'a [(Value, Value)],
     key: &'a str,
@@ -436,6 +455,7 @@ pub(crate) fn cbor_inner_u64_value<'a>(
     None
 }
 
+/// Retrieves the value of a key from a CBOR map if it's a u32. 
 pub(crate) fn cbor_inner_u32_value<'a>(
     document_type: &'a [(Value, Value)],
     key: &'a str,
@@ -447,6 +467,7 @@ pub(crate) fn cbor_inner_u32_value<'a>(
     None
 }
 
+/// Retrieves the value of a key from a CBOR map if it's a u16. 
 pub(crate) fn cbor_inner_u16_value<'a>(
     document_type: &'a [(Value, Value)],
     key: &'a str,
@@ -458,6 +479,7 @@ pub(crate) fn cbor_inner_u16_value<'a>(
     None
 }
 
+/// Retrieves the value of a key from a CBOR map if it's a u8. 
 pub(crate) fn cbor_inner_u8_value<'a>(
     document_type: &'a [(Value, Value)],
     key: &'a str,
