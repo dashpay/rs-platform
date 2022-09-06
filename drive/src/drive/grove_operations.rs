@@ -823,6 +823,7 @@ impl Drive {
             let cost_context = self.grove.apply_batch(
                 ops.operations,
                 Some(BatchApplyOptions {
+                    disable_operation_consistency_check: true,
                     validate_insertion_does_not_override: validate,
                 }),
                 transaction,
@@ -870,6 +871,7 @@ impl Drive {
         let cost_context = self.grove.worst_case_operations_for_batch(
             ops.operations,
             Some(BatchApplyOptions {
+                disable_operation_consistency_check: true,
                 validate_insertion_does_not_override: validate,
             }),
         );
