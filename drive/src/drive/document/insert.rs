@@ -1,4 +1,4 @@
-use grovedb::reference_path::ReferencePathType::SiblingReference;
+use grovedb::reference_path::ReferencePathType::{AbsolutePathReference, SiblingReference};
 use grovedb::{Element, TransactionArg};
 use std::collections::HashSet;
 use std::option::Option::None;
@@ -78,7 +78,7 @@ impl Drive {
             // we first insert an empty tree if the document is new
             self.batch_insert_empty_tree_if_not_exists(
                 path_key_info,
-                &storage_flags,
+                storage_flags,
                 apply,
                 transaction,
                 drive_operations,
@@ -88,7 +88,7 @@ impl Drive {
                 DocumentRefAndSerialization((document, serialized_document, storage_flags)) => {
                     let element = Element::Item(
                         Vec::from(serialized_document),
-                        storage_flags.to_some_element_flags(),
+                        StorageFlags::map_to_some_element_flags(storage_flags),
                     );
                     let document_id_in_primary_path =
                         contract_documents_keeping_history_primary_key_path_for_document_id(
@@ -106,7 +106,7 @@ impl Drive {
                     let serialized_document =
                         document.serialize(document_and_contract_info.document_type)?;
                     let element =
-                        Element::Item(serialized_document, storage_flags.to_some_element_flags());
+                        Element::Item(serialized_document, StorageFlags::map_to_some_element_flags(storage_flags));
                     let document_id_in_primary_path =
                         contract_documents_keeping_history_primary_key_path_for_document_id(
                             contract.id.as_bytes(),
@@ -151,7 +151,7 @@ impl Drive {
                         Element::Reference(
                             SiblingReference(encoded_time),
                             Some(1),
-                            storage_flags.to_some_element_flags(),
+                            StorageFlags::map_to_some_element_flags(storage_flags),
                         ),
                     ))
                 } else {
@@ -176,7 +176,7 @@ impl Drive {
                 DocumentRefAndSerialization((document, serialized_document, storage_flags)) => {
                     let element = Element::Item(
                         Vec::from(serialized_document),
-                        storage_flags.to_some_element_flags(),
+                        StorageFlags::map_to_some_element_flags(storage_flags),
                     );
                     PathFixedSizeKeyElement((primary_key_path, document.id.as_slice(), element))
                 }
@@ -184,7 +184,7 @@ impl Drive {
                     let serialized_document =
                         document.serialize(document_and_contract_info.document_type)?;
                     let element =
-                        Element::Item(serialized_document, storage_flags.to_some_element_flags());
+                        Element::Item(serialized_document, StorageFlags::map_to_some_element_flags(storage_flags));
                     PathFixedSizeKeyElement((primary_key_path, document.id.as_slice(), element))
                 }
                 DocumentSize(max_size) => PathKeyElementSize((
@@ -199,7 +199,7 @@ impl Drive {
                 DocumentRefAndSerialization((document, serialized_document, storage_flags)) => {
                     let element = Element::Item(
                         Vec::from(serialized_document),
-                        storage_flags.to_some_element_flags(),
+                        StorageFlags::map_to_some_element_flags(storage_flags),
                     );
                     PathFixedSizeKeyElement((primary_key_path, document.id.as_slice(), element))
                 }
@@ -207,7 +207,7 @@ impl Drive {
                     let serialized_document =
                         document.serialize(document_and_contract_info.document_type)?;
                     let element =
-                        Element::Item(serialized_document, storage_flags.to_some_element_flags());
+                        Element::Item(serialized_document, StorageFlags::map_to_some_element_flags(storage_flags));
                     PathFixedSizeKeyElement((primary_key_path, document.id.as_slice(), element))
                 }
                 DocumentSize(max_size) => PathKeyElementSize((
@@ -248,7 +248,7 @@ impl Drive {
         override_document: bool,
         block_time: f64,
         apply: bool,
-        storage_flags: StorageFlags,
+        storage_flags: Option<StorageFlags>,
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
         let contract = <Contract as DriveContractExt>::from_cbor(serialized_contract, None)?;
@@ -256,7 +256,7 @@ impl Drive {
         let document = Document::from_cbor(serialized_document, None, owner_id)?;
 
         let document_info =
-            DocumentRefAndSerialization((&document, serialized_document, &storage_flags));
+            DocumentRefAndSerialization((&document, serialized_document, storage_flags.as_ref()));
 
         let document_type = contract.document_type_for_name(document_type_name)?;
 
@@ -283,13 +283,13 @@ impl Drive {
         override_document: bool,
         block_time: f64,
         apply: bool,
-        storage_flags: StorageFlags,
+        storage_flags: Option<StorageFlags>,
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
         let document = Document::from_cbor(serialized_document, None, owner_id)?;
 
         let document_info =
-            DocumentRefAndSerialization((&document, serialized_document, &storage_flags));
+            DocumentRefAndSerialization((&document, serialized_document, storage_flags.as_ref()));
 
         let document_type = contract.document_type_for_name(document_type_name)?;
 
@@ -435,7 +435,7 @@ impl Drive {
                 // here we are inserting an empty tree that will have a subtree of all other index properties
                 let inserted = self.batch_insert_empty_tree_if_not_exists(
                     path_key_info.clone(),
-                    &storage_flags,
+                    storage_flags.as_ref(),
                     apply,
                     transaction,
                     &mut batch_operations,
@@ -484,7 +484,7 @@ impl Drive {
                     // here we are inserting an empty tree that will have a subtree of all other index properties
                     let inserted = self.batch_insert_empty_tree_if_not_exists(
                         path_key_info.clone(),
-                        &storage_flags,
+                        storage_flags.as_ref(),
                         apply,
                         transaction,
                         &mut batch_operations,
@@ -507,7 +507,7 @@ impl Drive {
                     // here we are inserting an empty tree that will have a subtree of all other index properties
                     let inserted = self.batch_insert_empty_tree_if_not_exists(
                         path_key_info.clone(),
-                        &storage_flags,
+                        storage_flags.as_ref(),
                         apply,
                         transaction,
                         &mut batch_operations,
@@ -529,7 +529,7 @@ impl Drive {
                 primary_key_path: [&[u8]; 5],
                 document: &Document,
                 document_type: &DocumentType,
-                storage_flags: &StorageFlags,
+                storage_flags: Option<&StorageFlags>,
             ) -> Element {
                 // we need to construct the reference to the original document
                 let mut reference_path = primary_key_path
@@ -541,9 +541,9 @@ impl Drive {
                     reference_path.push(vec![0]);
                 }
                 Element::Reference(
-                    reference_path,
+                    AbsolutePathReference(reference_path),
                     Some(1),
-                    storage_flags.to_some_element_flags(),
+                    StorageFlags::map_to_some_element_flags(storage_flags),
                 )
             }
 
@@ -556,7 +556,7 @@ impl Drive {
                 // here we are inserting an empty tree that will have a subtree of all other index properties
                 self.batch_insert_empty_tree_if_not_exists(
                     path_key_info,
-                    &storage_flags,
+                    storage_flags.as_ref(),
                     apply,
                     transaction,
                     &mut batch_operations,
@@ -572,7 +572,7 @@ impl Drive {
                             primary_key_path,
                             document,
                             document_and_contract_info.document_type,
-                            storage_flags,
+                            *storage_flags,
                         );
                         KeyElement((document.id.as_slice(), document_reference))
                     }
@@ -594,9 +594,10 @@ impl Drive {
                     DocumentRefAndSerialization((document, _, storage_flags))
                     | DocumentRefWithoutSerialization((document, storage_flags)) => {
                         let document_reference = make_document_reference(
+                            primary_key_path,
                             document,
                             document_and_contract_info.document_type,
-                            storage_flags,
+                            *storage_flags,
                         );
                         KeyElement((&[0], document_reference))
                     }

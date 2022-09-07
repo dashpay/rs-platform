@@ -256,7 +256,7 @@ impl Drive {
             ));
         }
 
-        let element_flags = contract_element.get_flags().clone();
+        let element_flags = contract_element.get_flags();
 
         // this will override the previous contract if we do not keep history
         self.add_contract_to_storage(
@@ -329,7 +329,7 @@ impl Drive {
                 self.batch_insert_empty_tree(
                     type_path,
                     KeyRef(&[0]),
-                    Some(&storage_flags),
+                    storage_flags.as_ref(),
                     &mut batch_operations,
                 )?;
 
@@ -342,7 +342,7 @@ impl Drive {
                         self.batch_insert_empty_tree(
                             type_path,
                             KeyRef(index.name.as_bytes()),
-                            Some(&storage_flags),
+                            storage_flags.as_ref(),
                             &mut batch_operations,
                         )?;
                         index_cache.insert(index_bytes);
@@ -371,7 +371,7 @@ impl Drive {
             contract_cbor,
             block_time,
             apply,
-            storage_flags,
+            storage_flags.as_ref(),
             transaction,
         )
     }
@@ -414,7 +414,7 @@ impl Drive {
         contract_id: [u8; 32],
         transaction: TransactionArg,
         drive_cache: RefMut<DriveCache>,
-    ) -> Result<(Option<Arc<Contract>>, StorageFlags), Error> {
+    ) -> Result<(Option<Arc<Contract>>, Option<StorageFlags>), Error> {
         let CostContext { value, cost: _ } =
             self.grove
                 .get(contract_root_path(&contract_id), &[0], transaction);
@@ -428,7 +428,7 @@ impl Drive {
                 .deref()
                 .cached_contracts
                 .insert(contract_id, Arc::clone(&contract));
-            let flags = StorageFlags::from_some_element_flags(element_flag)?;
+            let flags = StorageFlags::from_some_element_flags(&element_flag)?;
             Ok((Some(Arc::clone(&contract)), flags))
         } else {
             Err(Error::Drive(DriveError::CorruptedContractPath(
@@ -443,7 +443,7 @@ impl Drive {
         contract_serialization: Vec<u8>,
         block_time: f64,
         apply: bool,
-        storage_flags: StorageFlags,
+        storage_flags: Option<&StorageFlags>,
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
         let mut drive_operations: Vec<DriveOperation> = vec![];
@@ -481,7 +481,7 @@ impl Drive {
 
         let contract_element = Element::Item(
             contract_serialization,
-            storage_flags.to_some_element_flags(),
+            StorageFlags::map_to_some_element_flags(storage_flags),
         );
 
         if already_exists {
