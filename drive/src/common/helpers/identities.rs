@@ -27,7 +27,7 @@ pub fn create_test_identity(drive: &Drive, id: [u8; 32], transaction: Transactio
     };
 
     drive
-        .insert_identity(identity.clone(), true, StorageFlags::default(), transaction)
+        .insert_identity(identity.clone(), true, None, transaction)
         .expect("should insert identity");
 
     identity

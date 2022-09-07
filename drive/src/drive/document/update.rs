@@ -100,7 +100,7 @@ impl Drive {
         } else {
             let element_size = Element::Item(
                 serialized_document.to_vec(),
-                StorageFlags::to_element_flags(&storage_flags),
+                StorageFlags::to_some_element_flags(&storage_flags),
             )
             .serialized_byte_size();
 
@@ -229,7 +229,7 @@ impl Drive {
                         None,
                         owner_id,
                     )?;
-                    Ok(DocumentWithoutSerialization((document, StorageFlags::from_element_flags(element_flags)?)))
+                    Ok(DocumentWithoutSerialization((document, StorageFlags::from_some_element_flags(element_flags)?)))
                 } else {
                     Err(Error::Drive(DriveError::CorruptedDocumentNotItem(
                         "old document is not an item",

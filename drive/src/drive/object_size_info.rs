@@ -362,11 +362,11 @@ pub struct DocumentAndContractInfo<'a> {
 #[derive(Clone)]
 pub enum DocumentInfo<'a> {
     /// The borrowed document and it's serialized form
-    DocumentRefAndSerialization((&'a Document, &'a [u8], &'a StorageFlags)),
+    DocumentRefAndSerialization((&'a Document, &'a [u8], Option<&'a StorageFlags>)),
     /// The borrowed document without it's serialized form
-    DocumentRefWithoutSerialization((&'a Document, &'a StorageFlags)),
+    DocumentRefWithoutSerialization((&'a Document, Option<&'a StorageFlags>)),
     /// The document without it's serialized form
-    DocumentWithoutSerialization((Document, StorageFlags)),
+    DocumentWithoutSerialization((Document, Option<StorageFlags>)),
     /// An element size
     DocumentSize(u32),
 }

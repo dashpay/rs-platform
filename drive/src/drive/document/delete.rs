@@ -104,7 +104,7 @@ impl Drive {
         } else if let Some(document_element) = &document_element {
             if let Element::Item(data, element_flags) = document_element {
                 let document = Document::from_cbor(data.as_slice(), None, owner_id)?;
-                let storage_flags = StorageFlags::from_element_flags(element_flags.clone())?;
+                let storage_flags = StorageFlags::from_some_element_flags(element_flags.clone())?;
                 DocumentRefAndSerialization((&document, data.as_slice(), &storage_flags))
             } else {
                 return Err(Error::Drive(DriveError::CorruptedDocumentNotItem(

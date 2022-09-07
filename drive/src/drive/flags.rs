@@ -152,11 +152,26 @@ impl StorageFlags {
         Self::deserialize(data)
     }
 
-    pub fn from_element_flags(data: ElementFlags) -> Result<Option<Self>, Error> {
+    pub fn from_some_element_flags(data: Option<ElementFlags>) -> Result<Option<Self>, Error> {
         let data = data.ok_or(Error::Drive(DriveError::CorruptedElementFlags(
             "no element flag on data",
         )))?;
         Self::from_slice(data.as_slice())
+    }
+
+    pub fn from_some_element_flags_ref(data: &Option<ElementFlags>) -> Result<Option<Self>, Error> {
+        let data = data.as_ref().ok_or(Error::Drive(DriveError::CorruptedElementFlags(
+            "no element flag on data",
+        )))?;
+        Self::from_slice(data.as_slice())
+    }
+
+    pub fn map_to_some_element_flags(maybe_storage_flags : Option<&Self>) -> Option<ElementFlags> {
+        maybe_storage_flags.map(|storage_flags| storage_flags.serialize())
+    }
+
+    pub fn to_some_element_flags(&self) -> Option<ElementFlags> {
+        Some(self.serialize())
     }
 
     pub fn to_element_flags(&self) -> ElementFlags {

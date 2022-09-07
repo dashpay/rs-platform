@@ -70,7 +70,7 @@ impl Drive {
                         .insert(
                             path,
                             key,
-                            Element::empty_tree_with_flags(storage_flags.to_element_flags()),
+                            Element::empty_tree_with_flags(storage_flags.to_some_element_flags()),
                             transaction,
                         )
                         .map_err(Error::GroveDB);
@@ -121,7 +121,7 @@ impl Drive {
                     let cost_context = self.grove.insert_if_not_exists(
                         path_iter.clone(),
                         key,
-                        Element::empty_tree_with_flags(storage_flags.to_element_flags()),
+                        Element::empty_tree_with_flags(storage_flags.to_some_element_flags()),
                         transaction,
                     );
                     push_drive_operation_result_optional(cost_context, drive_operations)?
@@ -164,7 +164,7 @@ impl Drive {
                     let cost_context = self.grove.insert_if_not_exists(
                         path_iter.clone(),
                         key.as_slice(),
-                        Element::empty_tree_with_flags(storage_flags.to_element_flags()),
+                        Element::empty_tree_with_flags(storage_flags.to_some_element_flags()),
                         transaction,
                     );
                     push_drive_operation_result_optional(cost_context, drive_operations)?
@@ -189,7 +189,7 @@ impl Drive {
                     let cost_context = self.grove.insert_if_not_exists(
                         path.clone(),
                         key.as_slice(),
-                        Element::empty_tree_with_flags(storage_flags.to_element_flags()),
+                        Element::empty_tree_with_flags(storage_flags.to_some_element_flags()),
                         transaction,
                     );
                     push_drive_operation_result_optional(cost_context, drive_operations)?
@@ -217,7 +217,7 @@ impl Drive {
                     let cost_context = self.grove.insert_if_not_exists(
                         path.clone(),
                         key,
-                        Element::empty_tree_with_flags(storage_flags.to_element_flags()),
+                        Element::empty_tree_with_flags(storage_flags.to_some_element_flags()),
                         transaction,
                     );
                     push_drive_operation_result_optional(cost_context, drive_operations)?
@@ -565,7 +565,7 @@ impl Drive {
     pub(crate) fn batch_insert_empty_tree_if_not_exists<'a, 'c, const N: usize>(
         &'a self,
         path_key_info: PathKeyInfo<'c, N>,
-        storage_flags: &StorageFlags,
+        storage_flags: Option<&StorageFlags>,
         apply: bool,
         transaction: TransactionArg,
         drive_operations: &mut Vec<DriveOperation>,
@@ -585,7 +585,7 @@ impl Drive {
                     drive_operations.push(DriveOperation::for_empty_tree(
                         path,
                         key.to_vec(),
-                        Some(storage_flags),
+                        storage_flags,
                     ));
                 }
                 Ok(!has_raw)
@@ -615,7 +615,7 @@ impl Drive {
                     drive_operations.push(DriveOperation::for_empty_tree(
                         path,
                         key.to_vec(),
-                        Some(storage_flags),
+                        storage_flags,
                     ));
                 }
                 Ok(!has_raw)
@@ -633,7 +633,7 @@ impl Drive {
                     drive_operations.push(DriveOperation::for_empty_tree(
                         path_items,
                         key.to_vec(),
-                        Some(storage_flags),
+                        storage_flags,
                     ));
                 }
                 Ok(!has_raw)
@@ -646,7 +646,7 @@ impl Drive {
                     drive_operations.push(DriveOperation::for_empty_tree(
                         path_items,
                         key.to_vec(),
-                        Some(storage_flags),
+                        storage_flags,
                     ));
                 }
                 Ok(!has_raw)

@@ -17,7 +17,7 @@ impl Drive {
     pub fn add_insert_identity_operations(
         &self,
         identity: Identity,
-        storage_flags: StorageFlags,
+        storage_flags: Option<StorageFlags>,
         batch: &mut GroveDbOpBatch,
     ) -> Result<(), Error> {
         let identity_bytes = identity.to_buffer().map_err(|_| {
@@ -38,7 +38,7 @@ impl Drive {
                 identity.id.buffer.to_vec(),
             ],
             IDENTITY_KEY.to_vec(),
-            Element::Item(identity_bytes, storage_flags.to_element_flags()),
+            Element::Item(identity_bytes, storage_flags.to_some_element_flags()),
         );
 
         Ok(())
@@ -48,7 +48,7 @@ impl Drive {
         &self,
         identity: Identity,
         apply: bool,
-        storage_flags: StorageFlags,
+        storage_flags: Option<StorageFlags>,
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
         let mut batch = GroveDbOpBatch::new();
@@ -84,7 +84,7 @@ impl Drive {
                 ))
             })?;
 
-            Ok((identity, StorageFlags::from_element_flags(element_flags)?))
+            Ok((identity, StorageFlags::from_some_element_flags(element_flags)?))
         } else {
             Err(Error::Drive(DriveError::CorruptedIdentityNotItem(
                 "identity must be an item",
@@ -140,7 +140,7 @@ impl Drive {
                             ))
                         })?;
 
-                    Ok((identity, StorageFlags::from_element_flags(element_flags)?))
+                    Ok((identity, StorageFlags::from_some_element_flags(element_flags)?))
                 } else {
                     Err(Error::Drive(DriveError::CorruptedIdentityNotItem(
                         "identity must be an item",

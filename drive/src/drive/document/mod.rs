@@ -92,7 +92,7 @@ fn make_document_reference(
     Element::Reference(
         UpstreamRootHeightReference(4, reference_path),
         Some(max_reference_hops),
-        storage_flags.to_element_flags(),
+        storage_flags.to_some_element_flags(),
     )
 }
 

@@ -1,6 +1,7 @@
 use grovedb::{Element, TransactionArg};
 use std::collections::HashSet;
 use std::option::Option::None;
+use grovedb::reference_path::ReferencePathType::SiblingReference;
 
 use crate::contract::document::Document;
 use crate::contract::{Contract};
@@ -82,7 +83,7 @@ impl Drive {
                 DocumentRefAndSerialization((document, serialized_document, storage_flags)) => {
                     let element = Element::Item(
                         Vec::from(serialized_document),
-                        storage_flags.to_element_flags(),
+                        storage_flags.to_some_element_flags(),
                     );
                     let document_id_in_primary_path =
                         contract_documents_keeping_history_primary_key_path_for_document_id(
@@ -100,7 +101,7 @@ impl Drive {
                     let serialized_document =
                         document.serialize(document_and_contract_info.document_type)?;
                     let element =
-                        Element::Item(serialized_document, storage_flags.to_element_flags());
+                        Element::Item(serialized_document, storage_flags.to_some_element_flags());
                     let document_id_in_primary_path =
                         contract_documents_keeping_history_primary_key_path_for_document_id(
                             contract.id.as_bytes(),
@@ -145,7 +146,7 @@ impl Drive {
                         Element::Reference(
                             SiblingReference(encoded_time),
                             Some(1),
-                            storage_flags.to_element_flags(),
+                            storage_flags.to_some_element_flags(),
                         ),
                     ))
                 } else {
@@ -170,7 +171,7 @@ impl Drive {
                 DocumentRefAndSerialization((document, serialized_document, storage_flags)) => {
                     let element = Element::Item(
                         Vec::from(serialized_document),
-                        storage_flags.to_element_flags(),
+                        storage_flags.to_some_element_flags(),
                     );
                     PathFixedSizeKeyElement((primary_key_path, document.id.as_slice(), element))
                 }
@@ -178,7 +179,7 @@ impl Drive {
                     let serialized_document =
                         document.serialize(document_and_contract_info.document_type)?;
                     let element =
-                        Element::Item(serialized_document, storage_flags.to_element_flags());
+                        Element::Item(serialized_document, storage_flags.to_some_element_flags());
                     PathFixedSizeKeyElement((primary_key_path, document.id.as_slice(), element))
                 }
                 DocumentSize(max_size) => PathKeyElementSize((
@@ -193,7 +194,7 @@ impl Drive {
                 DocumentRefAndSerialization((document, serialized_document, storage_flags)) => {
                     let element = Element::Item(
                         Vec::from(serialized_document),
-                        storage_flags.to_element_flags(),
+                        storage_flags.to_some_element_flags(),
                     );
                     PathFixedSizeKeyElement((primary_key_path, document.id.as_slice(), element))
                 }
@@ -201,7 +202,7 @@ impl Drive {
                     let serialized_document =
                         document.serialize(document_and_contract_info.document_type)?;
                     let element =
-                        Element::Item(serialized_document, storage_flags.to_element_flags());
+                        Element::Item(serialized_document, storage_flags.to_some_element_flags());
                     PathFixedSizeKeyElement((primary_key_path, document.id.as_slice(), element))
                 }
                 DocumentSize(max_size) => PathKeyElementSize((
@@ -525,7 +526,7 @@ impl Drive {
                 if document_type.documents_keep_history {
                     reference_path.push(vec![0]);
                 }
-                Element::Reference(reference_path, Some(1), storage_flags.to_element_flags())
+                Element::Reference(reference_path, Some(1), storage_flags.to_some_element_flags())
             }
 
             // unique indexes will be stored under key "0"

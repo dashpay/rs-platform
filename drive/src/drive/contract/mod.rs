@@ -7,6 +7,7 @@ use costs::CostContext;
 use dpp::data_contract::extra::encode_float;
 use dpp::data_contract::extra::DriveContractExt;
 use grovedb::{Element, TransactionArg};
+use grovedb::reference_path::ReferencePathType::SiblingReference;
 
 use crate::contract::Contract;
 use crate::drive::batch::GroveDbOpBatch;
@@ -68,12 +69,12 @@ impl Drive {
         let contract_root_path = contract_root_path(contract.id.as_bytes());
         if contract.keeps_history() {
             let element_flags = contract_element.get_flags().clone();
-            let storage_flags = StorageFlags::from_element_flags(element_flags.clone())?;
+            let storage_flags = StorageFlags::from_some_element_flags_ref(contract_element.get_flags())?;
 
             self.batch_insert_empty_tree(
                 contract_root_path,
                 KeyRef(&[0]),
-                Some(&storage_flags),
+                storage_flags.as_ref(),
                 insert_operations,
             )?;
             let encoded_time = encode_float(block_time)?;
@@ -129,12 +130,12 @@ impl Drive {
         drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<(), Error> {
         let mut batch_operations: Vec<DriveOperation> = vec![];
-        let storage_flags = StorageFlags::from_element_flags(contract_element.get_flags().clone())?;
+        let storage_flags = StorageFlags::from_some_element_flags_ref(contract_element.get_flags())?;
 
         self.batch_insert_empty_tree(
             [Into::<&[u8; 1]>::into(RootTree::ContractDocuments).as_slice()],
             KeyRef(contract.id.as_bytes()),
-            Some(&storage_flags),
+            storage_flags.as_ref(),
             &mut batch_operations,
         )?;
 
@@ -152,7 +153,7 @@ impl Drive {
         self.batch_insert_empty_tree(
             contract_root_path,
             key_info,
-            Some(&storage_flags),
+            storage_flags.as_ref(),
             &mut batch_operations,
         )?;
 
@@ -165,7 +166,7 @@ impl Drive {
             self.batch_insert_empty_tree(
                 contract_documents_path,
                 KeyRef(type_key.as_bytes()),
-                Some(&storage_flags),
+                storage_flags.as_ref(),
                 &mut batch_operations,
             )?;
 
@@ -181,7 +182,7 @@ impl Drive {
             self.batch_insert_empty_tree(
                 type_path,
                 key_info,
-                Some(&storage_flags),
+                storage_flags.as_ref(),
                 &mut batch_operations,
             )?;
 
@@ -194,7 +195,7 @@ impl Drive {
                     self.batch_insert_empty_tree(
                         type_path,
                         KeyRef(index_bytes),
-                        Some(&storage_flags),
+                        storage_flags.as_ref(),
                         &mut batch_operations,
                     )?;
                     index_cache.insert(index_bytes);
@@ -264,7 +265,7 @@ impl Drive {
             &mut batch_operations,
         )?;
 
-        let storage_flags = StorageFlags::from_element_flags(element_flags)?;
+        let storage_flags = StorageFlags::from_some_element_flags(element_flags)?;
 
         let contract_documents_path = contract_documents_path(contract.id.as_bytes());
         for (type_key, document_type) in contract.document_types() {
@@ -298,7 +299,7 @@ impl Drive {
                     if !index_cache.contains(index_bytes) {
                         self.batch_insert_empty_tree_if_not_exists(
                             PathFixedSizeKeyRef((type_path, index.name.as_bytes())),
-                            &storage_flags,
+                            storage_flags.as_ref(),
                             apply,
                             transaction,
                             &mut batch_operations,
@@ -311,7 +312,7 @@ impl Drive {
                 self.batch_insert_empty_tree(
                     contract_documents_path,
                     KeyRef(type_key.as_bytes()),
-                    Some(&storage_flags),
+                    storage_flags.as_ref(),
                     &mut batch_operations,
                 )?;
 
@@ -357,7 +358,7 @@ impl Drive {
         contract_id: Option<[u8; 32]>,
         block_time: f64,
         apply: bool,
-        storage_flags: StorageFlags,
+        storage_flags: Option<StorageFlags>,
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
         // first we need to deserialize the contract
@@ -425,7 +426,7 @@ impl Drive {
                 .deref()
                 .cached_contracts
                 .insert(contract_id, Arc::clone(&contract));
-            let flags = StorageFlags::from_element_flags(element_flag)?;
+            let flags = StorageFlags::from_some_element_flags(element_flag)?;
             Ok((Some(Arc::clone(&contract)), flags))
         } else {
             Err(Error::Drive(DriveError::CorruptedContractPath(
@@ -473,7 +474,7 @@ impl Drive {
         };
 
         let contract_element =
-            Element::Item(contract_serialization, storage_flags.to_element_flags());
+            Element::Item(contract_serialization, storage_flags.to_some_element_flags());
 
         if already_exists {
             if !original_contract_stored_data.is_empty() {

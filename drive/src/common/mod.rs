@@ -38,7 +38,7 @@ pub fn setup_contract(
             contract_id,
             0f64,
             true,
-            StorageFlags::default(),
+            None,
             transaction,
         )
         .expect("contract should be applied");
@@ -59,7 +59,7 @@ pub fn setup_contract_from_hex(
             None,
             0f64,
             true,
-            StorageFlags::default(),
+            None,
             transaction,
         )
         .expect("contract should be applied");
