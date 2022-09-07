@@ -28,6 +28,10 @@ pub enum StorageFlags {
 }
 
 impl StorageFlags {
+    pub fn default() -> Option<Self> {
+        None
+    }
+
     pub fn type_byte(&self) -> u8 {
         match self {
             SingleEpoch(_) => 0,

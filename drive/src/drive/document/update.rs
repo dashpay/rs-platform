@@ -599,7 +599,7 @@ mod tests {
             .document_type_for_name("profile")
             .expect("expected to get a document type");
 
-        let storage_flags = StorageFlags { epoch: 0 };
+        let storage_flags = Some(StorageFlags::SingleEpoch(0));
 
         drive
             .add_document_for_contract(
@@ -607,7 +607,7 @@ mod tests {
                     document_info: DocumentRefAndSerialization((
                         &alice_profile,
                         alice_profile_cbor.as_slice(),
-                        &storage_flags,
+                        storage_flags.as_ref(),
                     )),
                     contract: &contract,
                     document_type,
@@ -690,7 +690,7 @@ mod tests {
             .document_type_for_name("profile")
             .expect("expected to get a document type");
 
-        let storage_flags = StorageFlags { epoch: 0 };
+        let storage_flags = Some(StorageFlags::SingleEpoch(0));
 
         drive
             .add_document_for_contract(
@@ -698,7 +698,7 @@ mod tests {
                     document_info: DocumentRefAndSerialization((
                         &alice_profile,
                         alice_profile_cbor.as_slice(),
-                        &storage_flags,
+                        storage_flags.as_ref(),
                     )),
                     contract: &contract,
                     document_type,
@@ -801,7 +801,7 @@ mod tests {
             .document_type_for_name("profile")
             .expect("expected to get a document type");
 
-        let storage_flags = StorageFlags { epoch: 0 };
+        let storage_flags = Some(StorageFlags::SingleEpoch(0));
 
         drive
             .add_document_for_contract(
@@ -809,7 +809,7 @@ mod tests {
                     document_info: DocumentRefAndSerialization((
                         &alice_profile,
                         alice_profile_cbor.as_slice(),
-                        &storage_flags,
+                        storage_flags.as_ref(),
                     )),
                     contract: &contract,
                     document_type,
@@ -1177,7 +1177,7 @@ mod tests {
             .document_type_for_name("person")
             .expect("expected to get document type");
 
-        let storage_flags = StorageFlags { epoch: 0 };
+        let storage_flags = Some(StorageFlags::SingleEpoch(0));
 
         drive
             .add_document_for_contract(
@@ -1185,7 +1185,7 @@ mod tests {
                     document_info: DocumentRefAndSerialization((
                         &document,
                         &document_cbor,
-                        &storage_flags,
+                        storage_flags.as_ref(),
                     )),
                     contract: &contract,
                     document_type,

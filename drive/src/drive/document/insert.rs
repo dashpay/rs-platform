@@ -906,12 +906,12 @@ mod tests {
         let document = Document::from_cbor(&dashpay_cr_serialized_document, None, Some(&owner_id))
             .expect("expected to deserialize document successfully");
 
-        let storage_flags = StorageFlags { epoch: 0 };
+        let storage_flags = Some(StorageFlags::SingleEpoch(0));
 
         let document_info = DocumentRefAndSerialization((
             &document,
             &dashpay_cr_serialized_document,
-            &storage_flags,
+            storage_flags.as_ref(),
         ));
 
         let document_type = contract
@@ -1003,7 +1003,7 @@ mod tests {
             .document_type_for_name("domain")
             .expect("expected to get a document type");
 
-        let storage_flags = StorageFlags { epoch: 0 };
+        let storage_flags = Some(StorageFlags::SingleEpoch(0));
 
         drive
             .add_document_for_contract(
@@ -1011,7 +1011,7 @@ mod tests {
                     document_info: DocumentRefAndSerialization((
                         &document,
                         &dpns_domain_serialized_document,
-                        &storage_flags,
+                        storage_flags.as_ref(),
                     )),
                     contract: &contract,
                     document_type,
