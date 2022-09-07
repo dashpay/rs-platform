@@ -1,6 +1,6 @@
 use crate::drive::batch::GroveDbOpBatch;
 use costs::{CostContext};
-use grovedb::batch::{BatchApplyOptions, GroveDbOp, GroveDbOpMode, KeyInfo, Op};
+use grovedb::batch::{BatchApplyOptions, GroveDbOp, GroveDbOpMode, KeyInfo, KeyInfoPath, Op};
 use grovedb::{Element, GroveDb, PathQuery, TransactionArg};
 
 use crate::drive::defaults::SOME_TREE_SIZE;
@@ -446,9 +446,10 @@ impl Drive {
                 if let Some((max_value_size, max_reference_sizes)) =
                     query_stateless_with_max_value_size_and_max_reference_sizes
                 {
+                    let key_info_path = KeyInfoPath::from_known_path(path);
                     let key_info = KeyInfo::KnownKey(key.to_vec());
                     let cost = GroveDb::worst_case_for_get(
-                        path,
+                        &key_info_path,
                         &key_info,
                         max_value_size as u32,
                         max_reference_sizes,
@@ -522,8 +523,10 @@ impl Drive {
         let CostContext { value, cost } = if let Some(max_value_size) =
             stateless_query_for_costs_with_max_value_size
         {
+            let key_info_path = KeyInfoPath::from_known_path(path);
+            let key_info = KeyInfo::KnownKey(key.to_vec());
             let cost =
-                GroveDb::worst_case_for_has_raw(path, key.len() as u32, max_value_size as u32);
+                GroveDb::worst_case_for_has_raw(&key_info_path, &key_info, max_value_size as u32);
             CostContext {
                 value: Ok(false),
                 cost,
@@ -930,7 +933,7 @@ impl Drive {
                         GroveDbOpMode::RunOp => match op {
                             Op::Insert { element } => self.grove_insert(
                                 PathKeyElementInfo::<0>::PathKeyElement((
-                                    path,
+                                    path.to_path(),
                                     key.as_slice(),
                                     element,
                                 )),
@@ -939,7 +942,7 @@ impl Drive {
                                 drive_operations,
                             )?,
                             Op::Delete => self.grove_delete(
-                                path,
+                                path.to_path(),
                                 key.as_slice(),
                                 true,
                                 transaction,
@@ -954,7 +957,7 @@ impl Drive {
                         GroveDbOpMode::WorstCaseOp => match op {
                             Op::Insert { element } => self.grove_insert(
                                 PathKeyElementInfo::<0>::PathKeyElement((
-                                    path,
+                                    path.to_path(),
                                     key.as_slice(),
                                     element,
                                 )),
@@ -963,7 +966,7 @@ impl Drive {
                                 drive_operations,
                             )?,
                             Op::Delete => self.grove_delete(
-                                path,
+                                path.to_path(),
                                 key.as_slice(),
                                 false,
                                 transaction,
