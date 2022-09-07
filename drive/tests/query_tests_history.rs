@@ -959,7 +959,11 @@ fn test_query_historical() {
     drive
         .add_document_for_contract(
             DocumentAndContractInfo {
-                document_info: DocumentRefAndSerialization((&document, &person_cbor, &storage_flags)),
+                document_info: DocumentRefAndSerialization((
+                    &document,
+                    &person_cbor,
+                    &storage_flags,
+                )),
                 contract: &contract,
                 document_type,
                 owner_id: None,
@@ -1003,7 +1007,11 @@ fn test_query_historical() {
     drive
         .add_document_for_contract(
             DocumentAndContractInfo {
-                document_info: DocumentRefAndSerialization((&document, &person_cbor, &storage_flags)),
+                document_info: DocumentRefAndSerialization((
+                    &document,
+                    &person_cbor,
+                    &storage_flags,
+                )),
                 contract: &contract,
                 document_type,
                 owner_id: None,

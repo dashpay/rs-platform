@@ -33,14 +33,7 @@ pub fn setup_contract(
         DriveContractExt::to_cbor(&contract).expect("contract should be serialized");
 
     drive
-        .apply_contract_cbor(
-            contract_cbor,
-            contract_id,
-            0f64,
-            true,
-            None,
-            transaction,
-        )
+        .apply_contract_cbor(contract_cbor, contract_id, 0f64, true, None, transaction)
         .expect("contract should be applied");
     contract
 }
@@ -54,14 +47,7 @@ pub fn setup_contract_from_hex(
     let contract = <Contract as DriveContractExt>::from_cbor(&contract_cbor, None)
         .expect("contract should be deserialized");
     drive
-        .apply_contract_cbor(
-            contract_cbor,
-            None,
-            0f64,
-            true,
-            None,
-            transaction,
-        )
+        .apply_contract_cbor(contract_cbor, None, 0f64, true, None, transaction)
         .expect("contract should be applied");
     contract
 }

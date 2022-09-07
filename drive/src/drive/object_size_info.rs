@@ -9,12 +9,12 @@ use PathKeyElementInfo::{PathFixedSizeKeyElement, PathKeyElement, PathKeyElement
 use PathKeyInfo::{PathFixedSizeKey, PathFixedSizeKeyRef, PathKey, PathKeyRef, PathKeySize};
 
 use crate::contract::document::Document;
-use crate::contract::{Contract};
-use dpp::data_contract::extra::DocumentType;
+use crate::contract::Contract;
 use crate::drive::defaults::DEFAULT_HASH_SIZE;
 use crate::drive::flags::StorageFlags;
 use crate::error::drive::DriveError;
 use crate::error::Error;
+use dpp::data_contract::extra::DocumentType;
 
 use dpp::data_contract::extra::ContractError;
 
@@ -374,7 +374,7 @@ pub enum DocumentInfo<'a> {
 impl<'a> DocumentInfo<'a> {
     pub fn is_document_and_serialization(&self) -> bool {
         match self {
-            DocumentInfo::DocumentRefAndSerialization(..)  => true,
+            DocumentInfo::DocumentRefAndSerialization(..) => true,
             _ => false,
         }
     }
@@ -382,7 +382,7 @@ impl<'a> DocumentInfo<'a> {
     pub fn id_key_value_info(&self) -> KeyValueInfo {
         match self {
             DocumentInfo::DocumentRefAndSerialization((document, _, _))
-            | DocumentInfo::DocumentRefWithoutSerialization((document, _))=> {
+            | DocumentInfo::DocumentRefWithoutSerialization((document, _)) => {
                 KeyRefRequest(document.id.as_slice())
             }
             DocumentInfo::DocumentWithoutSerialization((document, _)) => {
@@ -443,9 +443,7 @@ impl<'a> DocumentInfo<'a> {
             | DocumentInfo::DocumentRefWithoutSerialization((_, &storage_flags)) => {
                 storage_flags.clone()
             }
-            DocumentInfo::DocumentWithoutSerialization((_, storage_flags)) => {
-                storage_flags.clone()
-            }
+            DocumentInfo::DocumentWithoutSerialization((_, storage_flags)) => storage_flags.clone(),
             DocumentInfo::DocumentSize(_) => StorageFlags::default(),
         }
     }
@@ -465,7 +463,7 @@ impl<'a> KeyValueInfo<'a> {
             KeyRefRequest(key) => Ok(key),
             KeyValueMaxSize((_, _)) => Err(Error::Drive(DriveError::CorruptedCodeExecution(
                 "requesting KeyValueInfo as key ref request however it is a key value max size",
-            )))
+            ))),
         }
     }
 
@@ -478,6 +476,6 @@ impl<'a> KeyValueInfo<'a> {
 }
 
 pub struct DeletionInfo<'a, const N: usize> {
-    upper_path : PathInfo<'a, N>,
-    lower_path : Vec<KeyValueInfo<'a>>,
+    upper_path: PathInfo<'a, N>,
+    lower_path: Vec<KeyValueInfo<'a>>,
 }

@@ -1,13 +1,13 @@
 use grovedb::TransactionArg;
 
-use crate::contract::{Contract};
-use dpp::data_contract::extra::DocumentType;
+use crate::contract::Contract;
 use crate::drive::Drive;
 use crate::error::query::QueryError;
 use crate::error::Error;
 use crate::fee::calculate_fee;
 use crate::fee::op::DriveOperation;
 use crate::query::DriveQuery;
+use dpp::data_contract::extra::DocumentType;
 
 use dpp::data_contract::extra::DriveContractExt;
 

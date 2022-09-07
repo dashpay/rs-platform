@@ -5,8 +5,8 @@ use crate::fee_pools::epochs::Epoch;
 use crate::fee_pools::epochs_root_tree_key_constants::{
     KEY_STORAGE_FEE_POOL, KEY_UNPAID_EPOCH_INDEX,
 };
-use grovedb::batch::GroveDbOp;
 use grovedb::batch::Op::Insert;
+use grovedb::batch::{GroveDbOp, GroveDbOpMode};
 use grovedb::Element;
 
 pub mod epochs;
@@ -28,23 +28,19 @@ pub fn add_create_fee_pool_trees_operations(batch: &mut GroveDbOpBatch) {
 }
 
 pub fn update_storage_fee_distribution_pool_operation(storage_fee: u64) -> GroveDbOp {
-    GroveDbOp::RunOp {
-        path: pools_vec_path(),
-        key: KEY_STORAGE_FEE_POOL.to_vec(),
-        op: Insert {
-            element: Element::new_item(storage_fee.to_be_bytes().to_vec()),
-        },
-    }
+    GroveDbOp::insert_run_op(
+        pools_vec_path(),
+        KEY_STORAGE_FEE_POOL.to_vec(),
+        Element::new_item(storage_fee.to_be_bytes().to_vec()),
+    )
 }
 
 pub fn update_unpaid_epoch_index_operation(epoch_index: u16) -> GroveDbOp {
-    GroveDbOp::RunOp {
-        path: pools_vec_path(),
-        key: KEY_UNPAID_EPOCH_INDEX.to_vec(),
-        op: Insert {
-            element: Element::new_item(epoch_index.to_be_bytes().to_vec()),
-        },
-    }
+    GroveDbOp::insert_run_op(
+        pools_vec_path(),
+        KEY_UNPAID_EPOCH_INDEX.to_vec(),
+        Element::new_item(epoch_index.to_be_bytes().to_vec()),
+    )
 }
 
 // TODD: Find tests

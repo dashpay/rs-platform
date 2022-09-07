@@ -17,6 +17,7 @@ use crate::fee::op::DriveOperation::GroveOperation;
 
 pub mod batch;
 pub mod config;
+pub mod contract;
 pub mod defaults;
 pub mod document;
 pub mod fee_pools;
@@ -27,7 +28,6 @@ pub mod identity;
 pub mod initialization;
 pub mod object_size_info;
 pub mod query;
-pub mod contract;
 
 use dpp::data_contract::extra::DriveContractExt;
 

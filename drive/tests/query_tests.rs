@@ -1268,7 +1268,11 @@ fn test_family_basic_queries() {
     drive
         .add_document_for_contract(
             DocumentAndContractInfo {
-                document_info: DocumentRefAndSerialization((&document, &person_cbor, &storage_flags)),
+                document_info: DocumentRefAndSerialization((
+                    &document,
+                    &person_cbor,
+                    &storage_flags,
+                )),
                 contract: &contract,
                 document_type,
                 owner_id: None,
@@ -1311,7 +1315,11 @@ fn test_family_basic_queries() {
     drive
         .add_document_for_contract(
             DocumentAndContractInfo {
-                document_info: DocumentRefAndSerialization((&document, &person_cbor, &storage_flags)),
+                document_info: DocumentRefAndSerialization((
+                    &document,
+                    &person_cbor,
+                    &storage_flags,
+                )),
                 contract: &contract,
                 document_type,
                 owner_id: None,

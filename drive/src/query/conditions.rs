@@ -9,10 +9,10 @@ use WhereOperator::{
     GreaterThanOrEquals, In, LessThan, LessThanOrEquals, StartsWith,
 };
 
-use crate::contract::{document::Document};
-use dpp::data_contract::extra::DocumentType;
+use crate::contract::document::Document;
 use crate::error::query::QueryError;
 use crate::error::Error;
+use dpp::data_contract::extra::DocumentType;
 
 fn sql_value_to_cbor(sql_value: ast::Value) -> Option<Value> {
     match sql_value {

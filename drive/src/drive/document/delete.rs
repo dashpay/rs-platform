@@ -4,17 +4,17 @@ use crate::contract::document::Document;
 use crate::contract::Contract;
 use crate::drive::defaults::CONTRACT_DOCUMENTS_PATH_HEIGHT;
 use crate::drive::document::{contract_document_type_path, contract_documents_primary_key_path};
-use crate::drive::object_size_info::KeyValueInfo::KeyRefRequest;
-use crate::drive::Drive;
 use crate::drive::flags::StorageFlags;
 use crate::drive::object_size_info::DocumentInfo::{DocumentRefAndSerialization, DocumentSize};
+use crate::drive::object_size_info::DriveKeyInfo;
+use crate::drive::object_size_info::DriveKeyInfo::Key;
+use crate::drive::object_size_info::KeyValueInfo::KeyRefRequest;
+use crate::drive::Drive;
 use crate::error::drive::DriveError;
 use crate::error::Error;
 use crate::fee::calculate_fee;
 use crate::fee::op::DriveOperation;
 use dpp::data_contract::extra::DriveContractExt;
-use crate::drive::object_size_info::DriveKeyInfo;
-use crate::drive::object_size_info::DriveKeyInfo::Key;
 
 impl Drive {
     pub fn delete_document_for_contract(
@@ -88,7 +88,11 @@ impl Drive {
             contract_documents_primary_key_path(contract.id.as_bytes(), document_type_name);
 
         let stateless = !apply;
-        let query_stateless_max_value_size = if stateless { Some(document_type.max_size()) } else { None };
+        let query_stateless_max_value_size = if stateless {
+            Some(document_type.max_size())
+        } else {
+            None
+        };
 
         // next we need to get the document from storage
         let document_element: Option<Element> = self.grove_get_direct(
@@ -116,7 +120,6 @@ impl Drive {
                 "document being deleted does not exist",
             )));
         };
-
 
         // third we need to delete the document for it's primary key
         self.batch_delete(
@@ -149,11 +152,7 @@ impl Drive {
             // with the example of the dashpay contract's first index
             // the index path is now something like Contracts/ContractID/Documents(1)/$ownerId
             let document_top_field = document_info
-                .get_raw_for_document_type(
-                    &top_index_property.name,
-                    document_type,
-                    owner_id,
-                )?
+                .get_raw_for_document_type(&top_index_property.name, document_type, owner_id)?
                 .unwrap_or_default();
 
             // we push the actual value of the index path
@@ -170,11 +169,7 @@ impl Drive {
                 // Iteration 2. the index path is now something like Contracts/ContractID/Documents(1)/$ownerId/<ownerId>/toUserId/<ToUserId>/accountReference
 
                 let document_top_field = document_info
-                    .get_raw_for_document_type(
-                        &index_property.name,
-                        document_type,
-                        owner_id,
-                    )?
+                    .get_raw_for_document_type(&index_property.name, document_type, owner_id)?
                     .unwrap_or_default();
 
                 // we push the actual value of the index path

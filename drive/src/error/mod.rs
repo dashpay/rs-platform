@@ -1,3 +1,4 @@
+use crate::error::storage_flags::StorageFlagsError;
 use document::DocumentError;
 use dpp::data_contract::extra::ContractError;
 use drive::DriveError;
@@ -5,15 +6,14 @@ use fee::FeeError;
 use identity::IdentityError;
 use query::QueryError;
 use structure::StructureError;
-use crate::error::storage_flags::StorageFlagsError;
 
 pub mod document;
 pub mod drive;
 pub mod fee;
 pub mod identity;
 pub mod query;
-pub mod structure;
 pub mod storage_flags;
+pub mod structure;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {

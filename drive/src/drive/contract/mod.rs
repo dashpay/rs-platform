@@ -6,11 +6,12 @@ use std::sync::Arc;
 use costs::CostContext;
 use dpp::data_contract::extra::encode_float;
 use dpp::data_contract::extra::DriveContractExt;
-use grovedb::{Element, TransactionArg};
 use grovedb::reference_path::ReferencePathType::SiblingReference;
+use grovedb::{Element, TransactionArg};
 
 use crate::contract::Contract;
 use crate::drive::batch::GroveDbOpBatch;
+use crate::drive::defaults::CONTRACT_MAX_SERIALIZED_SIZE;
 use crate::drive::flags::StorageFlags;
 use crate::drive::object_size_info::DriveKeyInfo::{KeyRef, KeySize};
 use crate::drive::object_size_info::KeyValueInfo::KeyRefRequest;
@@ -19,7 +20,6 @@ use crate::drive::object_size_info::PathKeyElementInfo::{
 };
 use crate::drive::object_size_info::PathKeyInfo::PathFixedSizeKeyRef;
 use crate::drive::{contract_documents_path, defaults, Drive, DriveCache, RootTree};
-use crate::drive::defaults::CONTRACT_MAX_SERIALIZED_SIZE;
 use crate::error::drive::DriveError;
 use crate::error::Error;
 use crate::fee::calculate_fee;
@@ -69,7 +69,8 @@ impl Drive {
         let contract_root_path = contract_root_path(contract.id.as_bytes());
         if contract.keeps_history() {
             let element_flags = contract_element.get_flags().clone();
-            let storage_flags = StorageFlags::from_some_element_flags_ref(contract_element.get_flags())?;
+            let storage_flags =
+                StorageFlags::from_some_element_flags_ref(contract_element.get_flags())?;
 
             self.batch_insert_empty_tree(
                 contract_root_path,
@@ -130,7 +131,8 @@ impl Drive {
         drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<(), Error> {
         let mut batch_operations: Vec<DriveOperation> = vec![];
-        let storage_flags = StorageFlags::from_some_element_flags_ref(contract_element.get_flags())?;
+        let storage_flags =
+            StorageFlags::from_some_element_flags_ref(contract_element.get_flags())?;
 
         self.batch_insert_empty_tree(
             [Into::<&[u8; 1]>::into(RootTree::ContractDocuments).as_slice()],
@@ -449,8 +451,12 @@ impl Drive {
         // overlying structure
         let mut already_exists = false;
         let mut original_contract_stored_data = vec![];
-        
-        let query_state_less_max_value_size = if apply { None } else { Some(CONTRACT_MAX_SERIALIZED_SIZE) };
+
+        let query_state_less_max_value_size = if apply {
+            None
+        } else {
+            Some(CONTRACT_MAX_SERIALIZED_SIZE)
+        };
 
         // We can do a get direct because there are no references involved
         if let Ok(Some(stored_element)) = self.grove_get_direct(
@@ -473,8 +479,10 @@ impl Drive {
             }
         };
 
-        let contract_element =
-            Element::Item(contract_serialization, storage_flags.to_some_element_flags());
+        let contract_element = Element::Item(
+            contract_serialization,
+            storage_flags.to_some_element_flags(),
+        );
 
         if already_exists {
             if !original_contract_stored_data.is_empty() {
