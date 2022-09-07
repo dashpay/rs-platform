@@ -105,8 +105,10 @@ impl Drive {
                 DocumentRefWithoutSerialization((document, storage_flags)) => {
                     let serialized_document =
                         document.serialize(document_and_contract_info.document_type)?;
-                    let element =
-                        Element::Item(serialized_document, StorageFlags::map_to_some_element_flags(storage_flags));
+                    let element = Element::Item(
+                        serialized_document,
+                        StorageFlags::map_to_some_element_flags(storage_flags),
+                    );
                     let document_id_in_primary_path =
                         contract_documents_keeping_history_primary_key_path_for_document_id(
                             contract.id.as_bytes(),
@@ -183,8 +185,10 @@ impl Drive {
                 DocumentRefWithoutSerialization((document, storage_flags)) => {
                     let serialized_document =
                         document.serialize(document_and_contract_info.document_type)?;
-                    let element =
-                        Element::Item(serialized_document, StorageFlags::map_to_some_element_flags(storage_flags));
+                    let element = Element::Item(
+                        serialized_document,
+                        StorageFlags::map_to_some_element_flags(storage_flags),
+                    );
                     PathFixedSizeKeyElement((primary_key_path, document.id.as_slice(), element))
                 }
                 DocumentSize(max_size) => PathKeyElementSize((
@@ -206,8 +210,10 @@ impl Drive {
                 DocumentRefWithoutSerialization((document, storage_flags)) => {
                     let serialized_document =
                         document.serialize(document_and_contract_info.document_type)?;
-                    let element =
-                        Element::Item(serialized_document, StorageFlags::map_to_some_element_flags(storage_flags));
+                    let element = Element::Item(
+                        serialized_document,
+                        StorageFlags::map_to_some_element_flags(storage_flags),
+                    );
                     PathFixedSizeKeyElement((primary_key_path, document.id.as_slice(), element))
                 }
                 DocumentSize(max_size) => PathKeyElementSize((

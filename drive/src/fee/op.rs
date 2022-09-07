@@ -1,5 +1,8 @@
+use std::ops::Add;
 use crate::drive::batch::GroveDbOpBatch;
 use costs::OperationCost;
+use costs::storage_cost::removal::StorageRemovedBytes::NoStorageRemoval;
+use costs::storage_cost::StorageCost;
 use enum_map::Enum;
 use grovedb::{batch::GroveDbOp, Element, PathQuery};
 
@@ -12,6 +15,7 @@ use crate::fee::default_costs::{
     STORAGE_DISK_USAGE_CREDIT_PER_BYTE, STORAGE_LOAD_CREDIT_PER_BYTE,
     STORAGE_PROCESSING_CREDIT_PER_BYTE, STORAGE_SEEK_COST,
 };
+use crate::fee::op::BaseOp::Not;
 use crate::fee::op::DriveOperation::{
     CalculatedCostOperation, ContractFetch, CostCalculationDeleteOperation,
     CostCalculationInsertOperation, CostCalculationQueryOperation, GroveOperation,
@@ -208,7 +212,8 @@ impl SizesOfDeleteOperation {
     pub fn for_key_value(path_size: u32, key_size: u16, element: &Element, multiplier: u8) -> Self {
         let value_size = match element {
             Element::Item(item, _) => item.len(),
-            Element::Reference(path, _, _) => path.iter().map(|inner| inner.len()).sum(),
+            // subtracting one because we don't need to additional byte use to represent the Element::Reference type
+            Element::Reference(path, _, _) => path.encoding_length() - 1,
             Element::Tree(..) => 32,
         } as u32;
         SizesOfDeleteOperation::for_key_value_size(path_size, key_size, value_size, multiplier)
@@ -233,10 +238,12 @@ impl OperationCostConvert for SizesOfInsertOperation {
     fn cost(&self) -> OperationCost {
         OperationCost {
             seek_count: 0,
-            storage_written_bytes: 0,
+            storage_cost: StorageCost {
+                added_bytes: 0,
+                replaced_bytes: 0,
+                removed_bytes: NoStorageRemoval
+            },
             storage_loaded_bytes: 0,
-            storage_freed_bytes: 0,
-            hash_byte_calls: 0,
             hash_node_calls: 0,
         }
     }
@@ -246,10 +253,12 @@ impl OperationCostConvert for SizesOfQueryOperation {
     fn cost(&self) -> OperationCost {
         OperationCost {
             seek_count: 0,
-            storage_written_bytes: 0,
+            storage_cost: StorageCost {
+                added_bytes: 0,
+                replaced_bytes: 0,
+                removed_bytes: NoStorageRemoval
+            },
             storage_loaded_bytes: 0,
-            storage_freed_bytes: 0,
-            hash_byte_calls: 0,
             hash_node_calls: 0,
         }
     }
@@ -259,10 +268,12 @@ impl OperationCostConvert for SizesOfDeleteOperation {
     fn cost(&self) -> OperationCost {
         OperationCost {
             seek_count: 0,
-            storage_written_bytes: 0,
+            storage_cost: StorageCost {
+                added_bytes: 0,
+                replaced_bytes: 0,
+                removed_bytes: NoStorageRemoval
+            },
             storage_loaded_bytes: 0,
-            storage_freed_bytes: 0,
-            hash_byte_calls: 0,
             hash_node_calls: 0,
         }
     }
@@ -305,10 +316,12 @@ impl DriveOperation {
             CalculatedCostOperation(c) => Ok(c),
             ContractFetch => Ok(OperationCost {
                 seek_count: 0,
-                storage_written_bytes: 0,
+                storage_cost: StorageCost {
+                    added_bytes: 0,
+                    replaced_bytes: 0,
+                    removed_bytes: NoStorageRemoval
+                },
                 storage_loaded_bytes: 0,
-                storage_freed_bytes: 0,
-                hash_byte_calls: 0,
                 hash_node_calls: 0,
             }),
         }
@@ -396,32 +409,35 @@ impl DriveCost for OperationCost {
     fn ephemeral_cost(&self) -> Result<u64, Error> {
         let OperationCost {
             seek_count,
-            storage_written_bytes,
+            storage_cost,
             storage_loaded_bytes,
-            storage_freed_bytes: _,
-            hash_byte_calls,
             hash_node_calls,
-        } = *self;
+        } = self;
         let seek_cost = (seek_count as u64)
             .checked_mul(STORAGE_SEEK_COST)
             .ok_or_else(|| get_overflow_error("seek cost overflow"))?;
-        let storage_written_bytes_ephemeral_cost = (storage_written_bytes as u64)
+        let storage_added_bytes_ephemeral_cost = (*storage_cost.added_bytes as u64)
             .checked_mul(STORAGE_PROCESSING_CREDIT_PER_BYTE)
             .ok_or_else(|| get_overflow_error("storage written bytes cost overflow"))?;
-        let _storage_loaded_bytes_cost = (storage_loaded_bytes as u64)
+        let storage_replaced_bytes_ephemeral_cost = (*storage_cost.replaced_bytes as u64)
+            .checked_mul(STORAGE_PROCESSING_CREDIT_PER_BYTE)
+            .ok_or_else(|| get_overflow_error("storage written bytes cost overflow"))?;
+        let _storage_loaded_bytes_cost = (*storage_loaded_bytes as u64)
             .checked_mul(STORAGE_LOAD_CREDIT_PER_BYTE)
             .ok_or_else(|| get_overflow_error("storage loaded cost overflow"))?;
-        let storage_loaded_bytes_cost = (storage_loaded_bytes as u64)
+        let storage_loaded_bytes_cost = (*storage_loaded_bytes as u64)
             .checked_mul(NON_STORAGE_LOAD_CREDIT_PER_BYTE)
             .ok_or_else(|| get_overflow_error("loaded bytes cost overflow"))?;
-        let hash_byte_cost = (hash_byte_calls as u64)
+        let hash_byte_cost = (*hash_byte_calls as u64)
             .checked_mul(HASH_BYTE_COST)
             .ok_or_else(|| get_overflow_error("hash byte cost overflow"))?;
-        let hash_node_cost = (hash_node_calls as u64)
+        let hash_node_cost = (*hash_node_calls as u64)
             .checked_mul(HASH_NODE_COST)
             .ok_or_else(|| get_overflow_error("hash node cost overflow"))?;
         let cost = seek_cost
-            .checked_add(storage_written_bytes_ephemeral_cost)
+            .checked_add(storage_added_bytes_ephemeral_cost)
+            .map(|c| c.checked_add(storage_replaced_bytes_ephemeral_cost))
+            .flatten()
             .map(|c| c.checked_add(storage_loaded_bytes_cost))
             .flatten()
             .map(|c| c.checked_add(storage_loaded_bytes_cost))
@@ -436,10 +452,10 @@ impl DriveCost for OperationCost {
 
     fn storage_cost(&self) -> Result<i64, Error> {
         let OperationCost {
-            storage_written_bytes,
+            storage_cost,
             ..
-        } = *self;
-        let storage_written_bytes_disk_cost = (storage_written_bytes as i64)
+        } = self;
+        let storage_written_bytes_disk_cost = (storage_cost.added_bytes as i64)
             .checked_mul(STORAGE_DISK_USAGE_CREDIT_PER_BYTE)
             .ok_or_else(|| get_overflow_error("storage written bytes cost overflow"));
         storage_written_bytes_disk_cost
