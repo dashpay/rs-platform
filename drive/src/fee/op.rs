@@ -413,13 +413,13 @@ impl DriveCost for OperationCost {
             storage_loaded_bytes,
             hash_node_calls,
         } = self;
-        let seek_cost = (seek_count as u64)
+        let seek_cost = (*seek_count as u64)
             .checked_mul(STORAGE_SEEK_COST)
             .ok_or_else(|| get_overflow_error("seek cost overflow"))?;
-        let storage_added_bytes_ephemeral_cost = (*storage_cost.added_bytes as u64)
+        let storage_added_bytes_ephemeral_cost = (storage_cost.added_bytes as u64)
             .checked_mul(STORAGE_PROCESSING_CREDIT_PER_BYTE)
             .ok_or_else(|| get_overflow_error("storage written bytes cost overflow"))?;
-        let storage_replaced_bytes_ephemeral_cost = (*storage_cost.replaced_bytes as u64)
+        let storage_replaced_bytes_ephemeral_cost = (storage_cost.replaced_bytes as u64)
             .checked_mul(STORAGE_PROCESSING_CREDIT_PER_BYTE)
             .ok_or_else(|| get_overflow_error("storage written bytes cost overflow"))?;
         let _storage_loaded_bytes_cost = (*storage_loaded_bytes as u64)
