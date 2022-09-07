@@ -213,7 +213,7 @@ impl StorageFlags {
         Self::deserialize(data)
     }
 
-    pub fn from_some_element_flags(data: Option<ElementFlags>) -> Result<Option<Self>, Error> {
+    pub fn from_some_element_flags(data: &Option<ElementFlags>) -> Result<Option<Self>, Error> {
         let data = data.ok_or(Error::Drive(DriveError::CorruptedElementFlags(
             "no element flag on data",
         )))?;

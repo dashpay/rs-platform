@@ -437,7 +437,7 @@ impl<'a> DocumentInfo<'a> {
         }
     }
 
-    pub fn get_storage_flags(&self) -> StorageFlags {
+    pub fn get_storage_flags(&self) -> &Option<StorageFlags> {
         match self {
             DocumentInfo::DocumentRefAndSerialization((_, _, &storage_flags))
             | DocumentInfo::DocumentRefWithoutSerialization((_, &storage_flags)) => {

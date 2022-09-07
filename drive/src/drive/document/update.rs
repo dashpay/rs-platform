@@ -37,7 +37,7 @@ impl Drive {
         owner_id: Option<&[u8]>,
         block_time: f64,
         apply: bool,
-        storage_flags: StorageFlags,
+        storage_flags: Option<&StorageFlags>,
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
         let contract = <Contract as DriveContractExt>::from_cbor(contract_cbor, None)?;
@@ -65,7 +65,7 @@ impl Drive {
         owner_id: Option<&[u8]>,
         block_time: f64,
         apply: bool,
-        storage_flags: StorageFlags,
+        storage_flags: Option<&StorageFlags>,
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
         let document = Document::from_cbor(serialized_document, None, owner_id)?;
@@ -92,7 +92,7 @@ impl Drive {
         owner_id: Option<&[u8]>,
         block_time: f64,
         apply: bool,
-        storage_flags: StorageFlags,
+        storage_flags: Option<&StorageFlags>,
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
         let mut drive_operations: Vec<DriveOperation> = vec![];
@@ -100,11 +100,11 @@ impl Drive {
         let document_type = contract.document_type_for_name(document_type_name)?;
 
         let document_info = if apply {
-            DocumentRefAndSerialization((document, serialized_document, &storage_flags))
+            DocumentRefAndSerialization((document, serialized_document, storage_flags))
         } else {
             let element_size = Element::Item(
                 serialized_document.to_vec(),
-                StorageFlags::to_some_element_flags(&storage_flags),
+                StorageFlags::map_to_some_element_flags(storage_flags),
             )
             .serialized_byte_size();
 
@@ -237,7 +237,7 @@ impl Drive {
                         Document::from_cbor(old_serialized_document.as_slice(), None, owner_id)?;
                     Ok(DocumentWithoutSerialization((
                         document,
-                        StorageFlags::from_some_element_flags(element_flags)?,
+                        StorageFlags::from_some_element_flags(&element_flags)?,
                     )))
                 } else {
                     Err(Error::Drive(DriveError::CorruptedDocumentNotItem(

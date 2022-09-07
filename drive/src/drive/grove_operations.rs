@@ -1,6 +1,6 @@
 use crate::drive::batch::GroveDbOpBatch;
 use costs::{CostContext, OperationCost};
-use grovedb::batch::{BatchApplyOptions, GroveDbOp, Op};
+use grovedb::batch::{BatchApplyOptions, GroveDbOp, GroveDbOpMode, Op};
 use grovedb::{Element, GroveDb, PathQuery, TransactionArg};
 
 use crate::drive::defaults::SOME_TREE_SIZE;
@@ -921,7 +921,58 @@ impl Drive {
             for op in ops.operations.into_iter() {
                 //println!("on {:#?}", op);
                 match op {
-                    GroveDbOp::RunOp { path, key, op } => match op {
+                    GroveDbOp { path, key, op, mode } => match mode {
+                        GroveDbOpMode::RunOp => match op {
+                            Op::Insert { element } => self.grove_insert(
+                                PathKeyElementInfo::<0>::PathKeyElement((
+                                    path,
+                                    key.as_slice(),
+                                    element,
+                                )),
+                                transaction,
+                                true,
+                                drive_operations,
+                            )?,
+                            Op::Delete => self.grove_delete(
+                                path,
+                                key.as_slice(),
+                                true,
+                                transaction,
+                                drive_operations,
+                            )?,
+                            _ => {
+                                return Err(Error::Drive(DriveError::UnsupportedPrivate(
+                                    "Only Insert and Deletion operations are allowed",
+                                )))
+                            }
+                        },
+                        GroveDbOpMode::WorstCaseOp => match op {
+                            Op::Insert { element } => self.grove_insert(
+                                PathKeyElementInfo::<0>::PathKeyElement((
+                                    path,
+                                    key.as_slice(),
+                                    element,
+                                )),
+                                transaction,
+                                false,
+                                drive_operations,
+                            )?,
+                            Op::Delete => self.grove_delete(
+                                path,
+                                key.as_slice(),
+                                false,
+                                transaction,
+                                drive_operations,
+                            )?,
+                            _ => {
+                                return Err(Error::Drive(DriveError::UnsupportedPrivate(
+                                    "Only Insert and Deletion operations are allowed",
+                                )))
+                            }
+                        }
+                    }
+                    /*
+                    GroveDbOp { path, key, op, mode } => match op {
                         Op::Insert { element } => self.grove_insert(
                             PathKeyElementInfo::<0>::PathKeyElement((
                                 path,
@@ -975,6 +1026,7 @@ impl Drive {
                             )))
                         }
                     },
+                     */
                 }
             }
             Ok(())

@@ -66,7 +66,7 @@ fn contract_documents_keeping_history_storage_time_reference_path_size(
 fn make_document_reference(
     document: &Document,
     document_type: &DocumentType,
-    storage_flags: &StorageFlags,
+    storage_flags: Option<&StorageFlags>,
 ) -> Element {
     // we need to construct the reference from the split height of the contract document
     // type which is at 4
@@ -92,7 +92,7 @@ fn make_document_reference(
     Element::Reference(
         UpstreamRootHeightReference(4, reference_path),
         Some(max_reference_hops),
-        storage_flags.to_some_element_flags(),
+        StorageFlags::map_to_some_element_flags(storage_flags),
     )
 }
 
