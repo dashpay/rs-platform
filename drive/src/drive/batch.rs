@@ -82,7 +82,10 @@ impl GroveDbOpBatch {
     }
 
     pub fn add_worst_case_insert(&mut self, path: Vec<KeyInfo>, key: KeyInfo, element: Element) {
-        self.operations
-            .push(GroveDbOp::insert_worst_case_op(KeyInfoPath(path), key, element));
+        self.operations.push(GroveDbOp::insert_worst_case_op(
+            KeyInfoPath(path),
+            key,
+            element,
+        ));
     }
 }

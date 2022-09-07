@@ -636,7 +636,7 @@ mod tests {
 
         assert!(nested_value.is_some());
 
-        let storage_flags = StorageFlags { epoch: 0 };
+        let storage_flags = Some(StorageFlags::SingleEpoch(0));
 
         let random_owner_id = rand::thread_rng().gen::<[u8; 32]>();
         drive
@@ -645,7 +645,7 @@ mod tests {
                     document_info: DocumentInfo::DocumentRefAndSerialization((
                         &document,
                         document.to_cbor().as_slice(),
-                        &storage_flags,
+                        storage_flags.as_ref(),
                     )),
                     contract: &contract,
                     document_type,

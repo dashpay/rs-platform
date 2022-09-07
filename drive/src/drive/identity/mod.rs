@@ -29,7 +29,7 @@ impl Drive {
         batch.add_insert_empty_tree_with_flags(
             vec![vec![RootTree::Identities as u8]],
             identity.id.buffer.to_vec(),
-            &storage_flags,
+            storage_flags.as_ref(),
         );
 
         batch.add_insert(
@@ -38,7 +38,10 @@ impl Drive {
                 identity.id.buffer.to_vec(),
             ],
             IDENTITY_KEY.to_vec(),
-            Element::Item(identity_bytes, storage_flags.to_some_element_flags()),
+            Element::Item(
+                identity_bytes,
+                StorageFlags::map_to_some_element_flags(storage_flags.as_ref()),
+            ),
         );
 
         Ok(())
@@ -66,7 +69,7 @@ impl Drive {
         &self,
         id: &[u8],
         transaction: TransactionArg,
-    ) -> Result<(Identity, StorageFlags), Error> {
+    ) -> Result<(Identity, Option<StorageFlags>), Error> {
         let element = self
             .grove
             .get(
@@ -77,7 +80,7 @@ impl Drive {
             .unwrap()
             .map_err(Error::GroveDB)?;
 
-        if let Element::Item(identity_cbor, element_flags) = element {
+        if let Element::Item(identity_cbor, element_flags) = &element {
             let identity = Identity::from_buffer(identity_cbor.as_slice()).map_err(|_| {
                 Error::Identity(IdentityError::IdentitySerialization(
                     "failed to de-serialize identity from CBOR",
@@ -135,7 +138,7 @@ impl Drive {
             .to_elements()
             .into_iter()
             .map(|element| {
-                if let Element::Item(identity_cbor, element_flags) = element {
+                if let Element::Item(identity_cbor, element_flags) = &element {
                     let identity =
                         Identity::from_buffer(identity_cbor.as_slice()).map_err(|_| {
                             Error::Identity(IdentityError::IdentitySerialization(

@@ -105,8 +105,10 @@ impl Drive {
                 DocumentRefWithoutSerialization((document, storage_flags)) => {
                     let serialized_document =
                         document.serialize(document_and_contract_info.document_type)?;
-                    let element =
-                        Element::Item(serialized_document, StorageFlags::map_to_some_element_flags(storage_flags));
+                    let element = Element::Item(
+                        serialized_document,
+                        StorageFlags::map_to_some_element_flags(storage_flags),
+                    );
                     let document_id_in_primary_path =
                         contract_documents_keeping_history_primary_key_path_for_document_id(
                             contract.id.as_bytes(),
@@ -183,8 +185,10 @@ impl Drive {
                 DocumentRefWithoutSerialization((document, storage_flags)) => {
                     let serialized_document =
                         document.serialize(document_and_contract_info.document_type)?;
-                    let element =
-                        Element::Item(serialized_document, StorageFlags::map_to_some_element_flags(storage_flags));
+                    let element = Element::Item(
+                        serialized_document,
+                        StorageFlags::map_to_some_element_flags(storage_flags),
+                    );
                     PathFixedSizeKeyElement((primary_key_path, document.id.as_slice(), element))
                 }
                 DocumentSize(max_size) => PathKeyElementSize((
@@ -206,8 +210,10 @@ impl Drive {
                 DocumentRefWithoutSerialization((document, storage_flags)) => {
                     let serialized_document =
                         document.serialize(document_and_contract_info.document_type)?;
-                    let element =
-                        Element::Item(serialized_document, StorageFlags::map_to_some_element_flags(storage_flags));
+                    let element = Element::Item(
+                        serialized_document,
+                        StorageFlags::map_to_some_element_flags(storage_flags),
+                    );
                     PathFixedSizeKeyElement((primary_key_path, document.id.as_slice(), element))
                 }
                 DocumentSize(max_size) => PathKeyElementSize((
@@ -900,12 +906,12 @@ mod tests {
         let document = Document::from_cbor(&dashpay_cr_serialized_document, None, Some(&owner_id))
             .expect("expected to deserialize document successfully");
 
-        let storage_flags = StorageFlags { epoch: 0 };
+        let storage_flags = Some(StorageFlags::SingleEpoch(0));
 
         let document_info = DocumentRefAndSerialization((
             &document,
             &dashpay_cr_serialized_document,
-            &storage_flags,
+            storage_flags.as_ref(),
         ));
 
         let document_type = contract
@@ -997,7 +1003,7 @@ mod tests {
             .document_type_for_name("domain")
             .expect("expected to get a document type");
 
-        let storage_flags = StorageFlags { epoch: 0 };
+        let storage_flags = Some(StorageFlags::SingleEpoch(0));
 
         drive
             .add_document_for_contract(
@@ -1005,7 +1011,7 @@ mod tests {
                     document_info: DocumentRefAndSerialization((
                         &document,
                         &dpns_domain_serialized_document,
-                        &storage_flags,
+                        storage_flags.as_ref(),
                     )),
                     contract: &contract,
                     document_type,

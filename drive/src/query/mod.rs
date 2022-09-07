@@ -1253,14 +1253,15 @@ mod tests {
         let contract_cbor = json_document_to_cbor(contract_path, Some(1));
         let contract = <Contract as DriveContractExt>::from_cbor(&contract_cbor, None)
             .expect("expected to deserialize the contract");
-        let storage_flags = StorageFlags { epoch: 0 };
+
+        let storage_flags = Some(StorageFlags::SingleEpoch(0));
         drive
             .apply_contract(
                 &contract,
                 contract_cbor.clone(),
                 0f64,
                 true,
-                storage_flags,
+                storage_flags.as_ref(),
                 None,
             )
             .expect("expected to apply contract successfully");
@@ -1283,14 +1284,14 @@ mod tests {
         let contract_cbor = json_document_to_cbor(contract_path, Some(1));
         let contract = <Contract as DriveContractExt>::from_cbor(&contract_cbor, None)
             .expect("expected to deserialize the contract");
-        let storage_flags = StorageFlags { epoch: 0 };
+        let storage_flags = Some(StorageFlags::SingleEpoch(0));
         drive
             .apply_contract(
                 &contract,
                 contract_cbor.clone(),
                 0f64,
                 true,
-                storage_flags,
+                storage_flags.as_ref(),
                 None,
             )
             .expect("expected to apply contract successfully");
