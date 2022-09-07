@@ -84,7 +84,10 @@ impl Drive {
                 ))
             })?;
 
-            Ok((identity, StorageFlags::from_some_element_flags(element_flags)?))
+            Ok((
+                identity,
+                StorageFlags::from_some_element_flags(element_flags)?,
+            ))
         } else {
             Err(Error::Drive(DriveError::CorruptedIdentityNotItem(
                 "identity must be an item",
@@ -140,7 +143,10 @@ impl Drive {
                             ))
                         })?;
 
-                    Ok((identity, StorageFlags::from_some_element_flags(element_flags)?))
+                    Ok((
+                        identity,
+                        StorageFlags::from_some_element_flags(element_flags)?,
+                    ))
                 } else {
                     Err(Error::Drive(DriveError::CorruptedIdentityNotItem(
                         "identity must be an item",

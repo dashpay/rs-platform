@@ -1,7 +1,7 @@
 use crate::drive::flags::StorageFlags;
+use dpp::identity::KeyType;
 use grovedb::batch::{GroveDbOp, GroveDbOpMode, KeyInfo, Op};
 use grovedb::Element;
-use dpp::identity::KeyType;
 
 // TODO move to GroveDB
 #[derive(Debug)]
@@ -29,14 +29,8 @@ impl GroveDbOpBatch {
     }
 
     pub fn add_insert_empty_tree(&mut self, path: Vec<Vec<u8>>, key: Vec<u8>) {
-        self.operations.push(GroveDbOp {
-            path,
-            key,
-            op: Op::Insert {
-                element: Element::empty_tree(),
-            },
-            mode: GroveDbOpMode::RunOp
-        })
+        self.operations
+            .push(GroveDbOp::insert_run_op(path, key, Element::empty_tree()))
     }
 
     pub fn add_insert_empty_tree_with_flags(
@@ -45,33 +39,28 @@ impl GroveDbOpBatch {
         key: Vec<u8>,
         storage_flags: Option<&StorageFlags>,
     ) {
-        self.operations.push(GroveDbOp::RunOp {
+        self.operations.push(GroveDbOp::insert_run_op(
             path,
             key,
-            op: Op::Insert {
-                element: Element::empty_tree_with_flags(storage_flags.to_some_element_flags()),
-            },
-        })
+            Element::empty_tree_with_flags(storage_flags.to_some_element_flags()),
+        ))
     }
 
     pub fn add_delete(&mut self, path: Vec<Vec<u8>>, key: Vec<u8>) {
-        self.operations.push(GroveDbOp::RunOp {
-            path,
-            key,
-            op: Op::Delete,
-        })
+        self.operations.push(GroveDbOp::delete_run_op(path, key))
     }
 
     pub fn add_insert(&mut self, path: Vec<Vec<u8>>, key: Vec<u8>, element: Element) {
-        self.operations.push(GroveDbOp::RunOp {
-            path,
-            key,
-            op: Op::Insert { element },
-        })
+        self.operations
+            .push(GroveDbOp::insert_run_op(path, key, element))
     }
 
     pub fn add_worst_case_insert_empty_tree(&mut self, path: Vec<KeyInfo>, key: KeyInfo) {
-        self.operations.push(GroveDbOp::insert_worst_case_op(path, key, Element::empty_tree()));
+        self.operations.push(GroveDbOp::insert_worst_case_op(
+            path,
+            key,
+            Element::empty_tree(),
+        ));
     }
 
     pub fn add_worst_case_insert_empty_tree_with_flags(
@@ -80,14 +69,20 @@ impl GroveDbOpBatch {
         key: KeyInfo,
         storage_flags: &StorageFlags,
     ) {
-        self.operations.push(GroveDbOp::insert_worst_case_op(path, key, Element::empty_tree_with_flags(storage_flags.to_some_element_flags())));
+        self.operations.push(GroveDbOp::insert_worst_case_op(
+            path,
+            key,
+            Element::empty_tree_with_flags(storage_flags.to_some_element_flags()),
+        ));
     }
 
     pub fn add_worst_case_delete(&mut self, path: Vec<KeyInfo>, key: KeyInfo) {
-        self.operations.push(GroveDbOp::delete_worst_case_op(path, key));
+        self.operations
+            .push(GroveDbOp::delete_worst_case_op(path, key));
     }
 
     pub fn add_worst_case_insert(&mut self, path: Vec<KeyInfo>, key: KeyInfo, element: Element) {
-        self.operations.push(GroveDbOp::insert_worst_case_op(path, key, element));
+        self.operations
+            .push(GroveDbOp::insert_worst_case_op(path, key, element));
     }
 }

@@ -12,10 +12,14 @@ use crate::drive::document::{
     contract_documents_primary_key_path, make_document_reference,
 };
 use crate::drive::flags::StorageFlags;
-use crate::drive::object_size_info::DocumentInfo::{DocumentRefAndSerialization, DocumentSize, DocumentWithoutSerialization};
+use crate::drive::object_size_info::DocumentInfo::{
+    DocumentRefAndSerialization, DocumentSize, DocumentWithoutSerialization,
+};
 use crate::drive::object_size_info::KeyValueInfo::KeyRefRequest;
 use crate::drive::object_size_info::PathKeyElementInfo::PathKeyElement;
-use crate::drive::object_size_info::{DocumentAndContractInfo, DocumentInfo, DriveKeyInfo, PathKeyInfo};
+use crate::drive::object_size_info::{
+    DocumentAndContractInfo, DocumentInfo, DriveKeyInfo, PathKeyInfo,
+};
 use crate::drive::Drive;
 use crate::error::drive::DriveError;
 use crate::error::Error;
@@ -180,7 +184,11 @@ impl Drive {
                 document_and_contract_info.document_type,
                 storage_flags,
             );
-            let query_stateless_max_value_size = if apply { None } else { Some(document_type.max_size()) };
+            let query_stateless_max_value_size = if apply {
+                None
+            } else {
+                Some(document_type.max_size())
+            };
 
             // next we need to get the old document from storage
             let old_document_element = if document_type.documents_keep_history {
@@ -223,13 +231,14 @@ impl Drive {
             )?;
 
             let old_document_info = if let Some(old_document_element) = old_document_element {
-                if let Element::Item(old_serialized_document, element_flags) = old_document_element {
-                    let document = Document::from_cbor(
-                        old_serialized_document.as_slice(),
-                        None,
-                        owner_id,
-                    )?;
-                    Ok(DocumentWithoutSerialization((document, StorageFlags::from_some_element_flags(element_flags)?)))
+                if let Element::Item(old_serialized_document, element_flags) = old_document_element
+                {
+                    let document =
+                        Document::from_cbor(old_serialized_document.as_slice(), None, owner_id)?;
+                    Ok(DocumentWithoutSerialization((
+                        document,
+                        StorageFlags::from_some_element_flags(element_flags)?,
+                    )))
                 } else {
                     Err(Error::Drive(DriveError::CorruptedDocumentNotItem(
                         "old document is not an item",
@@ -242,7 +251,6 @@ impl Drive {
                     "document being updated does not exist",
                 )));
             };
-
 
             let mut batch_insertion_cache: HashSet<Vec<Vec<u8>>> = HashSet::new();
             // fourth we need to store a reference to the document for each index
@@ -262,26 +270,18 @@ impl Drive {
                 // with the example of the dashpay contract's first index
                 // the index path is now something like Contracts/ContractID/Documents(1)/$ownerId
                 let document_top_field = document
-                    .get_raw_for_document_type(
-                        &top_index_property.name,
-                        document_type,
-                        owner_id,
-                    )?
+                    .get_raw_for_document_type(&top_index_property.name, document_type, owner_id)?
                     .unwrap_or_default();
 
                 let old_document_top_field = old_document_info
-                    .get_raw_for_document_type(
-                        &top_index_property.name,
-                        document_type,
-                        owner_id,
-                    )?
+                    .get_raw_for_document_type(&top_index_property.name, document_type, owner_id)?
                     .unwrap_or_default();
 
                 // if we are not applying that means we are trying to get worst case costs
                 // which would entail a change on every index
                 let mut change_occurred_on_index = match &old_document_top_field {
-                    DriveKeyInfo::Key(k) => { &document_top_field != k}
-                    DriveKeyInfo::KeyRef(k) => { document_top_field.as_slice() != *k}
+                    DriveKeyInfo::Key(k) => &document_top_field != k,
+                    DriveKeyInfo::KeyRef(k) => document_top_field.as_slice() != *k,
                     DriveKeyInfo::KeySize(_) => {
                         // we should assume true in this worst case cost scenario
                         true
@@ -312,7 +312,10 @@ impl Drive {
 
                 let mut all_fields_null = document_top_field.is_empty();
 
-                let mut old_index_path : Vec<DriveKeyInfo> = index_path.iter().map(|path_item| DriveKeyInfo::Key(path_item.clone())).collect();
+                let mut old_index_path: Vec<DriveKeyInfo> = index_path
+                    .iter()
+                    .map(|path_item| DriveKeyInfo::Key(path_item.clone()))
+                    .collect();
                 // we push the actual value of the index path
                 index_path.push(document_top_field);
                 // the index path is now something like Contracts/ContractID/Documents(1)/$ownerId/<ownerId>
@@ -325,26 +328,18 @@ impl Drive {
                     ))?;
 
                     let document_index_field = document
-                        .get_raw_for_document_type(
-                            &index_property.name,
-                            document_type,
-                            owner_id,
-                        )?
+                        .get_raw_for_document_type(&index_property.name, document_type, owner_id)?
                         .unwrap_or_default();
 
                     let old_document_index_field = old_document_info
-                        .get_raw_for_document_type(
-                            &index_property.name,
-                            document_type,
-                            owner_id,
-                        )?
+                        .get_raw_for_document_type(&index_property.name, document_type, owner_id)?
                         .unwrap_or_default();
 
                     // if we are not applying that means we are trying to get worst case costs
                     // which would entail a change on every index
                     change_occurred_on_index |= match &old_document_index_field {
-                        DriveKeyInfo::Key(k) => { &document_top_field != k}
-                        DriveKeyInfo::KeyRef(k) => { &document_top_field != *k}
+                        DriveKeyInfo::Key(k) => &document_top_field != k,
+                        DriveKeyInfo::KeyRef(k) => &document_top_field != *k,
                         DriveKeyInfo::KeySize(_) => {
                             // we should assume true in this worst case cost scenario
                             true
@@ -375,7 +370,8 @@ impl Drive {
                     }
 
                     index_path.push(Vec::from(index_property.name.as_bytes()));
-                    old_index_path.push(DriveKeyInfo::Key(Vec::from(index_property.name.as_bytes())));
+                    old_index_path
+                        .push(DriveKeyInfo::Key(Vec::from(index_property.name.as_bytes())));
 
                     // Iteration 1. the index path is now something like Contracts/ContractID/Documents(1)/$ownerId/<ownerId>/toUserId
                     // Iteration 2. the index path is now something like Contracts/ContractID/Documents(1)/$ownerId/<ownerId>/toUserId/<ToUserId>/accountReference
@@ -467,7 +463,11 @@ impl Drive {
                         // here we should return an error if the element already exists
                         let inserted = self.batch_insert_if_not_exists(
                             PathKeyElement::<0>((index_path, &[0], document_reference.clone())),
-                            if apply {None} else { SOME_OPTIMIZED_DOCUMENT_REFERENCE },
+                            if apply {
+                                None
+                            } else {
+                                SOME_OPTIMIZED_DOCUMENT_REFERENCE
+                            },
                             transaction,
                             &mut batch_operations,
                         )?;

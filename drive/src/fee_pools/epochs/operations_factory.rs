@@ -66,72 +66,54 @@ impl Epoch {
     }
 
     pub fn update_start_time_operation(&self, time_ms: u64) -> GroveDbOp {
-        GroveDbOp::RunOp {
-            path: self.get_vec_path(),
-            key: KEY_START_TIME.to_vec(),
-            op: Insert {
-                element: Element::Item(time_ms.to_be_bytes().to_vec(), None),
-            },
-        }
+        GroveDbOp::insert_run_op(
+            self.get_vec_path(),
+            KEY_START_TIME.to_vec(),
+            Element::Item(time_ms.to_be_bytes().to_vec(), None),
+        )
     }
 
     pub fn update_start_block_height_operation(&self, start_block_height: u64) -> GroveDbOp {
-        GroveDbOp::RunOp {
-            path: self.get_vec_path(),
-            key: KEY_START_BLOCK_HEIGHT.to_vec(),
-            op: Insert {
-                element: Element::Item(start_block_height.to_be_bytes().to_vec(), None),
-            },
-        }
+        GroveDbOp::insert_run_op(
+            self.get_vec_path(),
+            KEY_START_BLOCK_HEIGHT.to_vec(),
+            Element::Item(start_block_height.to_be_bytes().to_vec(), None),
+        )
     }
 
     pub fn update_fee_multiplier_operation(&self, multiplier: f64) -> GroveDbOp {
-        GroveDbOp::RunOp {
-            path: self.get_vec_path(),
-            key: KEY_FEE_MULTIPLIER.to_vec(),
-            op: Insert {
-                element: Element::Item(multiplier.to_be_bytes().to_vec(), None),
-            },
-        }
+        GroveDbOp::insert_run_op(
+            self.get_vec_path(),
+            KEY_FEE_MULTIPLIER.to_vec(),
+            Element::Item(multiplier.to_be_bytes().to_vec(), None),
+        )
     }
 
     pub fn update_processing_credits_for_distribution_operation(
         &self,
         processing_fee: u64,
     ) -> GroveDbOp {
-        GroveDbOp::RunOp {
-            path: self.get_vec_path(),
-            key: KEY_POOL_PROCESSING_FEES.to_vec(),
-            op: Insert {
-                element: Element::new_item(processing_fee.to_be_bytes().to_vec()),
-            },
-        }
+        GroveDbOp::insert_run_op(
+            self.get_vec_path(),
+            KEY_POOL_PROCESSING_FEES.to_vec(),
+            Element::new_item(processing_fee.to_be_bytes().to_vec()),
+        )
     }
 
     pub fn delete_processing_credits_for_distribution_operation(&self) -> GroveDbOp {
-        GroveDbOp::RunOp {
-            path: self.get_vec_path(),
-            key: KEY_POOL_PROCESSING_FEES.to_vec(),
-            op: Op::Delete,
-        }
+        GroveDbOp::delete_run_op(self.get_vec_path(), KEY_POOL_PROCESSING_FEES.to_vec())
     }
 
     pub fn update_storage_credits_for_distribution_operation(&self, storage_fee: u64) -> GroveDbOp {
-        GroveDbOp::RunOp {
-            path: self.get_vec_path(),
-            key: KEY_POOL_STORAGE_FEES.to_vec(),
-            op: Insert {
-                element: Element::new_item(storage_fee.to_be_bytes().to_vec()),
-            },
-        }
+        GroveDbOp::insert_run_op(
+            self.get_vec_path(),
+            KEY_POOL_STORAGE_FEES.to_vec(),
+            Element::new_item(storage_fee.to_be_bytes().to_vec()),
+        )
     }
 
     pub fn delete_storage_credits_for_distribution_operation(&self) -> GroveDbOp {
-        GroveDbOp::RunOp {
-            path: self.get_vec_path(),
-            key: KEY_POOL_STORAGE_FEES.to_vec(),
-            op: Op::Delete,
-        }
+        GroveDbOp::delete_run_op(self.get_vec_path(), KEY_POOL_STORAGE_FEES.to_vec())
     }
 
     pub(crate) fn update_proposer_block_count_operation(
@@ -139,31 +121,26 @@ impl Epoch {
         proposer_pro_tx_hash: &[u8; 32],
         block_count: u64,
     ) -> GroveDbOp {
-        GroveDbOp::RunOp {
-            path: self.get_proposers_vec_path(),
-            key: proposer_pro_tx_hash.to_vec(),
-            op: Insert {
-                element: Element::Item(block_count.to_be_bytes().to_vec(), None),
-            },
-        }
+        GroveDbOp::insert_run_op(
+            self.get_proposers_vec_path(),
+            proposer_pro_tx_hash.to_vec(),
+            Element::Item(block_count.to_be_bytes().to_vec(), None),
+        )
     }
 
     pub fn init_proposers_tree_operation(&self) -> GroveDbOp {
-        GroveDbOp::RunOp {
-            path: self.get_vec_path(),
-            key: epoch_key_constants::KEY_PROPOSERS.to_vec(),
-            op: Insert {
-                element: Element::empty_tree(),
-            },
-        }
+        GroveDbOp::insert_run_op(
+            self.get_vec_path(),
+            epoch_key_constants::KEY_PROPOSERS.to_vec(),
+            Element::empty_tree(),
+        )
     }
 
     pub fn delete_proposers_tree_operation(&self) -> GroveDbOp {
-        GroveDbOp::RunOp {
-            path: self.get_vec_path(),
-            key: epoch_key_constants::KEY_PROPOSERS.to_vec(),
-            op: Op::Delete,
-        }
+        GroveDbOp::delete_run_op(
+            self.get_vec_path(),
+            epoch_key_constants::KEY_PROPOSERS.to_vec(),
+        )
     }
 
     pub fn add_delete_proposers_operations(

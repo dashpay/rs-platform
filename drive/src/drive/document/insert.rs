@@ -1,11 +1,10 @@
+use grovedb::reference_path::ReferencePathType::SiblingReference;
 use grovedb::{Element, TransactionArg};
 use std::collections::HashSet;
 use std::option::Option::None;
-use grovedb::reference_path::ReferencePathType::SiblingReference;
 
 use crate::contract::document::Document;
-use crate::contract::{Contract};
-use dpp::data_contract::extra::DocumentType;
+use crate::contract::Contract;
 use crate::drive::defaults::{DEFAULT_HASH_SIZE, STORAGE_FLAGS_SIZE};
 use crate::drive::document::{
     contract_document_type_path,
@@ -15,19 +14,25 @@ use crate::drive::document::{
     contract_documents_primary_key_path, make_document_reference,
 };
 use crate::drive::flags::StorageFlags;
-use crate::drive::object_size_info::DocumentInfo::{DocumentRefAndSerialization, DocumentSize, DocumentRefWithoutSerialization, DocumentWithoutSerialization};
-use crate::drive::object_size_info::KeyElementInfo::{KeyElement, KeyElementSize};
+use crate::drive::object_size_info::DocumentInfo::{
+    DocumentRefAndSerialization, DocumentRefWithoutSerialization, DocumentSize,
+    DocumentWithoutSerialization,
+};
 use crate::drive::object_size_info::DriveKeyInfo::{Key, KeyRef};
+use crate::drive::object_size_info::KeyElementInfo::{KeyElement, KeyElementSize};
 use crate::drive::object_size_info::PathKeyElementInfo::{
     PathFixedSizeKeyElement, PathKeyElementSize,
 };
 use crate::drive::object_size_info::PathKeyInfo::{PathFixedSizeKeyRef, PathKeySize};
-use crate::drive::object_size_info::{DocumentAndContractInfo, DocumentInfo, PathInfo, PathKeyElementInfo};
+use crate::drive::object_size_info::{
+    DocumentAndContractInfo, DocumentInfo, PathInfo, PathKeyElementInfo,
+};
 use crate::drive::{defaults, Drive};
 use crate::error::drive::DriveError;
 use crate::error::Error;
 use crate::fee::calculate_fee;
 use crate::fee::op::DriveOperation;
+use dpp::data_contract::extra::DocumentType;
 
 use dpp::data_contract::extra::encode_float;
 use dpp::data_contract::extra::DriveContractExt;
@@ -213,7 +218,11 @@ impl Drive {
             };
             let inserted = self.batch_insert_if_not_exists(
                 path_key_element_info,
-                if apply { None} else {Some(document_type.max_size()) },
+                if apply {
+                    None
+                } else {
+                    Some(document_type.max_size())
+                },
                 transaction,
                 drive_operations,
             )?;
@@ -345,18 +354,23 @@ impl Drive {
         );
 
         // Apply means stateful query
-        let query_stateless_with_max_value_size = if apply { None } else {
+        let query_stateless_with_max_value_size = if apply {
+            None
+        } else {
             Some(document_and_contract_info.document_type.max_size())
         };
 
         if override_document
             && document_and_contract_info
-            .document_info
-            .is_document_and_serialization()
+                .document_info
+                .is_document_and_serialization()
             && self
                 .grove_has_raw(
                     primary_key_path,
-                    document_and_contract_info.document_info.id_key_value_info().as_key_ref_request()?,
+                    document_and_contract_info
+                        .document_info
+                        .id_key_value_info()
+                        .as_key_ref_request()?,
                     query_stateless_with_max_value_size,
                     transaction,
                     &mut batch_operations,
@@ -526,7 +540,11 @@ impl Drive {
                 if document_type.documents_keep_history {
                     reference_path.push(vec![0]);
                 }
-                Element::Reference(reference_path, Some(1), storage_flags.to_some_element_flags())
+                Element::Reference(
+                    reference_path,
+                    Some(1),
+                    storage_flags.to_some_element_flags(),
+                )
             }
 
             // unique indexes will be stored under key "0"
@@ -596,7 +614,11 @@ impl Drive {
                 // here we should return an error if the element already exists
                 let inserted = self.batch_insert_if_not_exists(
                     path_key_element_info,
-                    if apply { None} else {Some(document_and_contract_info.document_type.max_size()) },
+                    if apply {
+                        None
+                    } else {
+                        Some(document_and_contract_info.document_type.max_size())
+                    },
                     transaction,
                     &mut batch_operations,
                 )?;
@@ -879,8 +901,11 @@ mod tests {
 
         let storage_flags = StorageFlags { epoch: 0 };
 
-        let document_info =
-            DocumentRefAndSerialization((&document, &dashpay_cr_serialized_document, &storage_flags));
+        let document_info = DocumentRefAndSerialization((
+            &document,
+            &dashpay_cr_serialized_document,
+            &storage_flags,
+        ));
 
         let document_type = contract
             .document_type_for_name("contactRequest")

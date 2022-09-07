@@ -331,7 +331,9 @@ impl DriveOperation {
         storage_flags: Option<&StorageFlags>,
     ) -> Self {
         let tree = match storage_flags {
-            Some(storage_flags) => Element::empty_tree_with_flags(storage_flags.to_some_element_flags()),
+            Some(storage_flags) => {
+                Element::empty_tree_with_flags(storage_flags.to_some_element_flags())
+            }
             None => Element::empty_tree(),
         };
 

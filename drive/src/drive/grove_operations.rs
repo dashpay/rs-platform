@@ -3,6 +3,7 @@ use costs::{CostContext, OperationCost};
 use grovedb::batch::{BatchApplyOptions, GroveDbOp, Op};
 use grovedb::{Element, GroveDb, PathQuery, TransactionArg};
 
+use crate::drive::defaults::SOME_TREE_SIZE;
 use crate::drive::flags::StorageFlags;
 use crate::drive::object_size_info::DriveKeyInfo::{Key, KeyRef, KeySize};
 use crate::drive::object_size_info::KeyValueInfo::{KeyRefRequest, KeyValueMaxSize};
@@ -16,12 +17,11 @@ use crate::drive::object_size_info::{DriveKeyInfo, KeyValueInfo, PathKeyElementI
 use crate::drive::Drive;
 use crate::error::drive::DriveError;
 use crate::error::Error;
+use crate::error::Error::GroveDB;
 use crate::fee::op::DriveOperation::{CalculatedCostOperation, CostCalculationQueryOperation};
 use crate::fee::op::{DriveOperation, SizesOfQueryOperation};
 use grovedb::query_result_type::{QueryResultElements, QueryResultType};
 use grovedb::Error as GroveError;
-use crate::drive::defaults::SOME_TREE_SIZE;
-use crate::error::Error::GroveDB;
 
 fn push_drive_operation_result<T>(
     cost_context: CostContext<Result<T, GroveError>>,
@@ -414,12 +414,19 @@ impl Drive {
         transaction: TransactionArg,
         drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<Option<Element>, Error>
-        where
-            P: IntoIterator<Item = &'c [u8]>,
-            <P as IntoIterator>::IntoIter: ExactSizeIterator + DoubleEndedIterator + Clone,
+    where
+        P: IntoIterator<Item = &'c [u8]>,
+        <P as IntoIterator>::IntoIter: ExactSizeIterator + DoubleEndedIterator + Clone,
     {
-        let query_stateless_with_max_value_size_and_max_reference_sizes = query_stateless_with_max_value_size.map(|vs| (vs, vec![]));
-        self.grove_get(path, key_value_info, query_stateless_with_max_value_size_and_max_reference_sizes, transaction, drive_operations)
+        let query_stateless_with_max_value_size_and_max_reference_sizes =
+            query_stateless_with_max_value_size.map(|vs| (vs, vec![]));
+        self.grove_get(
+            path,
+            key_value_info,
+            query_stateless_with_max_value_size_and_max_reference_sizes,
+            transaction,
+            drive_operations,
+        )
     }
 
     pub(crate) fn grove_get<'a, 'c, P>(
@@ -437,8 +444,15 @@ impl Drive {
         let path_iter = path.into_iter();
         match key_value_info {
             KeyRefRequest(key) => {
-                if let Some((max_value_size, max_reference_sizes)) = query_stateless_with_max_value_size_and_max_reference_sizes {
-                    let cost  = GroveDb::worst_case_for_get(path, key.len() as u32, max_value_size as u32, max_reference_sizes);
+                if let Some((max_value_size, max_reference_sizes)) =
+                    query_stateless_with_max_value_size_and_max_reference_sizes
+                {
+                    let cost = GroveDb::worst_case_for_get(
+                        path,
+                        key.len() as u32,
+                        max_value_size as u32,
+                        max_reference_sizes,
+                    );
                     drive_operations.push(CalculatedCostOperation(cost));
                     Ok(None)
                 } else {
@@ -505,25 +519,26 @@ impl Drive {
         P: IntoIterator<Item = &'p [u8]>,
         <P as IntoIterator>::IntoIter: ExactSizeIterator + DoubleEndedIterator + Clone,
     {
-        let CostContext { value, cost } = if let Some(max_value_size) = stateless_query_for_costs_with_max_value_size {
-            let cost = GroveDb::worst_case_for_has_raw(path,key.len() as u32,  max_value_size as u32);
-            CostContext{value: Ok(false), cost}
+        let CostContext { value, cost } = if let Some(max_value_size) =
+            stateless_query_for_costs_with_max_value_size
+        {
+            let cost =
+                GroveDb::worst_case_for_has_raw(path, key.len() as u32, max_value_size as u32);
+            CostContext {
+                value: Ok(false),
+                cost,
+            }
         } else if self.config.has_raw_enabled {
             self.grove.has_raw(path, key, transaction)
         } else {
-            self.grove
-                .get_raw(path, key, transaction)
-                .map(|r| {
-                    match r {
-                        Err(GroveError::PathKeyNotFound(_)) | Err(GroveError::PathNotFound(_)) => Ok(false),
-                        Err(e) => Err(e),
-                        Ok(_) => Ok(true)
-                    }
-                })
+            self.grove.get_raw(path, key, transaction).map(|r| match r {
+                Err(GroveError::PathKeyNotFound(_)) | Err(GroveError::PathNotFound(_)) => Ok(false),
+                Err(e) => Err(e),
+                Ok(_) => Ok(true),
+            })
         };
         drive_operations.push(CalculatedCostOperation(cost));
         Ok(value?)
-
     }
 
     pub(crate) fn batch_insert_empty_tree<'a, 'c, P>(
@@ -577,7 +592,7 @@ impl Drive {
                 let has_raw = self.grove_has_raw(
                     path_iter.clone(),
                     key,
-                    if apply { None } else {SOME_TREE_SIZE},
+                    if apply { None } else { SOME_TREE_SIZE },
                     transaction,
                     drive_operations,
                 )?;
@@ -607,7 +622,7 @@ impl Drive {
                 let has_raw = self.grove_has_raw(
                     path_iter.clone(),
                     key.as_slice(),
-                    if apply { None } else {SOME_TREE_SIZE},
+                    if apply { None } else { SOME_TREE_SIZE },
                     transaction,
                     drive_operations,
                 )?;
@@ -624,7 +639,7 @@ impl Drive {
                 let has_raw = self.grove_has_raw(
                     path.clone(),
                     key.as_slice(),
-                    if apply { None } else {SOME_TREE_SIZE},
+                    if apply { None } else { SOME_TREE_SIZE },
                     transaction,
                     drive_operations,
                 )?;
@@ -639,8 +654,13 @@ impl Drive {
                 Ok(!has_raw)
             }
             PathFixedSizeKeyRef((path, key)) => {
-                let has_raw =
-                    self.grove_has_raw(path.clone(), key, if apply { None } else {SOME_TREE_SIZE}, transaction, drive_operations)?;
+                let has_raw = self.grove_has_raw(
+                    path.clone(),
+                    key,
+                    if apply { None } else { SOME_TREE_SIZE },
+                    transaction,
+                    drive_operations,
+                )?;
                 if !has_raw {
                     let path_items: Vec<Vec<u8>> = path.into_iter().map(Vec::from).collect();
                     drive_operations.push(DriveOperation::for_empty_tree(
@@ -715,8 +735,13 @@ impl Drive {
                 Ok(!has_raw)
             }
             PathFixedSizeKeyElement((path, key, element)) => {
-                let has_raw =
-                    self.grove_has_raw(path, key, stateless_query_for_costs_with_max_value_size, transaction, drive_operations)?;
+                let has_raw = self.grove_has_raw(
+                    path,
+                    key,
+                    stateless_query_for_costs_with_max_value_size,
+                    transaction,
+                    drive_operations,
+                )?;
                 if !has_raw {
                     let path_items: Vec<Vec<u8>> = path.into_iter().map(Vec::from).collect();
                     drive_operations.push(DriveOperation::for_path_key_element(
@@ -768,7 +793,8 @@ impl Drive {
                 transaction,
             );
 
-            if let Some(delete_operation) = push_drive_operation_result(cost_context, drive_operations)?
+            if let Some(delete_operation) =
+                push_drive_operation_result(cost_context, drive_operations)?
             {
                 // we also add the actual delete operation
                 drive_operations.push(DriveOperation::GroveOperation(delete_operation))
@@ -783,7 +809,8 @@ impl Drive {
                 transaction,
             );
 
-            if let Some(delete_operation) = push_drive_operation_result(cost_context, drive_operations)?
+            if let Some(delete_operation) =
+                push_drive_operation_result(cost_context, drive_operations)?
             {
                 // we also add the actual delete operation
                 drive_operations.push(DriveOperation::GroveOperation(delete_operation))
@@ -813,7 +840,7 @@ impl Drive {
                 transaction,
             );
             if let Some(delete_operations) =
-            push_drive_operation_result(cost_context, drive_operations)?
+                push_drive_operation_result(cost_context, drive_operations)?
             {
                 delete_operations
                     .into_iter()
@@ -894,58 +921,60 @@ impl Drive {
             for op in ops.operations.into_iter() {
                 //println!("on {:#?}", op);
                 match op {
-                    GroveDbOp::RunOp { path, key, op } => {
-                        match op {
-                            Op::Insert { element } => self.grove_insert(
-                                PathKeyElementInfo::<0>::PathKeyElement((
-                                    path,
-                                    key.as_slice(),
-                                    element,
-                                )),
-                                transaction,
-                                true,
-                                drive_operations,
-                            )?,
-                            Op::Delete => self.grove_delete(
+                    GroveDbOp::RunOp { path, key, op } => match op {
+                        Op::Insert { element } => self.grove_insert(
+                            PathKeyElementInfo::<0>::PathKeyElement((
                                 path,
                                 key.as_slice(),
-                                true,
-                                transaction,
-                                drive_operations,
-                            )?,
-                            _ => {
-                                return Err(Error::Drive(DriveError::UnsupportedPrivate(
-                                    "Only Insert and Deletion operations are allowed",
-                                )))
-                            }
+                                element,
+                            )),
+                            transaction,
+                            true,
+                            drive_operations,
+                        )?,
+                        Op::Delete => self.grove_delete(
+                            path,
+                            key.as_slice(),
+                            true,
+                            transaction,
+                            drive_operations,
+                        )?,
+                        _ => {
+                            return Err(Error::Drive(DriveError::UnsupportedPrivate(
+                                "Only Insert and Deletion operations are allowed",
+                            )))
                         }
-                    }
-                    GroveDbOp::WorstCaseOp { path, key, op, unique_path, unique_key } => {
-                        match op {
-                            Op::Insert { element } => self.grove_insert(
-                                PathKeyElementInfo::<0>::PathKeyElement((
-                                    path,
-                                    key.as_slice(),
-                                    element,
-                                )),
-                                transaction,
-                                false,
-                                drive_operations,
-                            )?,
-                            Op::Delete => self.grove_delete(
+                    },
+                    GroveDbOp::WorstCaseOp {
+                        path,
+                        key,
+                        op,
+                        unique_path,
+                        unique_key,
+                    } => match op {
+                        Op::Insert { element } => self.grove_insert(
+                            PathKeyElementInfo::<0>::PathKeyElement((
                                 path,
                                 key.as_slice(),
-                                false,
-                                transaction,
-                                drive_operations,
-                            )?,
-                            _ => {
-                                return Err(Error::Drive(DriveError::UnsupportedPrivate(
-                                    "Only Insert and Deletion operations are allowed",
-                                )))
-                            }
+                                element,
+                            )),
+                            transaction,
+                            false,
+                            drive_operations,
+                        )?,
+                        Op::Delete => self.grove_delete(
+                            path,
+                            key.as_slice(),
+                            false,
+                            transaction,
+                            drive_operations,
+                        )?,
+                        _ => {
+                            return Err(Error::Drive(DriveError::UnsupportedPrivate(
+                                "Only Insert and Deletion operations are allowed",
+                            )))
                         }
-                    }
+                    },
                 }
             }
             Ok(())

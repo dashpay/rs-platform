@@ -2,9 +2,9 @@ use std::collections::BTreeMap;
 use std::ops::BitXor;
 
 use ciborium::value::Value;
-use dpp::data_contract::extra::{encode_float, Index, IndexProperty};
 use dpp::data_contract::extra::ContractError;
 use dpp::data_contract::extra::DriveContractExt;
+use dpp::data_contract::extra::{encode_float, Index, IndexProperty};
 pub use grovedb::{
     Element, Error as GroveError, GroveDb, PathQuery, Query, QueryItem, SizedQuery, TransactionArg,
 };
@@ -23,7 +23,6 @@ pub use ordering::OrderClause;
 
 use crate::common::bytes_for_system_value;
 use crate::contract::{document::Document, Contract};
-use dpp::data_contract::extra::DocumentType;
 use crate::drive::object_size_info::KeyValueInfo;
 use crate::drive::Drive;
 use crate::error::drive::DriveError;
@@ -33,6 +32,7 @@ use crate::error::Error;
 use crate::error::Error::GroveDB;
 use crate::fee::calculate_fee;
 use crate::fee::op::DriveOperation;
+use dpp::data_contract::extra::DocumentType;
 
 pub mod conditions;
 mod defaults;
@@ -1165,7 +1165,7 @@ impl<'a> DriveQuery<'a> {
         drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<([u8; 32], Vec<Vec<u8>>), Error> {
         let path_query =
-            self.construct_path_query_operations(drive, transaction, drive_operations, )?;
+            self.construct_path_query_operations(drive, transaction, drive_operations)?;
 
         let proof =
             drive.grove_get_proved_path_query(&path_query, transaction, drive_operations)?;
@@ -1207,7 +1207,7 @@ impl<'a> DriveQuery<'a> {
         drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<(Vec<Vec<u8>>, u16), Error> {
         let path_query =
-            self.construct_path_query_operations(drive, transaction, drive_operations, )?;
+            self.construct_path_query_operations(drive, transaction, drive_operations)?;
         let query_result = drive.grove_get_path_query(&path_query, transaction, drive_operations);
         match query_result {
             Err(GroveDB(GroveError::PathKeyNotFound(_)))
@@ -1230,12 +1230,12 @@ mod tests {
 
     use crate::common;
     use crate::common::json_document_to_cbor;
-    use crate::contract::{Contract};
+    use crate::contract::Contract;
     use crate::drive::flags::StorageFlags;
     use crate::drive::Drive;
     use crate::query::DriveQuery;
-    use serde_json::Value::Null;
     use dpp::data_contract::extra::DocumentType;
+    use serde_json::Value::Null;
 
     use dpp::data_contract::extra::DriveContractExt;
 

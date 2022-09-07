@@ -8,7 +8,7 @@ use dpp::data_contract::extra::DriveContractExt;
 use serde::{Deserialize, Serialize};
 
 use crate::common::{bytes_for_system_value_from_tree_map, get_key_from_cbor_map};
-use crate::contract::{Contract, reduced_value_string_representation};
+use crate::contract::{reduced_value_string_representation, Contract};
 use crate::drive::defaults::PROTOCOL_VERSION;
 use crate::drive::Drive;
 use dpp::data_contract::extra::{ContractError, DocumentType};
@@ -399,7 +399,6 @@ mod tests {
         }
     }
 
-
     #[test]
     fn test_document_cbor_serialization() {
         let dashpay_cbor = json_document_to_cbor(
@@ -437,5 +436,4 @@ mod tests {
         let document_string = format!("{}", document);
         assert_eq!(document_string.as_str(), "id:2vq574DjKi7ZD8kJ6dMHxT5wu6ZKD2bW5xKAyKAGW7qZ owner_id:ChTEGXJcpyknkADUC5s6tAzvPqVG7x6Lo1Nr5mFtj2mk $createdAt:1627081806.116 $updatedAt:1575820087.909 avatarUrl:W18RuyblDX7hxB38OJYt[...(894)] displayName:wvAD8Grs2h publicMessage:LdWpGtOzOkYXStdxU3G0[...(105)] ")
     }
-
 }
