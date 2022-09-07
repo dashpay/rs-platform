@@ -5,6 +5,7 @@ use fee::FeeError;
 use identity::IdentityError;
 use query::QueryError;
 use structure::StructureError;
+use crate::error::storage_flags::StorageFlagsError;
 
 pub mod document;
 pub mod drive;
@@ -12,11 +13,14 @@ pub mod fee;
 pub mod identity;
 pub mod query;
 pub mod structure;
+pub mod storage_flags;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("query: {0}")]
     Query(#[from] QueryError),
+    #[error("storage flags: {0}")]
+    StorageFlags(#[from] StorageFlagsError),
     #[error("drive: {0}")]
     Drive(#[from] DriveError),
     #[error("grovedb: {0}")]
