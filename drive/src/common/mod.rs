@@ -13,7 +13,6 @@ use ciborium::value::Value;
 use grovedb::TransactionArg;
 
 use crate::contract::Contract;
-use crate::drive::flags::StorageFlags;
 use crate::drive::Drive;
 use crate::error::structure::StructureError;
 use crate::error::Error;

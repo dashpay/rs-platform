@@ -1,5 +1,4 @@
 use crate::drive::batch::GroveDbOpBatch;
-use crate::drive::flags::StorageFlags;
 use crate::drive::Drive;
 use crate::fee_pools::epochs::Epoch;
 use dpp::identifier::Identifier;

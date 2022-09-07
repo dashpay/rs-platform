@@ -827,7 +827,7 @@ mod tests {
                 false,
                 0f64,
                 true,
-                StorageFlags::default(),
+                StorageFlags::optional_default(),
                 None,
             )
             .expect("expected to insert a document successfully");
@@ -881,7 +881,7 @@ mod tests {
                 false,
                 0f64,
                 true,
-                StorageFlags::default(),
+                StorageFlags::optional_default(),
                 Some(&db_transaction),
             )
             .expect("expected to insert a document successfully");

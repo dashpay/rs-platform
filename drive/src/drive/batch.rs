@@ -1,6 +1,5 @@
 use crate::drive::flags::StorageFlags;
-use dpp::identity::KeyType;
-use grovedb::batch::{GroveDbOp, GroveDbOpMode, KeyInfo, KeyInfoPath, Op};
+use grovedb::batch::{GroveDbOp, KeyInfo, KeyInfoPath};
 use grovedb::Element;
 
 // TODO move to GroveDB

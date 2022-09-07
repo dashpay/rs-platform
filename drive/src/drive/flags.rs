@@ -4,7 +4,6 @@ use crate::drive::flags::StorageFlags::{
 use grovedb::ElementFlags;
 use integer_encoding::VarInt;
 use nohash_hasher::IntMap;
-use std::hash::Hash;
 
 use crate::error::drive::DriveError;
 use crate::error::storage_flags::StorageFlagsError;
@@ -28,7 +27,11 @@ pub enum StorageFlags {
 }
 
 impl StorageFlags {
-    pub fn default() -> Option<Self> {
+    pub fn optional_default() -> Option<Self> {
+        None
+    }
+
+    pub fn optional_default_as_ref() -> Option<&'static Self> {
         None
     }
 

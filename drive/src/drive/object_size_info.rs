@@ -437,14 +437,14 @@ impl<'a> DocumentInfo<'a> {
         }
     }
 
-    pub fn get_storage_flags(&self) -> &Option<StorageFlags> {
+    pub fn get_storage_flags_ref(&self) -> Option<&StorageFlags> {
         match self {
-            DocumentInfo::DocumentRefAndSerialization((_, _, &storage_flags))
-            | DocumentInfo::DocumentRefWithoutSerialization((_, &storage_flags)) => {
+            DocumentInfo::DocumentRefAndSerialization((_, _, storage_flags))
+            | DocumentInfo::DocumentRefWithoutSerialization((_, storage_flags)) => {
                 storage_flags.clone()
             }
-            DocumentInfo::DocumentWithoutSerialization((_, storage_flags)) => storage_flags.clone(),
-            DocumentInfo::DocumentSize(_) => StorageFlags::default(),
+            DocumentInfo::DocumentWithoutSerialization((_, storage_flags)) => storage_flags.as_ref(),
+            DocumentInfo::DocumentSize(_) => StorageFlags::optional_default_as_ref(),
         }
     }
 }

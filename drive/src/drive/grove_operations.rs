@@ -1,6 +1,6 @@
 use crate::drive::batch::GroveDbOpBatch;
-use costs::{CostContext, OperationCost};
-use grovedb::batch::{BatchApplyOptions, GroveDbOp, GroveDbOpMode, Op};
+use costs::{CostContext};
+use grovedb::batch::{BatchApplyOptions, GroveDbOp, GroveDbOpMode, KeyInfo, Op};
 use grovedb::{Element, GroveDb, PathQuery, TransactionArg};
 
 use crate::drive::defaults::SOME_TREE_SIZE;
@@ -17,7 +17,6 @@ use crate::drive::object_size_info::{DriveKeyInfo, KeyValueInfo, PathKeyElementI
 use crate::drive::Drive;
 use crate::error::drive::DriveError;
 use crate::error::Error;
-use crate::error::Error::GroveDB;
 use crate::fee::op::DriveOperation::{CalculatedCostOperation, CostCalculationQueryOperation};
 use crate::fee::op::{DriveOperation, SizesOfQueryOperation};
 use grovedb::query_result_type::{QueryResultElements, QueryResultType};
@@ -447,9 +446,10 @@ impl Drive {
                 if let Some((max_value_size, max_reference_sizes)) =
                     query_stateless_with_max_value_size_and_max_reference_sizes
                 {
+                    let key_info = KeyInfo::KnownKey(key.to_vec());
                     let cost = GroveDb::worst_case_for_get(
                         path,
-                        key.len() as u32,
+                        &key_info,
                         max_value_size as u32,
                         max_reference_sizes,
                     );

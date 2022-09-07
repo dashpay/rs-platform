@@ -7,8 +7,7 @@ use crate::fee_pools::epochs::epoch_key_constants::{
     KEY_START_TIME,
 };
 use crate::fee_pools::epochs::{epoch_key_constants, Epoch};
-use grovedb::batch::Op::Insert;
-use grovedb::batch::{GroveDbOp, Op};
+use grovedb::batch::{GroveDbOp};
 use grovedb::{Element, TransactionArg};
 
 impl Epoch {

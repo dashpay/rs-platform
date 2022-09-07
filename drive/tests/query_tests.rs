@@ -1573,7 +1573,7 @@ fn test_family_basic_queries() {
             None,
             0f64,
             true,
-            StorageFlags::default(),
+            StorageFlags::optional_default(),
             Some(&db_transaction),
         )
         .expect("expected to apply contract successfully");

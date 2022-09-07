@@ -603,7 +603,7 @@ mod tests {
                 None,
                 0f64,
                 true,
-                StorageFlags::default(),
+                StorageFlags::optional_default(),
                 None,
             )
             .expect("expected to apply contract successfully");
@@ -616,7 +616,7 @@ mod tests {
                 None,
                 0f64,
                 true,
-                StorageFlags::default(),
+                StorageFlags::optional_default(),
                 None,
             )
             .expect("should update initial contract");

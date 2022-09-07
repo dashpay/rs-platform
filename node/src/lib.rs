@@ -283,7 +283,7 @@ impl DriveWrapper {
                     None,
                     block_time,
                     apply,
-                    StorageFlags::default(),
+                    StorageFlags::optional_default(),
                     using_transaction.then(|| transaction).flatten(),
                 );
 
@@ -358,7 +358,7 @@ impl DriveWrapper {
                         override_document,
                         block_time,
                         apply,
-                        StorageFlags::default(),
+                        StorageFlags::optional_default(),
                         using_transaction.then(|| transaction).flatten(),
                     );
 
@@ -428,7 +428,7 @@ impl DriveWrapper {
                     Some(&owner_id),
                     block_time,
                     apply,
-                    StorageFlags::default(),
+                    StorageFlags::optional_default(),
                     using_transaction.then(|| transaction).flatten(),
                 );
 
@@ -565,7 +565,7 @@ impl DriveWrapper {
                 let result = platform.drive.insert_identity(
                     identity,
                     apply,
-                    StorageFlags::default(),
+                    StorageFlags::optional_default(),
                     using_transaction.then(|| transaction).flatten(),
                 );
 

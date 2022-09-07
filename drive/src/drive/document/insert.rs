@@ -11,7 +11,7 @@ use crate::drive::document::{
     contract_documents_keeping_history_primary_key_path_for_document_id,
     contract_documents_keeping_history_primary_key_path_for_document_id_size,
     contract_documents_keeping_history_storage_time_reference_path_size,
-    contract_documents_primary_key_path, make_document_reference,
+    contract_documents_primary_key_path,
 };
 use crate::drive::flags::StorageFlags;
 use crate::drive::object_size_info::DocumentInfo::{
@@ -25,7 +25,7 @@ use crate::drive::object_size_info::PathKeyElementInfo::{
 };
 use crate::drive::object_size_info::PathKeyInfo::{PathFixedSizeKeyRef, PathKeySize};
 use crate::drive::object_size_info::{
-    DocumentAndContractInfo, DocumentInfo, PathInfo, PathKeyElementInfo,
+    DocumentAndContractInfo, PathInfo, PathKeyElementInfo,
 };
 use crate::drive::{defaults, Drive};
 use crate::error::drive::DriveError;
@@ -72,7 +72,7 @@ impl Drive {
                                 + document_type.name.len(),
                             DEFAULT_HASH_SIZE,
                         )),
-                        StorageFlags::default(),
+                        StorageFlags::optional_default_as_ref(),
                     )
                 };
             // we first insert an empty tree if the document is new
@@ -403,7 +403,7 @@ impl Drive {
             )?;
         }
 
-        let storage_flags = document_and_contract_info.document_info.get_storage_flags();
+        let storage_flags = document_and_contract_info.document_info.get_storage_flags_ref();
 
         let mut batch_insertion_cache: HashSet<Vec<Vec<u8>>> = HashSet::new();
 
@@ -441,7 +441,7 @@ impl Drive {
                 // here we are inserting an empty tree that will have a subtree of all other index properties
                 let inserted = self.batch_insert_empty_tree_if_not_exists(
                     path_key_info.clone(),
-                    storage_flags.as_ref(),
+                    storage_flags,
                     apply,
                     transaction,
                     &mut batch_operations,
@@ -490,7 +490,7 @@ impl Drive {
                     // here we are inserting an empty tree that will have a subtree of all other index properties
                     let inserted = self.batch_insert_empty_tree_if_not_exists(
                         path_key_info.clone(),
-                        storage_flags.as_ref(),
+                        storage_flags,
                         apply,
                         transaction,
                         &mut batch_operations,
@@ -513,7 +513,7 @@ impl Drive {
                     // here we are inserting an empty tree that will have a subtree of all other index properties
                     let inserted = self.batch_insert_empty_tree_if_not_exists(
                         path_key_info.clone(),
-                        storage_flags.as_ref(),
+                        storage_flags,
                         apply,
                         transaction,
                         &mut batch_operations,
@@ -562,7 +562,7 @@ impl Drive {
                 // here we are inserting an empty tree that will have a subtree of all other index properties
                 self.batch_insert_empty_tree_if_not_exists(
                     path_key_info,
-                    storage_flags.as_ref(),
+                    storage_flags,
                     apply,
                     transaction,
                     &mut batch_operations,
@@ -572,13 +572,21 @@ impl Drive {
 
                 let key_element_info = match &document_and_contract_info.document_info {
                     DocumentRefAndSerialization((document, _, storage_flags))
-                    | DocumentRefWithoutSerialization((document, storage_flags))
-                    | DocumentWithoutSerialization((document, storage_flags)) => {
+                    | DocumentRefWithoutSerialization((document, storage_flags)) => {
                         let document_reference = make_document_reference(
                             primary_key_path,
                             document,
                             document_and_contract_info.document_type,
                             *storage_flags,
+                        );
+                        KeyElement((document.id.as_slice(), document_reference))
+                    }
+                    DocumentWithoutSerialization((document, storage_flags)) => {
+                        let document_reference = make_document_reference(
+                            primary_key_path,
+                            document,
+                            document_and_contract_info.document_type,
+                            storage_flags.as_ref(),
                         );
                         KeyElement((document.id.as_slice(), document_reference))
                     }
@@ -676,7 +684,7 @@ mod tests {
                 false,
                 0f64,
                 true,
-                StorageFlags::default(),
+                StorageFlags::optional_default(),
                 None,
             )
             .expect("expected to insert a document successfully");
@@ -690,7 +698,7 @@ mod tests {
                 false,
                 0f64,
                 true,
-                StorageFlags::default(),
+                StorageFlags::optional_default(),
                 None,
             )
             .expect_err("expected not to be able to insert same document twice");
@@ -704,7 +712,7 @@ mod tests {
                 true,
                 0f64,
                 true,
-                StorageFlags::default(),
+                StorageFlags::optional_default(),
                 None,
             )
             .expect("expected to override a document successfully");
@@ -743,7 +751,7 @@ mod tests {
                 false,
                 0f64,
                 true,
-                StorageFlags::default(),
+                StorageFlags::optional_default(),
                 Some(&db_transaction),
             )
             .expect("expected to insert a document successfully");
@@ -757,7 +765,7 @@ mod tests {
                 false,
                 0f64,
                 true,
-                StorageFlags::default(),
+                StorageFlags::optional_default(),
                 Some(&db_transaction),
             )
             .expect_err("expected not to be able to insert same document twice");
@@ -771,7 +779,7 @@ mod tests {
                 true,
                 0f64,
                 true,
-                StorageFlags::default(),
+                StorageFlags::optional_default(),
                 Some(&db_transaction),
             )
             .expect("expected to override a document successfully");
@@ -812,7 +820,7 @@ mod tests {
                 false,
                 0f64,
                 true,
-                StorageFlags::default(),
+                StorageFlags::optional_default(),
                 Some(&db_transaction),
             )
             .expect("expected to insert a document successfully");
@@ -855,7 +863,7 @@ mod tests {
                 false,
                 0f64,
                 false,
-                StorageFlags::default(),
+                StorageFlags::optional_default(),
                 Some(&db_transaction),
             )
             .expect("expected to get back fee for document insertion successfully");
@@ -869,7 +877,7 @@ mod tests {
                 false,
                 0f64,
                 true,
-                StorageFlags::default(),
+                StorageFlags::optional_default(),
                 Some(&db_transaction),
             )
             .expect("expected to insert a document successfully");
@@ -1060,7 +1068,7 @@ mod tests {
                 false,
                 0f64,
                 true,
-                StorageFlags::default(),
+                StorageFlags::optional_default(),
                 None,
             )
             .expect("expected to insert a document successfully");
@@ -1073,7 +1081,7 @@ mod tests {
                 false,
                 0f64,
                 true,
-                StorageFlags::default(),
+                StorageFlags::optional_default(),
                 None,
             )
             .expect("expected to insert a document successfully");
@@ -1086,7 +1094,7 @@ mod tests {
                 false,
                 0f64,
                 true,
-                StorageFlags::default(),
+                StorageFlags::optional_default(),
                 None,
             )
             .expect("expected to insert a document successfully");
@@ -1116,7 +1124,7 @@ mod tests {
                 false,
                 0f64,
                 true,
-                StorageFlags::default(),
+                StorageFlags::optional_default(),
                 None,
             )
             .expect("expected to insert a document successfully");
@@ -1129,7 +1137,7 @@ mod tests {
                 false,
                 0f64,
                 true,
-                StorageFlags::default(),
+                StorageFlags::optional_default(),
                 None,
             )
             .expect_err(
@@ -1156,7 +1164,7 @@ mod tests {
                 None,
                 0f64,
                 true,
-                StorageFlags::default(),
+                StorageFlags::optional_default(),
                 Some(&db_transaction),
             )
             .expect("expected to apply contract successfully");
@@ -1174,7 +1182,7 @@ mod tests {
                 true,
                 0f64,
                 true,
-                StorageFlags::default(),
+                StorageFlags::optional_default(),
                 Some(&db_transaction),
             )
             .expect("should create dash tld");
@@ -1200,7 +1208,7 @@ mod tests {
                 true,
                 0f64,
                 true,
-                StorageFlags::default(),
+                StorageFlags::optional_default(),
                 Some(&db_transaction),
             )
             .expect("should add random tld");

@@ -1362,7 +1362,7 @@ fn test_query_historical() {
             None,
             0f64,
             true,
-            StorageFlags::default(),
+            StorageFlags::optional_default(),
             Some(&db_transaction),
         )
         .expect("expected to apply contract successfully");

@@ -114,7 +114,7 @@ impl Drive {
         &self,
         ids: &Vec<[u8; 32]>,
         transaction: TransactionArg,
-    ) -> Result<Vec<(Identity, StorageFlags)>, Error> {
+    ) -> Result<Vec<(Identity, Option<StorageFlags>)>, Error> {
         let mut query = Query::new();
         query.set_subquery_key(IDENTITY_KEY.to_vec());
         for id in ids {
@@ -185,7 +185,7 @@ mod tests {
             .insert_identity(
                 identity.clone(),
                 true,
-                StorageFlags::default(),
+                StorageFlags::optional_default(),
                 Some(&transaction),
             )
             .expect("expected to insert identity");
