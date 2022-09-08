@@ -1,3 +1,37 @@
+// MIT LICENSE
+//
+// Copyright (c) 2021 Dash Core Group
+// 
+// Permission is hereby granted, free of charge, to any
+// person obtaining a copy of this software and associated
+// documentation files (the "Software"), to deal in the
+// Software without restriction, including without
+// limitation the rights to use, copy, modify, merge,
+// publish, distribute, sublicense, and/or sell copies of
+// the Software, and to permit persons to whom the Software
+// is furnished to do so, subject to the following
+// conditions:
+//
+// The above copyright notice and this permission notice
+// shall be included in all copies or substantial portions
+// of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+// ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+// TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+// PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+// SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+// CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+// OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+// IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+// DEALINGS IN THE SOFTWARE.
+//
+
+//! Drive Contracts.
+//! 
+//! This module defines functions pertinent to Contracts stored in Drive.
+//! 
+
 use std::cell::RefMut;
 use std::collections::HashSet;
 use std::ops::Deref;
@@ -24,6 +58,7 @@ use crate::fee::calculate_fee;
 use crate::fee::op::DriveOperation;
 use crate::fee::op::DriveOperation::ContractFetch;
 
+/// Takes a contract ID and returns the contract's root path.
 fn contract_root_path(contract_id: &[u8]) -> [&[u8]; 2] {
     [
         Into::<&[u8; 1]>::into(RootTree::ContractDocuments),
@@ -31,6 +66,7 @@ fn contract_root_path(contract_id: &[u8]) -> [&[u8]; 2] {
     ]
 }
 
+/// Takes a contract ID and returns the contract's storage history path.
 fn contract_keeping_history_storage_path(contract_id: &[u8]) -> [&[u8]; 3] {
     [
         Into::<&[u8; 1]>::into(RootTree::ContractDocuments),
@@ -39,6 +75,8 @@ fn contract_keeping_history_storage_path(contract_id: &[u8]) -> [&[u8]; 3] {
     ]
 }
 
+/// Takes a contract ID and an encoded timestamp and returns the contract's storage history path
+/// for that timestamp.
 fn contract_keeping_history_storage_time_reference_path(
     contract_id: &[u8],
     encoded_time: Vec<u8>,
@@ -51,11 +89,15 @@ fn contract_keeping_history_storage_time_reference_path(
     ]
 }
 
+/// Adds operations to the op batch relevant to initializing the contract's structure.
+/// Namely it inserts an empty tree at the contract's root path.
 pub fn add_init_contracts_structure_operations(batch: &mut GroveDbOpBatch) {
     batch.add_insert_empty_tree(vec![], vec![RootTree::ContractDocuments as u8]);
 }
 
 impl Drive {
+
+    /// Adds a contract to storage.
     fn add_contract_to_storage(
         &self,
         contract_element: Element,
@@ -123,6 +165,8 @@ impl Drive {
         Ok(())
     }
 
+    /// Adds a contract to storage using `add_contract_to_storage`
+    /// and inserts the empty trees which will be necessary to later insert documents.
     fn insert_contract(
         &self,
         contract_element: Element,
@@ -208,6 +252,7 @@ impl Drive {
         self.apply_batch_drive_operations(apply, transaction, batch_operations, drive_operations)
     }
 
+    /// Updates a contract.
     fn update_contract(
         &self,
         contract_element: Element,
@@ -355,6 +400,7 @@ impl Drive {
         self.apply_batch_drive_operations(apply, transaction, batch_operations, drive_operations)
     }
 
+    /// Applies a contract CBOR.
     pub fn apply_contract_cbor(
         &self,
         contract_cbor: Vec<u8>,
@@ -377,6 +423,7 @@ impl Drive {
         )
     }
 
+    /// Returns the contract with the given ID.
     pub fn get_contract(
         &self,
         contract_id: [u8; 32],
@@ -397,6 +444,7 @@ impl Drive {
         }
     }
 
+    /// Returns the contract with the given ID if it's in cache.
     pub fn get_cached_contract(
         &self,
         contract_id: [u8; 32],
@@ -410,6 +458,7 @@ impl Drive {
         }
     }
 
+    /// Returns the contract with the given ID from storage and also inserts it in cache.
     pub fn fetch_contract(
         &self,
         contract_id: [u8; 32],
@@ -438,6 +487,8 @@ impl Drive {
         }
     }
 
+    /// Applies a contract and returns the fee for applying.
+    /// If the contract already exists, an update is applied, otherwise an insert.
     pub fn apply_contract(
         &self,
         contract: &Contract,

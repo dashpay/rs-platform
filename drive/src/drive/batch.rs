@@ -27,6 +27,8 @@
 // DEALINGS IN THE SOFTWARE.
 //
 
+//! GroveDB Operations Batch.
+//! 
 //! This module defines the GroveDbOpBatch struct and implements its functions.
 //! 
 
@@ -65,7 +67,7 @@ impl GroveDbOpBatch {
         GroveDbOpBatch { operations }
     }
 
-    /// Adds an `Insert` operation with an empty tree to a list of GroveDB ops .
+    /// Adds an `Insert` operation with an empty tree at the specified path and key to a list of GroveDB ops.
     pub fn add_insert_empty_tree(&mut self, path: Vec<Vec<u8>>, key: Vec<u8>) {
         self.operations.push(GroveDbOp {
             path,
