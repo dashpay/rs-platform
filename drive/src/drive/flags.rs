@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+use std::ops::Add;
 use crate::drive::flags::StorageFlags::{
     MultiEpoch, MultiEpochOwned, SingleEpoch, SingleEpochOwned,
 };
@@ -27,6 +29,55 @@ pub enum StorageFlags {
 }
 
 impl StorageFlags {
+    fn combine_same_base_epoch(self, rhs: Self) -> Result<Self, Error> {
+        let owner_id = if let Some(our_owner_id) = self.owner_id() {
+            if let Some(other_owner_id) = rhs.owner_id() {
+                if our_owner_id != other_owner_id {
+                    return Err(Error::StorageFlags(StorageFlagsError::MergingStorageFlagsFromDifferentOwners("can not merge from different owners")));
+                }
+            }
+            Some(our_owner_id)
+        } else if let Some(other_owner_id) = rhs.owner_id() {
+            Some(other_owner_id)
+        } else {
+            None
+        };
+
+    }
+
+    fn combine(self, rhs: Self) -> Self {
+        match self.base_epoch().cmp(rhs.base_epoch()) {
+            Ordering::Equal => {}
+            Ordering::Less => {}
+            Ordering::Greater => {}
+        }
+    }
+
+    pub fn base_epoch(&self) -> &BaseEpoch {
+        match self {
+            SingleEpoch(base_epoch) |
+            MultiEpoch(base_epoch, _) |
+            SingleEpochOwned(base_epoch, _) |
+            MultiEpochOwned(base_epoch, _, _) => { base_epoch}
+        }
+    }
+
+    pub fn owner_id(&self) -> Option<&OwnerId> {
+        match self {
+            SingleEpochOwned(_, owner_id) |
+            MultiEpochOwned(_, _, owner_id) => { Some(owner_id)}
+            _ => None
+        }
+    }
+
+    pub fn epoch_index_map(&self) -> Option<&IntMap<EpochIndex, BytesAddedInEpoch>> {
+        match self {
+            MultiEpoch(_, epoch_int_map) |
+            MultiEpochOwned(_, epoch_int_map, _) => { Some(epoch_int_map)}
+            _ => None
+        }
+    }
+
     pub fn optional_default() -> Option<Self> {
         None
     }
@@ -224,6 +275,15 @@ impl StorageFlags {
         let data = data.ok_or(Error::Drive(DriveError::CorruptedElementFlags(
             "no element flag on data",
         )))?;
+        Self::from_slice(data.as_slice())
+    }
+
+    pub fn from_element_flags_ref(data: &ElementFlags) -> Result<Option<Self>, Error> {
+        let data = data
+            .as_ref()
+            .ok_or(Error::Drive(DriveError::CorruptedElementFlags(
+                "no element flag on data",
+            )))?;
         Self::from_slice(data.as_slice())
     }
 

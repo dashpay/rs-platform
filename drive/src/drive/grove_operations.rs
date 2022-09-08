@@ -1,5 +1,6 @@
 use crate::drive::batch::GroveDbOpBatch;
 use costs::{CostContext};
+use costs::storage_cost::transition::OperationStorageTransitionType;
 use grovedb::batch::{BatchApplyOptions, GroveDbOp, GroveDbOpMode, KeyInfo, KeyInfoPath, Op};
 use grovedb::{Element, GroveDb, PathQuery, TransactionArg};
 
@@ -21,6 +22,7 @@ use crate::fee::op::DriveOperation::{CalculatedCostOperation, CostCalculationQue
 use crate::fee::op::{DriveOperation, SizesOfQueryOperation};
 use grovedb::query_result_type::{QueryResultElements, QueryResultType};
 use grovedb::Error as GroveError;
+use crate::error::Error::StorageFlags;
 
 fn push_drive_operation_result<T>(
     cost_context: CostContext<Result<T, GroveError>>,
@@ -911,13 +913,23 @@ impl Drive {
                 }
             }
 
-            let cost_context = self.grove.apply_batch(
-                ops.operations,
-                Some(BatchApplyOptions {
-                    validate_insertion_does_not_override: validate,
-                }),
-                transaction,
-            );
+            let cost_context = self.grove.apply_batch_with_element_flags_update(ops.operations, Some(BatchApplyOptions {
+                validate_insertion_does_not_override: validate,
+            }), |cost, old_flags, new_flags| {
+                let maybe_old_storage_flags = StorageFlags::from_some_element_flags(&old_flags)?;
+                let new_storage_flags = StorageFlags::from_element_flags_ref(new_flags)?;
+                match cost.transition_type() {
+                    OperationStorageTransitionType::OperationUpdateBiggerSize => {
+                        StorageFlags::from_slice(new_flags);
+                    }
+                    OperationStorageTransitionType::OperationUpdateSmallerSize => {
+                        new_flags.extend(vec![1, 2]);
+                        true
+                    }
+                    _ => false,
+                }
+            },
+                                                                                |flags, removed| Ok(BasicStorageRemoval(removed)),, transaction);
             push_drive_operation_result(cost_context, drive_operations)
         } else {
             //println!("changes {} {:#?}", ops.len(), ops);
