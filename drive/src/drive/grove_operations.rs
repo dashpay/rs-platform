@@ -5,7 +5,7 @@ use costs::{CostContext, CostsExt, OperationCost};
 use grovedb::batch::{BatchApplyOptions, GroveDbOp, GroveDbOpMode, KeyInfo, KeyInfoPath, Op};
 use grovedb::{Element, GroveDb, PathQuery, TransactionArg};
 
-use crate::drive::defaults::{SOME_TREE_SIZE, MAX_ELEMENT_SIZE};
+use crate::drive::defaults::{MAX_ELEMENT_SIZE, SOME_TREE_SIZE};
 use crate::drive::flags::StorageFlags;
 use crate::drive::object_size_info::DriveKeyInfo::{Key, KeyRef, KeySize};
 use crate::drive::object_size_info::KeyValueInfo::{KeyRefRequest, KeyValueMaxSize};
@@ -808,11 +808,10 @@ impl Drive {
             let worst_case_cost = self.grove.worst_case_deletion_cost(
                 path,
                 key,
-                MAX_ELEMENT_SIZE
-                // only_delete_tree_if_empty,
-                // true,
-                // &current_batch_operations,
-                // transaction,
+                MAX_ELEMENT_SIZE, // only_delete_tree_if_empty,
+                                  // true,
+                                  // &current_batch_operations,
+                                  // transaction,
             );
 
             let cost_context = Ok(worst_case_cost).wrap_with_cost(OperationCost::default());
@@ -925,8 +924,7 @@ impl Drive {
                 |cost, old_flags, new_flags| {
                     // TODO: If possibility to err, might need to change the update closure return type
                     //  from bool to maybe Result<bool, Error>
-                    let maybe_old_storage_flags =
-                        StorageFlags::from_some_element_flags(&old_flags);
+                    let maybe_old_storage_flags = StorageFlags::from_some_element_flags(&old_flags);
                     let new_storage_flags = StorageFlags::from_element_flags_ref(new_flags);
                     match cost.transition_type() {
                         OperationStorageTransitionType::OperationUpdateBiggerSize => {
