@@ -924,8 +924,10 @@ impl Drive {
                 |cost, old_flags, new_flags| {
                     // TODO: If possibility to err, might need to change the update closure return type
                     //  from bool to maybe Result<bool, Error>
+                    let new_element_flag = Some(new_flags.to_owned());
+
                     let maybe_old_storage_flags = StorageFlags::from_some_element_flags(&old_flags);
-                    let new_storage_flags = StorageFlags::from_element_flags_ref(new_flags);
+                    let new_storage_flags = StorageFlags::from_element_flags_ref(&new_element_flag);
                     match cost.transition_type() {
                         OperationStorageTransitionType::OperationUpdateBiggerSize => {
                             StorageFlags::from_slice(new_flags);

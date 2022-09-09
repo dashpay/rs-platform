@@ -281,7 +281,7 @@ impl StorageFlags {
         Self::from_slice(data.as_slice())
     }
 
-    pub fn from_element_flags_ref(data: &ElementFlags) -> Result<Option<Self>, Error> {
+    pub fn from_element_flags_ref(data: &Option<ElementFlags>) -> Result<Option<Self>, Error> {
         let data = data
             // .as_ref()
             .ok_or(Error::Drive(DriveError::CorruptedElementFlags(
