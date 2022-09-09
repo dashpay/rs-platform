@@ -2,6 +2,8 @@
 
 extern crate core;
 
+pub use dashcore;
+
 pub use convertible::Convertible;
 pub use dash_platform_protocol::DashPlatformProtocol;
 pub use errors::*;
