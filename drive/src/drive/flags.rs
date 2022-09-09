@@ -45,9 +45,9 @@ impl StorageFlags {
 
     }
 
-    fn combine(self, rhs: Self) -> Self {
+    fn combine(self, rhs: Self) -> Result<Self, Error> {
         match self.base_epoch().cmp(rhs.base_epoch()) {
-            Ordering::Equal => {}
+            Ordering::Equal => { self.combine_same_base_epoch(rhs) }
             Ordering::Less => {}
             Ordering::Greater => {}
         }
