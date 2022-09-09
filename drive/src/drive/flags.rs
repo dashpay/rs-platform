@@ -46,13 +46,33 @@ impl StorageFlags {
         } else {
             None
         };
+
+        match (self, rhs) {
+            (StorageFlags::SingleEpochOwned(..), StorageFlags::SingleEpochOwned(..)) => {
+                todo!()
+            }
+            (StorageFlags::MultiEpochOwned(..), StorageFlags::MultiEpochOwned(..)) => {
+                todo!()
+            }
+            (StorageFlags::SingleEpoch(..), StorageFlags::MultiEpochOwned(..)) => {
+                todo!()
+            }
+        }
     }
 
     fn combine(self, rhs: Self) -> Result<Self, Error> {
         match self.base_epoch().cmp(rhs.base_epoch()) {
             Ordering::Equal => self.combine_same_base_epoch(rhs),
-            Ordering::Less => {}
-            Ordering::Greater => {}
+            Ordering::Less => Err(Error::StorageFlags(
+                StorageFlagsError::MergingStorageFlagsWithDifferentBaseEpoch(
+                    "can not merge with different base epoch",
+                ),
+            )),
+            Ordering::Greater => Err(Error::StorageFlags(
+                StorageFlagsError::MergingStorageFlagsWithDifferentBaseEpoch(
+                    "can not merge with different base epoch",
+                ),
+            )),
         }
     }
 
@@ -283,7 +303,7 @@ impl StorageFlags {
 
     pub fn from_element_flags_ref(data: &Option<ElementFlags>) -> Result<Option<Self>, Error> {
         let data = data
-            // .as_ref()
+            .as_ref()
             .ok_or(Error::Drive(DriveError::CorruptedElementFlags(
                 "no element flag on data",
             )))?;

@@ -6,4 +6,6 @@ pub enum StorageFlagsError {
     StorageFlagsWrongSize(&'static str),
     #[error("merging storage flags from different owners error: {0}")]
     MergingStorageFlagsFromDifferentOwners(&'static str),
+    #[error("merging storage flags with different base epoch: {0}")]
+    MergingStorageFlagsWithDifferentBaseEpoch(&'static str),
 }
