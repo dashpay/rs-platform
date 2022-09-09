@@ -17,9 +17,7 @@ use crate::drive::object_size_info::DocumentInfo::{
 };
 use crate::drive::object_size_info::KeyValueInfo::KeyRefRequest;
 use crate::drive::object_size_info::PathKeyElementInfo::PathKeyElement;
-use crate::drive::object_size_info::{
-    DocumentAndContractInfo, DriveKeyInfo, PathKeyInfo,
-};
+use crate::drive::object_size_info::{DocumentAndContractInfo, DriveKeyInfo, PathKeyInfo};
 use crate::drive::Drive;
 use crate::error::drive::DriveError;
 use crate::error::Error;

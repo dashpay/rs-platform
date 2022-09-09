@@ -1,6 +1,6 @@
 use crate::drive::genesis_time::KEY_GENESIS_TIME;
 use crate::drive::RootTree;
-use grovedb::batch::{GroveDbOp};
+use grovedb::batch::GroveDbOp;
 use grovedb::Element;
 
 pub(super) fn update_genesis_time_operation(genesis_time_ms: u64) -> GroveDbOp {

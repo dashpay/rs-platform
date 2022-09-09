@@ -1,10 +1,11 @@
 use crate::drive::batch::GroveDbOpBatch;
-use costs::{CostContext};
+use costs::storage_cost::removal::StorageRemovedBytes::BasicStorageRemoval;
 use costs::storage_cost::transition::OperationStorageTransitionType;
+use costs::{CostContext, CostsExt, OperationCost};
 use grovedb::batch::{BatchApplyOptions, GroveDbOp, GroveDbOpMode, KeyInfo, KeyInfoPath, Op};
 use grovedb::{Element, GroveDb, PathQuery, TransactionArg};
 
-use crate::drive::defaults::SOME_TREE_SIZE;
+use crate::drive::defaults::{SOME_TREE_SIZE, MAX_ELEMENT_SIZE};
 use crate::drive::flags::StorageFlags;
 use crate::drive::object_size_info::DriveKeyInfo::{Key, KeyRef, KeySize};
 use crate::drive::object_size_info::KeyValueInfo::{KeyRefRequest, KeyValueMaxSize};
@@ -22,7 +23,6 @@ use crate::fee::op::DriveOperation::{CalculatedCostOperation, CostCalculationQue
 use crate::fee::op::{DriveOperation, SizesOfQueryOperation};
 use grovedb::query_result_type::{QueryResultElements, QueryResultType};
 use grovedb::Error as GroveError;
-use crate::error::Error::StorageFlags;
 
 fn push_drive_operation_result<T>(
     cost_context: CostContext<Result<T, GroveError>>,
@@ -805,14 +805,17 @@ impl Drive {
                 drive_operations.push(DriveOperation::GroveOperation(delete_operation))
             }
         } else {
-            let cost_context = self.grove.worst_case_deletion_cost(
+            let worst_case_cost = self.grove.worst_case_deletion_cost(
                 path,
                 key,
-                only_delete_tree_if_empty,
-                true,
-                &current_batch_operations,
-                transaction,
+                MAX_ELEMENT_SIZE
+                // only_delete_tree_if_empty,
+                // true,
+                // &current_batch_operations,
+                // transaction,
             );
+
+            let cost_context = Ok(worst_case_cost).wrap_with_cost(OperationCost::default());
 
             if let Some(delete_operation) =
                 push_drive_operation_result(cost_context, drive_operations)?
@@ -852,14 +855,15 @@ impl Drive {
                     .for_each(|op| drive_operations.push(DriveOperation::GroveOperation(op)))
             }
         } else {
-            let cost_context = GroveDb::worst_case_delete_operations_for_delete_up_tree_while_empty(
-                path,
-                key,
-                stop_path_height,
-                true,
-                current_batch_operations.operations,
-                transaction,
-            );
+            // TODO: Not implemented
+            // let cost_context = GroveDb::worst_case_delete_operations_for_delete_up_tree_while_empty(
+            //     path,
+            //     key,
+            //     stop_path_height,
+            //     true,
+            //     current_batch_operations.operations,
+            //     transaction,
+            // );
         }
 
         Ok(())
@@ -913,23 +917,32 @@ impl Drive {
                 }
             }
 
-            let cost_context = self.grove.apply_batch_with_element_flags_update(ops.operations, Some(BatchApplyOptions {
-                validate_insertion_does_not_override: validate,
-            }), |cost, old_flags, new_flags| {
-                let maybe_old_storage_flags = StorageFlags::from_some_element_flags(&old_flags)?;
-                let new_storage_flags = StorageFlags::from_element_flags_ref(new_flags)?;
-                match cost.transition_type() {
-                    OperationStorageTransitionType::OperationUpdateBiggerSize => {
-                        StorageFlags::from_slice(new_flags);
+            let cost_context = self.grove.apply_batch_with_element_flags_update(
+                ops.operations,
+                Some(BatchApplyOptions {
+                    validate_insertion_does_not_override: validate,
+                }),
+                |cost, old_flags, new_flags| {
+                    // TODO: If possibility to err, might need to change the update closure return type
+                    //  from bool to maybe Result<bool, Error>
+                    let maybe_old_storage_flags =
+                        StorageFlags::from_some_element_flags(&old_flags);
+                    let new_storage_flags = StorageFlags::from_element_flags_ref(new_flags);
+                    match cost.transition_type() {
+                        OperationStorageTransitionType::OperationUpdateBiggerSize => {
+                            StorageFlags::from_slice(new_flags);
+                            true
+                        }
+                        OperationStorageTransitionType::OperationUpdateSmallerSize => {
+                            new_flags.extend(vec![1, 2]);
+                            true
+                        }
+                        _ => false,
                     }
-                    OperationStorageTransitionType::OperationUpdateSmallerSize => {
-                        new_flags.extend(vec![1, 2]);
-                        true
-                    }
-                    _ => false,
-                }
-            },
-                                                                                |flags, removed| Ok(BasicStorageRemoval(removed)),, transaction);
+                },
+                |flags, removed| Ok(BasicStorageRemoval(removed)),
+                transaction,
+            );
             push_drive_operation_result(cost_context, drive_operations)
         } else {
             //println!("changes {} {:#?}", ops.len(), ops);
@@ -1058,11 +1071,13 @@ impl Drive {
         validate: bool,
         drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<(), Error> {
-        let cost_context = self.grove.worst_case_operations_for_batch(
+        let cost_context = GroveDb::worst_case_operations_for_batch(
             ops.operations,
             Some(BatchApplyOptions {
                 validate_insertion_does_not_override: validate,
             }),
+            |_, _, _| false,
+            |_, _| Err(GroveError::InternalError("not implemented")),
         );
         push_drive_operation_result(cost_context, drive_operations)
     }
