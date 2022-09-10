@@ -24,9 +24,7 @@ use crate::drive::object_size_info::PathKeyElementInfo::{
     PathFixedSizeKeyElement, PathKeyElementSize,
 };
 use crate::drive::object_size_info::PathKeyInfo::{PathFixedSizeKeyRef, PathKeySize};
-use crate::drive::object_size_info::{
-    DocumentAndContractInfo, PathInfo, PathKeyElementInfo,
-};
+use crate::drive::object_size_info::{DocumentAndContractInfo, PathInfo, PathKeyElementInfo};
 use crate::drive::{defaults, Drive};
 use crate::error::drive::DriveError;
 use crate::error::Error;
@@ -403,7 +401,9 @@ impl Drive {
             )?;
         }
 
-        let storage_flags = document_and_contract_info.document_info.get_storage_flags_ref();
+        let storage_flags = document_and_contract_info
+            .document_info
+            .get_storage_flags_ref();
 
         let mut batch_insertion_cache: HashSet<Vec<Vec<u8>>> = HashSet::new();
 

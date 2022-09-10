@@ -443,7 +443,9 @@ impl<'a> DocumentInfo<'a> {
             | DocumentInfo::DocumentRefWithoutSerialization((_, storage_flags)) => {
                 storage_flags.clone()
             }
-            DocumentInfo::DocumentWithoutSerialization((_, storage_flags)) => storage_flags.as_ref(),
+            DocumentInfo::DocumentWithoutSerialization((_, storage_flags)) => {
+                storage_flags.as_ref()
+            }
             DocumentInfo::DocumentSize(_) => StorageFlags::optional_default_as_ref(),
         }
     }

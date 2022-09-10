@@ -10,9 +10,8 @@ use crate::error::drive::DriveError;
 use crate::error::fee::FeeError;
 use crate::error::Error;
 use crate::fee::default_costs::{
-    HASH_NODE_COST, NON_STORAGE_LOAD_CREDIT_PER_BYTE,
-    STORAGE_DISK_USAGE_CREDIT_PER_BYTE, STORAGE_LOAD_CREDIT_PER_BYTE,
-    STORAGE_PROCESSING_CREDIT_PER_BYTE, STORAGE_SEEK_COST,
+    HASH_NODE_COST, NON_STORAGE_LOAD_CREDIT_PER_BYTE, STORAGE_DISK_USAGE_CREDIT_PER_BYTE,
+    STORAGE_LOAD_CREDIT_PER_BYTE, STORAGE_PROCESSING_CREDIT_PER_BYTE, STORAGE_SEEK_COST,
 };
 use crate::fee::op::DriveOperation::{
     CalculatedCostOperation, ContractFetch, CostCalculationDeleteOperation,

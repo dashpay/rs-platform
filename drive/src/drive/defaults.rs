@@ -15,3 +15,5 @@ pub const MAX_INDEX_SIZE: usize = 255;
 pub const STORAGE_FLAGS_SIZE: usize = 2;
 
 pub const CONTRACT_MAX_SERIALIZED_SIZE: u16 = 16384;
+// TODO: Insert correct value here
+pub const MAX_ELEMENT_SIZE: u32 = 5000;

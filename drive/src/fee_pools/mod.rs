@@ -5,7 +5,7 @@ use crate::fee_pools::epochs::Epoch;
 use crate::fee_pools::epochs_root_tree_key_constants::{
     KEY_STORAGE_FEE_POOL, KEY_UNPAID_EPOCH_INDEX,
 };
-use grovedb::batch::{GroveDbOp};
+use grovedb::batch::GroveDbOp;
 use grovedb::Element;
 
 pub mod epochs;

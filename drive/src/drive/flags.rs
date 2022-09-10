@@ -1,11 +1,11 @@
-use std::cmp::Ordering;
-use std::ops::Add;
 use crate::drive::flags::StorageFlags::{
     MultiEpoch, MultiEpochOwned, SingleEpoch, SingleEpochOwned,
 };
 use grovedb::ElementFlags;
 use integer_encoding::VarInt;
 use nohash_hasher::IntMap;
+use std::cmp::Ordering;
+use std::ops::Add;
 
 use crate::error::drive::DriveError;
 use crate::error::storage_flags::StorageFlagsError;
@@ -33,7 +33,11 @@ impl StorageFlags {
         let owner_id = if let Some(our_owner_id) = self.owner_id() {
             if let Some(other_owner_id) = rhs.owner_id() {
                 if our_owner_id != other_owner_id {
-                    return Err(Error::StorageFlags(StorageFlagsError::MergingStorageFlagsFromDifferentOwners("can not merge from different owners")));
+                    return Err(Error::StorageFlags(
+                        StorageFlagsError::MergingStorageFlagsFromDifferentOwners(
+                            "can not merge from different owners",
+                        ),
+                    ));
                 }
             }
             Some(our_owner_id)
@@ -43,38 +47,57 @@ impl StorageFlags {
             None
         };
 
+        match (self, rhs) {
+            (StorageFlags::SingleEpochOwned(..), StorageFlags::SingleEpochOwned(..)) => {
+                todo!()
+            }
+            (StorageFlags::MultiEpochOwned(..), StorageFlags::MultiEpochOwned(..)) => {
+                todo!()
+            }
+            (StorageFlags::SingleEpoch(..), StorageFlags::MultiEpochOwned(..)) => {
+                todo!()
+            }
+        }
     }
 
     fn combine(self, rhs: Self) -> Result<Self, Error> {
         match self.base_epoch().cmp(rhs.base_epoch()) {
-            Ordering::Equal => { self.combine_same_base_epoch(rhs) }
-            Ordering::Less => {}
-            Ordering::Greater => {}
+            Ordering::Equal => self.combine_same_base_epoch(rhs),
+            Ordering::Less => Err(Error::StorageFlags(
+                StorageFlagsError::MergingStorageFlagsWithDifferentBaseEpoch(
+                    "can not merge with different base epoch",
+                ),
+            )),
+            Ordering::Greater => Err(Error::StorageFlags(
+                StorageFlagsError::MergingStorageFlagsWithDifferentBaseEpoch(
+                    "can not merge with different base epoch",
+                ),
+            )),
         }
     }
 
     pub fn base_epoch(&self) -> &BaseEpoch {
         match self {
-            SingleEpoch(base_epoch) |
-            MultiEpoch(base_epoch, _) |
-            SingleEpochOwned(base_epoch, _) |
-            MultiEpochOwned(base_epoch, _, _) => { base_epoch}
+            SingleEpoch(base_epoch)
+            | MultiEpoch(base_epoch, _)
+            | SingleEpochOwned(base_epoch, _)
+            | MultiEpochOwned(base_epoch, _, _) => base_epoch,
         }
     }
 
     pub fn owner_id(&self) -> Option<&OwnerId> {
         match self {
-            SingleEpochOwned(_, owner_id) |
-            MultiEpochOwned(_, _, owner_id) => { Some(owner_id)}
-            _ => None
+            SingleEpochOwned(_, owner_id) | MultiEpochOwned(_, _, owner_id) => Some(owner_id),
+            _ => None,
         }
     }
 
     pub fn epoch_index_map(&self) -> Option<&IntMap<EpochIndex, BytesAddedInEpoch>> {
         match self {
-            MultiEpoch(_, epoch_int_map) |
-            MultiEpochOwned(_, epoch_int_map, _) => { Some(epoch_int_map)}
-            _ => None
+            MultiEpoch(_, epoch_int_map) | MultiEpochOwned(_, epoch_int_map, _) => {
+                Some(epoch_int_map)
+            }
+            _ => None,
         }
     }
 
@@ -278,7 +301,7 @@ impl StorageFlags {
         Self::from_slice(data.as_slice())
     }
 
-    pub fn from_element_flags_ref(data: &ElementFlags) -> Result<Option<Self>, Error> {
+    pub fn from_element_flags_ref(data: &Option<ElementFlags>) -> Result<Option<Self>, Error> {
         let data = data
             .as_ref()
             .ok_or(Error::Drive(DriveError::CorruptedElementFlags(
