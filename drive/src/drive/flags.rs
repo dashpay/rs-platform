@@ -5,7 +5,6 @@ use grovedb::ElementFlags;
 use integer_encoding::VarInt;
 use nohash_hasher::IntMap;
 use std::cmp::Ordering;
-use std::ops::Add;
 
 use crate::error::drive::DriveError;
 use crate::error::storage_flags::StorageFlagsError;
@@ -29,8 +28,8 @@ pub enum StorageFlags {
 }
 
 impl StorageFlags {
-    fn combine_same_base_epoch(self, rhs: Self) -> Result<Self, Error> {
-        let owner_id = if let Some(our_owner_id) = self.owner_id() {
+    fn combine_owner_id(self, rhs: &Self) -> Result<Option<&OwnerId>, Error> {
+        if let Some(our_owner_id) = self.owner_id() {
             if let Some(other_owner_id) = rhs.owner_id() {
                 if our_owner_id != other_owner_id {
                     return Err(Error::StorageFlags(
@@ -40,23 +39,60 @@ impl StorageFlags {
                     ));
                 }
             }
-            Some(our_owner_id)
+            Ok(Some(our_owner_id))
         } else if let Some(other_owner_id) = rhs.owner_id() {
-            Some(other_owner_id)
+            Ok(Some(other_owner_id))
+        } else {
+            Ok(None)
+        }
+    }
+
+    fn combine_non_base_epoch_bytes(
+        self,
+        rhs: &Self,
+    ) -> Option<IntMap<EpochIndex, BytesAddedInEpoch>> {
+        if let Some(our_epoch_index_map) = self.epoch_index_map() {
+            if let Some(other_epoch_index_map) = rhs.epoch_index_map() {
+                let mut combined_index_map = our_epoch_index_map.clone();
+                other_epoch_index_map
+                    .iter()
+                    .for_each(|(epoch_index, bytes_added)| {
+                        let original_value = combined_index_map.remove(epoch_index);
+                        match original_value {
+                            None => {
+                                combined_index_map.insert(epoch_index.clone(), bytes_added.clone())
+                            }
+                            Some(original_bytes) => combined_index_map.insert(
+                                epoch_index.clone(),
+                                original_bytes.clone() + bytes_added.clone(),
+                            ),
+                        };
+                    });
+                Some(combined_index_map)
+            } else {
+                Some(our_epoch_index_map.clone())
+            }
+        } else if let Some(other_epoch_index_map) = rhs.epoch_index_map() {
+            Some(other_epoch_index_map.clone())
         } else {
             None
-        };
+        }
+    }
 
-        match (self, rhs) {
-            (StorageFlags::SingleEpochOwned(..), StorageFlags::SingleEpochOwned(..)) => {
-                todo!()
-            }
-            (StorageFlags::MultiEpochOwned(..), StorageFlags::MultiEpochOwned(..)) => {
-                todo!()
-            }
-            (StorageFlags::SingleEpoch(..), StorageFlags::MultiEpochOwned(..)) => {
-                todo!()
-            }
+    fn combine_same_base_epoch(self, rhs: Self) -> Result<Self, Error> {
+        let base_epoch = self.base_epoch().clone();
+        let owner_id = self.combine_owner_id(&rhs)?;
+        let other_epoch_bytes = self.combine_non_base_epoch_bytes(&rhs);
+
+        match (owner_id, other_epoch_bytes) {
+            (None, None) => Ok(SingleEpoch(base_epoch)),
+            (Some(owner_id), None) => Ok(SingleEpochOwned(base_epoch, owner_id.clone())),
+            (None, Some(other_epoch_bytes)) => Ok(MultiEpoch(base_epoch, other_epoch_bytes)),
+            (Some(owner_id), Some(other_epoch_bytes)) => Ok(MultiEpochOwned(
+                base_epoch,
+                other_epoch_bytes,
+                owner_id.clone(),
+            )),
         }
     }
 
