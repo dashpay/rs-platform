@@ -142,6 +142,12 @@ impl Platform {
             &mut batch,
         )?;
 
+        let results = batch.verify_consistency_of_operations();
+
+        if !results.is_empty() {
+            dbg!(results);
+        }
+
         self.drive.grove_apply_batch(batch, false, transaction)?;
 
         Ok(ProcessedBlockFeesResult {
