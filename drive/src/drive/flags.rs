@@ -96,14 +96,47 @@ impl StorageFlags {
         }
     }
 
-    fn combine(self, rhs: Self) -> Result<Self, Error> {
+    fn combine_with_higher_base_epoch(self, rhs: Self, added_bytes: u32) -> Result<Self, Error> {
+        let base_epoch = self.base_epoch().clone();
+        let epoch_with_adding_bytes = rhs.base_epoch();
+        let owner_id = self.combine_owner_id(&rhs)?;
+        let mut other_epoch_bytes = self.combine_non_base_epoch_bytes(&rhs).unwrap_or_default();
+        let original_value = other_epoch_bytes.remove(epoch_with_adding_bytes);
+        match original_value {
+            None => other_epoch_bytes.insert(epoch_with_adding_bytes.clone(), added_bytes),
+            Some(original_bytes) => other_epoch_bytes.insert(
+                epoch_with_adding_bytes.clone(),
+                original_bytes.clone() + added_bytes,
+            ),
+        };
+
+        match owner_id {
+            None => Ok(MultiEpoch(base_epoch, other_epoch_bytes)),
+            Some(owner_id) => Ok(MultiEpochOwned(
+                base_epoch,
+                other_epoch_bytes,
+                owner_id.clone(),
+            )),
+        }
+    }
+
+    pub fn optional_combine_added_bytes(
+        ours: Option<Self>,
+        theirs: Option<Self>,
+        added_bytes: u32,
+    ) -> Result<Option<Self>, Error> {
+        match (ours, theirs) {
+            (None, None) => Ok(None),
+            (None, Some(theirs)) => Ok(Some(theirs)),
+            (Some(ours), None) => Ok(Some(ours)),
+            (Some(ours), Some(theirs)) => Ok(Some(ours.combine_added_bytes(theirs, added_bytes)?)),
+        }
+    }
+
+    pub fn combine_added_bytes(self, rhs: Self, added_bytes: u32) -> Result<Self, Error> {
         match self.base_epoch().cmp(rhs.base_epoch()) {
             Ordering::Equal => self.combine_same_base_epoch(rhs),
-            Ordering::Less => Err(Error::StorageFlags(
-                StorageFlagsError::MergingStorageFlagsWithDifferentBaseEpoch(
-                    "can not merge with different base epoch",
-                ),
-            )),
+            Ordering::Less => self.combine_with_higher_base_epoch(rhs, added_bytes),
             Ordering::Greater => Err(Error::StorageFlags(
                 StorageFlagsError::MergingStorageFlagsWithDifferentBaseEpoch(
                     "can not merge with different base epoch",
@@ -337,12 +370,7 @@ impl StorageFlags {
         Self::from_slice(data.as_slice())
     }
 
-    pub fn from_element_flags_ref(data: &Option<ElementFlags>) -> Result<Option<Self>, Error> {
-        let data = data
-            .as_ref()
-            .ok_or(Error::Drive(DriveError::CorruptedElementFlags(
-                "no element flag on data",
-            )))?;
+    pub fn from_element_flags_ref(data: &ElementFlags) -> Result<Option<Self>, Error> {
         Self::from_slice(data.as_slice())
     }
 
@@ -353,6 +381,12 @@ impl StorageFlags {
                 "no element flag on data",
             )))?;
         Self::from_slice(data.as_slice())
+    }
+
+    pub fn map_owned_to_element_flags(maybe_storage_flags: Option<Self>) -> ElementFlags {
+        maybe_storage_flags
+            .map(|storage_flags| storage_flags.serialize())
+            .unwrap_or_default()
     }
 
     pub fn map_to_some_element_flags(maybe_storage_flags: Option<&Self>) -> Option<ElementFlags> {

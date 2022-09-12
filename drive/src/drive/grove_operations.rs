@@ -921,16 +921,24 @@ impl Drive {
                 Some(BatchApplyOptions {
                     validate_insertion_does_not_override: validate,
                 }),
-                |cost, old_flags, new_flags| {
+                |cost, old_flags, mut new_flags| {
                     // TODO: If possibility to err, might need to change the update closure return type
                     //  from bool to maybe Result<bool, Error>
-                    let new_element_flag = Some(new_flags.to_owned());
 
-                    let maybe_old_storage_flags = StorageFlags::from_some_element_flags(&old_flags);
-                    let new_storage_flags = StorageFlags::from_element_flags_ref(&new_element_flag);
+                    let maybe_old_storage_flags =
+                        StorageFlags::from_some_element_flags(&old_flags)?;
+                    let new_storage_flags = StorageFlags::from_element_flags_ref(new_flags)?;
                     match cost.transition_type() {
                         OperationStorageTransitionType::OperationUpdateBiggerSize => {
-                            StorageFlags::from_slice(new_flags);
+                            let combined_storage_flags =
+                                StorageFlags::optional_combine_added_bytes(
+                                    maybe_old_storage_flags,
+                                    new_storage_flags,
+                                    cost.added_bytes,
+                                )?;
+                            new_flags = &mut StorageFlags::map_owned_to_element_flags(
+                                combined_storage_flags,
+                            );
                             true
                         }
                         OperationStorageTransitionType::OperationUpdateSmallerSize => {
