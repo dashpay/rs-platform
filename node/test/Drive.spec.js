@@ -395,6 +395,34 @@ describe('Drive', () => {
     });
   });
 
+  describe('Withdrawal queue', () => {
+    beforeEach(async () => {
+      await drive.createInitialStateStructure();
+    });
+
+    it('should enqueue and dequeue the withdrawal', async () => {
+      const withdrawal = {
+        id: 1,
+        index: 1,
+        fee: 1,
+        request_height: 1,
+        quorum_hash: Buffer.alloc(0),
+        quorum_sig: Buffer.alloc(0),
+        tx_out_hash: Buffer.alloc(0),
+      };
+
+      await drive.enqueueWithdrawal(withdrawal, true);
+
+      let withdrawals = await drive.dequeueWithdrawals(true);
+
+      expect(withdrawals).to.have.lengthOf(1);
+
+      withdrawals = await drive.dequeueWithdrawals(true);
+
+      expect(withdrawals).to.have.lengthOf(0);
+    });
+  });
+
   describe('ABCI', () => {
     describe('InitChain', () => {
       it('should successfully init chain', async () => {

@@ -2,7 +2,7 @@ use document::DocumentError;
 use dpp::data_contract::extra::ContractError;
 use drive::DriveError;
 use fee::FeeError;
-use identity::IdentityError;
+use identity::{IdentityError, WithdrawalError};
 use query::QueryError;
 use structure::StructureError;
 
@@ -31,4 +31,6 @@ pub enum Error {
     Fee(#[from] FeeError),
     #[error("document: {0}")]
     Document(#[from] DocumentError),
+    #[error("withdrawal: {0}")]
+    Withdrawal(#[from] WithdrawalError),
 }

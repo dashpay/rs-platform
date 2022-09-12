@@ -2,6 +2,7 @@ mod converter;
 
 use std::{option::Option::None, path::Path, sync::mpsc, thread};
 
+use converter::nested_vecs_to_js;
 use dash_abci::abci::handlers::TenderdashAbci;
 use dash_abci::abci::messages::{
     BlockBeginRequest, BlockEndRequest, InitChainRequest, Serializable,
@@ -11,6 +12,8 @@ use neon::prelude::*;
 use neon::types::JsDate;
 use rs_drive::dpp::identity::Identity;
 use rs_drive::drive::flags::StorageFlags;
+use rs_drive::drive::identity::withdrawal_queue::Withdrawal;
+use rs_drive::error::Error;
 use rs_drive::grovedb::{PathQuery, Transaction, TransactionArg};
 
 const READONLY_MSG: &str =
@@ -1588,6 +1591,94 @@ impl DriveWrapper {
         // The result is returned through the callback, not through direct return
         Ok(cx.undefined())
     }
+
+    fn js_enqueue_withdrawal(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+        let js_withdrawal = cx.argument::<JsBuffer>(0)?;
+        let js_using_transaction = cx.argument::<JsBoolean>(1)?;
+        let js_callback = cx.argument::<JsFunction>(2)?.root(&mut cx);
+
+        let db = cx
+            .this()
+            .downcast_or_throw::<JsBox<DriveWrapper>, _>(&mut cx)?;
+
+        let withdrawal_bytes = converter::js_buffer_to_vec_u8(js_withdrawal, &mut cx);
+        let using_transaction = js_using_transaction.value(&mut cx);
+
+        db.send_to_drive_thread(move |platform: &Platform, transaction, channel| {
+            let result = Withdrawal::from_cbor(&withdrawal_bytes).and_then(|withdrawal| {
+                platform.drive.enqueue_withdrawal(
+                    withdrawal,
+                    using_transaction.then(|| transaction).flatten(),
+                )
+            });
+
+            channel.send(move |mut task_context| {
+                let callback = js_callback.into_inner(&mut task_context);
+                let this = task_context.undefined();
+                let callback_arguments: Vec<Handle<JsValue>> = match result {
+                    Ok(_) => {
+                        // First parameter of JS callbacks is error, which is null in this case
+                        vec![
+                            task_context.null().upcast(),
+                            task_context.undefined().upcast(),
+                        ]
+                    }
+
+                    // Convert the error to a JavaScript exception on failure
+                    Err(err) => vec![task_context.error(err.to_string())?.upcast()],
+                };
+
+                callback.call(&mut task_context, this, callback_arguments)?;
+
+                Ok(())
+            });
+        })
+        .or_else(|err| cx.throw_error(err.to_string()))?;
+
+        Ok(cx.undefined())
+    }
+
+    fn js_dequeue_withdrawals(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+        let js_using_transaction = cx.argument::<JsBoolean>(0)?;
+        let js_callback = cx.argument::<JsFunction>(1)?.root(&mut cx);
+
+        let db = cx
+            .this()
+            .downcast_or_throw::<JsBox<DriveWrapper>, _>(&mut cx)?;
+
+        let using_transaction = js_using_transaction.value(&mut cx);
+
+        db.send_to_drive_thread(move |platform: &Platform, transaction, channel| {
+            let result: Result<Vec<Vec<u8>>, Error> = platform
+                .drive
+                .dequeue_withdrawals(using_transaction.then(|| transaction).flatten())
+                .and_then(|withdrawals| withdrawals.iter().map(|w| w.to_cbor()).collect());
+
+            channel.send(move |mut task_context| {
+                let callback = js_callback.into_inner(&mut task_context);
+                let this = task_context.undefined();
+                let callback_arguments: Vec<Handle<JsValue>> = match result {
+                    Ok(withdrawals) => {
+                        // First parameter of JS callbacks is error, which is null in this case
+                        vec![
+                            task_context.null().upcast(),
+                            nested_vecs_to_js(withdrawals, &mut task_context)?,
+                        ]
+                    }
+
+                    // Convert the error to a JavaScript exception on failure
+                    Err(err) => vec![task_context.error(err.to_string())?.upcast()],
+                };
+
+                callback.call(&mut task_context, this, callback_arguments)?;
+
+                Ok(())
+            });
+        })
+        .or_else(|err| cx.throw_error(err.to_string()))?;
+
+        Ok(cx.undefined())
+    }
 }
 
 #[neon::main]
@@ -1617,6 +1708,15 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function(
         "driveProveDocumentsQuery",
         DriveWrapper::js_prove_documents_query,
+    )?;
+
+    cx.export_function(
+        "driveEnqueueWithdrawal",
+        DriveWrapper::js_enqueue_withdrawal,
+    )?;
+    cx.export_function(
+        "driveDequeueWithdrawals",
+        DriveWrapper::js_dequeue_withdrawals,
     )?;
 
     cx.export_function("groveDbInsert", DriveWrapper::js_grove_db_insert)?;
