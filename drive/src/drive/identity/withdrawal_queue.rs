@@ -16,7 +16,7 @@ use crate::fee::op::DriveOperation;
 
 const QUERY_LIMIT: u16 = 16;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Withdrawal {
     pub id: u128,
     pub index: u64,
@@ -47,7 +47,8 @@ impl Withdrawal {
     }
 
     pub fn from_cbor(cbor: &[u8]) -> Result<Self, Error> {
-        let map: BTreeMap<String, CborValue> = ciborium::de::from_reader(cbor).map_err(|_| {
+        let map: BTreeMap<String, CborValue> = ciborium::de::from_reader(cbor).map_err(|e| {
+            dbg!(e);
             Error::Drive(DriveError::CorruptedCodeExecution(
                 "Could not read withdrawal CBOR map",
             ))
@@ -234,15 +235,14 @@ mod tests {
 
     use super::Withdrawal;
 
-    #[test]
-    fn test_enqueue_and_dequeue() {
-        let drive = setup_drive_with_initial_state_structure();
+    mod serialization {
+        use super::*;
+        use hex::ToHex;
 
-        let transaction = drive.grove.start_transaction();
-
-        for i in 0..17 {
+        #[test]
+        fn test_successfull_serialization() {
             let withdrawal = Withdrawal {
-                id: i,
+                id: 1,
                 index: 1,
                 fee: 1,
                 request_height: 1,
@@ -251,21 +251,79 @@ mod tests {
                 tx_out_hash: vec![],
             };
 
-            drive
-                .enqueue_withdrawal(withdrawal, Some(&transaction))
-                .expect("to enqueue withdrawal");
+            let cbor = withdrawal.to_cbor().expect("to serialize the withdrawal");
+
+            let hex: String = cbor.encode_hex();
+
+            assert_eq!(hex, "a762696401636665650165696e646578016a71756f72756d5f736967406b71756f72756d5f68617368406b74785f6f75745f68617368406e726571756573745f68656967687401");
         }
 
-        let withdrawals = drive
-            .dequeue_withdrawals(Some(&transaction))
-            .expect("to dequeue withdrawals");
+        #[test]
+        fn test_successfull_deserialization() {
+            let original_withdrawal = Withdrawal {
+                id: 1,
+                index: 1,
+                fee: 1,
+                request_height: 1,
+                quorum_hash: vec![],
+                quorum_sig: vec![],
+                tx_out_hash: vec![],
+            };
 
-        assert_eq!(withdrawals.len(), 16);
+            let withdrawal = Withdrawal::from_cbor(
+                original_withdrawal
+                    .to_cbor()
+                    .expect("to serialize withdrawal")
+                    .as_slice(),
+            )
+            .expect("to deserialize withdrawal");
 
-        let withdrawals = drive
-            .dequeue_withdrawals(Some(&transaction))
-            .expect("to dequeue withdrawals");
+            assert_eq!(withdrawal, original_withdrawal,);
+        }
+    }
 
-        assert_eq!(withdrawals.len(), 1);
+    mod queue {
+        use super::*;
+
+        #[test]
+        fn test_enqueue_and_dequeue() {
+            let drive = setup_drive_with_initial_state_structure();
+
+            let transaction = drive.grove.start_transaction();
+
+            for i in 0..17 {
+                let withdrawal = Withdrawal {
+                    id: i,
+                    index: 1,
+                    fee: 1,
+                    request_height: 1,
+                    quorum_hash: vec![],
+                    quorum_sig: vec![],
+                    tx_out_hash: vec![],
+                };
+
+                drive
+                    .enqueue_withdrawal(withdrawal, Some(&transaction))
+                    .expect("to enqueue withdrawal");
+            }
+
+            let withdrawals = drive
+                .dequeue_withdrawals(Some(&transaction))
+                .expect("to dequeue withdrawals");
+
+            assert_eq!(withdrawals.len(), 16);
+
+            let withdrawals = drive
+                .dequeue_withdrawals(Some(&transaction))
+                .expect("to dequeue withdrawals");
+
+            assert_eq!(withdrawals.len(), 1);
+
+            let withdrawals = drive
+                .dequeue_withdrawals(Some(&transaction))
+                .expect("to dequeue withdrawals");
+
+            assert_eq!(withdrawals.len(), 0);
+        }
     }
 }
