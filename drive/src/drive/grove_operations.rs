@@ -925,9 +925,13 @@ impl Drive {
                     // TODO: If possibility to err, might need to change the update closure return type
                     //  from bool to maybe Result<bool, Error>
 
+                    // This could be none only because the old element didn't exist
+                    // If they were empty we get an error
                     let maybe_old_storage_flags =
                         StorageFlags::from_some_element_flags(&old_flags)?;
-                    let new_storage_flags = StorageFlags::from_element_flags_ref(new_flags)?;
+                    let new_storage_flags = StorageFlags::from_element_flags_ref(new_flags)?.ok_or(Error::Drive(DriveError::CorruptedElementFlags(
+                        "no element flag on data",
+                    )))?;
                     match cost.transition_type() {
                         OperationStorageTransitionType::OperationUpdateBiggerSize => {
                             let combined_storage_flags =
@@ -936,19 +940,29 @@ impl Drive {
                                     new_storage_flags,
                                     cost.added_bytes,
                                 )?;
-                            new_flags = &mut StorageFlags::map_owned_to_element_flags(
-                                combined_storage_flags,
-                            );
+                            new_flags = &mut combined_storage_flags.to_element_flags();
                             true
                         }
                         OperationStorageTransitionType::OperationUpdateSmallerSize => {
-                            new_flags.extend(vec![1, 2]);
+                            let combined_storage_flags =
+                                StorageFlags::optional_combine_removed_bytes(
+                                    maybe_old_storage_flags,
+                                    new_storage_flags,
+                                    cost.removed_bytes,
+                                )?;
+                            new_flags = &mut combined_storage_flags.to_element_flags();
                             true
                         }
                         _ => false,
                     }
                 },
-                |flags, removed| Ok(BasicStorageRemoval(removed)),
+                |flags, removed| {
+                    let storage_flags = StorageFlags::from_element_flags_ref(new_flags)?.ok_or(Error::Drive(DriveError::CorruptedElementFlags(
+                        "no element flag on data",
+                    )))?;
+                    let storage_removed_bytes = storage_flags.split_storage_removed_bytes(removed);
+                    Ok(storage_removed_bytes)
+                },
                 transaction,
             );
             push_drive_operation_result(cost_context, drive_operations)

@@ -3,8 +3,11 @@ use crate::drive::flags::StorageFlags::{
 };
 use grovedb::ElementFlags;
 use integer_encoding::VarInt;
-use nohash_hasher::IntMap;
 use std::cmp::Ordering;
+use std::collections::BTreeMap;
+use costs::storage_cost::removal::StorageRemovedBytes;
+use costs::storage_cost::removal::StorageRemovedBytes::BasicStorageRemoval;
+use nohash_hasher::IntMap;
 
 use crate::error::drive::DriveError;
 use crate::error::storage_flags::StorageFlagsError;
@@ -22,9 +25,9 @@ type OwnerId = [u8; 32];
 #[derive(Clone, Debug, PartialEq)]
 pub enum StorageFlags {
     SingleEpoch(BaseEpoch),                                                     //0
-    MultiEpoch(BaseEpoch, IntMap<EpochIndex, BytesAddedInEpoch>),               //1
+    MultiEpoch(BaseEpoch, BTreeMap<EpochIndex, BytesAddedInEpoch>),               //1
     SingleEpochOwned(BaseEpoch, OwnerId),                                       //2
-    MultiEpochOwned(BaseEpoch, IntMap<EpochIndex, BytesAddedInEpoch>, OwnerId), //3
+    MultiEpochOwned(BaseEpoch, BTreeMap<EpochIndex, BytesAddedInEpoch>, OwnerId), //3
 }
 
 impl StorageFlags {
@@ -50,7 +53,7 @@ impl StorageFlags {
     fn combine_non_base_epoch_bytes(
         self,
         rhs: &Self,
-    ) -> Option<IntMap<EpochIndex, BytesAddedInEpoch>> {
+    ) -> Option<BTreeMap<EpochIndex, BytesAddedInEpoch>> {
         if let Some(our_epoch_index_map) = self.epoch_index_map() {
             if let Some(other_epoch_index_map) = rhs.epoch_index_map() {
                 let mut combined_index_map = our_epoch_index_map.clone();
@@ -120,16 +123,49 @@ impl StorageFlags {
         }
     }
 
+    fn combine_with_higher_base_epoch_remove_bytes(self, rhs: Self, removed_bytes: StorageRemovedBytes) -> Result<Self, Error> {
+        let base_epoch = self.base_epoch().clone();
+        let epoch_with_adding_bytes = rhs.base_epoch();
+        let owner_id = self.combine_owner_id(&rhs)?;
+        let mut other_epoch_bytes = self.combine_non_base_epoch_bytes(&rhs).unwrap_or_default();
+        let original_value = other_epoch_bytes.remove(epoch_with_adding_bytes);
+        match original_value {
+            None => other_epoch_bytes.insert(epoch_with_adding_bytes.clone(), added_bytes),
+            Some(original_bytes) => other_epoch_bytes.insert(
+                epoch_with_adding_bytes.clone(),
+                original_bytes.clone() + added_bytes,
+            ),
+        };
+
+        match owner_id {
+            None => Ok(MultiEpoch(base_epoch, other_epoch_bytes)),
+            Some(owner_id) => Ok(MultiEpochOwned(
+                base_epoch,
+                other_epoch_bytes,
+                owner_id.clone(),
+            )),
+        }
+    }
+
     pub fn optional_combine_added_bytes(
         ours: Option<Self>,
-        theirs: Option<Self>,
+        theirs: Self,
         added_bytes: u32,
-    ) -> Result<Option<Self>, Error> {
-        match (ours, theirs) {
-            (None, None) => Ok(None),
-            (None, Some(theirs)) => Ok(Some(theirs)),
-            (Some(ours), None) => Ok(Some(ours)),
-            (Some(ours), Some(theirs)) => Ok(Some(ours.combine_added_bytes(theirs, added_bytes)?)),
+    ) -> Result<Self, Error> {
+        match ours {
+            None => Ok(theirs),
+            Some(ours) => Ok(ours.combine_added_bytes(theirs, added_bytes)?),
+        }
+    }
+
+    pub fn optional_combine_removed_bytes(
+        ours: Option<Self>,
+        theirs: Self,
+        removed_bytes: StorageRemovedBytes,
+    ) -> Result<Self, Error> {
+        match ours {
+            None => Ok(theirs),
+            Some(ours) => Ok(ours.combine_removed_bytes(theirs, removed_bytes)?),
         }
     }
 
@@ -139,7 +175,19 @@ impl StorageFlags {
             Ordering::Less => self.combine_with_higher_base_epoch(rhs, added_bytes),
             Ordering::Greater => Err(Error::StorageFlags(
                 StorageFlagsError::MergingStorageFlagsWithDifferentBaseEpoch(
-                    "can not merge with different base epoch",
+                    "can not merge with new item in older base epoch",
+                ),
+            )),
+        }
+    }
+
+    pub fn combine_removed_bytes(self, rhs: Self, removed_bytes: StorageRemovedBytes) -> Result<Self, Error> {
+        match self.base_epoch().cmp(rhs.base_epoch()) {
+            Ordering::Equal => self.combine_same_base_epoch(rhs),
+            Ordering::Less => self.combine_with_higher_base_epoch_remove_bytes(rhs, removed_bytes),
+            Ordering::Greater => Err(Error::StorageFlags(
+                StorageFlagsError::MergingStorageFlagsWithDifferentBaseEpoch(
+                    "can not merge with new item in older base epoch",
                 ),
             )),
         }
@@ -161,7 +209,7 @@ impl StorageFlags {
         }
     }
 
-    pub fn epoch_index_map(&self) -> Option<&IntMap<EpochIndex, BytesAddedInEpoch>> {
+    pub fn epoch_index_map(&self) -> Option<&BTreeMap<EpochIndex, BytesAddedInEpoch>> {
         match self {
             MultiEpoch(_, epoch_int_map) | MultiEpochOwned(_, epoch_int_map, _) => {
                 Some(epoch_int_map)
@@ -255,7 +303,7 @@ impl StorageFlags {
                 ))
             })?);
             let mut offset = 3;
-            let mut bytes_per_epoch: IntMap<u16, u32> = IntMap::default();
+            let mut bytes_per_epoch: BTreeMap<u16, u32> = BTreeMap::default();
             while offset + 2 < len {
                 // 2 for epoch size
                 let epoch_index =
@@ -319,7 +367,7 @@ impl StorageFlags {
                 ))
             })?);
             let mut offset = 3;
-            let mut bytes_per_epoch: IntMap<u16, u32> = IntMap::default();
+            let mut bytes_per_epoch: BTreeMap<u16, u32> = BTreeMap::default();
             while offset + 2 < len {
                 // 2 for epoch size
                 let epoch_index =
@@ -399,5 +447,36 @@ impl StorageFlags {
 
     pub fn to_element_flags(&self) -> ElementFlags {
         self.serialize()
+    }
+
+    /// split_storage_removed_bytes removes bytes as LIFO
+    pub fn split_storage_removed_bytes(&self, removed_bytes: u32) -> StorageRemovedBytes {
+        match self {
+            SingleEpoch(_) | SingleEpochOwned(_, _) => BasicStorageRemoval(removed_bytes),
+            MultiEpoch(base_epoch, other_epoch_bytes) | MultiEpochOwned(base_epoch, other_epoch_bytes, _) => {
+                let mut bytes_left = removed_bytes;
+                let mut rev_iter = other_epoch_bytes.iter().rev();
+                let mut sectioned_storage_removal = IntMap::default();
+                while bytes_left > 0 {
+                    if let Some((epoch_index, bytes_in_epoch)) = rev_iter.next_back() {
+                        if *bytes_in_epoch < bytes_left {
+                            bytes_left -= bytes_in_epoch;
+                            sectioned_storage_removal.insert(epoch_index.clone() as u32, *bytes_in_epoch);
+                        } else if *bytes_in_epoch >= bytes_left {
+                            //take all bytes
+                            bytes_left = 0;
+                            sectioned_storage_removal.insert(epoch_index.clone() as u32, bytes_left);
+                        }
+                    } else {
+                        break;
+                    }
+                }
+                if bytes_left > 0 {
+                    // We need to take some from the base epoch
+                    sectioned_storage_removal.insert(base_epoch.clone() as u32, bytes_left);
+                }
+                sectioned_storage_removal
+            }
+        }
     }
 }
