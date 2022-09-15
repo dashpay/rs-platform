@@ -49,7 +49,7 @@ impl Platform {
 
         for epoch_index in last_initiated_epoch_index..=epoch_info.current_epoch_index {
             let next_thousandth_epoch = Epoch::new(epoch_index + PERPETUAL_STORAGE_EPOCHS);
-            next_thousandth_epoch.add_init_empty_operations_no_storage(batch);
+            next_thousandth_epoch.add_init_empty_without_storage_operations(batch);
         }
 
         // init current epoch pool for processing
@@ -262,6 +262,7 @@ mod tests {
 
                 let thousandth_epoch = Epoch::new(next_thousandth_epoch.index - 1);
 
+                // TODO: We should check that storage pool key wasn't created
                 let aggregate_storage_fees = platform
                     .drive
                     .get_epoch_storage_credits_for_distribution(&thousandth_epoch, transaction)
