@@ -49,7 +49,7 @@ impl Platform {
 
         for epoch_index in last_initiated_epoch_index..=epoch_info.current_epoch_index {
             let next_thousandth_epoch = Epoch::new(epoch_index + PERPETUAL_STORAGE_EPOCHS);
-            next_thousandth_epoch.add_init_empty_operations(batch);
+            next_thousandth_epoch.add_init_empty_operations_no_storage(batch);
         }
 
         // init current epoch pool for processing
@@ -141,12 +141,6 @@ impl Platform {
             transaction,
             &mut batch,
         )?;
-
-        let results = batch.verify_consistency_of_operations();
-
-        if !results.is_empty() {
-            dbg!(results);
-        }
 
         self.drive.grove_apply_batch(batch, false, transaction)?;
 

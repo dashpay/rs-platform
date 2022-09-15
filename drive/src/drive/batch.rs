@@ -67,7 +67,7 @@ impl GroveDbOpBatch {
             op: Op::Insert { element },
         })
     }
-    
+
     pub fn verify_consistency_of_operations(&self) -> GroveDbOpConsistencyResults {
         GroveDbOp::verify_consistency_of_operations(&self.operations)
     }

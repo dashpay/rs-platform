@@ -11,24 +11,31 @@ impl Drive {
         &self,
         transaction: TransactionArg,
     ) -> Result<u64, Error> {
-        let element = self
+        let result = self
             .grove
             .get(pools_path(), KEY_STORAGE_FEE_POOL.as_slice(), transaction)
             .unwrap()
-            .map_err(Error::GroveDB)?;
+            .map(|element| {
+                if let Element::Item(item, _) = element {
+                    let fee = u64::from_be_bytes(item.as_slice().try_into().map_err(|_| {
+                        Error::Fee(FeeError::CorruptedStorageFeePoolInvalidItemLength(
+                            "fee pools storage fee pool is not i64",
+                        ))
+                    })?);
 
-        if let Element::Item(item, _) = element {
-            let fee = u64::from_be_bytes(item.as_slice().try_into().map_err(|_| {
-                Error::Fee(FeeError::CorruptedStorageFeePoolInvalidItemLength(
-                    "fee pools storage fee pool is not i64",
-                ))
-            })?);
-
-            Ok(fee)
-        } else {
-            Err(Error::Fee(FeeError::CorruptedStorageFeePoolNotItem(
-                "fee pools storage fee pool must be an item",
-            )))
+                    Ok(fee)
+                } else {
+                    Err(Error::Fee(FeeError::CorruptedStorageFeePoolNotItem(
+                        "fee pools storage fee pool must be an item",
+                    )))
+                }
+            });
+        match result {
+            Ok(r) => r,
+            Err(e) => match e {
+                grovedb::Error::PathKeyNotFound(_) => Ok(0),
+                _ => Err(Error::GroveDB(e)),
+            },
         }
     }
 }
