@@ -363,11 +363,7 @@ mod tests {
                             storage_fees: storage_fees_per_block,
                         },
                     };
-
-                    if day == 37 {
-                        dbg!("here");
-                    }
-
+                    
                     let block_end_response = platform
                         .block_end(block_end_request, Some(&transaction))
                         .expect(
