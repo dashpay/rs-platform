@@ -1,9 +1,9 @@
 use ciborium::value::Value as CborValue;
 use std::collections::BTreeMap;
+use std::convert::TryInto;
 use std::ops::RangeFull;
 
 use dpp::util::cbor_value::{CborBTreeMapHelper, CborCanonicalMap};
-use grovedb::query_result_type::QueryResultType::QueryElementResultType;
 use grovedb::{Element, PathQuery, Query, QueryItem, SizedQuery, TransactionArg};
 
 use crate::drive::batch::GroveDbOpBatch;
@@ -22,9 +22,9 @@ pub struct Withdrawal {
     pub index: u64,
     pub fee: u32,
     pub request_height: u32,
-    pub quorum_hash: Vec<u8>,
-    pub quorum_sig: Vec<u8>,
-    pub tx_out_hash: Vec<u8>,
+    pub quorum_hash: [u8; 32],
+    pub quorum_sig: [u8; 96],
+    pub tx_out_hash: [u8; 32],
 }
 
 impl Withdrawal {
@@ -35,9 +35,9 @@ impl Withdrawal {
         map.insert("index", self.index);
         map.insert("fee", self.fee);
         map.insert("request_height", self.request_height);
-        map.insert("quorum_hash", self.quorum_hash.clone());
-        map.insert("quorum_sig", self.quorum_sig.clone());
-        map.insert("tx_out_hash", self.tx_out_hash.clone());
+        map.insert("quorum_hash", self.quorum_hash.to_vec());
+        map.insert("quorum_sig", self.quorum_sig.to_vec());
+        map.insert("tx_out_hash", self.tx_out_hash.to_vec());
 
         map.to_bytes().map_err(|_| {
             Error::Drive(DriveError::CorruptedCodeExecution(
@@ -78,7 +78,7 @@ impl Withdrawal {
             ))
         })?;
 
-        let quorum_hash: Vec<u8> = map
+        let quorum_hash: [u8; 32] = map
             .get("quorum_hash")
             .ok_or_else(|| {
                 Error::Drive(DriveError::CorruptedCodeExecution(
@@ -91,9 +91,15 @@ impl Withdrawal {
                     "could not convert quorum_hash to Vec<u8>",
                 ))
             })?
-            .clone();
+            .clone()
+            .try_into()
+            .or_else(|_| {
+                Err(Error::Drive(DriveError::CorruptedCodeExecution(
+                    "Expected quorum_hash vector to be of length 32",
+                )))
+            })?;
 
-        let quorum_sig: Vec<u8> = map
+        let quorum_sig: [u8; 96] = map
             .get("quorum_sig")
             .ok_or_else(|| {
                 Error::Drive(DriveError::CorruptedCodeExecution(
@@ -106,9 +112,15 @@ impl Withdrawal {
                     "could not convert quorum_sig to Vec<u8>",
                 ))
             })?
-            .clone();
+            .clone()
+            .try_into()
+            .or_else(|_| {
+                Err(Error::Drive(DriveError::CorruptedCodeExecution(
+                    "Expected quorum_sig vector to be of length 96",
+                )))
+            })?;
 
-        let tx_out_hash: Vec<u8> = map
+        let tx_out_hash: [u8; 32] = map
             .get("tx_out_hash")
             .ok_or_else(|| {
                 Error::Drive(DriveError::CorruptedCodeExecution(
@@ -121,7 +133,13 @@ impl Withdrawal {
                     "could not convert tx_out_hash to Vec<u8>",
                 ))
             })?
-            .clone();
+            .clone()
+            .try_into()
+            .or_else(|_| {
+                Err(Error::Drive(DriveError::CorruptedCodeExecution(
+                    "Expected tx_out_hash vector to be of length 32",
+                )))
+            })?;
 
         Ok(Self {
             id,
@@ -136,18 +154,20 @@ impl Withdrawal {
 }
 
 impl Drive {
-    pub fn enqueue_withdrawal(
+    pub fn enqueue_withdrawals(
         &self,
-        withdrawal: Withdrawal,
+        withdrawals: Vec<Withdrawal>,
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
         let mut batch = GroveDbOpBatch::new();
 
-        batch.add_insert(
-            vec![vec![RootTree::Withdrawals as u8]],
-            withdrawal.id.to_be_bytes().to_vec(),
-            Element::Item(withdrawal.to_cbor()?, None),
-        );
+        for withdrawal in withdrawals {
+            batch.add_insert(
+                vec![vec![RootTree::Withdrawals as u8]],
+                withdrawal.id.to_be_bytes().to_vec(),
+                Element::Item(withdrawal.to_cbor()?, None),
+            );
+        }
 
         let mut drive_operations: Vec<DriveOperation> = vec![];
 
@@ -175,31 +195,20 @@ impl Drive {
 
         let (result_items, _) = self
             .grove
-            .query_raw(&path_query, QueryElementResultType, transaction)
+            .query(&path_query, transaction)
             .unwrap()
             .map_err(Error::GroveDB)?;
 
-        let result: Result<Vec<Withdrawal>, Error> = result_items
-            .to_elements()
+        let withdrawals = result_items
             .into_iter()
-            .map(|element| {
-                if let Element::Item(cbor, _) = element {
-                    let withdrawal = Withdrawal::from_cbor(cbor.as_slice()).map_err(|_| {
-                        Error::Withdrawal(WithdrawalError::WithdrawalSerialization(
-                            "failed to de-serialize withdrawal from CBOR",
-                        ))
-                    })?;
-
-                    Ok(withdrawal)
-                } else {
-                    Err(Error::Drive(DriveError::CorruptedWithdrawalNotItem(
-                        "withdrawal must be an item",
-                    )))
-                }
+            .map(|cbor| {
+                Withdrawal::from_cbor(cbor.as_slice()).map_err(|_| {
+                    Error::Withdrawal(WithdrawalError::WithdrawalSerialization(
+                        "failed to de-serialize withdrawal from CBOR",
+                    ))
+                })
             })
-            .collect();
-
-        let withdrawals = result?;
+            .collect::<Result<Vec<Withdrawal>, Error>>()?;
 
         if withdrawals.len() > 0 {
             let mut batch_operations: Vec<DriveOperation> = vec![];
@@ -236,6 +245,8 @@ mod tests {
     use super::Withdrawal;
 
     mod serialization {
+        use std::convert::TryInto;
+
         use super::*;
         use hex::ToHex;
 
@@ -246,16 +257,16 @@ mod tests {
                 index: 1,
                 fee: 1,
                 request_height: 1,
-                quorum_hash: vec![],
-                quorum_sig: vec![],
-                tx_out_hash: vec![],
+                quorum_hash: vec![0; 32].try_into().unwrap(),
+                quorum_sig: vec![0; 96].try_into().unwrap(),
+                tx_out_hash: vec![0; 32].try_into().unwrap(),
             };
 
             let cbor = withdrawal.to_cbor().expect("to serialize the withdrawal");
 
             let hex: String = cbor.encode_hex();
 
-            assert_eq!(hex, "a762696401636665650165696e646578016a71756f72756d5f736967406b71756f72756d5f68617368406b74785f6f75745f68617368406e726571756573745f68656967687401");
+            assert_eq!(hex, "a762696401636665650165696e646578016a71756f72756d5f73696758600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006b71756f72756d5f68617368582000000000000000000000000000000000000000000000000000000000000000006b74785f6f75745f68617368582000000000000000000000000000000000000000000000000000000000000000006e726571756573745f68656967687401");
         }
 
         #[test]
@@ -265,9 +276,9 @@ mod tests {
                 index: 1,
                 fee: 1,
                 request_height: 1,
-                quorum_hash: vec![],
-                quorum_sig: vec![],
-                tx_out_hash: vec![],
+                quorum_hash: vec![0; 32].try_into().unwrap(),
+                quorum_sig: vec![0; 96].try_into().unwrap(),
+                tx_out_hash: vec![0; 32].try_into().unwrap(),
             };
 
             let withdrawal = Withdrawal::from_cbor(
@@ -291,21 +302,21 @@ mod tests {
 
             let transaction = drive.grove.start_transaction();
 
-            for i in 0..17 {
-                let withdrawal = Withdrawal {
+            let withdrawals: Vec<Withdrawal> = (0..17)
+                .map(|i| Withdrawal {
                     id: i,
                     index: 1,
                     fee: 1,
                     request_height: 1,
-                    quorum_hash: vec![],
-                    quorum_sig: vec![],
-                    tx_out_hash: vec![],
-                };
+                    quorum_hash: vec![0; 32].try_into().unwrap(),
+                    quorum_sig: vec![0; 96].try_into().unwrap(),
+                    tx_out_hash: vec![0; 32].try_into().unwrap(),
+                })
+                .collect();
 
-                drive
-                    .enqueue_withdrawal(withdrawal, Some(&transaction))
-                    .expect("to enqueue withdrawal");
-            }
+            drive
+                .enqueue_withdrawals(withdrawals, Some(&transaction))
+                .expect("to enqueue withdrawal");
 
             let withdrawals = drive
                 .dequeue_withdrawals(Some(&transaction))

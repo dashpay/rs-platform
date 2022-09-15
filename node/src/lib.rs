@@ -1592,8 +1592,8 @@ impl DriveWrapper {
         Ok(cx.undefined())
     }
 
-    fn js_enqueue_withdrawal(mut cx: FunctionContext) -> JsResult<JsUndefined> {
-        let js_withdrawal = cx.argument::<JsBuffer>(0)?;
+    fn js_enqueue_withdrawals(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+        let js_withdrawals = cx.argument::<JsArray>(0)?;
         let js_using_transaction = cx.argument::<JsBoolean>(1)?;
         let js_callback = cx.argument::<JsFunction>(2)?.root(&mut cx);
 
@@ -1601,16 +1601,20 @@ impl DriveWrapper {
             .this()
             .downcast_or_throw::<JsBox<DriveWrapper>, _>(&mut cx)?;
 
-        let withdrawal_bytes = converter::js_buffer_to_vec_u8(js_withdrawal, &mut cx);
+        let withdrawal_bytes = converter::js_array_of_buffers_to_vec(js_withdrawals, &mut cx)?;
         let using_transaction = js_using_transaction.value(&mut cx);
 
         db.send_to_drive_thread(move |platform: &Platform, transaction, channel| {
-            let result = Withdrawal::from_cbor(&withdrawal_bytes).and_then(|withdrawal| {
-                platform.drive.enqueue_withdrawal(
-                    withdrawal,
-                    using_transaction.then(|| transaction).flatten(),
-                )
-            });
+            let result = withdrawal_bytes
+                .iter()
+                .map(|bytes| Withdrawal::from_cbor(bytes))
+                .collect::<Result<Vec<Withdrawal>, Error>>()
+                .and_then(|withdrawals| {
+                    platform.drive.enqueue_withdrawals(
+                        withdrawals,
+                        using_transaction.then(|| transaction).flatten(),
+                    )
+                });
 
             channel.send(move |mut task_context| {
                 let callback = js_callback.into_inner(&mut task_context);
@@ -1711,8 +1715,8 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
     )?;
 
     cx.export_function(
-        "driveEnqueueWithdrawal",
-        DriveWrapper::js_enqueue_withdrawal,
+        "driveEnqueueWithdrawals",
+        DriveWrapper::js_enqueue_withdrawals,
     )?;
     cx.export_function(
         "driveDequeueWithdrawals",

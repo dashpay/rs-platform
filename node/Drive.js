@@ -17,7 +17,7 @@ const {
   driveQueryDocuments,
   driveProveDocumentsQuery,
   driveInsertIdentity,
-  driveEnqueueWithdrawal,
+  driveEnqueueWithdrawals,
   driveDequeueWithdrawals,
   abciInitChain,
   abciBlockBegin,
@@ -44,7 +44,7 @@ const driveDeleteDocumentAsync = appendStack(promisify(driveDeleteDocument));
 const driveQueryDocumentsAsync = appendStack(promisify(driveQueryDocuments));
 const driveProveDocumentsQueryAsync = appendStack(promisify(driveProveDocumentsQuery));
 const driveInsertIdentityAsync = appendStack(promisify(driveInsertIdentity));
-const driveEnqueueWithdrawalAsync = appendStack(promisify(driveEnqueueWithdrawal));
+const driveEnqueueWithdrawalsAsync = appendStack(promisify(driveEnqueueWithdrawals));
 const driveDequeueWithdrawalsAsync = appendStack(promisify(driveDequeueWithdrawals));
 const abciInitChainAsync = appendStack(promisify(abciInitChain));
 const abciBlockBeginAsync = appendStack(promisify(abciBlockBegin));
@@ -253,15 +253,15 @@ class Drive {
   }
 
   /**
-   * @param {Object} withdrawal
+   * @param {Object[]} withdrawals
    * @param {boolean} [useTransaction=false]
    *
    * @returns {Promise<void>}
    */
-  async enqueueWithdrawal(withdrawal, useTransaction = false) {
-    const withdrawalBytes = cbor.encode(withdrawal);
+  async enqueueWithdrawals(withdrawals, useTransaction = false) {
+    const withdrawalBytes = withdrawals.map((withdrawal) => cbor.encode(withdrawal));
 
-    return driveEnqueueWithdrawalAsync.call(
+    return driveEnqueueWithdrawalsAsync.call(
       this.drive,
       withdrawalBytes,
       useTransaction,

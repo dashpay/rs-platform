@@ -400,22 +400,32 @@ describe('Drive', () => {
       await drive.createInitialStateStructure();
     });
 
-    it('should enqueue and dequeue the withdrawal', async () => {
-      const withdrawal = {
+    it('should enqueue and dequeue the withdrawals', async () => {
+      const first_withdrawal = {
         id: 1,
         index: 1,
         fee: 1,
         request_height: 1,
-        quorum_hash: Buffer.alloc(0),
-        quorum_sig: Buffer.alloc(0),
-        tx_out_hash: Buffer.alloc(0),
+        quorum_hash: Buffer.alloc(32),
+        quorum_sig: Buffer.alloc(96),
+        tx_out_hash: Buffer.alloc(32),
       };
 
-      await drive.enqueueWithdrawal(withdrawal, true);
+      const second_withdrawal = {
+        id: 2,
+        index: 1,
+        fee: 1,
+        request_height: 1,
+        quorum_hash: Buffer.alloc(32),
+        quorum_sig: Buffer.alloc(96),
+        tx_out_hash: Buffer.alloc(32),
+      };
+
+      await drive.enqueueWithdrawals([first_withdrawal, second_withdrawal], true);
 
       let withdrawals = await drive.dequeueWithdrawals(true);
 
-      expect(withdrawals).to.have.lengthOf(1);
+      expect(withdrawals).to.have.lengthOf(2);
 
       withdrawals = await drive.dequeueWithdrawals(true);
 
