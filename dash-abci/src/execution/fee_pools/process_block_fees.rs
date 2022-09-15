@@ -262,7 +262,6 @@ mod tests {
 
                 let thousandth_epoch = Epoch::new(next_thousandth_epoch.index - 1);
 
-                // TODO: We should check that storage pool key wasn't created
                 let aggregate_storage_fees = platform
                     .drive
                     .get_epoch_storage_credits_for_distribution(&thousandth_epoch, transaction)
