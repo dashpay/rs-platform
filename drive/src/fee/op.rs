@@ -1,3 +1,37 @@
+// MIT LICENSE
+//
+// Copyright (c) 2021 Dash Core Group
+// 
+// Permission is hereby granted, free of charge, to any
+// person obtaining a copy of this software and associated
+// documentation files (the "Software"), to deal in the
+// Software without restriction, including without
+// limitation the rights to use, copy, modify, merge,
+// publish, distribute, sublicense, and/or sell copies of
+// the Software, and to permit persons to whom the Software
+// is furnished to do so, subject to the following
+// conditions:
+//
+// The above copyright notice and this permission notice
+// shall be included in all copies or substantial portions
+// of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+// ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+// TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+// PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+// SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+// CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+// OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+// IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+// DEALINGS IN THE SOFTWARE.
+//
+
+//! 
+//! 
+//! 
+//! 
+
 use crate::drive::batch::GroveDbOpBatch;
 use costs::OperationCost;
 use enum_map::Enum;
@@ -279,6 +313,8 @@ pub enum DriveOperation {
 }
 
 impl DriveOperation {
+
+    /// Returns a list of the costs of the Drive operations.
     pub fn consume_to_costs(
         drive_operation: Vec<DriveOperation>,
     ) -> Result<Vec<OperationCost>, Error> {
@@ -288,6 +324,7 @@ impl DriveOperation {
             .collect()
     }
 
+    /// Returns the cost of this operation
     pub fn operation_cost(self) -> Result<OperationCost, Error> {
         match self {
             GroveOperation(_) => Err(Error::Drive(DriveError::CorruptedCodeExecution(
@@ -314,6 +351,7 @@ impl DriveOperation {
         }
     }
 
+    /// Filters the groveDB ops from a list of operations and puts them in a `GroveDbOpBatch`.
     pub fn grovedb_operations_batch(insert_operations: &Vec<DriveOperation>) -> GroveDbOpBatch {
         let operations = insert_operations
             .iter()
@@ -325,6 +363,7 @@ impl DriveOperation {
         GroveDbOpBatch::from_operations(operations)
     }
 
+    /// Sets `GroveOperation` for inserting an empty tree at the given path and key
     pub fn for_empty_tree(
         path: Vec<Vec<u8>>,
         key: Vec<u8>,
@@ -338,10 +377,12 @@ impl DriveOperation {
         DriveOperation::for_path_key_element(path, key, tree)
     }
 
+    /// Sets `GroveOperation` for inserting an element at the given path and key
     pub fn for_path_key_element(path: Vec<Vec<u8>>, key: Vec<u8>, element: Element) -> Self {
         GroveOperation(GroveDbOp::insert(path, key, element))
     }
 
+    /// Sets `CostCalculationInsertOperation` given path, key, and value sizes.
     pub fn for_insert_path_key_value_size(path_size: u32, key_size: u16, value_size: u32) -> Self {
         CostCalculationInsertOperation(SizesOfInsertOperation {
             path_size,
@@ -350,6 +391,7 @@ impl DriveOperation {
         })
     }
 
+    /// Sets `CostCalculationDeleteOperation`
     pub fn for_delete_path_key_value_size(
         path: Vec<Vec<u8>>,
         key_size: u16,
@@ -360,6 +402,7 @@ impl DriveOperation {
         Self::for_delete_path_key_value_max_sizes(path_sizes, key_size, value_size, multiplier)
     }
 
+    /// Sets `CostCalculationDeleteOperation` with max sizes
     pub fn for_delete_path_key_value_max_sizes(
         path: Vec<u16>,
         key_size: u16,
@@ -372,6 +415,7 @@ impl DriveOperation {
         ))
     }
 
+    /// Sets `CostCalculationQueryOperation`
     pub fn for_query_path_key_value_size(path_size: u32, key_size: u32, value_size: u32) -> Self {
         CostCalculationQueryOperation(SizesOfQueryOperation {
             path_size,
@@ -391,6 +435,7 @@ fn get_overflow_error(str: &'static str) -> Error {
 }
 
 impl DriveCost for OperationCost {
+    /// Return the ephemeral cost from the operation
     fn ephemeral_cost(&self) -> Result<u64, Error> {
         let OperationCost {
             seek_count,
@@ -432,6 +477,7 @@ impl DriveCost for OperationCost {
         cost
     }
 
+    /// Return the storage cost from the operation
     fn storage_cost(&self) -> Result<i64, Error> {
         let OperationCost {
             storage_written_bytes,

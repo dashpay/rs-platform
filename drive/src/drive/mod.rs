@@ -1,3 +1,35 @@
+// MIT LICENSE
+//
+// Copyright (c) 2021 Dash Core Group
+// 
+// Permission is hereby granted, free of charge, to any
+// person obtaining a copy of this software and associated
+// documentation files (the "Software"), to deal in the
+// Software without restriction, including without
+// limitation the rights to use, copy, modify, merge,
+// publish, distribute, sublicense, and/or sell copies of
+// the Software, and to permit persons to whom the Software
+// is furnished to do so, subject to the following
+// conditions:
+//
+// The above copyright notice and this permission notice
+// shall be included in all copies or substantial portions
+// of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+// ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+// TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+// PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+// SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+// CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+// OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+// IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+// DEALINGS IN THE SOFTWARE.
+//
+
+//! Drive Mod File
+//! 
+
 use std::cell::RefCell;
 use std::path::Path;
 use std::sync::Arc;
@@ -42,6 +74,7 @@ pub struct Drive {
     pub cache: RefCell<DriveCache>,
 }
 
+/// Keys for the first layer of subtrees below the root tree.
 #[repr(u8)]
 pub enum RootTree {
     // Input data errors
@@ -78,6 +111,7 @@ impl From<RootTree> for &'static [u8; 1] {
     }
 }
 
+/// Returns the path to a contract's document types.
 fn contract_documents_path(contract_id: &[u8]) -> [&[u8]; 3] {
     [
         Into::<&[u8; 1]>::into(RootTree::ContractDocuments),
@@ -87,6 +121,8 @@ fn contract_documents_path(contract_id: &[u8]) -> [&[u8]; 3] {
 }
 
 impl Drive {
+
+    /// Opens a path in groveDB.
     pub fn open<P: AsRef<Path>>(path: P, config: Option<DriveConfig>) -> Result<Self, Error> {
         match GroveDb::open(path) {
             Ok(grove) => {
@@ -105,6 +141,7 @@ impl Drive {
         }
     }
 
+    /// Commits a transaction.
     pub fn commit_transaction(&self, transaction: Transaction) -> Result<(), Error> {
         self.grove
             .commit_transaction(transaction)
@@ -113,17 +150,20 @@ impl Drive {
             .map_err(Error::GroveDB)
     }
 
+    /// Rolls back a transaction.
     pub fn rollback_transaction(&self, transaction: &Transaction) -> Result<(), Error> {
         self.grove
             .rollback_transaction(transaction)
             .map_err(Error::GroveDB)
     }
 
+    /// Make sure the protocol version is correct.
     pub const fn check_protocol_version(_version: u32) -> bool {
         // Temporary disabled due protocol version is dynamic and goes from consensus params
         true
     }
 
+    /// Makes sure the protocol version is correct given the version as a u8.
     pub fn check_protocol_version_bytes(version_bytes: &[u8]) -> bool {
         if version_bytes.len() != 4 {
             false
@@ -136,6 +176,7 @@ impl Drive {
         }
     }
 
+    /// Applies a batch of Drive operations to groveDB.
     fn apply_batch_drive_operations(
         &self,
         apply: bool,
@@ -157,6 +198,7 @@ impl Drive {
         Ok(())
     }
 
+    /// Applies a batch of groveDB operations if apply is True, otherwise gets the cost of the operations.
     fn apply_batch_grovedb_operations(
         &self,
         apply: bool,
@@ -177,6 +219,7 @@ impl Drive {
         Ok(())
     }
 
+    /// Returns the worst case fee for a contract document type.
     pub fn worst_case_fee_for_document_type_with_name(
         &self,
         contract: &Contract,
