@@ -202,9 +202,8 @@ impl IdentityPublicKey {
     }
 
     /// Set key ID
-    pub fn set_id(mut self, id: KeyID) -> Self {
+    pub fn set_id(&mut self, id: KeyID) {
         self.id = id;
-        self
     }
 
     /// Get key type
@@ -213,9 +212,8 @@ impl IdentityPublicKey {
     }
 
     /// Set key type
-    pub fn set_type(mut self, key_type: KeyType) -> Self {
+    pub fn set_type(&mut self, key_type: KeyType) {
         self.key_type = key_type;
-        self
     }
 
     /// Get raw public key
@@ -224,9 +222,8 @@ impl IdentityPublicKey {
     }
 
     /// Set raw public key
-    pub fn set_data(mut self, data: Vec<u8>) -> Self {
+    pub fn set_data(&mut self, data: Vec<u8>) {
         self.data = data;
-        self
     }
 
     /// Get the purpose value
@@ -235,9 +232,8 @@ impl IdentityPublicKey {
     }
 
     /// Set the purpose value
-    pub fn set_purpose(mut self, purpose: Purpose) -> Self {
+    pub fn set_purpose(&mut self, purpose: Purpose) {
         self.purpose = purpose;
-        self
     }
 
     /// Get the raw security level value. A uint8 number
@@ -247,9 +243,8 @@ impl IdentityPublicKey {
 
     /// Set the raw security level
     //? maybe we should replace the enum with impl TryInto<SecurityLevel> or Into<SecurityLevel>
-    pub fn set_security_level(mut self, security_level: SecurityLevel) -> Self {
+    pub fn set_security_level(&mut self, security_level: SecurityLevel) {
         self.security_level = security_level;
-        self
     }
 
     /// Get readOnly flag
@@ -258,9 +253,8 @@ impl IdentityPublicKey {
     }
 
     /// Set readOnly flag
-    pub fn set_readonly(mut self, ro: bool) -> Self {
+    pub fn set_readonly(&mut self, ro: bool) {
         self.read_only = ro;
-        self
     }
 
     /// Get the original public key hash
