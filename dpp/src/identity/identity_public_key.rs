@@ -276,9 +276,8 @@ impl IdentityPublicKey {
     }
 
     /// Set disabledAt
-    pub fn set_disabled_at(mut self, timestamp_millis: u64) -> Self {
+    pub fn set_disabled_at(&mut self, timestamp_millis: u64) {
         self.disabled_at = Some(timestamp_millis);
-        self
     }
 
     /// Checks if public key security level is MASTER
