@@ -31,10 +31,7 @@ mod test {
     use super::*;
     use crate::{
         state_repository::MockStateRepositoryLike,
-        tests::{
-            fixtures::identity_fixture_raw_object,
-            utils::{get_basic_error_from_result, get_signature_error_from_result},
-        },
+        tests::{fixtures::identity_fixture_raw_object, utils::get_signature_error_from_result},
     };
 
     #[tokio::test]

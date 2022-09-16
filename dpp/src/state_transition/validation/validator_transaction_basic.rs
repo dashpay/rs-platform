@@ -127,7 +127,7 @@ mod test {
             )
             .expect("the state transition should be signed");
 
-        let mut raw_state_transition = state_transition.to_object(false).unwrap();
+        let raw_state_transition = state_transition.to_object(false).unwrap();
 
         TestData {
             data_contract,

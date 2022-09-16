@@ -43,7 +43,7 @@ fn should_return_invalid_result_if_state_transition_does_not_contain_master_key(
 }
 
 #[test]
-fn should_return_valid_resutl() {
+fn should_return_valid_result() {
     let validator = RequiredPurposeAndSecurityLevelValidator {};
     let raw_public_keys = vec![
         json!({
