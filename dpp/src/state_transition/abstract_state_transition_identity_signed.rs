@@ -16,6 +16,7 @@ pub trait StateTransitionIdentitySigned
 where
     Self: StateTransitionLike,
 {
+    fn get_owner_id(&self) -> &Identifier;
     fn get_signature_public_key_id(&self) -> KeyID;
     fn set_signature_public_key_id(&mut self, key_id: KeyID);
 
@@ -25,6 +26,7 @@ where
         private_key: &[u8],
     ) -> Result<(), ProtocolError> {
         self.verify_public_key_level_and_purpose(identity_public_key)?;
+        self.verify_public_key_is_enabled(identity_public_key)?;
 
         match identity_public_key.get_type() {
             KeyType::ECDSA_SECP256K1 => {
@@ -63,6 +65,13 @@ where
                 }
                 self.sign_by_private_key(private_key, identity_public_key.get_type())
             }
+
+            // the default behavior from
+            // https://github.com/dashevo/platform/blob/6b02b26e5cd3a7c877c5fdfe40c4a4385a8dda15/packages/js-dpp/lib/stateTransition/AbstractStateTransitionIdentitySigned.js#L108
+            // is to return the error for the BIP13_SCRIPT_HASH
+            KeyType::BIP13_SCRIPT_HASH => {
+                Err(ProtocolError::InvalidIdentityPublicKeyTypeError { public_key_type: 3 })
+            }
         }
     }
 
@@ -91,6 +100,9 @@ where
             KeyType::ECDSA_SECP256K1 => self.verify_ecdsa_signature_by_public_key(public_key_bytes),
 
             KeyType::BLS12_381 => self.verify_bls_signature_by_public_key(public_key_bytes),
+
+            // per https://github.com/dashevo/platform/pull/353, signing and verification is not supported
+            KeyType::BIP13_SCRIPT_HASH => Ok(()),
         }
     }
 
@@ -100,6 +112,17 @@ where
         &self,
         public_key: &IdentityPublicKey,
     ) -> Result<(), ProtocolError> {
+        // If state transition requires MASTER security level it must be signed only with
+        // a MASTER key
+        if public_key.is_master() && self.get_security_level_requirement() != SecurityLevel::MASTER
+        {
+            return Err(ProtocolError::InvalidSignaturePublicKeySecurityLevelError {
+                public_key_security_level: public_key.get_security_level(),
+                required_security_level: self.get_security_level_requirement(),
+            });
+        }
+
+        // Otherwise, key security level should be less than MASTER but more or equal than required
         if self.get_security_level_requirement() < public_key.get_security_level() {
             return Err(ProtocolError::PublicKeySecurityLevelNotMetError {
                 public_key_security_level: public_key.get_security_level(),
@@ -116,8 +139,22 @@ where
         Ok(())
     }
 
+    fn verify_public_key_is_enabled(
+        &self,
+        public_key: &IdentityPublicKey,
+    ) -> Result<(), ProtocolError> {
+        if public_key.get_disabled_at().is_some() {
+            return Err(ProtocolError::PublicKeyIsDisabledError {
+                public_key: public_key.to_owned(),
+            });
+        }
+        Ok(())
+    }
+
+    /// Returns minimal key security level that can be used to sign this ST.
+    /// Override this method if the ST requires a different security level.
     fn get_security_level_requirement(&self) -> SecurityLevel {
-        SecurityLevel::MASTER
+        SecurityLevel::HIGH
     }
 }
 
@@ -142,10 +179,12 @@ pub fn get_public_bls_key(private_key: &[u8]) -> Result<Vec<u8>, ProtocolError> 
 #[cfg(test)]
 mod test {
     use bls_signatures::Serialize as BlsSerialize;
+    use chrono::Utc;
     use serde::{Deserialize, Serialize};
     use serde_json::json;
 
     use crate::document::DocumentsBatchTransition;
+    use crate::util::string_encoding::Encoding;
     use crate::{
         assert_error_contains,
         identity::{KeyID, SecurityLevel},
@@ -165,6 +204,7 @@ mod test {
         pub signature: Vec<u8>,
         pub signature_public_key_id: KeyID,
         pub transition_type: StateTransitionType,
+        pub owner_id: Identifier,
     }
 
     impl StateTransitionConvert for ExampleStateTransition {
@@ -205,6 +245,9 @@ mod test {
     }
 
     impl StateTransitionIdentitySigned for ExampleStateTransition {
+        fn get_owner_id(&self) -> &Identifier {
+            &self.owner_id
+        }
         fn get_security_level_requirement(&self) -> SecurityLevel {
             SecurityLevel::MASTER
         }
@@ -219,11 +262,17 @@ mod test {
     }
 
     fn get_mock_state_transition() -> ExampleStateTransition {
+        let owner_id = Identifier::from_string(
+            "AX5o22ARWFYZE9JZTA5SSeyvprtetBcvbQLSBZ7cR7Gw",
+            Encoding::Base58,
+        )
+        .unwrap();
         ExampleStateTransition {
             protocol_version: 1,
             transition_type: StateTransitionType::DocumentsBatch,
             signature: Default::default(),
             signature_public_key_id: 1,
+            owner_id,
         }
     }
 
@@ -261,6 +310,7 @@ mod test {
             security_level: SecurityLevel::MASTER,
             data: ec_public_compressed_bytes.try_into().unwrap(),
             read_only: false,
+            disabled_at: None,
         };
 
         Keys {
@@ -307,6 +357,7 @@ mod test {
                 "signature": "",
                 "signaturePublicKeyId": 1,
                 "transitionType" : 1,
+                "ownerId" : "AX5o22ARWFYZE9JZTA5SSeyvprtetBcvbQLSBZ7cR7Gw"
             })
         );
     }
@@ -316,7 +367,7 @@ mod test {
         let st = get_mock_state_transition();
         let hash = st.hash(false).unwrap();
         assert_eq!(
-            "86a734f974cb260d528079d2b47050891afce203c56077d603f9896a40044223",
+            "be27201d895364e9543f0c4c6a372bb2e262af891296fbdc4cef09b3224d9b51",
             hex::encode(hash)
         )
     }
@@ -327,7 +378,7 @@ mod test {
         let hash = st.to_buffer(false).unwrap();
         let result = hex::encode(hash);
 
-        assert_eq!(108, result.len());
+        assert_eq!(216, result.len());
         assert!(result.starts_with("01000000"))
     }
 
@@ -337,8 +388,8 @@ mod test {
         let hash = st.to_buffer(true).unwrap();
         let result = hex::encode(hash);
 
-        assert_eq!(42, result.len());
-        assert_eq!("01000000a16e7472616e736974696f6e5479706501", result);
+        assert_eq!(150, result.len());
+        assert_eq!("01000000a26e7472616e736974696f6e5479706501676f776e65724964782c4158356f323241525746595a45394a5a5441355353657976707274657442637662514c53425a376352374777", result);
     }
 
     #[test]
@@ -488,5 +539,23 @@ mod test {
         let public_key_id = 2;
         st.set_signature_public_key_id(public_key_id);
         assert_eq!(public_key_id, st.get_signature_public_key_id());
+    }
+
+    #[test]
+    fn should_throw_public_key_is_disabled_error_if_public_key_is_disabled() {
+        let mut st = get_mock_state_transition();
+        let keys = get_test_keys();
+        let identity_public_key = keys
+            .identity_public_key
+            .set_disabled_at(Utc::now().timestamp_millis() as u64);
+
+        let result = st
+            .sign(&identity_public_key, &keys.bls_private)
+            .expect_err("the protocol error should be returned");
+
+        assert!(matches!(
+            result,
+            ProtocolError::PublicKeyIsDisabledError { .. }
+        ))
     }
 }
