@@ -1,7 +1,7 @@
 // MIT LICENSE
 //
 // Copyright (c) 2021 Dash Core Group
-// 
+//
 // Permission is hereby granted, free of charge, to any
 // person obtaining a copy of this software and associated
 // documentation files (the "Software"), to deal in the
@@ -28,7 +28,7 @@
 //
 
 //! Fee Pool Epochs Mod File
-//! 
+//!
 
 use crate::drive::batch::GroveDbOpBatch;
 use crate::drive::fee_pools::epochs::constants::{GENESIS_EPOCH_INDEX, PERPETUAL_STORAGE_EPOCHS};

@@ -1,7 +1,7 @@
 // MIT LICENSE
 //
 // Copyright (c) 2021 Dash Core Group
-// 
+//
 // Permission is hereby granted, free of charge, to any
 // person obtaining a copy of this software and associated
 // documentation files (the "Software"), to deal in the
@@ -28,9 +28,9 @@
 //
 
 //! Grove Operations.
-//! 
+//!
 //! Defines and implements in Drive functions pertinent to groveDB operations.
-//! 
+//!
 
 use crate::drive::batch::GroveDbOpBatch;
 use costs::CostContext;
@@ -68,7 +68,6 @@ fn push_drive_operation_result<T>(
 
 /// Pushes an operation's `OperationCost` to `drive_operations` given its `CostContext`
 /// if `drive_operations` is given. Returns the operation's return value.
-if drive_operations is given.
 fn push_drive_operation_result_optional<T>(
     cost_context: CostContext<Result<T, GroveError>>,
     drive_operations: Option<&mut Vec<DriveOperation>>,
@@ -145,7 +144,7 @@ impl Drive {
         }
     }
 
-    /// Pushes the `OperationCost` of inserting an empty tree in groveDB where the 
+    /// Pushes the `OperationCost` of inserting an empty tree in groveDB where the
     /// path key does not yet exist to `drive_operations`.
     pub(crate) fn grove_insert_empty_tree_if_not_exists<'a, 'c, const N: usize>(
         &'a self,
@@ -336,7 +335,7 @@ impl Drive {
         }
     }
 
-    /// Pushes the `OperationCost` of inserting an element in groveDB where the path key does not yet exist 
+    /// Pushes the `OperationCost` of inserting an element in groveDB where the path key does not yet exist
     /// to `drive_operations`.
     pub(crate) fn grove_insert_if_not_exists<'a, 'c, const N: usize>(
         &'a self,
@@ -425,7 +424,7 @@ impl Drive {
         }
     }
 
-    /// Pushes the `OperationCost` of deleting an element in groveDB to `drive_operations`. 
+    /// Pushes the `OperationCost` of deleting an element in groveDB to `drive_operations`.
     pub(crate) fn grove_delete<'p>(
         &self,
         path: Vec<Vec<u8>>,
@@ -451,7 +450,7 @@ impl Drive {
     }
 
     /// Gets the element at the given path from groveDB.
-    /// Pushes the `OperationCost` of getting the element to `drive_operations`. 
+    /// Pushes the `OperationCost` of getting the element to `drive_operations`.
     pub(crate) fn grove_get<'a, 'c, P>(
         &'a self,
         path: P,
@@ -895,6 +894,7 @@ impl Drive {
                 ops.operations,
                 Some(BatchApplyOptions {
                     validate_insertion_does_not_override: validate,
+                    disable_operation_consistency_check: false,
                 }),
                 transaction,
             );
@@ -943,6 +943,7 @@ impl Drive {
             ops.operations,
             Some(BatchApplyOptions {
                 validate_insertion_does_not_override: validate,
+                disable_operation_consistency_check: false,
             }),
         );
         push_drive_operation_result(cost_context, drive_operations)

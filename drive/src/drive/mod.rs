@@ -1,7 +1,7 @@
 // MIT LICENSE
 //
 // Copyright (c) 2021 Dash Core Group
-// 
+//
 // Permission is hereby granted, free of charge, to any
 // person obtaining a copy of this software and associated
 // documentation files (the "Software"), to deal in the
@@ -28,7 +28,7 @@
 //
 
 //! Drive Mod File
-//! 
+//!
 
 use std::cell::RefCell;
 use std::path::Path;
@@ -121,7 +121,6 @@ fn contract_documents_path(contract_id: &[u8]) -> [&[u8]; 3] {
 }
 
 impl Drive {
-
     /// Opens a path in groveDB.
     pub fn open<P: AsRef<Path>>(path: P, config: Option<DriveConfig>) -> Result<Self, Error> {
         match GroveDb::open(path) {

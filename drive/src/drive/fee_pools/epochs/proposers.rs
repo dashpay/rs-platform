@@ -1,7 +1,7 @@
 // MIT LICENSE
 //
 // Copyright (c) 2021 Dash Core Group
-// 
+//
 // Permission is hereby granted, free of charge, to any
 // person obtaining a copy of this software and associated
 // documentation files (the "Software"), to deal in the
@@ -28,9 +28,9 @@
 //
 
 //! Epoch Proposers.
-//! 
+//!
 //! This module implements functions in Drive relevant to block proposers.
-//! 
+//!
 
 use grovedb::query_result_type::QueryResultType::QueryKeyElementPairResultType;
 use grovedb::{Element, PathQuery, Query, SizedQuery, TransactionArg};
@@ -42,7 +42,6 @@ use crate::error::Error;
 use crate::fee_pools::epochs::Epoch;
 
 impl Drive {
-
     /// Returns the given proposer's block count
     pub fn get_epochs_proposer_block_count(
         &self,

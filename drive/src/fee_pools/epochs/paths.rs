@@ -1,7 +1,7 @@
 // MIT LICENSE
 //
 // Copyright (c) 2021 Dash Core Group
-// 
+//
 // Permission is hereby granted, free of charge, to any
 // person obtaining a copy of this software and associated
 // documentation files (the "Software"), to deal in the
@@ -28,9 +28,9 @@
 //
 
 //! Epoch Paths
-//! 
+//!
 //! Defines and implements in `Epoch` functions related to paths related to epochs.
-//! 
+//!
 
 use crate::drive::RootTree;
 use crate::error::fee::FeeError;
@@ -40,7 +40,6 @@ use crate::fee_pools::epochs::epoch_key_constants::EPOCH_STORAGE_OFFSET;
 use crate::fee_pools::epochs::Epoch;
 
 impl Epoch {
-
     /// Get the path to the proposers tree of this epoch as a fixed length path
     pub fn get_proposers_path(&self) -> [&[u8]; 3] {
         [

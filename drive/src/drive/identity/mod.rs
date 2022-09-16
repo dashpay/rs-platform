@@ -1,7 +1,7 @@
 // MIT LICENSE
 //
 // Copyright (c) 2021 Dash Core Group
-// 
+//
 // Permission is hereby granted, free of charge, to any
 // person obtaining a copy of this software and associated
 // documentation files (the "Software"), to deal in the
@@ -30,7 +30,7 @@
 //! This module defines functions within the Drive struct related to identities.
 //! Functions include inserting new identities into the `Identities` subtree and
 //! fetching identities from the subtree.
-//! 
+//!
 
 use dpp::identity::Identity;
 use grovedb::query_result_type::QueryResultType::QueryElementResultType;
@@ -48,7 +48,6 @@ use crate::fee::op::DriveOperation;
 const IDENTITY_KEY: [u8; 1] = [0];
 
 impl Drive {
-
     /// Adds operations to the op batch to insert a new identity in the `Identities` subtree
     /// with its own empty subtree.
     pub fn add_insert_identity_operations(
@@ -57,7 +56,6 @@ impl Drive {
         storage_flags: StorageFlags,
         batch: &mut GroveDbOpBatch,
     ) -> Result<(), Error> {
-        
         // Serialize identity
         let identity_bytes = identity.to_buffer().map_err(|_| {
             Error::Identity(IdentityError::IdentitySerialization(
@@ -112,7 +110,6 @@ impl Drive {
         id: &[u8],
         transaction: TransactionArg,
     ) -> Result<(Identity, StorageFlags), Error> {
-        
         // get element from GroveDB
         let element = self
             .grove

@@ -1,7 +1,7 @@
 // MIT LICENSE
 //
 // Copyright (c) 2021 Dash Core Group
-// 
+//
 // Permission is hereby granted, free of charge, to any
 // person obtaining a copy of this software and associated
 // documentation files (the "Software"), to deal in the
@@ -28,13 +28,14 @@
 //
 
 //! Insert Documents.
-//! 
+//!
 //! This module implements functions in Drive relevant to inserting documents.
-//! 
+//!
 
 use grovedb::{Element, TransactionArg};
 use std::collections::HashSet;
 
+use grovedb::reference_path::ReferencePathType::{SiblingReference, UpstreamRootHeightReference};
 use std::option::Option::None;
 
 use crate::contract::document::Document;
@@ -44,9 +45,8 @@ use crate::drive::document::{
     contract_document_type_path,
     contract_documents_keeping_history_primary_key_path_for_document_id,
     contract_documents_keeping_history_primary_key_path_for_document_id_size,
-    contract_documents_keeping_history_storage_time_reference_path,
     contract_documents_keeping_history_storage_time_reference_path_size,
-    contract_documents_primary_key_path,
+    contract_documents_primary_key_path, make_document_reference,
 };
 use crate::drive::flags::StorageFlags;
 use crate::drive::object_size_info::DocumentInfo::{
@@ -69,7 +69,6 @@ use dpp::data_contract::extra::encode_float;
 use dpp::data_contract::extra::DriveContractExt;
 
 impl Drive {
-    
     /// Adds a document to primary storage.
     // If a document isn't sent to this function then we are just calling to know the query and
     // insert operations
@@ -178,17 +177,14 @@ impl Drive {
                             document_type.name.as_str(),
                             document.id.as_slice(),
                         );
-                    let contract_storage_path =
-                        contract_documents_keeping_history_storage_time_reference_path(
-                            contract.id.as_bytes(),
-                            document_type.name.as_str(),
-                            document.id.as_slice(),
-                            encoded_time,
-                        );
                     PathFixedSizeKeyElement((
                         document_id_in_primary_path,
                         &[0],
-                        Element::Reference(contract_storage_path, storage_flags.to_element_flags()),
+                        Element::Reference(
+                            SiblingReference(encoded_time),
+                            Some(1),
+                            storage_flags.to_element_flags(),
+                        ),
                     ))
                 } else {
                     let path_max_length =
@@ -550,25 +546,6 @@ impl Drive {
                 // Iteration 2. the index path is now something like Contracts/ContractID/Documents(1)/$ownerId/<ownerId>/toUserId/<ToUserId>/accountReference/<accountReference>
             }
 
-            /// Creates a reference to a document.
-            fn make_document_reference(
-                primary_key_path: [&[u8]; 5],
-                document: &Document,
-                document_type: &DocumentType,
-                storage_flags: &StorageFlags,
-            ) -> Element {
-                // we need to construct the reference to the original document
-                let mut reference_path = primary_key_path
-                    .iter()
-                    .map(|x| x.to_vec())
-                    .collect::<Vec<Vec<u8>>>();
-                reference_path.push(Vec::from(document.id));
-                if document_type.documents_keep_history {
-                    reference_path.push(vec![0]);
-                }
-                Element::Reference(reference_path, storage_flags.to_element_flags())
-            }
-
             // unique indexes will be stored under key "0"
             // non unique indices should have a tree at key "0" that has all elements based off of primary key
             if !index.unique || any_fields_null {
@@ -590,7 +567,6 @@ impl Drive {
                     DocumentAndSerialization((document, _, storage_flags))
                     | DocumentWithoutSerialization((document, storage_flags)) => {
                         let document_reference = make_document_reference(
-                            primary_key_path,
                             document,
                             document_and_contract_info.document_type,
                             storage_flags,
@@ -615,7 +591,6 @@ impl Drive {
                     DocumentAndSerialization((document, _, storage_flags))
                     | DocumentWithoutSerialization((document, storage_flags)) => {
                         let document_reference = make_document_reference(
-                            primary_key_path,
                             document,
                             document_and_contract_info.document_type,
                             storage_flags,

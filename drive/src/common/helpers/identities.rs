@@ -1,7 +1,7 @@
 // MIT LICENSE
 //
 // Copyright (c) 2021 Dash Core Group
-// 
+//
 // Permission is hereby granted, free of charge, to any
 // person obtaining a copy of this software and associated
 // documentation files (the "Software"), to deal in the
@@ -28,9 +28,9 @@
 //
 
 //! Drive Identity Helpers.
-//! 
+//!
 //! This module defines helper functions pertinent to identities in Drive.
-//! 
+//!
 
 use crate::drive::batch::GroveDbOpBatch;
 use crate::drive::flags::StorageFlags;
@@ -49,6 +49,7 @@ pub fn create_test_identity(drive: &Drive, id: [u8; 32], transaction: Transactio
         purpose: dpp::identity::Purpose::AUTHENTICATION,
         security_level: dpp::identity::SecurityLevel::MASTER,
         read_only: false,
+        disabled_at: None,
     };
 
     let identity = Identity {

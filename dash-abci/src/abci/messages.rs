@@ -1,7 +1,7 @@
 // MIT LICENSE
 //
 // Copyright (c) 2021 Dash Core Group
-// 
+//
 // Permission is hereby granted, free of charge, to any
 // person obtaining a copy of this software and associated
 // documentation files (the "Software"), to deal in the
@@ -28,10 +28,10 @@
 //
 
 //! Tenderdash ABCI Messages.
-//! 
+//!
 //! This module defines the structs used for handling ABCI messages
 //! as well as defining and implementing the trait for serializing/deserializing them.
-//! 
+//!
 
 use crate::error::serialization::SerializationError;
 use crate::error::Error;
@@ -127,7 +127,6 @@ impl<'a> Serializable<'a> for BlockEndResponse {}
 
 /// A trait for serializing or deserializing ABCI messages
 pub trait Serializable<'a>: Serialize + Deserialize<'a> {
-    
     /// Serialize ABCI message
     fn to_bytes(&self) -> Result<Vec<u8>, Error> {
         let mut bytes = vec![];

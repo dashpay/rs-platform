@@ -1,7 +1,7 @@
 // MIT LICENSE
 //
 // Copyright (c) 2021 Dash Core Group
-// 
+//
 // Permission is hereby granted, free of charge, to any
 // person obtaining a copy of this software and associated
 // documentation files (the "Software"), to deal in the
@@ -28,9 +28,9 @@
 //
 
 //! Object Size Info
-//! 
+//!
 //! This module defines enums and implements functions relevant to the sizes of objects.
-//! 
+//!
 
 use grovedb::Element;
 use std::collections::HashSet;
@@ -65,7 +65,6 @@ pub enum PathInfo<'a, const N: usize> {
 }
 
 impl<'a, const N: usize> PathInfo<'a, N> {
-    
     /// Returns the length of the path as a usize.
     pub fn len(&self) -> usize {
         match self {
@@ -132,7 +131,6 @@ impl<'a> Default for KeyInfo<'a> {
 }
 
 impl<'a> KeyInfo<'a> {
-
     /// Returns the length of the key as a usize.
     pub fn len(&'a self) -> usize {
         match self {
@@ -203,7 +201,6 @@ pub enum PathKeyInfo<'a, const N: usize> {
 }
 
 impl<'a, const N: usize> PathKeyInfo<'a, N> {
-    
     /// Returns the length of the path with key as a usize.
     pub fn len(&'a self) -> usize {
         match self {
@@ -331,7 +328,6 @@ pub enum PathKeyElementInfo<'a, const N: usize> {
 }
 
 impl<'a, const N: usize> PathKeyElementInfo<'a, N> {
-    
     /// Create and return a `PathKeyElement` from `PathInfo` and `KeyElementInfo`
     pub fn from_path_info_and_key_element(
         path_info: PathInfo<'a, N>,

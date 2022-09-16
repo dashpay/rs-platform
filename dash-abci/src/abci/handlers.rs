@@ -1,7 +1,7 @@
 // MIT LICENSE
 //
 // Copyright (c) 2021 Dash Core Group
-// 
+//
 // Permission is hereby granted, free of charge, to any
 // person obtaining a copy of this software and associated
 // documentation files (the "Software"), to deal in the
@@ -28,9 +28,9 @@
 //
 
 //! Tenderdash ABCI Handlers.
-//! 
+//!
 //! This module defines the `TenderdashAbci` trait and implements it for type `Platform`.
-//! 
+//!
 
 use std::ops::Deref;
 
@@ -48,7 +48,6 @@ use crate::platform::Platform;
 
 /// A trait for handling the Tenderdash ABCI (Application Blockchain Interface).
 pub trait TenderdashAbci {
-    
     /// Send request to initialize the blockchain
     fn init_chain(
         &self,

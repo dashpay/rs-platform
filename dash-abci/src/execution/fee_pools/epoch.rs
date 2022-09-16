@@ -1,7 +1,7 @@
 // MIT LICENSE
 //
 // Copyright (c) 2021 Dash Core Group
-// 
+//
 // Permission is hereby granted, free of charge, to any
 // person obtaining a copy of this software and associated
 // documentation files (the "Software"), to deal in the
@@ -28,10 +28,10 @@
 //
 
 //! Epoch Info.
-//! 
+//!
 //! This module defines and implements the `EpochInfo` struct containing
 //! information about the current epoch.
-//! 
+//!
 
 use crate::block::BlockInfo;
 use crate::error::execution::ExecutionError;
@@ -53,7 +53,6 @@ pub struct EpochInfo {
 }
 
 impl EpochInfo {
-
     /// Default epoch info.
     pub fn default() -> EpochInfo {
         EpochInfo {

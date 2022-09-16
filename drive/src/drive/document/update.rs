@@ -1,7 +1,7 @@
 // MIT LICENSE
 //
 // Copyright (c) 2021 Dash Core Group
-// 
+//
 // Permission is hereby granted, free of charge, to any
 // person obtaining a copy of this software and associated
 // documentation files (the "Software"), to deal in the
@@ -28,9 +28,9 @@
 //
 
 //! Update Documents.
-//! 
+//!
 //! This modules implements functions in Drive relevant to updating Documents.
-//! 
+//!
 
 use std::collections::HashSet;
 use std::option::Option::None;
@@ -43,7 +43,7 @@ use crate::drive::defaults::CONTRACT_DOCUMENTS_PATH_HEIGHT;
 use crate::drive::document::{
     contract_document_type_path,
     contract_documents_keeping_history_primary_key_path_for_document_id,
-    contract_documents_primary_key_path,
+    contract_documents_primary_key_path, make_document_reference,
 };
 use crate::drive::flags::StorageFlags;
 use crate::drive::object_size_info::DocumentInfo::{DocumentAndSerialization, DocumentSize};
@@ -59,7 +59,6 @@ use crate::fee::op::DriveOperation;
 use dpp::data_contract::extra::DriveContractExt;
 
 impl Drive {
-    
     /// Updates a serialized document given a contract CBOR and returns the associated fee.
     pub fn update_document_for_contract_cbor(
         &self,
@@ -214,18 +213,11 @@ impl Drive {
                 document_type.name.as_str(),
             );
 
-            // we need to construct the reference to the original document
-            let mut reference_path = contract_documents_primary_key_path
-                .iter()
-                .map(|x| x.to_vec())
-                .collect::<Vec<Vec<u8>>>();
-            reference_path.push(Vec::from(document.id));
-            if document_type.documents_keep_history {
-                // if the document keeps history the value will at 0 will always point to the most recent version
-                reference_path.push(vec![0]);
-            }
-            let document_reference =
-                Element::Reference(reference_path, storage_flags.to_element_flags());
+            let document_reference = make_document_reference(
+                document,
+                document_and_contract_info.document_type,
+                storage_flags,
+            );
 
             // next we need to get the old document from storage
             let old_document_element: Element = if document_type.documents_keep_history {

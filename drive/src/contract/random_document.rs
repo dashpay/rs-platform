@@ -1,7 +1,7 @@
 // MIT LICENSE
 //
 // Copyright (c) 2021 Dash Core Group
-// 
+//
 // Permission is hereby granted, free of charge, to any
 // person obtaining a copy of this software and associated
 // documentation files (the "Software"), to deal in the
@@ -28,10 +28,10 @@
 //
 
 //! Random Documents.
-//! 
+//!
 //! This module defines the CreateRandomDocument trait and its functions, which
 //! create various types of random documents.
-//! 
+//!
 
 use super::document::Document;
 use crate::error::Error;
@@ -122,7 +122,7 @@ impl CreateRandomDocument for DocumentType {
         self.random_filled_document_with_rng(&mut rng)
     }
 
-    /// Creates a Document with properties filled to max size with random data, along with 
+    /// Creates a Document with properties filled to max size with random data, along with
     /// a random id and owner id.
     fn random_filled_document_with_rng(&self, rng: &mut StdRng) -> Document {
         let id = rng.gen::<[u8; 32]>();

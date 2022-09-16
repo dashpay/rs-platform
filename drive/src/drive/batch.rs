@@ -1,7 +1,7 @@
 // MIT LICENSE
 //
 // Copyright (c) 2021 Dash Core Group
-// 
+//
 // Permission is hereby granted, free of charge, to any
 // person obtaining a copy of this software and associated
 // documentation files (the "Software"), to deal in the
@@ -28,12 +28,12 @@
 //
 
 //! GroveDB Operations Batch.
-//! 
+//!
 //! This module defines the GroveDbOpBatch struct and implements its functions.
-//! 
+//!
 
 use crate::drive::flags::StorageFlags;
-use grovedb::batch::{GroveDbOp, Op};
+use grovedb::batch::{GroveDbOp, GroveDbOpConsistencyResults, Op};
 use grovedb::Element;
 
 /// A batch of GroveDB operations as a vector.
@@ -44,7 +44,6 @@ pub struct GroveDbOpBatch {
 }
 
 impl GroveDbOpBatch {
-    
     /// Creates a new empty batch of GroveDB operations.
     pub fn new() -> Self {
         GroveDbOpBatch {
@@ -110,5 +109,9 @@ impl GroveDbOpBatch {
             key,
             op: Op::Insert { element },
         })
+    }
+
+    pub fn verify_consistency_of_operations(&self) -> GroveDbOpConsistencyResults {
+        GroveDbOp::verify_consistency_of_operations(&self.operations)
     }
 }

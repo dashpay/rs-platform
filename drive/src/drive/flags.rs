@@ -1,7 +1,7 @@
 // MIT LICENSE
 //
 // Copyright (c) 2021 Dash Core Group
-// 
+//
 // Permission is hereby granted, free of charge, to any
 // person obtaining a copy of this software and associated
 // documentation files (the "Software"), to deal in the
@@ -28,7 +28,7 @@
 //
 
 //! Flags
-//! 
+//!
 
 use byteorder::{BigEndian, ReadBytesExt};
 use grovedb::ElementFlags;
@@ -43,7 +43,6 @@ pub struct StorageFlags {
 }
 
 impl StorageFlags {
-
     /// Creates storage flags from a slice.
     pub fn from_slice(data: &[u8]) -> Result<Self, Error> {
         let mut epoch_bytes =

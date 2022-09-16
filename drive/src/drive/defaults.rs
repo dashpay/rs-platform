@@ -1,7 +1,7 @@
 // MIT LICENSE
 //
 // Copyright (c) 2021 Dash Core Group
-// 
+//
 // Permission is hereby granted, free of charge, to any
 // person obtaining a copy of this software and associated
 // documentation files (the "Software"), to deal in the
@@ -28,9 +28,9 @@
 //
 
 //! Drive Defaults
-//! 
+//!
 //! Default values for Drive constants.
-//! 
+//!
 
 pub const PROTOCOL_VERSION: u32 = 1;
 pub const CONTRACT_DOCUMENTS_PATH_HEIGHT: u16 = 4;

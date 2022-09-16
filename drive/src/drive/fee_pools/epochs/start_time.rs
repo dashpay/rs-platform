@@ -1,7 +1,7 @@
 // MIT LICENSE
 //
 // Copyright (c) 2021 Dash Core Group
-// 
+//
 // Permission is hereby granted, free of charge, to any
 // person obtaining a copy of this software and associated
 // documentation files (the "Software"), to deal in the
@@ -28,9 +28,9 @@
 //
 
 //! Epoch Start Times.
-//! 
+//!
 //! This module implements functions in Drive relevant to Epoch start times.
-//! 
+//!
 
 use crate::drive::Drive;
 use crate::error::fee::FeeError;
@@ -41,7 +41,6 @@ use grovedb::{Element, TransactionArg};
 use crate::fee_pools::epochs::epoch_key_constants;
 
 impl Drive {
-
     /// Returns the start time of the given Epoch.
     pub fn get_epoch_start_time(
         &self,

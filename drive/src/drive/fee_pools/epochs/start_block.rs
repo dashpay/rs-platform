@@ -1,7 +1,7 @@
 // MIT LICENSE
 //
 // Copyright (c) 2021 Dash Core Group
-// 
+//
 // Permission is hereby granted, free of charge, to any
 // person obtaining a copy of this software and associated
 // documentation files (the "Software"), to deal in the
@@ -28,9 +28,9 @@
 //
 
 //! Epoch Start Blocks
-//! 
+//!
 //! This modules implements functions in Drive relevant to Epoch start blocks.
-//! 
+//!
 
 use crate::drive::fee_pools::pools_vec_path;
 use crate::drive::Drive;
@@ -44,7 +44,6 @@ use crate::fee_pools::epochs::epoch_key_constants;
 use crate::fee_pools::epochs::epoch_key_constants::KEY_START_BLOCK_HEIGHT;
 
 impl Drive {
-
     /// Returns the block height of the Epoch's start block
     pub fn get_epoch_start_block_height(
         &self,

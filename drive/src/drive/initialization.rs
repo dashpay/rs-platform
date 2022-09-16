@@ -1,7 +1,7 @@
 // MIT LICENSE
 //
 // Copyright (c) 2021 Dash Core Group
-// 
+//
 // Permission is hereby granted, free of charge, to any
 // person obtaining a copy of this software and associated
 // documentation files (the "Software"), to deal in the
@@ -28,7 +28,7 @@
 //
 
 //! Drive Initialization
-//! 
+//!
 
 use crate::drive::batch::GroveDbOpBatch;
 use crate::drive::contract::add_init_contracts_structure_operations;
@@ -38,7 +38,6 @@ use crate::fee_pools::add_create_fee_pool_trees_operations;
 use grovedb::TransactionArg;
 
 impl Drive {
-
     /// Creates the initial state structure.
     pub fn create_initial_state_structure(&self, transaction: TransactionArg) -> Result<(), Error> {
         let mut batch = GroveDbOpBatch::new();

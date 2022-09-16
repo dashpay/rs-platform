@@ -1,7 +1,7 @@
 // MIT LICENSE
 //
 // Copyright (c) 2021 Dash Core Group
-// 
+//
 // Permission is hereby granted, free of charge, to any
 // person obtaining a copy of this software and associated
 // documentation files (the "Software"), to deal in the
@@ -28,9 +28,9 @@
 //
 
 //! Documents.
-//! 
+//!
 //! This module defines the `Document` struct and implements its functions.
-//! 
+//!
 
 use std::collections::BTreeMap;
 use std::io::{BufReader, Read};
@@ -53,7 +53,6 @@ use crate::error::Error;
 /// Documents contain the data that goes into data contracts.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Document {
-
     /// The unique document ID.
     #[serde(rename = "$id")]
     pub id: [u8; 32],
@@ -68,9 +67,8 @@ pub struct Document {
 }
 
 impl Document {
-
     /// Serializes the document.
-    /// 
+    ///
     /// The serialization of a document follows the pattern:
     /// id 32 bytes + owner_id 32 bytes + encoded values byte arrays
     pub fn serialize(&self, document_type: &DocumentType) -> Result<Vec<u8>, Error> {
@@ -101,7 +99,7 @@ impl Document {
     }
 
     /// Serializes and consumes the document.
-    /// 
+    ///
     /// The serialization of a document follows the pattern:
     /// id 32 bytes + owner_id 32 bytes + encoded values byte arrays
     pub fn serialize_consume(mut self, document_type: &DocumentType) -> Result<Vec<u8>, Error> {

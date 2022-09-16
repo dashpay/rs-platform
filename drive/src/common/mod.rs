@@ -1,7 +1,7 @@
 // MIT LICENSE
 //
 // Copyright (c) 2021 Dash Core Group
-// 
+//
 // Permission is hereby granted, free of charge, to any
 // person obtaining a copy of this software and associated
 // documentation files (the "Software"), to deal in the
@@ -28,9 +28,9 @@
 //
 
 //! Common functions.
-//! 
+//!
 //! This module defines general, commonly used functions in Drive.
-//! 
+//!
 
 pub mod encode;
 pub mod helpers;
@@ -408,7 +408,7 @@ pub fn bytes_for_system_value(value: &Value) -> Result<Option<Vec<u8>>, Error> {
     }
 }
 
-/// Takes a B-tree map and a key and returns the corresponding value (should be a system value) 
+/// Takes a B-tree map and a key and returns the corresponding value (should be a system value)
 /// as a byte array if possible.
 pub fn bytes_for_system_value_from_tree_map(
     document: &BTreeMap<String, Value>,
@@ -422,7 +422,7 @@ pub fn bytes_for_system_value_from_tree_map(
     }
 }
 
-/// Takes a B-tree map, a key, and a default bool values and returns the corresponding 
+/// Takes a B-tree map, a key, and a default bool values and returns the corresponding
 /// value (should be a system value) from the key if it's a boolean, otherwise returns the default.
 pub fn bool_for_system_value_from_tree_map(
     document: &BTreeMap<String, Value>,
@@ -443,7 +443,7 @@ pub fn bool_for_system_value_from_tree_map(
     }
 }
 
-/// Retrieves the value of a key from a CBOR map if it's a u64. 
+/// Retrieves the value of a key from a CBOR map if it's a u64.
 pub(crate) fn cbor_inner_u64_value<'a>(
     document_type: &'a [(Value, Value)],
     key: &'a str,
@@ -455,7 +455,7 @@ pub(crate) fn cbor_inner_u64_value<'a>(
     None
 }
 
-/// Retrieves the value of a key from a CBOR map if it's a u32. 
+/// Retrieves the value of a key from a CBOR map if it's a u32.
 pub(crate) fn cbor_inner_u32_value<'a>(
     document_type: &'a [(Value, Value)],
     key: &'a str,
@@ -467,7 +467,7 @@ pub(crate) fn cbor_inner_u32_value<'a>(
     None
 }
 
-/// Retrieves the value of a key from a CBOR map if it's a u16. 
+/// Retrieves the value of a key from a CBOR map if it's a u16.
 pub(crate) fn cbor_inner_u16_value<'a>(
     document_type: &'a [(Value, Value)],
     key: &'a str,
@@ -479,7 +479,7 @@ pub(crate) fn cbor_inner_u16_value<'a>(
     None
 }
 
-/// Retrieves the value of a key from a CBOR map if it's a u8. 
+/// Retrieves the value of a key from a CBOR map if it's a u8.
 pub(crate) fn cbor_inner_u8_value<'a>(
     document_type: &'a [(Value, Value)],
     key: &'a str,

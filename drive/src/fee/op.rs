@@ -1,7 +1,7 @@
 // MIT LICENSE
 //
 // Copyright (c) 2021 Dash Core Group
-// 
+//
 // Permission is hereby granted, free of charge, to any
 // person obtaining a copy of this software and associated
 // documentation files (the "Software"), to deal in the
@@ -27,10 +27,10 @@
 // DEALINGS IN THE SOFTWARE.
 //
 
-//! 
-//! 
-//! 
-//! 
+//!
+//!
+//!
+//!
 
 use crate::drive::batch::GroveDbOpBatch;
 use costs::OperationCost;
@@ -242,7 +242,7 @@ impl SizesOfDeleteOperation {
     pub fn for_key_value(path_size: u32, key_size: u16, element: &Element, multiplier: u8) -> Self {
         let value_size = match element {
             Element::Item(item, _) => item.len(),
-            Element::Reference(path, _) => path.iter().map(|inner| inner.len()).sum(),
+            Element::Reference(path, _, _) => path.encoding_length(),
             Element::Tree(..) => 32,
         } as u32;
         SizesOfDeleteOperation::for_key_value_size(path_size, key_size, value_size, multiplier)
@@ -313,7 +313,6 @@ pub enum DriveOperation {
 }
 
 impl DriveOperation {
-
     /// Returns a list of the costs of the Drive operations.
     pub fn consume_to_costs(
         drive_operation: Vec<DriveOperation>,

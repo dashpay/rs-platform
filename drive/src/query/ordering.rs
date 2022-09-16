@@ -1,7 +1,7 @@
 // MIT LICENSE
 //
 // Copyright (c) 2021 Dash Core Group
-// 
+//
 // Permission is hereby granted, free of charge, to any
 // person obtaining a copy of this software and associated
 // documentation files (the "Software"), to deal in the
@@ -28,7 +28,7 @@
 //
 
 //! Query Ordering
-//! 
+//!
 
 use ciborium::value::Value;
 use grovedb::Error;
@@ -40,7 +40,6 @@ pub struct OrderClause {
 }
 
 impl<'a> OrderClause {
-
     /// Converts clause components to an `OrderClause`.
     pub fn from_components(clause_components: &'a [Value]) -> Result<Self, Error> {
         if clause_components.len() != 2 {

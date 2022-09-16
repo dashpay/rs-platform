@@ -1,7 +1,7 @@
 // MIT LICENSE
 //
 // Copyright (c) 2021 Dash Core Group
-// 
+//
 // Permission is hereby granted, free of charge, to any
 // person obtaining a copy of this software and associated
 // documentation files (the "Software"), to deal in the
@@ -28,9 +28,9 @@
 //
 
 //! Genesis Time.
-//! 
+//!
 //! This module defines functions relevant to the chain's genesis time.
-//! 
+//!
 
 pub mod operations;
 
@@ -44,7 +44,6 @@ use std::array::TryFromSliceError;
 const KEY_GENESIS_TIME: &[u8; 1] = b"g";
 
 impl Drive {
-
     /// Returns the genesis time. Checks cache first, then storage.
     pub fn get_genesis_time(&self, transaction: TransactionArg) -> Result<Option<u64>, Error> {
         // let's first check the cache

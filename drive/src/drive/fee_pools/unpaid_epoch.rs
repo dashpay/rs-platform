@@ -1,7 +1,7 @@
 // MIT LICENSE
 //
 // Copyright (c) 2021 Dash Core Group
-// 
+//
 // Permission is hereby granted, free of charge, to any
 // person obtaining a copy of this software and associated
 // documentation files (the "Software"), to deal in the
@@ -28,7 +28,7 @@
 //
 
 //! Unpaid Epoch.
-//! 
+//!
 
 use crate::drive::fee_pools::pools_path;
 use crate::drive::Drive;
@@ -38,7 +38,6 @@ use crate::fee_pools::epochs_root_tree_key_constants::KEY_UNPAID_EPOCH_INDEX;
 use grovedb::{Element, TransactionArg};
 
 impl Drive {
-
     /// Returns the index of the unpaid Epoch.
     pub fn get_unpaid_epoch_index(&self, transaction: TransactionArg) -> Result<u16, Error> {
         let element = self

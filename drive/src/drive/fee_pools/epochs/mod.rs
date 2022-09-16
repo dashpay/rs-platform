@@ -1,7 +1,7 @@
 // MIT LICENSE
 //
 // Copyright (c) 2021 Dash Core Group
-// 
+//
 // Permission is hereby granted, free of charge, to any
 // person obtaining a copy of this software and associated
 // documentation files (the "Software"), to deal in the
@@ -28,7 +28,7 @@
 //
 
 //! Epochs Mod File.
-//! 
+//!
 
 use crate::drive::fee_pools::pools_path;
 use crate::drive::Drive;
@@ -43,7 +43,6 @@ pub mod start_block;
 pub mod start_time;
 
 impl Drive {
-
     /// Checks if an Epoch tree exists. Returns a bool.
     pub fn is_epoch_tree_exists(
         &self,

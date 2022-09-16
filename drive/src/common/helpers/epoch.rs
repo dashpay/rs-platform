@@ -1,7 +1,7 @@
 // MIT LICENSE
 //
 // Copyright (c) 2021 Dash Core Group
-// 
+//
 // Permission is hereby granted, free of charge, to any
 // person obtaining a copy of this software and associated
 // documentation files (the "Software"), to deal in the
@@ -28,7 +28,7 @@
 //
 
 //! This module defines a function to get a list of storage credits from a range of epochs.
-//! 
+//!
 
 use crate::drive::Drive;
 use crate::fee_pools::epochs::Epoch;

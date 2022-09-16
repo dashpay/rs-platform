@@ -1,7 +1,7 @@
 // MIT LICENSE
 //
 // Copyright (c) 2021 Dash Core Group
-// 
+//
 // Permission is hereby granted, free of charge, to any
 // person obtaining a copy of this software and associated
 // documentation files (the "Software"), to deal in the
@@ -28,10 +28,10 @@
 //
 
 //! Block Fees Processing.
-//! 
+//!
 //! This modules defines functions related to processing block fees upon block and
 //! epoch changes.
-//! 
+//!
 
 use crate::abci::messages::FeesAggregate;
 use crate::block::BlockInfo;
@@ -70,11 +70,10 @@ pub struct ProcessedBlockFeesResult {
 }
 
 impl Platform {
-
     /// Adds operations to the GroveDB batch which initialize the current epoch
     /// as well as the current+1000 epoch, then distributes storage fees accumulated
     /// during the previous epoch.
-    /// 
+    ///
     /// `StorageDistributionLeftoverCredits` will be returned, except if we are at Genesis Epoch.
     fn add_process_epoch_change_operations(
         &self,
@@ -90,7 +89,7 @@ impl Platform {
 
         for epoch_index in last_initiated_epoch_index..=epoch_info.current_epoch_index {
             let next_thousandth_epoch = Epoch::new(epoch_index + PERPETUAL_STORAGE_EPOCHS);
-            next_thousandth_epoch.add_init_empty_operations(batch);
+            next_thousandth_epoch.add_init_empty_without_storage_operations(batch);
         }
 
         // init current epoch pool for processing
@@ -121,7 +120,7 @@ impl Platform {
 
     /// Adds operations to GroveDB op batch related to processing
     /// and distributing the block fees from the previous block and applies the batch.
-    /// 
+    ///
     /// Returns `ProcessedBlockFeesResult`.
     pub fn process_block_fees(
         &self,

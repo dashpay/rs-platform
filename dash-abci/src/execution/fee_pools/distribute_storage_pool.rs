@@ -1,7 +1,7 @@
 // MIT LICENSE
 //
 // Copyright (c) 2021 Dash Core Group
-// 
+//
 // Permission is hereby granted, free of charge, to any
 // person obtaining a copy of this software and associated
 // documentation files (the "Software"), to deal in the
@@ -28,10 +28,10 @@
 //
 
 //! Fee Distribution to Epoch Pools.
-//! 
+//!
 //! This module defines and implements in the Platform trait functions to add up and distribute
 //! storage fees from the distribution pool to the epoch pools.
-//! 
+//!
 
 use crate::error::execution::ExecutionError;
 use crate::error::Error;
@@ -49,7 +49,7 @@ use rust_decimal::Decimal;
 pub type StorageDistributionLeftoverCredits = u64;
 
 impl Platform {
-    /// Adds operations to the GroveDB op batch which calculate and distribute storage fees 
+    /// Adds operations to the GroveDB op batch which calculate and distribute storage fees
     /// from the distribution pool to the epoch pools and returns the leftovers.
     pub fn add_distribute_storage_fee_distribution_pool_to_epochs_operations(
         &self,
@@ -100,7 +100,8 @@ impl Platform {
                     .or_else(|e| match e {
                         // In case if we have a gap between current and previous epochs
                         // multiple future epochs could be created in the current batch
-                        error::Error::GroveDB(grovedb::Error::PathNotFound(_)) => Ok(0u64),
+                        error::Error::GroveDB(grovedb::Error::PathNotFound(_))
+                        | error::Error::GroveDB(grovedb::Error::PathKeyNotFound(_)) => Ok(0u64),
                         _ => Err(e),
                     })?;
 

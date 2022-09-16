@@ -1,7 +1,7 @@
 // MIT LICENSE
 //
 // Copyright (c) 2021 Dash Core Group
-// 
+//
 // Permission is hereby granted, free of charge, to any
 // person obtaining a copy of this software and associated
 // documentation files (the "Software"), to deal in the
@@ -28,9 +28,9 @@
 //
 
 //! Epoch Operations
-//! 
+//!
 //! Defines and implements in `Epoch` functions relevant to epoch management.
-//! 
+//!
 
 use crate::drive::batch::GroveDbOpBatch;
 use crate::drive::fee_pools::pools_vec_path;
@@ -70,9 +70,14 @@ impl Epoch {
     }
 
     /// Adds to the groveDB op batch operations to insert an empty tree into the epoch
+    pub fn add_init_empty_without_storage_operations(&self, batch: &mut GroveDbOpBatch) {
+        batch.add_insert_empty_tree(pools_vec_path(), self.key.to_vec());
+    }
+
+    /// Adds to the groveDB op batch operations to insert an empty tree into the epoch
     /// and sets the storage distribution pool to 0.
     pub fn add_init_empty_operations(&self, batch: &mut GroveDbOpBatch) {
-        batch.add_insert_empty_tree(pools_vec_path(), self.key.to_vec());
+        self.add_init_empty_without_storage_operations(batch);
 
         // init storage fee item to 0
         batch.push(self.update_storage_credits_for_distribution_operation(0));

@@ -1,7 +1,7 @@
 // MIT LICENSE
 //
 // Copyright (c) 2021 Dash Core Group
-// 
+//
 // Permission is hereby granted, free of charge, to any
 // person obtaining a copy of this software and associated
 // documentation files (the "Software"), to deal in the
@@ -28,9 +28,9 @@
 //
 
 //! Fee Distribution to Proposers.
-//! 
+//!
 //! This module defines structs and functions related to distributing fees to proposers.
-//! 
+//!
 
 use crate::abci::messages::FeesAggregate;
 use crate::error::execution::ExecutionError;
@@ -85,7 +85,7 @@ impl UnpaidEpoch {
 impl Platform {
     /// Adds operations to the op batch which distribute fees
     /// from the oldest unpaid epoch pool to proposers.
-    /// 
+    ///
     /// Returns `ProposersPayouts` if there are any.
     pub fn add_distribute_fees_from_oldest_unpaid_epoch_pool_to_proposers_operations(
         &self,
@@ -214,7 +214,7 @@ impl Platform {
 
     /// Adds operations to the op batch which distribute the fees from an unpaid epoch pool
     /// to the total fees to be paid out to proposers and divides amongst masternode reward shares.
-    /// 
+    ///
     /// Returns the number of proposers to be paid out.
     fn add_epoch_pool_to_proposers_payout_operations(
         &self,
@@ -370,7 +370,7 @@ impl Platform {
 
     /// Adds operations to an op batch which update total storage fees
     /// for the epoch considering fees from a new block.
-    /// 
+    ///
     /// Returns `FeesInPools`
     pub fn add_distribute_block_fees_into_pools_operations(
         &self,

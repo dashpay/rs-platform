@@ -1,7 +1,7 @@
 // MIT LICENSE
 //
 // Copyright (c) 2021 Dash Core Group
-// 
+//
 // Permission is hereby granted, free of charge, to any
 // person obtaining a copy of this software and associated
 // documentation files (the "Software"), to deal in the
@@ -28,9 +28,9 @@
 //
 
 //! Fee pool helper functions.
-//! 
+//!
 //! This module defines helper functions related to fee distribution pools.
-//! 
+//!
 
 use std::collections::BTreeMap;
 
@@ -105,7 +105,7 @@ fn create_test_mn_share_document(
     document
 }
 
-/// A function which creates a vector of test identities with 
+/// A function which creates a vector of test identities with
 /// a test MN_REWARD_SHARES_DOCUMENT_TYPE document for each.
 pub fn create_test_masternode_share_identities_and_documents(
     drive: &Drive,
@@ -135,7 +135,7 @@ pub fn create_test_masternode_share_identities_and_documents(
 }
 
 /// A function for refetching identities.
-/// 
+///
 /// Takes a list of identities, queries the database for them, and returns the query result as a list of identities.
 pub fn refetch_identities(
     drive: &Drive,

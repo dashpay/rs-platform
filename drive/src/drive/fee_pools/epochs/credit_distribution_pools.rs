@@ -1,7 +1,7 @@
 // MIT LICENSE
 //
 // Copyright (c) 2021 Dash Core Group
-// 
+//
 // Permission is hereby granted, free of charge, to any
 // person obtaining a copy of this software and associated
 // documentation files (the "Software"), to deal in the
@@ -28,9 +28,9 @@
 //
 
 //! Credit Distribution.
-//! 
+//!
 //! This module implements functions in Drive to distribute fees for a given Epoch.
-//! 
+//!
 
 use grovedb::{Element, TransactionArg};
 
@@ -42,7 +42,6 @@ use crate::fee_pools::epochs::Epoch;
 use crate::fee_pools::epochs::epoch_key_constants;
 
 impl Drive {
-
     /// Gets the amount of storage credits to be distributed for the Epoch.
     pub fn get_epoch_storage_credits_for_distribution(
         &self,

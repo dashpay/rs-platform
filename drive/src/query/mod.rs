@@ -1,7 +1,7 @@
 // MIT LICENSE
 //
 // Copyright (c) 2021 Dash Core Group
-// 
+//
 // Permission is hereby granted, free of charge, to any
 // person obtaining a copy of this software and associated
 // documentation files (the "Software"), to deal in the
@@ -28,9 +28,9 @@
 //
 
 //! Drive Query Mod File
-//! 
-//! 
-//! 
+//!
+//!
+//!
 
 use std::collections::BTreeMap;
 use std::ops::BitXor;
@@ -82,7 +82,6 @@ pub struct InternalClauses {
 }
 
 impl InternalClauses {
-
     /// Returns true if the clause is a valid format.
     pub fn verify(&self) -> bool {
         // There can only be 1 primary key clause, or many other clauses
@@ -202,7 +201,6 @@ pub struct DriveQuery<'a> {
 }
 
 impl<'a> DriveQuery<'a> {
-
     /// Returns true if the query clause if for primary keys.
     pub fn is_for_primary_key(&self) -> bool {
         self.internal_clauses.is_for_primary_key()

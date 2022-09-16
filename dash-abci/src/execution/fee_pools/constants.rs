@@ -1,7 +1,7 @@
 // MIT LICENSE
 //
 // Copyright (c) 2021 Dash Core Group
-// 
+//
 // Permission is hereby granted, free of charge, to any
 // person obtaining a copy of this software and associated
 // documentation files (the "Software"), to deal in the
@@ -28,9 +28,9 @@
 //
 
 //! Fee pool constants.
-//! 
+//!
 //! This module defines constants related to fee distribution pools.
-//! 
+//!
 
 use rs_drive::drive::fee_pools::epochs::constants::PERPETUAL_STORAGE_YEARS;
 use rust_decimal::Decimal;
