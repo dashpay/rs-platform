@@ -8,7 +8,7 @@ use crate::consensus::basic::identity::{
     IdentityAssetLockTransactionIsNotFoundError,
     IdentityAssetLockTransactionOutPointAlreadyExistsError,
     IdentityAssetLockTransactionOutputNotFoundError, InvalidAssetLockProofCoreChainHeightError,
-    InvalidAssetLockProofTransactionHeightError, InvalidAssetLockTransactionOutputReturnSize,
+    InvalidAssetLockProofTransactionHeightError, InvalidAssetLockTransactionOutputReturnSizeError,
     InvalidIdentityAssetLockTransactionError, InvalidIdentityAssetLockTransactionOutputError,
     InvalidIdentityPublicKeyDataError, InvalidIdentityPublicKeySecurityLevelError,
     InvalidInstantAssetLockProofError, InvalidInstantAssetLockProofSignatureError,
@@ -23,6 +23,7 @@ use crate::errors::consensus::basic::{
 use crate::errors::StateError;
 
 use super::basic::identity::IdentityInsufficientBalanceError;
+use super::signature::SignatureError;
 
 #[derive(Error, Debug)]
 //#[cfg_attr(test, derive(Clone))]
@@ -50,7 +51,7 @@ pub enum ConsensusError {
     #[error("{0}")]
     InvalidIdentityAssetLockTransactionOutputError(InvalidIdentityAssetLockTransactionOutputError),
     #[error("{0}")]
-    InvalidAssetLockTransactionOutputReturnSize(InvalidAssetLockTransactionOutputReturnSize),
+    InvalidAssetLockTransactionOutputReturnSize(InvalidAssetLockTransactionOutputReturnSizeError),
     #[error("{0}")]
     IdentityAssetLockTransactionOutputNotFoundError(
         IdentityAssetLockTransactionOutputNotFoundError,
@@ -96,6 +97,9 @@ pub enum ConsensusError {
 
     #[error(transparent)]
     IdentityAlreadyExistsError(IdentityAlreadyExistsError),
+
+    #[error(transparent)]
+    SignatureError(SignatureError),
 
     #[cfg(test)]
     #[cfg_attr(test, error("{0}"))]
@@ -143,6 +147,7 @@ impl ConsensusError {
 
             ConsensusError::StateError(e) => e.get_code(),
             ConsensusError::BasicError(e) => e.get_code(),
+            ConsensusError::SignatureError(e) => e.get_code(),
 
             ConsensusError::IdentityAlreadyExistsError(_) => 4011,
 
@@ -238,8 +243,8 @@ impl From<InvalidIdentityAssetLockTransactionOutputError> for ConsensusError {
     }
 }
 
-impl From<InvalidAssetLockTransactionOutputReturnSize> for ConsensusError {
-    fn from(err: InvalidAssetLockTransactionOutputReturnSize) -> Self {
+impl From<InvalidAssetLockTransactionOutputReturnSizeError> for ConsensusError {
+    fn from(err: InvalidAssetLockTransactionOutputReturnSizeError) -> Self {
         Self::InvalidAssetLockTransactionOutputReturnSize(err)
     }
 }
@@ -283,5 +288,11 @@ impl From<IdentityAlreadyExistsError> for ConsensusError {
 impl From<IdentityInsufficientBalanceError> for ConsensusError {
     fn from(err: IdentityInsufficientBalanceError) -> Self {
         Self::IdentityInsufficientBalanceError(err)
+    }
+}
+
+impl From<SignatureError> for ConsensusError {
+    fn from(err: SignatureError) -> Self {
+        Self::SignatureError(err)
     }
 }
