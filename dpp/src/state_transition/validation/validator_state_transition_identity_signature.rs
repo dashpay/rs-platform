@@ -1,13 +1,10 @@
-use anyhow::{anyhow, bail};
+use anyhow::anyhow;
 
 use crate::{
     consensus::signature::SignatureError,
     identity::{validation::validate_identity_existence, KeyType},
-    prelude::{Identifier, IdentityPublicKey},
     state_repository::StateRepositoryLike,
-    state_transition::{
-        StateTransition, StateTransitionIdentitySigned, StateTransitionLike, StateTransitionType,
-    },
+    state_transition::StateTransitionIdentitySigned,
     validation::ValidationResult,
     ProtocolError,
 };
@@ -38,7 +35,7 @@ pub async fn validate_state_transition_identity_signature(
             });
             return Ok(validation_result);
         }
-        Some(id) => id,
+        Some(pk) => pk,
     };
 
     if public_key.get_type() != KeyType::ECDSA_SECP256K1
@@ -65,9 +62,11 @@ mod test {
     use crate::{
         document::DocumentsBatchTransition,
         identity::{KeyID, SecurityLevel},
-        prelude::Identity,
+        prelude::{Identifier, Identity, IdentityPublicKey},
         state_repository::MockStateRepositoryLike,
-        state_transition::StateTransitionConvert,
+        state_transition::{
+            StateTransition, StateTransitionConvert, StateTransitionLike, StateTransitionType,
+        },
         tests::{
             fixtures::identity_fixture_raw_object,
             utils::{generate_random_identifier_struct, get_signature_error_from_result},

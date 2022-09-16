@@ -28,19 +28,6 @@ pub async fn create_state_transition(
 ) -> Result<StateTransition, ProtocolError> {
     let transition_type = try_get_transition_type(&raw_state_transition)?;
 
-    if transition_type == StateTransitionType::DocumentsBatch {
-        let maybe_transitions = raw_state_transition
-            .get("transitions")
-            .ok_or_else(|| anyhow!("the transitions property doesn't exist"))?;
-        if let Some(transitions) = maybe_transitions.as_array() {
-            let data_contracts =
-                fetch_data_contracts_for_document_transition(state_repository, transitions).await?;
-            let documents_batch_transition =
-                DocumentsBatchTransition::from_raw_object(raw_state_transition, data_contracts)?;
-            return Ok(StateTransition::DocumentsBatch(documents_batch_transition));
-        }
-    }
-
     match transition_type {
         StateTransitionType::DataContractCreate => {
             let transition = DataContractCreateTransition::from_raw_object(raw_state_transition)?;
@@ -134,9 +121,7 @@ mod test {
         state_repository::{self, MockStateRepositoryLike},
         state_transition::{StateTransition, StateTransitionConvert},
         tests::fixtures::get_documents_fixture_with_owner_id_from_contract,
-        tests::fixtures::{
-            get_data_contract_fixture, get_document_transitions_fixture, get_documents_fixture,
-        },
+        tests::fixtures::{get_data_contract_fixture, get_document_transitions_fixture},
         ProtocolError,
     };
 
@@ -221,7 +206,7 @@ mod test {
 
     #[tokio::test]
     async fn should_return_invalid_state_transition_type_if_type_is_invalid() {
-        let mut state_repostiory_mock = MockStateRepositoryLike::new();
+        let state_repostiory_mock = MockStateRepositoryLike::new();
         let raw_state_transition = json!( {
             "type" : 666
 

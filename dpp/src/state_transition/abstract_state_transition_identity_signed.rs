@@ -170,7 +170,6 @@ mod test {
     use serde_json::json;
 
     use crate::document::DocumentsBatchTransition;
-    use crate::tests::utils::generate_random_identifier_struct;
     use crate::util::string_encoding::Encoding;
     use crate::{
         assert_error_contains,
