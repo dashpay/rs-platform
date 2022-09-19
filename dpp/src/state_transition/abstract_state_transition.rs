@@ -239,7 +239,7 @@ pub mod state_transition_helpers {
         skip_signature: bool,
     ) -> Result<JsonValue, ProtocolError> {
         let mut json_value: JsonValue = serde_json::to_value(serializable)?;
-        json_value.replace_identifier_paths(identifier_property_paths, ReplaceWith::Bytes);
+        json_value.replace_identifier_paths(identifier_property_paths, ReplaceWith::Bytes)?;
 
         if skip_signature {
             if let JsonValue::Object(ref mut o) = json_value {
