@@ -66,9 +66,8 @@ impl Identity {
     }
 
     /// Set Identity public key
-    pub fn set_public_keys(mut self, pub_key: Vec<IdentityPublicKey>) -> Self {
+    pub fn set_public_keys(&mut self, pub_key: Vec<IdentityPublicKey>) {
         self.public_keys = pub_key;
-        self
     }
 
     /// Get Identity public keys revision
@@ -102,27 +101,23 @@ impl Identity {
     }
 
     /// Set Identity balance
-    pub fn set_balance(mut self, balance: u64) -> Self {
+    pub fn set_balance(&mut self, balance: u64) {
         self.balance = balance;
-        self
     }
 
     /// Increase Identity balance
-    pub fn increase_balance(mut self, amount: u64) -> Self {
+    pub fn increase_balance(&mut self, amount: u64) {
         self.balance += amount;
-        self
     }
 
     /// Reduce the Identity balance
-    pub fn reduce_balance(mut self, amount: u64) -> Self {
+    pub fn reduce_balance(&mut self, amount: u64) {
         self.balance -= amount;
-        self
     }
 
     /// Set Identity asset lock
-    pub fn set_asset_lock_proof(mut self, lock: AssetLockProof) -> Self {
+    pub fn set_asset_lock_proof(&mut self, lock: AssetLockProof) {
         self.asset_lock_proof = Some(lock);
-        self
     }
 
     /// Get Identity asset lock
@@ -131,9 +126,8 @@ impl Identity {
     }
 
     /// Set Identity revision
-    pub fn set_revision(mut self, revision: Revision) -> Self {
+    pub fn set_revision(&mut self, revision: Revision) {
         self.revision = revision;
-        self
     }
 
     /// Get Identity revision
@@ -147,9 +141,8 @@ impl Identity {
     }
 
     /// Set metadata
-    pub fn set_metadata(mut self, m: Metadata) -> Self {
+    pub fn set_metadata(&mut self, m: Metadata) {
         self.metadata = Some(m);
-        self
     }
 
     /// Get the biggest public KeyID
