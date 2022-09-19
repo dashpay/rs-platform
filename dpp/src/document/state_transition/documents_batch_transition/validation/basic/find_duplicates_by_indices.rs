@@ -1,7 +1,6 @@
 use serde_json::{Value, Value as JsonValue};
 use std::{
     collections::{hash_map::Entry, HashMap},
-    fmt::Write,
 };
 
 use crate::{

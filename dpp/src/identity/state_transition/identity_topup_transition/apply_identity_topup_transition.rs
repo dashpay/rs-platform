@@ -41,8 +41,8 @@ where
             .fetch_identity::<Identity>(identity_id)
             .await?;
 
-        if let Some(identity) = maybe_identity {
-            let identity = identity.increase_balance(credits_amount);
+        if let Some(mut identity) = maybe_identity {
+            identity.increase_balance(credits_amount);
 
             self.state_repository.update_identity(&identity).await?;
 

@@ -1,6 +1,6 @@
 use anyhow::anyhow;
 use lazy_static::lazy_static;
-use serde_json::{json, Value as JsonValue};
+use serde_json::{Value as JsonValue};
 use std::sync::Arc;
 
 use crate::{

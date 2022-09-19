@@ -247,7 +247,7 @@ impl Identity {
         Ok(identity)
     }
 
-    pub fn from_raw_identity(mut raw_object: JsonValue) -> Result<Identity, ProtocolError> {
+    pub fn from_raw_identity(raw_object: JsonValue) -> Result<Identity, ProtocolError> {
         // // TODO identifier_default_deserializer: default deserializer should be changed to bytes
         // // Identifiers fields should be replaced with the string format to deserialize Identity
         // raw_object.replace_identifier_paths(IDENTIFIER_FIELDS_RAW_OBJECT, ReplaceWith::Base58)?;
@@ -256,8 +256,8 @@ impl Identity {
         let pks = raw_object.get("publicKeys").unwrap().as_array().unwrap();
 
         for pk in pks {
-            let pkd: IdentityPublicKey = serde_json::from_value(pk.clone())
-                .map_err(|e| ProtocolError::Generic(format!("Can't parse publick key: {}", pk.to_string())))?;
+            let _pkd: IdentityPublicKey = serde_json::from_value(pk.clone())
+                .map_err(|_e| ProtocolError::Generic(format!("Can't parse publick key: {}", pk.to_string())))?;
         }
 
         let identity: Identity = serde_json::from_value(raw_object)?;
