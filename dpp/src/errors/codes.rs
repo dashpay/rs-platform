@@ -1,4 +1,4 @@
-use crate::consensus::basic::IndexError;
+use crate::consensus::{basic::IndexError, signature::SignatureError};
 
 use super::{
     abstract_state_error::StateError, consensus::basic::BasicError, consensus::ConsensusError,
@@ -45,6 +45,7 @@ impl ErrorWithCode for ConsensusError {
 
             Self::StateError(e) => e.get_code(),
             Self::BasicError(e) => e.get_code(),
+            Self::SignatureError(e) => e.get_code(),
 
             Self::IdentityAlreadyExistsError(_) => 4011,
 
@@ -68,6 +69,15 @@ impl ErrorWithCode for StateError {
             // Data contract
             Self::DataContractAlreadyPresentError { .. } => 4000,
             Self::DataTriggerError(ref e) => e.get_code(),
+
+            // Identity
+            Self::IdentityPublicKeyDisabledAtWindowViolationError { .. } => 4012,
+            Self::IdentityPublicKeyIsReadOnlyError { .. } => 4017,
+            Self::InvalidIdentityPublicKeyIdError { .. } => 4018,
+            Self::InvalidIdentityRevisionError { .. } => 4019,
+            Self::MaxIdentityPublicKeyLimitReached { .. } => 4020,
+            Self::DuplicatedIdentityPublicKeyError { .. } => 4021,
+            Self::DuplicatedIdentityPublicKeyIdError { .. } => 4022,
         }
     }
 }
@@ -112,6 +122,11 @@ impl ErrorWithCode for BasicError {
             Self::DataContractInvalidIndexDefinitionUpdateError { .. } => 0,
             Self::IndexError(ref e) => e.get_code(),
             Self::IdentityNotFoundError { .. } => 2000,
+
+            // State Transition
+            Self::InvalidStateTransitionTypeError { .. } => 1043,
+            Self::MissingStateTransitionTypeError => 1044,
+            Self::StateTransitionMaxSizeExceededError { .. } => 1045,
         }
     }
 }
@@ -126,6 +141,17 @@ impl ErrorWithCode for IndexError {
             Self::InvalidIndexedPropertyConstraintError { .. } => 1012,
             Self::InvalidCompoundIndexError { .. } => 1010,
             Self::DuplicateIndexError { .. } => 1008,
+        }
+    }
+}
+
+impl ErrorWithCode for SignatureError {
+    fn get_code(&self) -> u32 {
+        match *self {
+            Self::IdentityNotFoundError { .. } => 2000,
+            Self::InvalidIdentityPublicKeyTypeError { .. } => 2001,
+            Self::InvalidStateTransitionSignatureError => 2002,
+            Self::MissingPublicKeyError { .. } => 2003,
         }
     }
 }

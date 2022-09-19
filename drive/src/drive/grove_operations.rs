@@ -920,6 +920,7 @@ impl Drive {
                 ops.operations,
                 Some(BatchApplyOptions {
                     validate_insertion_does_not_override: validate,
+                    disable_operation_consistency_check: false,
                 }),
                 |cost, old_flags, mut new_flags| {
                     // TODO: If possibility to err, might need to change the update closure return type
@@ -1097,6 +1098,7 @@ impl Drive {
             ops.operations,
             Some(BatchApplyOptions {
                 validate_insertion_does_not_override: validate,
+                disable_operation_consistency_check: false,
             }),
             |_, _, _| false,
             |_, _| Err(GroveError::InternalError("not implemented")),
