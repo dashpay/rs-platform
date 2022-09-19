@@ -1,4 +1,15 @@
 use anyhow::{anyhow, Result};
+use dashcore::{
+    blockdata::transaction::special_transaction::{
+        asset_lock::AssetLockPayload,
+        asset_unlock::{
+            qualified_asset_unlock::AssetUnlockPayload,
+            unqualified_asset_unlock::AssetUnlockBasePayload,
+        },
+        TransactionPayload,
+    },
+    Transaction,
+};
 
 use crate::{prelude::Identity, state_repository::StateRepositoryLike};
 
@@ -23,6 +34,33 @@ where
         &self,
         state_transition: &IdentityCreditWithdrawalTransition,
     ) -> Result<()> {
+        let latest_withdrawal_index = self
+            .state_repository
+            .fetch_latest_withdrawal_transaction_index()
+            .await?;
+
+        let withdrwal_transaction = Transaction {
+            version: 1,
+            lock_time: 0,
+            input: vec![],
+            output: vec![],
+            special_transaction_payload: Some(TransactionPayload::AssetUnlockPayloadType(
+                AssetUnlockPayload {
+                    base: AssetUnlockBasePayload {
+                        version: 1,
+                        index: latest_withdrawal_index + 1,
+                        fee: state_transition.core_fee,
+                    },
+                    request_info: todo!(),
+                    quorum_sig: todo!(),
+                },
+            )),
+        };
+
+        self.state_repository
+            .enqueue_withdrawal_transaction(&withdrwal_transaction)
+            .await?;
+
         let maybe_existing_identity: Option<Identity> = self
             .state_repository
             .fetch_identity(&state_transition.identity_id)

@@ -79,7 +79,12 @@ impl TenderdashAbci for Platform {
         self.block_execution_context
             .replace(Some(block_execution_context));
 
-        let response = BlockBeginResponse {};
+        // Get 16 latest withdrawal transactions from the queue
+        let withdrawal_transactions = self.drive.dequeue_withdrawals(transaction)?;
+
+        let response = BlockBeginResponse {
+            withdrawal_transactions: todo!(),
+        };
 
         Ok(response)
     }

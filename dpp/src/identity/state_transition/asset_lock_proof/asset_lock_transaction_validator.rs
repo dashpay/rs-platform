@@ -28,6 +28,7 @@ impl Default for AssetLockTransactionResultData {
                 lock_time: 0,
                 input: vec![],
                 output: vec![],
+                special_transaction_payload: None,
             },
         }
     }

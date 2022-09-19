@@ -1,6 +1,6 @@
 use anyhow::Result as AnyResult;
 use async_trait::async_trait;
-use dashcore::InstantLock;
+use dashcore::{InstantLock, Transaction};
 #[cfg(test)]
 use mockall::{automock, predicate::*};
 use serde_json::Value as JsonValue;
@@ -101,4 +101,10 @@ pub trait StateRepositoryLike: Send + Sync {
 
     /// Update an identity
     async fn update_identity(&self, identity: &Identity) -> AnyResult<()>;
+
+    // Get latest (in a queue) withdrawal transaction index
+    async fn fetch_latest_withdrawal_transaction_index(&self) -> AnyResult<u64>;
+
+    // Enqueue withdrawal transaction
+    async fn enqueue_withdrawal_transaction(&self, transaction: &Transaction) -> AnyResult<()>;
 }

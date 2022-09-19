@@ -43,7 +43,7 @@ pub struct IdentityCreditWithdrawalTransition {
     pub transition_type: StateTransitionType,
     pub identity_id: Identifier,
     pub amount: u64,
-    pub core_fee: u64,
+    pub core_fee: u32,
     pub pooling: Pooling,
     pub output: Vec<u8>,
     pub signature_public_key_id: KeyID,
