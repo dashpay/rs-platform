@@ -360,7 +360,7 @@ impl Drive {
         contract_id: Option<[u8; 32]>,
         block_time: f64,
         apply: bool,
-        storage_flags: Option<StorageFlags>,
+        storage_flags: Option<&StorageFlags>,
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
         // first we need to deserialize the contract
@@ -371,7 +371,7 @@ impl Drive {
             contract_cbor,
             block_time,
             apply,
-            storage_flags.as_ref(),
+            storage_flags,
             transaction,
         )
     }

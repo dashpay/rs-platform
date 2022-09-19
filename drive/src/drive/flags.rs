@@ -130,7 +130,7 @@ impl StorageFlags {
         let mut other_epoch_bytes = self.combine_non_base_epoch_bytes(&rhs).unwrap_or_default();
         let original_value = other_epoch_bytes.remove(epoch_with_adding_bytes);
         match original_value {
-            None => other_epoch_bytes.insert(epoch_with_adding_bytes.clone(), added_bytes),
+            None => other_epoch_bytes.insert(epoch_with_adding_bytes.clone(), removed_bytes),
             Some(original_bytes) => other_epoch_bytes.insert(
                 epoch_with_adding_bytes.clone(),
                 original_bytes.clone() + added_bytes,

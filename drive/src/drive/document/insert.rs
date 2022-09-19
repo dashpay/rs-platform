@@ -172,11 +172,11 @@ impl Drive {
 
             self.batch_insert(path_key_element_info, drive_operations)?;
         } else if insert_without_check {
-            let path_key_element_info = match document_and_contract_info.document_info {
+            let path_key_element_info = match &document_and_contract_info.document_info {
                 DocumentRefAndSerialization((document, serialized_document, storage_flags)) => {
                     let element = Element::Item(
-                        Vec::from(serialized_document),
-                        StorageFlags::map_to_some_element_flags(storage_flags),
+                        serialized_document.to_vec(),
+                        StorageFlags::map_to_some_element_flags(storage_flags.clone()),
                     );
                     PathFixedSizeKeyElement((primary_key_path, document.id.as_slice(), element))
                 }
@@ -185,15 +185,24 @@ impl Drive {
                         document.serialize(document_and_contract_info.document_type)?;
                     let element = Element::Item(
                         serialized_document,
-                        StorageFlags::map_to_some_element_flags(storage_flags),
+                        StorageFlags::map_to_some_element_flags(storage_flags.clone()),
                     );
                     PathFixedSizeKeyElement((primary_key_path, document.id.as_slice(), element))
                 }
                 DocumentSize(max_size) => PathKeyElementSize((
                     defaults::BASE_CONTRACT_DOCUMENTS_PRIMARY_KEY_PATH + document_type.name.len(),
                     DEFAULT_HASH_SIZE,
-                    Element::required_item_space(max_size as usize, STORAGE_FLAGS_SIZE),
+                    Element::required_item_space(*max_size as usize, STORAGE_FLAGS_SIZE),
                 )),
+                DocumentWithoutSerialization((document, storage_flags)) => {
+                    let serialized_document =
+                        document.serialize(document_and_contract_info.document_type)?;
+                    let element = Element::Item(
+                        serialized_document,
+                        StorageFlags::map_to_some_element_flags(storage_flags.as_ref()),
+                    );
+                    PathFixedSizeKeyElement((primary_key_path, document.id.as_slice(), element))
+                }
             };
             self.batch_insert(path_key_element_info, drive_operations)?;
         } else {
@@ -252,7 +261,7 @@ impl Drive {
         override_document: bool,
         block_time: f64,
         apply: bool,
-        storage_flags: Option<StorageFlags>,
+        storage_flags: Option<&StorageFlags>,
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
         let contract = <Contract as DriveContractExt>::from_cbor(serialized_contract, None)?;
@@ -260,7 +269,7 @@ impl Drive {
         let document = Document::from_cbor(serialized_document, None, owner_id)?;
 
         let document_info =
-            DocumentRefAndSerialization((&document, serialized_document, storage_flags.as_ref()));
+            DocumentRefAndSerialization((&document, serialized_document, storage_flags));
 
         let document_type = contract.document_type_for_name(document_type_name)?;
 
@@ -287,13 +296,13 @@ impl Drive {
         override_document: bool,
         block_time: f64,
         apply: bool,
-        storage_flags: Option<StorageFlags>,
+        storage_flags: Option<&StorageFlags>,
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
         let document = Document::from_cbor(serialized_document, None, owner_id)?;
 
         let document_info =
-            DocumentRefAndSerialization((&document, serialized_document, storage_flags.as_ref()));
+            DocumentRefAndSerialization((&document, serialized_document, storage_flags));
 
         let document_type = contract.document_type_for_name(document_type_name)?;
 

@@ -816,12 +816,9 @@ impl Drive {
 
             let cost_context = Ok(worst_case_cost).wrap_with_cost(OperationCost::default());
 
-            if let Some(delete_operation) =
-                push_drive_operation_result(cost_context, drive_operations)?
-            {
-                // we also add the actual delete operation
-                drive_operations.push(DriveOperation::GroveOperation(delete_operation))
-            }
+            let delete_operation = push_drive_operation_result(cost_context, drive_operations)?;
+            // we also add the actual delete operation
+            drive_operations.push(CalculatedCostOperation(delete_operation))
         }
 
         Ok(())
@@ -923,16 +920,16 @@ impl Drive {
                     disable_operation_consistency_check: false,
                 }),
                 |cost, old_flags, mut new_flags| {
-                    // TODO: If possibility to err, might need to change the update closure return type
-                    //  from bool to maybe Result<bool, Error>
 
+                    // if there were no flags before then the new flags are used
+                    if old_flags.is_none() {
+                        return Ok(false);
+                    }
                     // This could be none only because the old element didn't exist
                     // If they were empty we get an error
                     let maybe_old_storage_flags =
-                        StorageFlags::from_some_element_flags(&old_flags)?;
-                    let new_storage_flags = StorageFlags::from_element_flags_ref(new_flags)?.ok_or(Error::Drive(DriveError::CorruptedElementFlags(
-                        "no element flag on data",
-                    )))?;
+                        StorageFlags::from_some_element_flags(&old_flags).map_err(|_| GroveError::JustInTimeElementFlagsClientError("drive did not understand flags of old item being updated"))?;
+                    let new_storage_flags = StorageFlags::from_element_flags_ref(new_flags).map_err(|_| GroveError::JustInTimeElementFlagsClientError("drive did not understand updated item flag information"))?.ok_or(GroveError::JustInTimeElementFlagsClientError("removing flags from an item with flags is not allowed"))?;
                     match cost.transition_type() {
                         OperationStorageTransitionType::OperationUpdateBiggerSize => {
                             let combined_storage_flags =
@@ -940,9 +937,9 @@ impl Drive {
                                     maybe_old_storage_flags,
                                     new_storage_flags,
                                     cost.added_bytes,
-                                )?;
+                                ).map_err(|_| GroveError::JustInTimeElementFlagsClientError("drive could not combine storage flags (new flags were bigger)"))?;
                             new_flags = &mut combined_storage_flags.to_element_flags();
-                            true
+                            Ok(true)
                         }
                         OperationStorageTransitionType::OperationUpdateSmallerSize => {
                             let combined_storage_flags =
@@ -950,19 +947,24 @@ impl Drive {
                                     maybe_old_storage_flags,
                                     new_storage_flags,
                                     cost.removed_bytes,
-                                )?;
+                                ).map_err(|_| GroveError::JustInTimeElementFlagsClientError("drive could not combine storage flags (new flags were smaller)"))?;
                             new_flags = &mut combined_storage_flags.to_element_flags();
-                            true
+                            Ok(true)
                         }
-                        _ => false,
+                        _ => Ok(false),
                     }
                 },
                 |flags, removed| {
-                    let storage_flags = StorageFlags::from_element_flags_ref(new_flags)?.ok_or(Error::Drive(DriveError::CorruptedElementFlags(
-                        "no element flag on data",
-                    )))?;
-                    let storage_removed_bytes = storage_flags.split_storage_removed_bytes(removed);
-                    Ok(storage_removed_bytes)
+                    let maybe_storage_flags = StorageFlags::from_element_flags_ref(flags).map_err(|_| GroveError::SplitRemovalBytesClientError("drive did not understand flags of item being updated"))?;
+                    // if there were no flags before then the new flags are used
+                    match maybe_storage_flags {
+                        None => { Ok(BasicStorageRemoval(removed))}
+                        Some(storage_flags) => {
+                            let storage_removed_bytes = storage_flags.split_storage_removed_bytes(removed);
+                            Ok(storage_removed_bytes)
+                        }
+                    }
+
                 },
                 transaction,
             );
@@ -1100,7 +1102,7 @@ impl Drive {
                 validate_insertion_does_not_override: validate,
                 disable_operation_consistency_check: false,
             }),
-            |_, _, _| false,
+            |_, _, _| Ok(false),
             |_, _| Err(GroveError::InternalError("not implemented")),
         );
         push_drive_operation_result(cost_context, drive_operations)

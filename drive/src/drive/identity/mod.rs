@@ -17,7 +17,7 @@ impl Drive {
     pub fn add_insert_identity_operations(
         &self,
         identity: Identity,
-        storage_flags: Option<StorageFlags>,
+        storage_flags: Option<&StorageFlags>,
         batch: &mut GroveDbOpBatch,
     ) -> Result<(), Error> {
         let identity_bytes = identity.to_buffer().map_err(|_| {
@@ -29,7 +29,7 @@ impl Drive {
         batch.add_insert_empty_tree_with_flags(
             vec![vec![RootTree::Identities as u8]],
             identity.id.buffer.to_vec(),
-            storage_flags.as_ref(),
+            storage_flags,
         );
 
         batch.add_insert(
@@ -40,7 +40,7 @@ impl Drive {
             IDENTITY_KEY.to_vec(),
             Element::Item(
                 identity_bytes,
-                StorageFlags::map_to_some_element_flags(storage_flags.as_ref()),
+                StorageFlags::map_to_some_element_flags(storage_flags),
             ),
         );
 
@@ -51,7 +51,7 @@ impl Drive {
         &self,
         identity: Identity,
         apply: bool,
-        storage_flags: Option<StorageFlags>,
+        storage_flags: Option<&StorageFlags>,
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
         let mut batch = GroveDbOpBatch::new();
