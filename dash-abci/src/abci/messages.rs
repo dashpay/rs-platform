@@ -19,6 +19,7 @@ pub struct BlockBeginRequest {
     pub block_time_ms: u64,
     pub previous_block_time_ms: Option<u64>,
     pub proposer_pro_tx_hash: [u8; 32],
+    pub quorum_hash: [u8; 32],
 }
 
 #[derive(Serialize, Deserialize)]

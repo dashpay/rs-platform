@@ -1,16 +1,11 @@
-use ciborium::value::Value as CborValue;
-use dashcore::Transaction;
-use std::collections::BTreeMap;
-use std::convert::TryInto;
 use std::ops::RangeFull;
 
-use dpp::util::cbor_value::{CborBTreeMapHelper, CborCanonicalMap};
+use grovedb::query_result_type::QueryResultType::QueryKeyElementPairResultType;
 use grovedb::{Element, PathQuery, Query, QueryItem, SizedQuery, TransactionArg};
 
 use crate::drive::batch::GroveDbOpBatch;
 use crate::drive::{Drive, RootTree};
 use crate::error::drive::DriveError;
-use crate::error::identity::WithdrawalError;
 use crate::error::Error;
 use crate::fee::calculate_fee;
 use crate::fee::op::DriveOperation;
@@ -20,16 +15,16 @@ const QUERY_LIMIT: u16 = 16;
 impl Drive {
     pub fn enqueue_withdrawals(
         &self,
-        withdrawals: Vec<Transaction>,
+        withdrawals: Vec<(Vec<u8>, Vec<u8>)>,
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
         let mut batch = GroveDbOpBatch::new();
 
-        for withdrawal in withdrawals {
+        for (id, bytes) in withdrawals {
             batch.add_insert(
                 vec![vec![RootTree::Withdrawals as u8]],
-                withdrawal.id.to_be_bytes().to_vec(),
-                Element::Item(withdrawal.to_cbor()?, None),
+                id,
+                Element::Item(bytes, None),
             );
         }
 
@@ -43,7 +38,7 @@ impl Drive {
     pub fn dequeue_withdrawals(
         &self,
         transaction: TransactionArg,
-    ) -> Result<Vec<Withdrawal>, Error> {
+    ) -> Result<Vec<(Vec<u8>, Vec<u8>)>, Error> {
         let mut query = Query::new();
 
         query.insert_item(QueryItem::RangeFull(RangeFull));
@@ -57,22 +52,23 @@ impl Drive {
             },
         };
 
-        let (result_items, _) = self
+        let result_items = self
             .grove
-            .query(&path_query, transaction)
+            .query_raw(&path_query, QueryKeyElementPairResultType, transaction)
             .unwrap()
-            .map_err(Error::GroveDB)?;
+            .map_err(Error::GroveDB)?
+            .0
+            .to_key_elements();
 
         let withdrawals = result_items
             .into_iter()
-            .map(|cbor| {
-                Withdrawal::from_cbor(cbor.as_slice()).map_err(|_| {
-                    Error::Withdrawal(WithdrawalError::WithdrawalSerialization(
-                        "failed to de-serialize withdrawal from CBOR",
-                    ))
-                })
+            .map(|(id, element)| match element {
+                Element::Item(bytes, _) => Ok((id, bytes)),
+                _ => Err(Error::Drive(DriveError::CorruptedWithdrawalNotItem(
+                    "withdrawal is not an item",
+                ))),
             })
-            .collect::<Result<Vec<Withdrawal>, Error>>()?;
+            .collect::<Result<Vec<(Vec<u8>, Vec<u8>)>, Error>>()?;
 
         if withdrawals.len() > 0 {
             let mut batch_operations: Vec<DriveOperation> = vec![];
@@ -80,10 +76,10 @@ impl Drive {
 
             let withdrawals_path: [&[u8]; 1] = [Into::<&[u8; 1]>::into(RootTree::Withdrawals)];
 
-            for withdrawal in withdrawals.iter() {
+            for (id, _) in withdrawals.iter() {
                 self.batch_delete(
                     withdrawals_path,
-                    &withdrawal.id.to_be_bytes(),
+                    id,
                     true,
                     transaction,
                     &mut batch_operations,
@@ -105,8 +101,6 @@ impl Drive {
 #[cfg(test)]
 mod tests {
     use crate::common::helpers::setup::setup_drive_with_initial_state_structure;
-
-    use super::Withdrawal;
 
     mod queue {
         use super::*;

@@ -326,6 +326,7 @@ class Drive {
           ...request,
           // cborium doesn't eat Buffers
           proposerProTxHash: Array.from(request.proposerProTxHash),
+          quorumHash: Array.from(request.quorumHash),
         });
 
         const responseBytes = await abciBlockBeginAsync.call(
@@ -374,10 +375,12 @@ class Drive {
  * @property {number} blockTimeMs - timestamp in milliseconds
  * @property {number} [previousBlockTimeMs] - timestamp in milliseconds
  * @property {Buffer} proposerProTxHash
+ * @property {Buffer} quorumHash
  */
 
 /**
  * @typedef BlockBeginResponse
+ * @property {Buffer[]} withdrawalTransactions
  */
 
 /**

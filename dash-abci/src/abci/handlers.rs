@@ -6,6 +6,9 @@ use crate::abci::messages::{
 };
 use crate::block::{BlockExecutionContext, BlockInfo};
 use crate::execution::fee_pools::epoch::EpochInfo;
+use dashcore::blockdata::transaction::special_transaction::asset_unlock::request_info::AssetUnlockRequestInfo;
+use dashcore::hashes::Hash;
+use dashcore::QuorumHash;
 use rs_drive::grovedb::TransactionArg;
 
 use crate::error::execution::ExecutionError;
@@ -82,8 +85,30 @@ impl TenderdashAbci for Platform {
         // Get 16 latest withdrawal transactions from the queue
         let withdrawal_transactions = self.drive.dequeue_withdrawals(transaction)?;
 
+        let withdrawal_bytes = withdrawal_transactions
+            .into_iter()
+            .map(|(_, bytes)| {
+                let request_info = AssetUnlockRequestInfo {
+                    request_height: request.block_height as u32,
+                    quorum_hash: QuorumHash::hash(&request.quorum_hash),
+                };
+
+                let mut bytes_buffer = vec![];
+
+                request_info
+                    .consensus_append_to_base_encode(bytes, &mut bytes_buffer)
+                    .map_err(|_| {
+                        Error::Execution(ExecutionError::CorruptedCodeExecution(
+                            "could not add aditional request info to asset unlock transaction",
+                        ))
+                    })?;
+
+                Ok(bytes_buffer)
+            })
+            .collect::<Result<Vec<Vec<u8>>, Error>>()?;
+
         let response = BlockBeginResponse {
-            withdrawal_transactions: todo!(),
+            withdrawal_transactions: withdrawal_bytes,
         };
 
         Ok(response)
