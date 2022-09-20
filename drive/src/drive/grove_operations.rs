@@ -835,6 +835,11 @@ impl Drive {
     ) -> Result<(), Error> {
         let current_batch_operations = DriveOperation::grovedb_operations_batch(drive_operations);
         if apply {
+            let path = path.iter().map(|key_info| match key_info {
+                Key(key) => { Ok(key.as_slice()) }
+                KeyRef(key_ref) => {Ok(key_ref.as_ref()) }
+                KeySize(_) => { Err(Error::Drive(DriveError::CorruptedCodeExecution("key size used with apply"))) }
+            }).collect::<Result<Vec<&[u8]>, Error>>()?;
             let cost_context = self.grove.delete_operations_for_delete_up_tree_while_empty(
                 path,
                 key,

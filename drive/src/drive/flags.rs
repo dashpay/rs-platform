@@ -6,8 +6,8 @@ use integer_encoding::VarInt;
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use costs::storage_cost::removal::StorageRemovedBytes;
-use costs::storage_cost::removal::StorageRemovedBytes::{NoStorageRemoval, BasicStorageRemoval, SectionedStorageRemoval};
-use nohash_hasher::IntMap;
+use costs::storage_cost::removal::StorageRemovedBytes::{BasicStorageRemoval, SectionedStorageRemoval};
+use intmap::IntMap;
 
 use crate::error::drive::DriveError;
 use crate::error::storage_flags::StorageFlagsError;
@@ -31,7 +31,7 @@ pub enum StorageFlags {
 }
 
 impl StorageFlags {
-    fn combine_owner_id(self, rhs: &Self) -> Result<Option<&OwnerId>, Error> {
+    fn combine_owner_id<'a>(&'a self, rhs: &'a Self) -> Result<Option<&'a OwnerId>, Error> {
         if let Some(our_owner_id) = self.owner_id() {
             if let Some(other_owner_id) = rhs.owner_id() {
                 if our_owner_id != other_owner_id {
@@ -51,7 +51,7 @@ impl StorageFlags {
     }
 
     fn combine_non_base_epoch_bytes(
-        self,
+        &self,
         rhs: &Self,
     ) -> Option<BTreeMap<EpochIndex, BytesAddedInEpoch>> {
         if let Some(our_epoch_index_map) = self.epoch_index_map() {
@@ -82,7 +82,7 @@ impl StorageFlags {
         }
     }
 
-    fn combine_same_base_epoch(self, rhs: Self) -> Result<Self, Error> {
+    fn combine_same_base_epoch(&self, rhs: Self) -> Result<Self, Error> {
         let base_epoch = self.base_epoch().clone();
         let owner_id = self.combine_owner_id(&rhs)?;
         let other_epoch_bytes = self.combine_non_base_epoch_bytes(&rhs);
@@ -99,7 +99,7 @@ impl StorageFlags {
         }
     }
 
-    fn combine_with_higher_base_epoch(self, rhs: Self, added_bytes: u32) -> Result<Self, Error> {
+    fn combine_with_higher_base_epoch(&self, rhs: Self, added_bytes: u32) -> Result<Self, Error> {
         let base_epoch = self.base_epoch().clone();
         let epoch_with_adding_bytes = rhs.base_epoch();
         let owner_id = self.combine_owner_id(&rhs)?;
@@ -130,7 +130,7 @@ impl StorageFlags {
         match removed_bytes {
             SectionedStorageRemoval(sectioned_bytes) => {
                 sectioned_bytes.iter().map(|(epoch, removed_bytes)| {
-                    let mut bytes_added_in_epoch = other_epoch_bytes.get_mut(&(*epoch as u16)).ok_or(Error::StorageFlags(StorageFlagsError::RemovingAtEpochWithNoAssociatedStorage(
+                    let bytes_added_in_epoch = other_epoch_bytes.get_mut(&(*epoch as u16)).ok_or(Error::StorageFlags(StorageFlagsError::RemovingAtEpochWithNoAssociatedStorage(
                         "can not remove bytes when there is no epoch",
                     )))?;
                     *bytes_added_in_epoch = bytes_added_in_epoch.checked_sub(*removed_bytes).ok_or(Error::StorageFlags(StorageFlagsError::StorageFlagsOverflow(
@@ -417,7 +417,7 @@ impl StorageFlags {
     }
 
     pub fn from_some_element_flags(data: &Option<ElementFlags>) -> Result<Option<Self>, Error> {
-        let data = data.ok_or(Error::Drive(DriveError::CorruptedElementFlags(
+        let data = data.as_ref().ok_or(Error::Drive(DriveError::CorruptedElementFlags(
             "no element flag on data",
         )))?;
         Self::from_slice(data.as_slice())
@@ -461,16 +461,16 @@ impl StorageFlags {
             MultiEpoch(base_epoch, other_epoch_bytes) | MultiEpochOwned(base_epoch, other_epoch_bytes, _) => {
                 let mut bytes_left = removed_bytes;
                 let mut rev_iter = other_epoch_bytes.iter().rev();
-                let mut sectioned_storage_removal: IntMap<u32, V> = IntMap::default();
+                let mut sectioned_storage_removal: IntMap<u32> = IntMap::default();
                 while bytes_left > 0 {
                     if let Some((epoch_index, bytes_in_epoch)) = rev_iter.next_back() {
                         if *bytes_in_epoch < bytes_left {
                             bytes_left -= bytes_in_epoch;
-                            sectioned_storage_removal.insert(epoch_index.clone() as u32, *bytes_in_epoch);
+                            sectioned_storage_removal.insert(epoch_index.clone() as u64, *bytes_in_epoch);
                         } else if *bytes_in_epoch >= bytes_left {
                             //take all bytes
                             bytes_left = 0;
-                            sectioned_storage_removal.insert(epoch_index.clone() as u32, bytes_left);
+                            sectioned_storage_removal.insert(epoch_index.clone() as u64, bytes_left);
                         }
                     } else {
                         break;
@@ -478,7 +478,7 @@ impl StorageFlags {
                 }
                 if bytes_left > 0 {
                     // We need to take some from the base epoch
-                    sectioned_storage_removal.insert(base_epoch.clone() as u32, bytes_left);
+                    sectioned_storage_removal.insert(base_epoch.clone() as u64, bytes_left);
                 }
                 SectionedStorageRemoval(sectioned_storage_removal)
             }
