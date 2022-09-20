@@ -32,6 +32,7 @@ use crate::fee::calculate_fee;
 use crate::fee::op::DriveOperation;
 use dpp::data_contract::extra::DocumentType;
 
+use crate::error::Error::GroveDB;
 use dpp::data_contract::extra::encode_float;
 use dpp::data_contract::extra::DriveContractExt;
 
@@ -405,18 +406,16 @@ impl Drive {
             && document_and_contract_info
                 .document_info
                 .is_document_and_serialization()
-            && self
-                .grove_has_raw(
-                    primary_key_path,
-                    document_and_contract_info
-                        .document_info
-                        .id_key_value_info()
-                        .as_key_ref_request()?,
-                    query_stateless_with_max_value_size,
-                    transaction,
-                    &mut batch_operations,
-                )
-                .is_ok()
+            && self.grove_has_raw(
+                primary_key_path,
+                document_and_contract_info
+                    .document_info
+                    .id_key_value_info()
+                    .as_key_ref_request()?,
+                query_stateless_with_max_value_size,
+                transaction,
+                &mut batch_operations,
+            )?
         {
             self.update_document_for_contract_operations(
                 document_and_contract_info,

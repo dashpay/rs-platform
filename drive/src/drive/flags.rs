@@ -443,15 +443,6 @@ impl StorageFlags {
         Self::deserialize(data)
     }
 
-    pub fn from_some_element_flags(data: &Option<ElementFlags>) -> Result<Option<Self>, Error> {
-        let data = data
-            .as_ref()
-            .ok_or(Error::Drive(DriveError::CorruptedElementFlags(
-                "no element flag on data",
-            )))?;
-        Self::from_slice(data.as_slice())
-    }
-
     pub fn from_element_flags_ref(data: &ElementFlags) -> Result<Option<Self>, Error> {
         Self::from_slice(data.as_slice())
     }

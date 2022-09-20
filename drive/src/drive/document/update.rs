@@ -235,7 +235,7 @@ impl Drive {
                         Document::from_cbor(old_serialized_document.as_slice(), None, owner_id)?;
                     Ok(DocumentWithoutSerialization((
                         document,
-                        StorageFlags::from_some_element_flags(&element_flags)?,
+                        StorageFlags::from_some_element_flags_ref(&element_flags)?,
                     )))
                 } else {
                     Err(Error::Drive(DriveError::CorruptedDocumentNotItem(

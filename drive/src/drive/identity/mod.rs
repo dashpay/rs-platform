@@ -89,7 +89,7 @@ impl Drive {
 
             Ok((
                 identity,
-                StorageFlags::from_some_element_flags(element_flags)?,
+                StorageFlags::from_some_element_flags_ref(element_flags)?,
             ))
         } else {
             Err(Error::Drive(DriveError::CorruptedIdentityNotItem(
@@ -148,7 +148,7 @@ impl Drive {
 
                     Ok((
                         identity,
-                        StorageFlags::from_some_element_flags(element_flags)?,
+                        StorageFlags::from_some_element_flags_ref(element_flags)?,
                     ))
                 } else {
                     Err(Error::Drive(DriveError::CorruptedIdentityNotItem(

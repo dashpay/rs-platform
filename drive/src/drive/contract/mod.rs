@@ -267,7 +267,7 @@ impl Drive {
             &mut batch_operations,
         )?;
 
-        let storage_flags = StorageFlags::from_some_element_flags(&element_flags)?;
+        let storage_flags = StorageFlags::from_some_element_flags_ref(&element_flags)?;
 
         let contract_documents_path = contract_documents_path(contract.id.as_bytes());
         for (type_key, document_type) in contract.document_types() {
@@ -428,7 +428,7 @@ impl Drive {
                 .deref()
                 .cached_contracts
                 .insert(contract_id, Arc::clone(&contract));
-            let flags = StorageFlags::from_some_element_flags(&element_flag)?;
+            let flags = StorageFlags::from_some_element_flags_ref(&element_flag)?;
             Ok((Some(Arc::clone(&contract)), flags))
         } else {
             Err(Error::Drive(DriveError::CorruptedContractPath(
