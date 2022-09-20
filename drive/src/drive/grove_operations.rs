@@ -930,7 +930,7 @@ impl Drive {
                     let maybe_old_storage_flags =
                         StorageFlags::from_some_element_flags(&old_flags).map_err(|_| GroveError::JustInTimeElementFlagsClientError("drive did not understand flags of old item being updated"))?;
                     let new_storage_flags = StorageFlags::from_element_flags_ref(new_flags).map_err(|_| GroveError::JustInTimeElementFlagsClientError("drive did not understand updated item flag information"))?.ok_or(GroveError::JustInTimeElementFlagsClientError("removing flags from an item with flags is not allowed"))?;
-                    match cost.transition_type() {
+                    match &cost.transition_type() {
                         OperationStorageTransitionType::OperationUpdateBiggerSize => {
                             let combined_storage_flags =
                                 StorageFlags::optional_combine_added_bytes(
