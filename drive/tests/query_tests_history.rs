@@ -168,7 +168,7 @@ pub fn setup(
                 .document_type_for_name("person")
                 .expect("expected to get document type");
 
-            let storage_flags = StorageFlags { epoch: 0 };
+            let storage_flags = Some(StorageFlags::SingleEpoch(0));
 
             // if block_time == 100 && i == 9 {
             //     dbg!("block time {} {} {:#?}",block_time, i, person);
@@ -180,7 +180,7 @@ pub fn setup(
                         document_info: DocumentRefAndSerialization((
                             &document,
                             &document_cbor,
-                            &storage_flags,
+                            storage_flags.as_ref(),
                         )),
                         contract: &contract,
                         document_type,
@@ -954,7 +954,7 @@ fn test_query_historical() {
         .document_type_for_name("person")
         .expect("expected to get document type");
 
-    let storage_flags = StorageFlags { epoch: 0 };
+    let storage_flags = Some(StorageFlags::SingleEpoch(0));
 
     drive
         .add_document_for_contract(
@@ -962,7 +962,7 @@ fn test_query_historical() {
                 document_info: DocumentRefAndSerialization((
                     &document,
                     &person_cbor,
-                    &storage_flags,
+                    storage_flags.as_ref(),
                 )),
                 contract: &contract,
                 document_type,
@@ -1002,7 +1002,7 @@ fn test_query_historical() {
         .document_type_for_name("person")
         .expect("expected to get document type");
 
-    let storage_flags = StorageFlags { epoch: 0 };
+    let storage_flags = Some(StorageFlags::SingleEpoch(0));
 
     drive
         .add_document_for_contract(
@@ -1010,7 +1010,7 @@ fn test_query_historical() {
                 document_info: DocumentRefAndSerialization((
                     &document,
                     &person_cbor,
-                    &storage_flags,
+                    storage_flags.as_ref(),
                 )),
                 contract: &contract,
                 document_type,
@@ -1362,7 +1362,7 @@ fn test_query_historical() {
             None,
             0f64,
             true,
-            StorageFlags::optional_default(),
+            StorageFlags::optional_default_as_ref(),
             Some(&db_transaction),
         )
         .expect("expected to apply contract successfully");

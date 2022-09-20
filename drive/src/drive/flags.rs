@@ -1,13 +1,15 @@
 use crate::drive::flags::StorageFlags::{
     MultiEpoch, MultiEpochOwned, SingleEpoch, SingleEpochOwned,
 };
+use costs::storage_cost::removal::StorageRemovedBytes;
+use costs::storage_cost::removal::StorageRemovedBytes::{
+    BasicStorageRemoval, SectionedStorageRemoval,
+};
 use grovedb::ElementFlags;
 use integer_encoding::VarInt;
+use intmap::IntMap;
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
-use costs::storage_cost::removal::StorageRemovedBytes;
-use costs::storage_cost::removal::StorageRemovedBytes::{BasicStorageRemoval, SectionedStorageRemoval};
-use intmap::IntMap;
 
 use crate::error::drive::DriveError;
 use crate::error::storage_flags::StorageFlagsError;
@@ -24,13 +26,20 @@ type OwnerId = [u8; 32];
 // Struct Definitions
 #[derive(Clone, Debug, PartialEq)]
 pub enum StorageFlags {
-    SingleEpoch(BaseEpoch),                                                     //0
-    MultiEpoch(BaseEpoch, BTreeMap<EpochIndex, BytesAddedInEpoch>),               //1
-    SingleEpochOwned(BaseEpoch, OwnerId),                                       //2
+    SingleEpoch(BaseEpoch),                                         //0
+    MultiEpoch(BaseEpoch, BTreeMap<EpochIndex, BytesAddedInEpoch>), //1
+    SingleEpochOwned(BaseEpoch, OwnerId),                           //2
     MultiEpochOwned(BaseEpoch, BTreeMap<EpochIndex, BytesAddedInEpoch>, OwnerId), //3
 }
 
 impl StorageFlags {
+    pub fn new_single_epoch(epoch: BaseEpoch, maybe_owner_id: Option<OwnerId>) -> Self {
+        match maybe_owner_id {
+            None => SingleEpoch(epoch),
+            Some(owner_id) => SingleEpochOwned(epoch, owner_id),
+        }
+    }
+
     fn combine_owner_id<'a>(&'a self, rhs: &'a Self) -> Result<Option<&'a OwnerId>, Error> {
         if let Some(our_owner_id) = self.owner_id() {
             if let Some(other_owner_id) = rhs.owner_id() {
@@ -123,21 +132,35 @@ impl StorageFlags {
         }
     }
 
-    fn combine_with_higher_base_epoch_remove_bytes(self, rhs: Self, removed_bytes: StorageRemovedBytes) -> Result<Self, Error> {
+    fn combine_with_higher_base_epoch_remove_bytes(
+        self,
+        rhs: Self,
+        removed_bytes: &StorageRemovedBytes,
+    ) -> Result<Self, Error> {
         let base_epoch = self.base_epoch().clone();
         let owner_id = self.combine_owner_id(&rhs)?;
         let mut other_epoch_bytes = self.combine_non_base_epoch_bytes(&rhs).unwrap_or_default();
         match removed_bytes {
             SectionedStorageRemoval(sectioned_bytes) => {
-                sectioned_bytes.iter().map(|(epoch, removed_bytes)| {
-                    let bytes_added_in_epoch = other_epoch_bytes.get_mut(&(*epoch as u16)).ok_or(Error::StorageFlags(StorageFlagsError::RemovingAtEpochWithNoAssociatedStorage(
-                        "can not remove bytes when there is no epoch",
-                    )))?;
-                    *bytes_added_in_epoch = bytes_added_in_epoch.checked_sub(*removed_bytes).ok_or(Error::StorageFlags(StorageFlagsError::StorageFlagsOverflow(
-                        "can't remove more bytes than exist at that epoch",
-                    )))?;
-                    Ok(())
-                }).collect::<Result<(), Error>>()?;
+                sectioned_bytes
+                    .iter()
+                    .map(|(epoch, removed_bytes)| {
+                        let bytes_added_in_epoch = other_epoch_bytes
+                            .get_mut(&(*epoch as u16))
+                            .ok_or(Error::StorageFlags(
+                                StorageFlagsError::RemovingAtEpochWithNoAssociatedStorage(
+                                    "can not remove bytes when there is no epoch",
+                                ),
+                            ))?;
+                        *bytes_added_in_epoch =
+                            bytes_added_in_epoch.checked_sub(*removed_bytes).ok_or(
+                                Error::StorageFlags(StorageFlagsError::StorageFlagsOverflow(
+                                    "can't remove more bytes than exist at that epoch",
+                                )),
+                            )?;
+                        Ok(())
+                    })
+                    .collect::<Result<(), Error>>()?;
             }
             _ => {}
         }
@@ -166,7 +189,7 @@ impl StorageFlags {
     pub fn optional_combine_removed_bytes(
         ours: Option<Self>,
         theirs: Self,
-        removed_bytes: StorageRemovedBytes,
+        removed_bytes: &StorageRemovedBytes,
     ) -> Result<Self, Error> {
         match ours {
             None => Ok(theirs),
@@ -186,7 +209,11 @@ impl StorageFlags {
         }
     }
 
-    pub fn combine_removed_bytes(self, rhs: Self, removed_bytes: StorageRemovedBytes) -> Result<Self, Error> {
+    pub fn combine_removed_bytes(
+        self,
+        rhs: Self,
+        removed_bytes: &StorageRemovedBytes,
+    ) -> Result<Self, Error> {
         match self.base_epoch().cmp(rhs.base_epoch()) {
             Ordering::Equal => self.combine_same_base_epoch(rhs),
             Ordering::Less => self.combine_with_higher_base_epoch_remove_bytes(rhs, removed_bytes),
@@ -417,9 +444,11 @@ impl StorageFlags {
     }
 
     pub fn from_some_element_flags(data: &Option<ElementFlags>) -> Result<Option<Self>, Error> {
-        let data = data.as_ref().ok_or(Error::Drive(DriveError::CorruptedElementFlags(
-            "no element flag on data",
-        )))?;
+        let data = data
+            .as_ref()
+            .ok_or(Error::Drive(DriveError::CorruptedElementFlags(
+                "no element flag on data",
+            )))?;
         Self::from_slice(data.as_slice())
     }
 
@@ -428,12 +457,10 @@ impl StorageFlags {
     }
 
     pub fn from_some_element_flags_ref(data: &Option<ElementFlags>) -> Result<Option<Self>, Error> {
-        let data = data
-            .as_ref()
-            .ok_or(Error::Drive(DriveError::CorruptedElementFlags(
-                "no element flag on data",
-            )))?;
-        Self::from_slice(data.as_slice())
+        match data {
+            None => Ok(None),
+            Some(data) => Self::from_slice(data.as_slice()),
+        }
     }
 
     pub fn map_owned_to_element_flags(maybe_storage_flags: Option<Self>) -> ElementFlags {
@@ -458,7 +485,8 @@ impl StorageFlags {
     pub fn split_storage_removed_bytes(&self, removed_bytes: u32) -> StorageRemovedBytes {
         match self {
             SingleEpoch(_) | SingleEpochOwned(_, _) => BasicStorageRemoval(removed_bytes),
-            MultiEpoch(base_epoch, other_epoch_bytes) | MultiEpochOwned(base_epoch, other_epoch_bytes, _) => {
+            MultiEpoch(base_epoch, other_epoch_bytes)
+            | MultiEpochOwned(base_epoch, other_epoch_bytes, _) => {
                 let mut bytes_left = removed_bytes;
                 let mut rev_iter = other_epoch_bytes.iter().rev();
                 let mut sectioned_storage_removal: IntMap<u32> = IntMap::default();
@@ -466,11 +494,13 @@ impl StorageFlags {
                     if let Some((epoch_index, bytes_in_epoch)) = rev_iter.next_back() {
                         if *bytes_in_epoch < bytes_left {
                             bytes_left -= bytes_in_epoch;
-                            sectioned_storage_removal.insert(epoch_index.clone() as u64, *bytes_in_epoch);
+                            sectioned_storage_removal
+                                .insert(epoch_index.clone() as u64, *bytes_in_epoch);
                         } else if *bytes_in_epoch >= bytes_left {
                             //take all bytes
                             bytes_left = 0;
-                            sectioned_storage_removal.insert(epoch_index.clone() as u64, bytes_left);
+                            sectioned_storage_removal
+                                .insert(epoch_index.clone() as u64, bytes_left);
                         }
                     } else {
                         break;

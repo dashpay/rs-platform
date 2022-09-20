@@ -24,10 +24,16 @@ pub fn js_object_to_element<'a, C: Context<'a>>(
 
     let js_element_epoch: Handle<JsNumber> = js_object.get(cx, "epoch")?;
 
+    let js_maybe_owner_id: Option<Handle<JsBuffer>> = js_object.get_opt(cx, "ownerId")?;
+
     let epoch = u16::try_from(js_element_epoch.value(cx) as i64)
         .or_else(|_| cx.throw_range_error("`epochs` must fit in u16"))?;
 
-    let storage_flags = StorageFlags { epoch };
+    let maybe_owner_id = js_maybe_owner_id
+        .map(|js_buffer| js_buffer_to_hash(js_buffer, cx))
+        .transpose()?;
+
+    let storage_flags = StorageFlags::new_single_epoch(epoch, maybe_owner_id);
 
     match element_type.as_str() {
         "item" => {
@@ -36,7 +42,7 @@ pub fn js_object_to_element<'a, C: Context<'a>>(
 
             Ok(Element::new_item_with_flags(
                 item,
-                storage_flags.to_element_flags(),
+                storage_flags.to_some_element_flags(),
             ))
         }
         "reference" => {
@@ -45,7 +51,7 @@ pub fn js_object_to_element<'a, C: Context<'a>>(
 
             Ok(Element::new_reference_with_flags(
                 reference,
-                storage_flags.to_element_flags(),
+                storage_flags.to_some_element_flags(),
             ))
         }
         "tree" => {
@@ -59,7 +65,7 @@ pub fn js_object_to_element<'a, C: Context<'a>>(
                         v.len()
                     ))
                 })?,
-                storage_flags.to_element_flags(),
+                storage_flags.to_some_element_flags(),
             ))
         }
         _ => cx.throw_error(format!("Unexpected element type {}", element_type)),
@@ -216,6 +222,20 @@ pub fn reference_to_dictionary<'a, C: Context<'a>>(
     }
 
     Ok(js_object.upcast())
+}
+
+pub fn js_buffer_to_hash<'a, C: Context<'a>>(
+    js_buffer: Handle<JsBuffer>,
+    cx: &mut C,
+) -> NeonResult<[u8; 32]> {
+    // let guard = cx.lock();
+
+    let key_memory_view = js_buffer.borrow();
+
+    // let key_buffer = js_buffer.deref();
+    // let key_memory_view = js_buffer.borrow(&guard);
+    let key_slice: &[u8] = key_memory_view.as_slice(cx);
+    <[u8; 32]>::try_from(key_slice).or_else(|_| cx.throw_type_error("hash must be 32 bytes long"))
 }
 
 pub fn js_buffer_to_vec_u8<'a, C: Context<'a>>(js_buffer: Handle<JsBuffer>, cx: &mut C) -> Vec<u8> {

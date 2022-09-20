@@ -256,7 +256,7 @@ impl Drive {
             ));
         }
 
-        let element_flags = contract_element.get_flags();
+        let element_flags = contract_element.get_flags().clone();
 
         // this will override the previous contract if we do not keep history
         self.add_contract_to_storage(
@@ -267,7 +267,7 @@ impl Drive {
             &mut batch_operations,
         )?;
 
-        let storage_flags = StorageFlags::from_some_element_flags(element_flags)?;
+        let storage_flags = StorageFlags::from_some_element_flags(&element_flags)?;
 
         let contract_documents_path = contract_documents_path(contract.id.as_bytes());
         for (type_key, document_type) in contract.document_types() {
@@ -550,7 +550,7 @@ mod tests {
                 contract_cbor.clone(),
                 0f64,
                 true,
-                StorageFlags { epoch: 0 },
+                StorageFlags::optional_default_as_ref(),
                 None,
             )
             .expect("expected to apply contract successfully");
@@ -578,7 +578,7 @@ mod tests {
                 contract_cbor.clone(),
                 0f64,
                 true,
-                StorageFlags { epoch: 0 },
+                StorageFlags::optional_default_as_ref(),
                 None,
             )
             .expect("expected to apply contract successfully");
@@ -603,7 +603,7 @@ mod tests {
                 None,
                 0f64,
                 true,
-                StorageFlags::optional_default(),
+                StorageFlags::optional_default_as_ref(),
                 None,
             )
             .expect("expected to apply contract successfully");
@@ -616,7 +616,7 @@ mod tests {
                 None,
                 0f64,
                 true,
-                StorageFlags::optional_default(),
+                StorageFlags::optional_default_as_ref(),
                 None,
             )
             .expect("should update initial contract");
@@ -673,7 +673,7 @@ mod tests {
 
         assert!(ref_value.is_some());
 
-        let storage_flags = StorageFlags { epoch: 0 };
+        let storage_flags = Some(StorageFlags::SingleEpoch(0));
 
         let random_owner_id = rand::thread_rng().gen::<[u8; 32]>();
         drive
@@ -682,7 +682,7 @@ mod tests {
                     document_info: DocumentInfo::DocumentRefAndSerialization((
                         &document,
                         document.to_cbor().as_slice(),
-                        &storage_flags,
+                        storage_flags.as_ref(),
                     )),
                     contract: &contract,
                     document_type,

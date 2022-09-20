@@ -185,7 +185,7 @@ mod tests {
             .insert_identity(
                 identity.clone(),
                 true,
-                StorageFlags::optional_default(),
+                StorageFlags::optional_default_as_ref(),
                 Some(&transaction),
             )
             .expect("expected to insert identity");

@@ -158,7 +158,7 @@ pub fn setup_family_tests(count: u32, with_batching: bool, seed: u64) -> (Drive,
             .document_type_for_name("person")
             .expect("expected to get document type");
 
-        let storage_flags = StorageFlags { epoch: 0 };
+        let storage_flags = Some(StorageFlags::SingleEpoch(0));
 
         drive
             .add_document_for_contract(
@@ -166,7 +166,7 @@ pub fn setup_family_tests(count: u32, with_batching: bool, seed: u64) -> (Drive,
                     document_info: DocumentRefAndSerialization((
                         &document,
                         &document_cbor,
-                        &storage_flags,
+                        storage_flags.as_ref(),
                     )),
                     contract: &contract,
                     document_type,
@@ -231,7 +231,7 @@ pub fn setup_family_tests_with_nulls(
             .document_type_for_name("person")
             .expect("expected to get document type");
 
-        let storage_flags = StorageFlags { epoch: 0 };
+        let storage_flags = Some(StorageFlags::SingleEpoch(0));
 
         drive
             .add_document_for_contract(
@@ -239,7 +239,7 @@ pub fn setup_family_tests_with_nulls(
                     document_info: DocumentRefAndSerialization((
                         &document,
                         &document_cbor,
-                        &storage_flags,
+                        storage_flags.as_ref(),
                     )),
                     contract: &contract,
                     document_type,
@@ -332,7 +332,7 @@ pub fn add_domains_to_contract(
             .document_type_for_name("domain")
             .expect("expected to get document type");
 
-        let storage_flags = StorageFlags { epoch: 0 };
+        let storage_flags = Some(StorageFlags::SingleEpoch(0));
 
         drive
             .add_document_for_contract(
@@ -340,7 +340,7 @@ pub fn add_domains_to_contract(
                     document_info: DocumentRefAndSerialization((
                         &document,
                         &document_cbor,
-                        &storage_flags,
+                        storage_flags.as_ref(),
                     )),
                     contract: &contract,
                     document_type,
@@ -427,7 +427,7 @@ pub fn setup_dpns_test_with_data(path: &str) -> (Drive, Contract) {
                 .document_type_for_name("domain")
                 .expect("expected to get document type");
 
-            let storage_flags = StorageFlags { epoch: 0 };
+            let storage_flags = Some(StorageFlags::SingleEpoch(0));
 
             drive
                 .add_document_for_contract(
@@ -435,7 +435,7 @@ pub fn setup_dpns_test_with_data(path: &str) -> (Drive, Contract) {
                         document_info: DocumentRefAndSerialization((
                             &domain,
                             &domain_cbor,
-                            &storage_flags,
+                            storage_flags.as_ref(),
                         )),
                         contract: &contract,
                         document_type,
@@ -475,7 +475,7 @@ fn test_query_many() {
             .document_type_for_name("person")
             .expect("expected to get document type");
 
-        let storage_flags = StorageFlags { epoch: 0 };
+        let storage_flags = Some(StorageFlags::SingleEpoch(0));
 
         drive
             .add_document_for_contract(
@@ -483,7 +483,7 @@ fn test_query_many() {
                     document_info: DocumentRefAndSerialization((
                         &document,
                         &document_cbor,
-                        &storage_flags,
+                        storage_flags.as_ref(),
                     )),
                     contract: &contract,
                     document_type,
@@ -1263,7 +1263,7 @@ fn test_family_basic_queries() {
         .document_type_for_name("person")
         .expect("expected to get document type");
 
-    let storage_flags = StorageFlags { epoch: 0 };
+    let storage_flags = Some(StorageFlags::SingleEpoch(0));
 
     drive
         .add_document_for_contract(
@@ -1271,7 +1271,7 @@ fn test_family_basic_queries() {
                 document_info: DocumentRefAndSerialization((
                     &document,
                     &person_cbor,
-                    &storage_flags,
+                    storage_flags.as_ref(),
                 )),
                 contract: &contract,
                 document_type,
@@ -1310,7 +1310,7 @@ fn test_family_basic_queries() {
         .document_type_for_name("person")
         .expect("expected to get document type");
 
-    let storage_flags = StorageFlags { epoch: 0 };
+    let storage_flags = Some(StorageFlags::SingleEpoch(0));
 
     drive
         .add_document_for_contract(
@@ -1318,7 +1318,7 @@ fn test_family_basic_queries() {
                 document_info: DocumentRefAndSerialization((
                     &document,
                     &person_cbor,
-                    &storage_flags,
+                    storage_flags.as_ref(),
                 )),
                 contract: &contract,
                 document_type,
@@ -1573,7 +1573,7 @@ fn test_family_basic_queries() {
             None,
             0f64,
             true,
-            StorageFlags::optional_default(),
+            StorageFlags::optional_default_as_ref(),
             Some(&db_transaction),
         )
         .expect("expected to apply contract successfully");
@@ -3129,7 +3129,7 @@ fn test_dpns_query_start_at_with_null_id() {
     let document0 = Document::from_cbor(document_cbor0.as_slice(), None, None)
         .expect("document should be properly deserialized");
 
-    let storage_flags = StorageFlags { epoch: 0 };
+    let storage_flags = Some(StorageFlags::SingleEpoch(0));
 
     drive
         .add_document_for_contract(
@@ -3137,7 +3137,7 @@ fn test_dpns_query_start_at_with_null_id() {
                 document_info: DocumentRefAndSerialization((
                     &document0,
                     &document_cbor0,
-                    &storage_flags,
+                    storage_flags.as_ref(),
                 )),
                 contract: &contract,
                 document_type,
@@ -3171,14 +3171,14 @@ fn test_dpns_query_start_at_with_null_id() {
     let document1 = Document::from_cbor(document_cbor1.as_slice(), None, None)
         .expect("document should be properly deserialized");
 
-    let storage_flags = StorageFlags { epoch: 0 };
+    let storage_flags = Some(StorageFlags::SingleEpoch(0));
     drive
         .add_document_for_contract(
             DocumentAndContractInfo {
                 document_info: DocumentRefAndSerialization((
                     &document1,
                     &document_cbor1,
-                    &storage_flags,
+                    storage_flags.as_ref(),
                 )),
                 contract: &contract,
                 document_type,
@@ -3321,7 +3321,7 @@ fn test_dpns_query_start_after_with_null_id() {
     let document0 = Document::from_cbor(document_cbor0.as_slice(), None, None)
         .expect("document should be properly deserialized");
 
-    let storage_flags = StorageFlags { epoch: 0 };
+    let storage_flags = Some(StorageFlags::SingleEpoch(0));
 
     drive
         .add_document_for_contract(
@@ -3329,7 +3329,7 @@ fn test_dpns_query_start_after_with_null_id() {
                 document_info: DocumentRefAndSerialization((
                     &document0,
                     &document_cbor0,
-                    &storage_flags,
+                    storage_flags.as_ref(),
                 )),
                 contract: &contract,
                 document_type,
@@ -3363,7 +3363,7 @@ fn test_dpns_query_start_after_with_null_id() {
     let document1 = Document::from_cbor(document_cbor1.as_slice(), None, None)
         .expect("document should be properly deserialized");
 
-    let storage_flags = StorageFlags { epoch: 0 };
+    let storage_flags = Some(StorageFlags::SingleEpoch(0));
 
     drive
         .add_document_for_contract(
@@ -3371,7 +3371,7 @@ fn test_dpns_query_start_after_with_null_id() {
                 document_info: DocumentRefAndSerialization((
                     &document1,
                     &document_cbor1,
-                    &storage_flags,
+                    storage_flags.as_ref(),
                 )),
                 contract: &contract,
                 document_type,
@@ -3516,7 +3516,7 @@ fn test_dpns_query_start_after_with_null_id_desc() {
     let document0 = Document::from_cbor(document_cbor0.as_slice(), None, None)
         .expect("document should be properly deserialized");
 
-    let storage_flags = StorageFlags { epoch: 0 };
+    let storage_flags = Some(StorageFlags::SingleEpoch(0));
 
     drive
         .add_document_for_contract(
@@ -3524,7 +3524,7 @@ fn test_dpns_query_start_after_with_null_id_desc() {
                 document_info: DocumentRefAndSerialization((
                     &document0,
                     &document_cbor0,
-                    &storage_flags,
+                    storage_flags.as_ref(),
                 )),
                 contract: &contract,
                 document_type,
@@ -3558,7 +3558,7 @@ fn test_dpns_query_start_after_with_null_id_desc() {
     let document1 = Document::from_cbor(document_cbor1.as_slice(), None, None)
         .expect("document should be properly deserialized");
 
-    let storage_flags = StorageFlags { epoch: 0 };
+    let storage_flags = Some(StorageFlags::SingleEpoch(0));
 
     drive
         .add_document_for_contract(
@@ -3566,7 +3566,7 @@ fn test_dpns_query_start_after_with_null_id_desc() {
                 document_info: DocumentRefAndSerialization((
                     &document1,
                     &document_cbor1,
-                    &storage_flags,
+                    storage_flags.as_ref(),
                 )),
                 contract: &contract,
                 document_type,

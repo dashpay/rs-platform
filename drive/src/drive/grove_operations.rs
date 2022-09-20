@@ -448,7 +448,7 @@ impl Drive {
                 if let Some((max_value_size, max_reference_sizes)) =
                     query_stateless_with_max_value_size_and_max_reference_sizes
                 {
-                    let key_info_path = KeyInfoPath::from_known_path(path);
+                    let key_info_path = KeyInfoPath::from_known_path(path_iter);
                     let key_info = KeyInfo::KnownKey(key.to_vec());
                     let cost = GroveDb::worst_case_for_get(
                         &key_info_path,
@@ -593,7 +593,6 @@ impl Drive {
         match path_key_info {
             PathKeyRef((path, key)) => {
                 let path_iter: Vec<&[u8]> = path.iter().map(|x| x.as_slice()).collect();
-                let stateless = !apply;
                 let has_raw = self.grove_has_raw(
                     path_iter.clone(),
                     key,
@@ -835,11 +834,16 @@ impl Drive {
     ) -> Result<(), Error> {
         let current_batch_operations = DriveOperation::grovedb_operations_batch(drive_operations);
         if apply {
-            let path = path.iter().map(|key_info| match key_info {
-                Key(key) => { Ok(key.as_slice()) }
-                KeyRef(key_ref) => {Ok(key_ref.as_ref()) }
-                KeySize(_) => { Err(Error::Drive(DriveError::CorruptedCodeExecution("key size used with apply"))) }
-            }).collect::<Result<Vec<&[u8]>, Error>>()?;
+            let path = path
+                .iter()
+                .map(|key_info| match key_info {
+                    Key(key) => Ok(key.as_slice()),
+                    KeyRef(key_ref) => Ok(key_ref.as_ref()),
+                    KeySize(_) => Err(Error::Drive(DriveError::CorruptedCodeExecution(
+                        "key size used with apply",
+                    ))),
+                })
+                .collect::<Result<Vec<&[u8]>, Error>>()?;
             let cost_context = self.grove.delete_operations_for_delete_up_tree_while_empty(
                 path,
                 key,
@@ -943,7 +947,7 @@ impl Drive {
                                     new_storage_flags,
                                     cost.added_bytes,
                                 ).map_err(|_| GroveError::JustInTimeElementFlagsClientError("drive could not combine storage flags (new flags were bigger)"))?;
-                            new_flags = &mut combined_storage_flags.to_element_flags();
+                            *new_flags = combined_storage_flags.to_element_flags();
                             Ok(true)
                         }
                         OperationStorageTransitionType::OperationUpdateSmallerSize => {
@@ -951,9 +955,9 @@ impl Drive {
                                 StorageFlags::optional_combine_removed_bytes(
                                     maybe_old_storage_flags,
                                     new_storage_flags,
-                                    cost.removed_bytes,
+                                    &cost.removed_bytes,
                                 ).map_err(|_| GroveError::JustInTimeElementFlagsClientError("drive could not combine storage flags (new flags were smaller)"))?;
-                            new_flags = &mut combined_storage_flags.to_element_flags();
+                            *new_flags = combined_storage_flags.to_element_flags();
                             Ok(true)
                         }
                         _ => Ok(false),

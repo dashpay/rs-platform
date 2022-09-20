@@ -82,15 +82,34 @@ impl Drive {
                 drive_operations,
             )?;
             let encoded_time = encode_float(block_time)?;
-            let path_key_element_info = match document_and_contract_info.document_info {
+            let path_key_element_info = match &document_and_contract_info.document_info {
                 DocumentRefAndSerialization((document, serialized_document, storage_flags)) => {
                     let element = Element::Item(
-                        Vec::from(serialized_document),
-                        StorageFlags::map_to_some_element_flags(storage_flags),
+                        serialized_document.to_vec(),
+                        StorageFlags::map_to_some_element_flags(*storage_flags),
                     );
                     let document_id_in_primary_path =
                         contract_documents_keeping_history_primary_key_path_for_document_id(
                             contract.id().as_bytes(),
+                            document_type.name.as_str(),
+                            document.id.as_slice(),
+                        );
+                    PathFixedSizeKeyElement((
+                        document_id_in_primary_path,
+                        encoded_time.as_slice(),
+                        element,
+                    ))
+                }
+                DocumentWithoutSerialization((document, storage_flags)) => {
+                    let serialized_document =
+                        document.serialize(document_and_contract_info.document_type)?;
+                    let element = Element::Item(
+                        serialized_document,
+                        StorageFlags::map_to_some_element_flags(storage_flags.as_ref()),
+                    );
+                    let document_id_in_primary_path =
+                        contract_documents_keeping_history_primary_key_path_for_document_id(
+                            contract.id.as_bytes(),
                             document_type.name.as_str(),
                             document.id.as_slice(),
                         );
@@ -105,7 +124,7 @@ impl Drive {
                         document.serialize(document_and_contract_info.document_type)?;
                     let element = Element::Item(
                         serialized_document,
-                        StorageFlags::map_to_some_element_flags(storage_flags),
+                        StorageFlags::map_to_some_element_flags(*storage_flags),
                     );
                     let document_id_in_primary_path =
                         contract_documents_keeping_history_primary_key_path_for_document_id(
@@ -127,7 +146,7 @@ impl Drive {
                     PathKeyElementSize((
                         path_max_length,
                         8_usize,
-                        Element::required_item_space(max_size as usize, STORAGE_FLAGS_SIZE),
+                        Element::required_item_space(*max_size as usize, STORAGE_FLAGS_SIZE),
                     ))
                 }
             };
@@ -206,11 +225,20 @@ impl Drive {
             };
             self.batch_insert(path_key_element_info, drive_operations)?;
         } else {
-            let path_key_element_info = match document_and_contract_info.document_info {
+            let path_key_element_info = match &document_and_contract_info.document_info {
                 DocumentRefAndSerialization((document, serialized_document, storage_flags)) => {
                     let element = Element::Item(
-                        Vec::from(serialized_document),
-                        StorageFlags::map_to_some_element_flags(storage_flags),
+                        serialized_document.to_vec(),
+                        StorageFlags::map_to_some_element_flags(*storage_flags),
+                    );
+                    PathFixedSizeKeyElement((primary_key_path, document.id.as_slice(), element))
+                }
+                DocumentWithoutSerialization((document, storage_flags)) => {
+                    let serialized_document =
+                        document.serialize(document_and_contract_info.document_type)?;
+                    let element = Element::Item(
+                        serialized_document,
+                        StorageFlags::map_to_some_element_flags(storage_flags.as_ref()),
                     );
                     PathFixedSizeKeyElement((primary_key_path, document.id.as_slice(), element))
                 }
@@ -219,14 +247,14 @@ impl Drive {
                         document.serialize(document_and_contract_info.document_type)?;
                     let element = Element::Item(
                         serialized_document,
-                        StorageFlags::map_to_some_element_flags(storage_flags),
+                        StorageFlags::map_to_some_element_flags(*storage_flags),
                     );
                     PathFixedSizeKeyElement((primary_key_path, document.id.as_slice(), element))
                 }
                 DocumentSize(max_size) => PathKeyElementSize((
                     defaults::BASE_CONTRACT_DOCUMENTS_PRIMARY_KEY_PATH + document_type.name.len(),
                     DEFAULT_HASH_SIZE,
-                    Element::required_item_space(max_size as usize, STORAGE_FLAGS_SIZE),
+                    Element::required_item_space(*max_size as usize, STORAGE_FLAGS_SIZE),
                 )),
             };
             let inserted = self.batch_insert_if_not_exists(
@@ -624,6 +652,15 @@ impl Drive {
                         );
                         KeyElement((&[0], document_reference))
                     }
+                    DocumentWithoutSerialization((document, storage_flags)) => {
+                        let document_reference = make_document_reference(
+                            primary_key_path,
+                            document,
+                            document_and_contract_info.document_type,
+                            storage_flags.as_ref(),
+                        );
+                        KeyElement((&[0], document_reference))
+                    }
                     DocumentSize(max_size) => KeyElementSize((
                         1,
                         Element::required_item_space(*max_size as usize, STORAGE_FLAGS_SIZE),
@@ -693,7 +730,7 @@ mod tests {
                 false,
                 0f64,
                 true,
-                StorageFlags::optional_default(),
+                StorageFlags::optional_default_as_ref(),
                 None,
             )
             .expect("expected to insert a document successfully");
@@ -707,7 +744,7 @@ mod tests {
                 false,
                 0f64,
                 true,
-                StorageFlags::optional_default(),
+                StorageFlags::optional_default_as_ref(),
                 None,
             )
             .expect_err("expected not to be able to insert same document twice");
@@ -721,7 +758,7 @@ mod tests {
                 true,
                 0f64,
                 true,
-                StorageFlags::optional_default(),
+                StorageFlags::optional_default_as_ref(),
                 None,
             )
             .expect("expected to override a document successfully");
@@ -760,7 +797,7 @@ mod tests {
                 false,
                 0f64,
                 true,
-                StorageFlags::optional_default(),
+                StorageFlags::optional_default_as_ref(),
                 Some(&db_transaction),
             )
             .expect("expected to insert a document successfully");
@@ -774,7 +811,7 @@ mod tests {
                 false,
                 0f64,
                 true,
-                StorageFlags::optional_default(),
+                StorageFlags::optional_default_as_ref(),
                 Some(&db_transaction),
             )
             .expect_err("expected not to be able to insert same document twice");
@@ -788,7 +825,7 @@ mod tests {
                 true,
                 0f64,
                 true,
-                StorageFlags::optional_default(),
+                StorageFlags::optional_default_as_ref(),
                 Some(&db_transaction),
             )
             .expect("expected to override a document successfully");
@@ -829,7 +866,7 @@ mod tests {
                 false,
                 0f64,
                 true,
-                StorageFlags::optional_default(),
+                StorageFlags::optional_default_as_ref(),
                 Some(&db_transaction),
             )
             .expect("expected to insert a document successfully");
@@ -872,7 +909,7 @@ mod tests {
                 false,
                 0f64,
                 false,
-                StorageFlags::optional_default(),
+                StorageFlags::optional_default_as_ref(),
                 Some(&db_transaction),
             )
             .expect("expected to get back fee for document insertion successfully");
@@ -886,7 +923,7 @@ mod tests {
                 false,
                 0f64,
                 true,
-                StorageFlags::optional_default(),
+                StorageFlags::optional_default_as_ref(),
                 Some(&db_transaction),
             )
             .expect("expected to insert a document successfully");
@@ -1077,7 +1114,7 @@ mod tests {
                 false,
                 0f64,
                 true,
-                StorageFlags::optional_default(),
+                StorageFlags::optional_default_as_ref(),
                 None,
             )
             .expect("expected to insert a document successfully");
@@ -1090,7 +1127,7 @@ mod tests {
                 false,
                 0f64,
                 true,
-                StorageFlags::optional_default(),
+                StorageFlags::optional_default_as_ref(),
                 None,
             )
             .expect("expected to insert a document successfully");
@@ -1103,7 +1140,7 @@ mod tests {
                 false,
                 0f64,
                 true,
-                StorageFlags::optional_default(),
+                StorageFlags::optional_default_as_ref(),
                 None,
             )
             .expect("expected to insert a document successfully");
@@ -1133,7 +1170,7 @@ mod tests {
                 false,
                 0f64,
                 true,
-                StorageFlags::optional_default(),
+                StorageFlags::optional_default_as_ref(),
                 None,
             )
             .expect("expected to insert a document successfully");
@@ -1146,7 +1183,7 @@ mod tests {
                 false,
                 0f64,
                 true,
-                StorageFlags::optional_default(),
+                StorageFlags::optional_default_as_ref(),
                 None,
             )
             .expect_err(
@@ -1173,7 +1210,7 @@ mod tests {
                 None,
                 0f64,
                 true,
-                StorageFlags::optional_default(),
+                StorageFlags::optional_default_as_ref(),
                 Some(&db_transaction),
             )
             .expect("expected to apply contract successfully");
@@ -1191,7 +1228,7 @@ mod tests {
                 true,
                 0f64,
                 true,
-                StorageFlags::optional_default(),
+                StorageFlags::optional_default_as_ref(),
                 Some(&db_transaction),
             )
             .expect("should create dash tld");
@@ -1217,7 +1254,7 @@ mod tests {
                 true,
                 0f64,
                 true,
-                StorageFlags::optional_default(),
+                StorageFlags::optional_default_as_ref(),
                 Some(&db_transaction),
             )
             .expect("should add random tld");

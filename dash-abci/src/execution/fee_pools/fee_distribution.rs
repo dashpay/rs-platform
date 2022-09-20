@@ -315,7 +315,7 @@ impl Platform {
             )))?;
 
         self.drive
-            .add_insert_identity_operations(identity, storage_flags, batch)
+            .add_insert_identity_operations(identity, storage_flags.as_ref(), batch)
             .map_err(Error::Drive)
     }
 

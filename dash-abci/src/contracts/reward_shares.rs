@@ -50,13 +50,15 @@ impl Platform {
         let contract = <Contract as DriveContractExt>::from_cbor(&contract_cbor, None)
             .expect("expected to deserialize the contract");
 
+        let storage_flags = Some(StorageFlags::SingleEpoch(0));
+
         self.drive
             .apply_contract(
                 &contract,
                 contract_cbor.clone(),
                 0f64,
                 true,
-                StorageFlags { epoch: 0 },
+                storage_flags.as_ref(),
                 transaction,
             )
             .expect("expected to apply contract successfully");

@@ -336,8 +336,8 @@ impl Drive {
                     // if we are not applying that means we are trying to get worst case costs
                     // which would entail a change on every index
                     change_occurred_on_index |= match &old_document_index_field {
-                        DriveKeyInfo::Key(k) => &document_top_field != k,
-                        DriveKeyInfo::KeyRef(k) => &document_top_field != *k,
+                        DriveKeyInfo::Key(k) => &document_index_field != k,
+                        DriveKeyInfo::KeyRef(k) => &document_index_field != *k,
                         DriveKeyInfo::KeySize(_) => {
                             // we should assume true in this worst case cost scenario
                             true
@@ -521,7 +521,7 @@ mod tests {
                 None,
                 0f64,
                 true,
-                StorageFlags::optional_default(),
+                StorageFlags::optional_default_as_ref(),
                 Some(&db_transaction),
             )
             .expect("expected to apply contract successfully");
@@ -539,7 +539,7 @@ mod tests {
                 true,
                 0f64,
                 true,
-                StorageFlags::optional_default(),
+                StorageFlags::optional_default_as_ref(),
                 Some(&db_transaction),
             )
             .expect("should create alice profile");
@@ -556,7 +556,7 @@ mod tests {
                 None,
                 0f64,
                 true,
-                StorageFlags::optional_default(),
+                StorageFlags::optional_default_as_ref(),
                 Some(&db_transaction),
             )
             .expect("should update alice profile");
@@ -581,7 +581,7 @@ mod tests {
                 None,
                 0f64,
                 true,
-                StorageFlags::optional_default(),
+                StorageFlags::optional_default_as_ref(),
                 None,
             )
             .expect("expected to apply contract successfully");
@@ -639,7 +639,7 @@ mod tests {
                 None,
                 0f64,
                 true,
-                StorageFlags::optional_default(),
+                StorageFlags::optional_default_as_ref(),
                 None,
             )
             .expect("should update alice profile");
@@ -672,7 +672,7 @@ mod tests {
                 None,
                 0f64,
                 true,
-                StorageFlags::optional_default(),
+                StorageFlags::optional_default_as_ref(),
                 Some(&db_transaction),
             )
             .expect("expected to apply contract successfully");
@@ -744,7 +744,7 @@ mod tests {
                 None,
                 0f64,
                 true,
-                StorageFlags::optional_default(),
+                StorageFlags::optional_default_as_ref(),
                 Some(&db_transaction),
             )
             .expect("should update alice profile");
@@ -783,7 +783,7 @@ mod tests {
                 None,
                 0f64,
                 true,
-                StorageFlags::optional_default(),
+                StorageFlags::optional_default_as_ref(),
                 Some(&db_transaction),
             )
             .expect("expected to apply contract successfully");
@@ -883,7 +883,7 @@ mod tests {
                 None,
                 0f64,
                 true,
-                StorageFlags::optional_default(),
+                StorageFlags::optional_default_as_ref(),
                 Some(&db_transaction),
             )
             .expect("should update alice profile");
@@ -939,7 +939,7 @@ mod tests {
                 None,
                 0f64,
                 true,
-                StorageFlags::optional_default(),
+                StorageFlags::optional_default_as_ref(),
                 None,
             )
             .expect("should create a contract");
@@ -970,7 +970,7 @@ mod tests {
                 true,
                 0f64,
                 true,
-                StorageFlags::optional_default(),
+                StorageFlags::optional_default_as_ref(),
                 None,
             )
             .expect("should add document");
@@ -1000,7 +1000,7 @@ mod tests {
                 None,
                 0f64,
                 true,
-                StorageFlags::optional_default(),
+                StorageFlags::optional_default_as_ref(),
                 None,
             )
             .expect("should update document");
@@ -1056,7 +1056,7 @@ mod tests {
                 false,
                 0f64,
                 true,
-                StorageFlags::optional_default(),
+                StorageFlags::optional_default_as_ref(),
                 Some(&db_transaction),
             )
             .expect("expected to insert a document successfully");
@@ -1069,7 +1069,7 @@ mod tests {
                 Some(&random_owner_id),
                 0f64,
                 true,
-                StorageFlags::optional_default(),
+                StorageFlags::optional_default_as_ref(),
                 Some(&db_transaction),
             )
             .expect_err("expected not to be able to update a non mutable document");
@@ -1083,7 +1083,7 @@ mod tests {
                 true,
                 0f64,
                 true,
-                StorageFlags::optional_default(),
+                StorageFlags::optional_default_as_ref(),
                 Some(&db_transaction),
             )
             .expect_err("expected not to be able to override a non mutable document");
@@ -1127,7 +1127,7 @@ mod tests {
                 false,
                 0f64,
                 true,
-                StorageFlags::optional_default(),
+                StorageFlags::optional_default_as_ref(),
                 Some(&db_transaction),
             )
             .expect("expected to insert a document successfully");
@@ -1140,7 +1140,7 @@ mod tests {
                 Some(&random_owner_id),
                 0f64,
                 true,
-                StorageFlags::optional_default(),
+                StorageFlags::optional_default_as_ref(),
                 Some(&db_transaction),
             )
             .expect("expected to update a document with history successfully");

@@ -129,7 +129,7 @@ pub(crate) mod tests {
                 None,
                 0f64,
                 true,
-                StorageFlags::optional_default(),
+                StorageFlags::optional_default_as_ref(),
                 None,
             )
             .expect("expected to apply contract successfully");

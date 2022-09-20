@@ -5,7 +5,7 @@ use crate::contract::Contract;
 use crate::drive::defaults::CONTRACT_DOCUMENTS_PATH_HEIGHT;
 use crate::drive::document::{contract_document_type_path, contract_documents_primary_key_path};
 use crate::drive::flags::StorageFlags;
-use crate::drive::object_size_info::DocumentInfo::{DocumentRefAndSerialization, DocumentSize};
+use crate::drive::object_size_info::DocumentInfo::{DocumentSize, DocumentWithoutSerialization};
 use crate::drive::object_size_info::DriveKeyInfo;
 use crate::drive::object_size_info::DriveKeyInfo::Key;
 use crate::drive::object_size_info::KeyValueInfo::KeyRefRequest;
@@ -109,7 +109,7 @@ impl Drive {
             if let Element::Item(data, element_flags) = document_element {
                 let document = Document::from_cbor(data.as_slice(), None, owner_id)?;
                 let storage_flags = StorageFlags::from_some_element_flags(element_flags)?;
-                DocumentRefAndSerialization((&document, data.as_slice(), storage_flags.as_ref()))
+                DocumentWithoutSerialization((document, storage_flags))
             } else {
                 return Err(Error::Drive(DriveError::CorruptedDocumentNotItem(
                     "document being deleted is not an item",
@@ -827,7 +827,7 @@ mod tests {
                 false,
                 0f64,
                 true,
-                StorageFlags::optional_default(),
+                StorageFlags::optional_default_as_ref(),
                 None,
             )
             .expect("expected to insert a document successfully");
@@ -881,7 +881,7 @@ mod tests {
                 false,
                 0f64,
                 true,
-                StorageFlags::optional_default(),
+                StorageFlags::optional_default_as_ref(),
                 Some(&db_transaction),
             )
             .expect("expected to insert a document successfully");

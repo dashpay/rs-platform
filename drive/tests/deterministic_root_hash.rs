@@ -89,7 +89,7 @@ pub fn add_domains_to_contract(
             .document_type_for_name("domain")
             .expect("expected to get document type");
 
-        let storage_flags = StorageFlags { epoch: 0 };
+        let storage_flags = Some(StorageFlags::SingleEpoch(0));
 
         drive
             .add_document_for_contract(
@@ -97,7 +97,7 @@ pub fn add_domains_to_contract(
                     document_info: DocumentRefAndSerialization((
                         &document,
                         &document_cbor,
-                        &storage_flags,
+                        storage_flags.as_ref(),
                     )),
                     contract: &contract,
                     document_type,
@@ -361,7 +361,7 @@ fn test_root_hash_with_batches(drive: &Drive, db_transaction: &Transaction) {
             None,
             0f64,
             true,
-            StorageFlags::optional_default(),
+            StorageFlags::optional_default_as_ref(),
             Some(db_transaction),
         )
         .expect("apply contract");

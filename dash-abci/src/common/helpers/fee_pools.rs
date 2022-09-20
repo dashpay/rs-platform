@@ -44,7 +44,7 @@ fn create_test_mn_share_document(
         .document_type_for_name(MN_REWARD_SHARES_DOCUMENT_TYPE)
         .expect("expected to get a document type");
 
-    let storage_flags = StorageFlags { epoch: 0 };
+    let storage_flags = Some(StorageFlags::SingleEpoch(0));
 
     let document_cbor = document.to_cbor();
 
@@ -54,7 +54,7 @@ fn create_test_mn_share_document(
                 document_info: DocumentRefAndSerialization((
                     &document,
                     &document_cbor,
-                    &storage_flags,
+                    storage_flags.as_ref(),
                 )),
                 contract: &contract,
                 document_type,
