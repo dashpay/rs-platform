@@ -1,15 +1,10 @@
 use anyhow::{anyhow, Result};
 use dashcore::{
-    blockdata::transaction::special_transaction::{
-        asset_lock::AssetLockPayload,
-        asset_unlock::{
-            qualified_asset_unlock::AssetUnlockPayload,
-            unqualified_asset_unlock::{AssetUnlockBasePayload, AssetUnlockBaseTransactionInfo},
-        },
-        TransactionPayload,
+    blockdata::transaction::special_transaction::asset_unlock::unqualified_asset_unlock::{
+        AssetUnlockBasePayload, AssetUnlockBaseTransactionInfo,
     },
-    consensus::Encodable,
-    Transaction,
+    consensus::{Decodable, Encodable},
+    TxOut,
 };
 
 use crate::{prelude::Identity, state_repository::StateRepositoryLike};
@@ -40,10 +35,13 @@ where
             .fetch_latest_withdrawal_transaction_index()
             .await?;
 
+        let tx_out =
+            TxOut::consensus_decode(state_transition.output.as_slice()).map_err(|e| anyhow!(e))?;
+
         let withdrwal_transaction = AssetUnlockBaseTransactionInfo {
             version: 1,
             lock_time: 0,
-            output: vec![],
+            output: vec![tx_out],
             base_payload: AssetUnlockBasePayload {
                 version: 1,
                 index: latest_withdrawal_index + 1,
