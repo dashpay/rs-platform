@@ -106,13 +106,15 @@ impl Identity {
     }
 
     /// Increase Identity balance
-    pub fn increase_balance(&mut self, amount: u64) {
+    pub fn increase_balance(&mut self, amount: u64) -> u64 {
         self.balance += amount;
+        self.balance
     }
 
     /// Reduce the Identity balance
-    pub fn reduce_balance(&mut self, amount: u64) {
+    pub fn reduce_balance(&mut self, amount: u64) -> u64 {
         self.balance -= amount;
+        self.balance
     }
 
     /// Set Identity asset lock
