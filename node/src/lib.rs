@@ -1610,7 +1610,7 @@ impl DriveWrapper {
                 .map(|bytes| Withdrawal::from_cbor(bytes))
                 .collect::<Result<Vec<Withdrawal>, Error>>()
                 .and_then(|withdrawals| {
-                    platform.drive.enqueue_withdrawals(
+                    platform.drive.enqueue_withdrawal_transactions(
                         withdrawals,
                         using_transaction.then(|| transaction).flatten(),
                     )
@@ -1655,7 +1655,7 @@ impl DriveWrapper {
         db.send_to_drive_thread(move |platform: &Platform, transaction, channel| {
             let result: Result<Vec<Vec<u8>>, Error> = platform
                 .drive
-                .dequeue_withdrawals(using_transaction.then(|| transaction).flatten())
+                .dequeue_withdrawal_transactions(using_transaction.then(|| transaction).flatten())
                 .and_then(|withdrawals| withdrawals.iter().map(|w| w.to_cbor()).collect());
 
             channel.send(move |mut task_context| {

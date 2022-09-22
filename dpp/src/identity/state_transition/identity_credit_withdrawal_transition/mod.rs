@@ -45,7 +45,7 @@ pub struct IdentityCreditWithdrawalTransition {
     pub amount: u64,
     pub core_fee: u32,
     pub pooling: Pooling,
-    pub output: Vec<u8>,
+    pub output_script: Vec<u8>,
     pub signature_public_key_id: KeyID,
     pub signature: Vec<u8>,
 }
@@ -59,7 +59,7 @@ impl std::default::Default for IdentityCreditWithdrawalTransition {
             amount: Default::default(),
             core_fee: Default::default(),
             pooling: Default::default(),
-            output: Default::default(),
+            output_script: Default::default(),
             signature_public_key_id: Default::default(),
             signature: Default::default(),
         }

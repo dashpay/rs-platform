@@ -22,7 +22,7 @@ mod deserialization {
             Identifier::from_bytes(&vec![1; 32]).unwrap()
         );
 
-        assert_eq!(state_transition.output, vec![0; 20]);
+        assert_eq!(state_transition.output_script, vec![0; 20]);
         assert_eq!(state_transition.signature, vec![0; 65]);
     }
 
@@ -36,7 +36,7 @@ mod deserialization {
             Identifier::from_bytes(&vec![1; 32]).unwrap()
         );
 
-        assert_eq!(state_transition.output, vec![0; 20]);
+        assert_eq!(state_transition.output_script, vec![0; 20]);
         assert_eq!(state_transition.signature, vec![0; 65]);
     }
 }

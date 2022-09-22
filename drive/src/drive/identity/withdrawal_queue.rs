@@ -13,7 +13,7 @@ use crate::fee::op::DriveOperation;
 const QUERY_LIMIT: u16 = 16;
 
 impl Drive {
-    pub fn enqueue_withdrawals(
+    pub fn enqueue_withdrawal_transactions(
         &self,
         withdrawals: Vec<(Vec<u8>, Vec<u8>)>,
         transaction: TransactionArg,
@@ -35,7 +35,7 @@ impl Drive {
         calculate_fee(None, Some(drive_operations))
     }
 
-    pub fn dequeue_withdrawals(
+    pub fn dequeue_withdrawal_transactions(
         &self,
         transaction: TransactionArg,
     ) -> Result<Vec<(Vec<u8>, Vec<u8>)>, Error> {
@@ -124,23 +124,23 @@ mod tests {
                 .collect();
 
             drive
-                .enqueue_withdrawals(withdrawals, Some(&transaction))
+                .enqueue_withdrawal_transactions(withdrawals, Some(&transaction))
                 .expect("to enqueue withdrawal");
 
             let withdrawals = drive
-                .dequeue_withdrawals(Some(&transaction))
+                .dequeue_withdrawal_transactions(Some(&transaction))
                 .expect("to dequeue withdrawals");
 
             assert_eq!(withdrawals.len(), 16);
 
             let withdrawals = drive
-                .dequeue_withdrawals(Some(&transaction))
+                .dequeue_withdrawal_transactions(Some(&transaction))
                 .expect("to dequeue withdrawals");
 
             assert_eq!(withdrawals.len(), 1);
 
             let withdrawals = drive
-                .dequeue_withdrawals(Some(&transaction))
+                .dequeue_withdrawal_transactions(Some(&transaction))
                 .expect("to dequeue withdrawals");
 
             assert_eq!(withdrawals.len(), 0);

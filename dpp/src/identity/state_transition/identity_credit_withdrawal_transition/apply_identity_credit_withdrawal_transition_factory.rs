@@ -4,7 +4,7 @@ use dashcore::{
         AssetUnlockBasePayload, AssetUnlockBaseTransactionInfo,
     },
     consensus::{Decodable, Encodable},
-    TxOut,
+    Script, TxOut,
 };
 
 use crate::{prelude::Identity, state_repository::StateRepositoryLike};
@@ -35,8 +35,12 @@ where
             .fetch_latest_withdrawal_transaction_index()
             .await?;
 
-        let tx_out =
-            TxOut::consensus_decode(state_transition.output.as_slice()).map_err(|e| anyhow!(e))?;
+        let output_script = Script(state_transition.output_script.into_boxed_slice());
+
+        let tx_out = TxOut {
+            value: state_transition.amount,
+            script_pubkey: output_script,
+        };
 
         let withdrwal_transaction = AssetUnlockBaseTransactionInfo {
             version: 1,
@@ -69,6 +73,7 @@ where
 
         existing_identity = existing_identity.reduce_balance(state_transition.amount);
 
+        // TODO: we need to be able to batch state repository operations
         self.state_repository
             .update_identity(&existing_identity)
             .await

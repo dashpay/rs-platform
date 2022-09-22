@@ -83,14 +83,16 @@ impl TenderdashAbci for Platform {
             .replace(Some(block_execution_context));
 
         // Get 16 latest withdrawal transactions from the queue
-        let withdrawal_transactions = self.drive.dequeue_withdrawals(transaction)?;
+        let withdrawal_transactions = self.drive.dequeue_withdrawal_transactions(transaction)?;
 
-        let withdrawal_bytes = withdrawal_transactions
+        // Appending request_height and quorum_hash to withdrwal transaction
+        // and pass it to JS Drive for singing and broadcasting
+        let withdrawal_transaction_bytes = withdrawal_transactions
             .into_iter()
             .map(|(_, bytes)| {
                 let request_info = AssetUnlockRequestInfo {
                     request_height: request.block_height as u32,
-                    quorum_hash: QuorumHash::hash(&request.quorum_hash),
+                    quorum_hash: QuorumHash::hash(&request.validator_set_quorum_hash),
                 };
 
                 let mut bytes_buffer = vec![];
@@ -108,7 +110,7 @@ impl TenderdashAbci for Platform {
             .collect::<Result<Vec<Vec<u8>>, Error>>()?;
 
         let response = BlockBeginResponse {
-            withdrawal_transactions: withdrawal_bytes,
+            raw_withdrawal_transactions: withdrawal_transaction_bytes,
         };
 
         Ok(response)
