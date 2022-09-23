@@ -33,9 +33,12 @@
 use ciborium::value::Value;
 use grovedb::Error;
 
+/// Order clause struct
 #[derive(Clone, Debug, PartialEq)]
 pub struct OrderClause {
+    /// Field
     pub field: String,
+    /// Ascending bool
     pub ascending: bool,
 }
 

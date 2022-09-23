@@ -62,10 +62,11 @@ use std::option::Option::None;
 /// the accumulated fees to their corresponding pools, and in the case of deletion of data, remove
 /// storage fees from future Epoch storage pools.
 
-/// Amount of fees in the storage and processing fee distribution pools and the number of
-/// proposers to be paid out.
+/// Holds info relevant fees and a processed block
 pub struct ProcessedBlockFeesResult {
+    /// Amount of fees in the storage and processing fee distribution pools
     pub fees_in_pools: FeesInPools,
+    /// A struct with the number of proposers to be paid out and the last paid epoch index
     pub payouts: Option<ProposersPayouts>,
 }
 
@@ -213,6 +214,7 @@ mod tests {
             use rs_drive::fee_pools::epochs::Epoch;
             use rs_drive::grovedb::TransactionArg;
 
+            /// Process and validate an epoch change
             pub fn process_and_validate_epoch_change(
                 platform: &Platform,
                 genesis_time_ms: u64,
@@ -406,6 +408,7 @@ mod tests {
             use rs_drive::fee_pools::epochs::Epoch;
             use rs_drive::grovedb::TransactionArg;
 
+            /// Process and validate block fees
             pub fn process_and_validate_block_fees(
                 platform: &Platform,
                 genesis_time_ms: u64,

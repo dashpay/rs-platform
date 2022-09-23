@@ -1,3 +1,4 @@
+/// Drive errors
 #[derive(Debug, thiserror::Error)]
 pub enum DriveError {
     // This error should never occur, it is the equivalent of a panic.

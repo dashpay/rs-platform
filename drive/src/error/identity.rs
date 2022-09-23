@@ -1,3 +1,4 @@
+/// Identity errors
 #[derive(Debug, thiserror::Error)]
 pub enum IdentityError {
     #[error("missing required key: {0}")]

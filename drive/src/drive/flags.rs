@@ -36,9 +36,10 @@ use grovedb::ElementFlags;
 use crate::error::drive::DriveError;
 use crate::error::Error;
 
-// Struct Definitions
+/// Storage flags
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct StorageFlags {
+    /// Epoch
     pub epoch: u16,
 }
 

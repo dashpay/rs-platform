@@ -53,9 +53,13 @@ pub struct InitChainResponse {}
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BlockBeginRequest {
+    /// Block height
     pub block_height: u64,
+    /// Block time in ms
     pub block_time_ms: u64,
+    /// Previous block time in ms
     pub previous_block_time_ms: Option<u64>,
+    /// The block proposer's proTxHash
     pub proposer_pro_tx_hash: [u8; 32],
 }
 
@@ -68,6 +72,7 @@ pub struct BlockBeginResponse {}
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BlockEndRequest {
+    /// The fees for the block
     pub fees: FeesAggregate,
 }
 
@@ -78,8 +83,11 @@ pub type EpochRefund = (u16, u64);
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FeesAggregate {
+    /// The aggregate processing fees
     pub processing_fees: u64,
+    /// The aggregate storage fees
     pub storage_fees: u64,
+    /// The aggregate refund amount by epoch
     // pub refunds_by_epoch: Vec<EpochRefund>,
 }
 
@@ -87,9 +95,13 @@ pub struct FeesAggregate {
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BlockEndResponse {
+    /// The current epoch index
     pub current_epoch_index: u16,
+    /// Boolean whether this block is the first of an epoch
     pub is_epoch_change: bool,
+    /// Number of proposers to be paid
     pub proposers_paid_count: Option<u16>,
+    /// Index of the last epoch that marked as paid
     pub paid_epoch_index: Option<u16>,
 }
 

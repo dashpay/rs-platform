@@ -32,7 +32,9 @@
 //! This module defines general, commonly used functions in Drive.
 //!
 
+/// Encode module
 pub mod encode;
+/// Helpers module
 pub mod helpers;
 
 use std::collections::{BTreeMap, BTreeSet};

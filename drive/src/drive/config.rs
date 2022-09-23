@@ -32,20 +32,30 @@
 
 use DriveEncoding::DriveProtobuf;
 
+/// Boolean if GroveDB batching is enabled by default
 pub const DEFAULT_GROVE_BATCHING_ENABLED: bool = true;
+/// Boolean if GroveDB batching consistency verification is enabled by default
 pub const DEFAULT_GROVE_BATCHING_CONSISTENCY_VERIFICATION_ENABLED: bool = false;
+/// Boolean if GroveDB has_raw in enabled by default
 pub const DEFAULT_GROVE_HAS_RAW_ENABLED: bool = true;
 
+/// Encoding for Drive
 pub enum DriveEncoding {
     DriveCbor,
     DriveProtobuf,
 }
 
+/// Drive configuration struct
 pub struct DriveConfig {
+    /// Boolean if batching is enabled
     pub batching_enabled: bool,
+    /// Boolean if batching consistency verification is enabled
     pub batching_consistency_verification: bool,
+    /// Boolean if has_raw is enabled
     pub has_raw_enabled: bool,
+    /// Default genesis time
     pub default_genesis_time: Option<u64>,
+    /// Encoding
     pub encoding: DriveEncoding,
 }
 
@@ -63,6 +73,7 @@ impl Default for DriveConfig {
 }
 
 impl DriveConfig {
+    /// Default `DriveConfig` settings with batching enabled
     pub fn default_with_batches() -> Self {
         DriveConfig {
             batching_enabled: true,
@@ -70,6 +81,7 @@ impl DriveConfig {
         }
     }
 
+    /// Default `DriveConfig` settings with batching disabled
     pub fn default_without_batches() -> Self {
         DriveConfig {
             batching_enabled: false,

@@ -1,3 +1,4 @@
+/// Query errors
 #[derive(Debug, thiserror::Error)]
 pub enum QueryError {
     #[error("unsupported error: {0}")]

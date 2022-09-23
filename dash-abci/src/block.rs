@@ -30,14 +30,20 @@
 use crate::abci::messages::BlockBeginRequest;
 use crate::execution::fee_pools::epoch::EpochInfo;
 
+/// Block info
 pub struct BlockInfo {
+    /// Block height
     pub block_height: u64,
+    /// Block time in ms
     pub block_time_ms: u64,
+    /// Previous block time in ms
     pub previous_block_time_ms: Option<u64>,
+    /// Block proposer's proTxHash
     pub proposer_pro_tx_hash: [u8; 32],
 }
 
 impl BlockInfo {
+    /// Given a `BlockBeginRequest` return `BlockInfo`
     pub fn from_block_begin_request(block_begin_request: &BlockBeginRequest) -> BlockInfo {
         BlockInfo {
             block_height: block_begin_request.block_height,
@@ -48,7 +54,10 @@ impl BlockInfo {
     }
 }
 
+/// Block execution context
 pub struct BlockExecutionContext {
+    /// Block info
     pub block_info: BlockInfo,
+    /// Epoch info
     pub epoch_info: EpochInfo,
 }

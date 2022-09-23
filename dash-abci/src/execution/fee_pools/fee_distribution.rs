@@ -52,22 +52,30 @@ use rust_decimal_macros::dec;
 /// Struct containing the number of proposers to be paid and the index of the epoch
 /// they're to be paid from.
 pub struct ProposersPayouts {
+    /// Number of proposers to be paid
     pub proposers_paid_count: u16,
+    /// Index of last epoch marked as paid
     pub paid_epoch_index: u16,
 }
 
 /// Struct containing the amount of processing and storage fees in the distribution pools
 pub struct FeesInPools {
+    /// Amount of processing fees in the distribution pools
     pub processing_fees: u64,
+    /// Amount of storage fees in the distribution pools
     pub storage_fees: u64,
 }
 
 /// Struct containing info about an epoch containing fees that have not been paid out yet.
 #[derive(Default)]
 pub struct UnpaidEpoch {
+    /// Index of the current epoch
     pub epoch_index: u16,
+    /// Block height of the first block in the epoch
     pub start_block_height: u64,
+    /// Block height of the last block in the epoch
     pub end_block_height: u64,
+    /// Index of the next unpaid epoch
     pub next_unpaid_epoch_index: u16,
 }
 

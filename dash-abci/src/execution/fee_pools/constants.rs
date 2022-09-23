@@ -36,6 +36,7 @@ use rs_drive::drive::fee_pools::epochs::constants::PERPETUAL_STORAGE_YEARS;
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 
+/// Default original fee multiplier
 pub const DEFAULT_ORIGINAL_FEE_MULTIPLIER: f64 = 2.0;
 
 // TODO: Should be updated from the doc

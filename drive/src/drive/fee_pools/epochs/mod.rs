@@ -36,10 +36,15 @@ use crate::error::Error;
 use crate::fee_pools::epochs::Epoch;
 use grovedb::TransactionArg;
 
+/// Constants module
 pub mod constants;
+/// Credit distribution pools module
 pub mod credit_distribution_pools;
+/// Proposers module
 pub mod proposers;
+/// Start block module
 pub mod start_block;
+/// Start time module
 pub mod start_time;
 
 impl Drive {

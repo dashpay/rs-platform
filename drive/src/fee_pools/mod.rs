@@ -41,7 +41,9 @@ use grovedb::batch::GroveDbOp;
 use grovedb::batch::Op::Insert;
 use grovedb::Element;
 
+/// Epochs module
 pub mod epochs;
+/// Epochs root tree key constants module
 pub mod epochs_root_tree_key_constants;
 
 /// Adds the operations to groveDB op batch to create the fee pool trees

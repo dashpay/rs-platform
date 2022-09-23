@@ -1,3 +1,4 @@
+/// Serialization errors
 #[derive(Debug, thiserror::Error)]
 pub enum SerializationError {
     #[error("corrupted serialization error key: {0}")]

@@ -39,6 +39,7 @@ use ciborium::value::Value;
 use dpp::data_contract::extra::encode_float;
 use dpp::data_contract::extra::ContractError;
 use dpp::data_contract::extra::DriveContractExt;
+/// Import grovedb
 pub use grovedb::{
     Element, Error as GroveError, GroveDb, PathQuery, Query, QueryItem, SizedQuery, TransactionArg,
 };
@@ -52,7 +53,9 @@ use sqlparser::dialect::GenericDialect;
 use sqlparser::parser::Parser;
 
 use conditions::WhereOperator::{Equal, In};
+/// Import conditions
 pub use conditions::{WhereClause, WhereOperator};
+/// Import ordering
 pub use ordering::OrderClause;
 
 use crate::common::bytes_for_system_value;
@@ -67,17 +70,25 @@ use crate::error::Error::GroveDB;
 use crate::fee::calculate_fee;
 use crate::fee::op::DriveOperation;
 
+/// Conditions module
 pub mod conditions;
 mod defaults;
+/// Ordering module
 pub mod ordering;
 mod test_index;
 
+/// Internal clauses struct
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct InternalClauses {
+    /// Primary key in clause
     pub primary_key_in_clause: Option<WhereClause>,
+    /// Primary key equal clause
     pub primary_key_equal_clause: Option<WhereClause>,
+    /// In clause
     pub in_clause: Option<WhereClause>,
+    /// Range clause
     pub range_clause: Option<WhereClause>,
+    /// Equal clause
     pub equal_clauses: BTreeMap<String, WhereClause>,
 }
 
@@ -187,16 +198,26 @@ impl InternalClauses {
     }
 }
 
+/// Drive query struct
 #[derive(Debug, PartialEq)]
 pub struct DriveQuery<'a> {
+    /// Contract
     pub contract: &'a Contract,
+    /// Document type
     pub document_type: &'a DocumentType,
+    /// Internal clauses
     pub internal_clauses: InternalClauses,
+    /// Offset
     pub offset: u16,
+    /// Limit
     pub limit: u16,
+    /// Order by
     pub order_by: IndexMap<String, OrderClause>,
+    /// Start at
     pub start_at: Option<Vec<u8>>,
+    /// Start at included
     pub start_at_included: bool,
+    /// Block time
     pub block_time: Option<f64>,
 }
 

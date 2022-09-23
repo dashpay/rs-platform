@@ -40,6 +40,7 @@ use grovedb::Element;
 // TODO move to GroveDB
 #[derive(Debug)]
 pub struct GroveDbOpBatch {
+    /// Operations
     pub(crate) operations: Vec<GroveDbOp>,
 }
 
@@ -111,6 +112,7 @@ impl GroveDbOpBatch {
         })
     }
 
+    /// Verify consistency of operations
     pub fn verify_consistency_of_operations(&self) -> GroveDbOpConsistencyResults {
         GroveDbOp::verify_consistency_of_operations(&self.operations)
     }

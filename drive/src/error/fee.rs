@@ -1,3 +1,4 @@
+/// Fee errors
 #[derive(Debug, thiserror::Error)]
 pub enum FeeError {
     // TODO: Revisit

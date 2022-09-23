@@ -47,34 +47,54 @@ use crate::error::Error;
 use crate::fee::op::DriveOperation;
 use crate::fee::op::DriveOperation::GroveOperation;
 
+/// Batch module
 pub mod batch;
+/// Config module
 pub mod config;
+/// Contract module
 pub mod contract;
+/// Defaults module
 pub mod defaults;
+/// Document module
 pub mod document;
+/// Fee pools module
 pub mod fee_pools;
+/// Flags module
 pub mod flags;
+/// Genesis time module
 pub mod genesis_time;
+/// Grove operations module
 mod grove_operations;
+/// Identity module
 pub mod identity;
+/// Initialization module
 pub mod initialization;
+/// Object size info module
 pub mod object_size_info;
+/// Query module
 pub mod query;
 
 use dpp::data_contract::extra::DriveContractExt;
 
+/// Drive cache struct
 pub struct DriveCache {
+    /// Cached contracts
     pub cached_contracts: Cache<[u8; 32], Arc<Contract>>,
+    /// Genesis time in ms
     pub genesis_time_ms: Option<u64>,
 }
 
+/// Drive struct
 pub struct Drive {
+    /// GroveDB
     pub grove: GroveDb,
+    /// Drive config
     pub config: DriveConfig,
+    /// Drive Cache
     pub cache: RefCell<DriveCache>,
 }
 
-/// Keys for the first layer of subtrees below the root tree.
+/// Keys for the root tree.
 #[repr(u8)]
 pub enum RootTree {
     // Input data errors
@@ -85,6 +105,7 @@ pub enum RootTree {
     Pools = 4,
 }
 
+/// Storage cost
 pub const STORAGE_COST: i32 = 50;
 
 impl From<RootTree> for u8 {

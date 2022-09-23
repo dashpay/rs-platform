@@ -46,9 +46,14 @@ pub const EPOCH_CHANGE_TIME_MS: u64 = 1576800000;
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EpochInfo {
+    /// Current epoch index
     pub current_epoch_index: u16,
+
+    /// Previous epoch index
     // Available only on epoch change
     pub previous_epoch_index: Option<u16>,
+    
+    /// Boolean true if it's the first block of a new epoch
     pub is_epoch_change: bool,
 }
 

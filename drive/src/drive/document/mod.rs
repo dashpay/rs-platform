@@ -137,6 +137,7 @@ fn make_document_reference(
     )
 }
 
+/// Tests module
 #[cfg(test)]
 pub(crate) mod tests {
     use std::option::Option::None;
@@ -147,6 +148,7 @@ pub(crate) mod tests {
     use crate::drive::flags::StorageFlags;
     use crate::drive::Drive;
 
+    /// Setup Dashpay
     pub fn setup_dashpay(_prefix: &str, mutable_contact_requests: bool) -> (Drive, Vec<u8>) {
         // Todo: make TempDir based on _prefix
         let tmp_dir = TempDir::new().unwrap();

@@ -1,3 +1,4 @@
+/// Document errors
 #[derive(Debug, thiserror::Error)]
 pub enum DocumentError {
     #[error("missing document propoerty error: {0}")]

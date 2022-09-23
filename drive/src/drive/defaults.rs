@@ -32,16 +32,29 @@
 //! Default values for Drive constants.
 //!
 
+/// Protocol version
 pub const PROTOCOL_VERSION: u32 = 1;
+/// Contract Documents subtree path height
 pub const CONTRACT_DOCUMENTS_PATH_HEIGHT: u16 = 4;
+/// Base contract root path size
 pub const BASE_CONTRACT_ROOT_PATH_SIZE: usize = 33; // 1 + 32
+/// Base contract keeping_history_storage path size
 pub const BASE_CONTRACT_KEEPING_HISTORY_STORAGE_PATH_SIZE: usize = 34; // 1 + 32 + 1
+/// Base contract documents_keeping_history_storage_time_reference path size
 pub const BASE_CONTRACT_DOCUMENTS_KEEPING_HISTORY_STORAGE_TIME_REFERENCE_PATH: usize = 75;
+/// Base contract documents_keeping_history_primary_key path for document ID size
 pub const BASE_CONTRACT_DOCUMENTS_KEEPING_HISTORY_PRIMARY_KEY_PATH_FOR_DOCUMENT_ID_SIZE: usize = 67; // 1 + 32 + 1 + 1 + 32, then we need to add document_type_name.len()
+/// Base Contract Documents path size
 pub const BASE_CONTRACT_DOCUMENTS_PATH: usize = 34;
+/// Base Contract Documents primary key path
 pub const BASE_CONTRACT_DOCUMENTS_PRIMARY_KEY_PATH: usize = 35;
+/// Default hash size
 pub const DEFAULT_HASH_SIZE: usize = 32;
+/// Default float size
 pub const DEFAULT_FLOAT_SIZE: usize = 8;
+/// Empty tree storage size
 pub const EMPTY_TREE_STORAGE_SIZE: usize = 33;
+/// Max index size
 pub const MAX_INDEX_SIZE: usize = 255;
+/// Storage flags size
 pub const STORAGE_FLAGS_SIZE: usize = 2;

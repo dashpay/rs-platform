@@ -51,6 +51,7 @@ use crate::fee::op::DriveOperation::{
     CostCalculationInsertOperation, CostCalculationQueryOperation, GroveOperation,
 };
 
+/// Base ops
 #[derive(Debug, Enum)]
 pub enum BaseOp {
     Stop,
@@ -78,6 +79,7 @@ pub enum BaseOp {
 }
 
 impl BaseOp {
+    /// Match the op and get the cost
     pub fn cost(&self) -> u64 {
         match self {
             BaseOp::Stop => 0,
@@ -106,6 +108,7 @@ impl BaseOp {
     }
 }
 
+/// Function ops
 #[derive(Debug, Enum)]
 pub enum FunctionOp {
     Exp,
@@ -115,13 +118,18 @@ pub enum FunctionOp {
 }
 
 impl FunctionOp {
+    /// Cost
     pub fn cost(&self, _word_count: u32) {}
 }
 
+/// Sizes of query operation
 #[derive(Debug)]
 pub struct SizesOfQueryOperation {
+    /// Key size
     pub key_size: u32,
+    /// Path size
     pub path_size: u32,
+    /// Value size
     pub value_size: u32,
 }
 
@@ -130,6 +138,7 @@ trait OperationCostConvert {
 }
 
 impl SizesOfQueryOperation {
+    /// Get sizes from key_len and path
     pub fn for_key_check_in_path<'a: 'b, 'b, 'c, P>(key_len: usize, path: P) -> Self
     where
         P: IntoIterator<Item = &'c [u8]>,
@@ -146,6 +155,7 @@ impl SizesOfQueryOperation {
         }
     }
 
+    /// Get sizes with zero for value
     pub fn for_key_check_with_path_length(key_len: usize, path_len: usize) -> Self {
         SizesOfQueryOperation {
             key_size: key_len as u32,
@@ -154,6 +164,7 @@ impl SizesOfQueryOperation {
         }
     }
 
+    /// Get sizes from key and value lengths and path
     pub fn for_value_retrieval_in_path<'a: 'b, 'b, 'c, P>(
         key_len: usize,
         path: P,
@@ -174,6 +185,7 @@ impl SizesOfQueryOperation {
         }
     }
 
+    /// Get sizes
     pub fn for_value_retrieval_with_path_length(
         key_len: usize,
         path_len: usize,
@@ -186,6 +198,7 @@ impl SizesOfQueryOperation {
         }
     }
 
+    /// Get sizes from `PathQuery` and returned values
     pub fn for_path_query(path_query: &PathQuery, returned_values: &[Vec<u8>]) -> Self {
         SizesOfQueryOperation {
             key_size: path_query
@@ -200,6 +213,7 @@ impl SizesOfQueryOperation {
         }
     }
 
+    /// Get sizes for empty path query
     pub fn for_empty_path_query(path_query: &PathQuery) -> Self {
         SizesOfQueryOperation {
             key_size: path_query
@@ -215,22 +229,32 @@ impl SizesOfQueryOperation {
     }
 }
 
+/// Sizes of insert operation
 #[derive(Debug)]
 pub struct SizesOfInsertOperation {
+    /// Path size
     pub path_size: u32,
+    /// Key size
     pub key_size: u16,
+    /// Value size
     pub value_size: u32,
 }
 
+/// Sizes of delete operation
 #[derive(Debug)]
 pub struct SizesOfDeleteOperation {
+    /// Path size
     pub path_size: u32,
+    /// Key size
     pub key_size: u16,
+    /// Value size
     pub value_size: u32,
+    /// Multiplier
     pub multiplier: u8,
 }
 
 impl SizesOfDeleteOperation {
+    /// Get sizes for empty tree
     pub fn for_empty_tree(path_size: u32, key_size: u16, multiplier: u8) -> Self {
         SizesOfDeleteOperation {
             path_size,
@@ -239,6 +263,7 @@ impl SizesOfDeleteOperation {
             multiplier,
         }
     }
+    /// Get sizes for key value
     pub fn for_key_value(path_size: u32, key_size: u16, element: &Element, multiplier: u8) -> Self {
         let value_size = match element {
             Element::Item(item, _) => item.len(),
@@ -248,6 +273,7 @@ impl SizesOfDeleteOperation {
         SizesOfDeleteOperation::for_key_value_size(path_size, key_size, value_size, multiplier)
     }
 
+    /// Get sizes for key value size
     pub fn for_key_value_size(
         path_size: u32,
         key_size: u16,
@@ -302,6 +328,7 @@ impl OperationCostConvert for SizesOfDeleteOperation {
     }
 }
 
+/// Drive operation
 #[derive(Debug)]
 pub enum DriveOperation {
     GroveOperation(GroveDbOp),
@@ -424,6 +451,7 @@ impl DriveOperation {
     }
 }
 
+/// Drive cost trait
 pub trait DriveCost {
     fn ephemeral_cost(&self) -> Result<u64, Error>;
     fn storage_cost(&self) -> Result<i64, Error>;

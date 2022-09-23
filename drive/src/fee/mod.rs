@@ -36,7 +36,9 @@ use crate::error::fee::FeeError;
 use crate::error::Error;
 use crate::fee::op::{BaseOp, DriveCost, DriveOperation};
 
+/// Default costs module
 pub mod default_costs;
+/// Op module
 pub mod op;
 
 /// Calculates fees for the given operations. Returns the storage and processing costs.

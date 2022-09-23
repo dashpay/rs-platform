@@ -1,3 +1,4 @@
+/// Execution errors
 #[derive(Debug, thiserror::Error)]
 pub enum ExecutionError {
     #[error("execution error key: {0}")]

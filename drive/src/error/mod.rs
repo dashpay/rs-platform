@@ -6,13 +6,20 @@ use identity::IdentityError;
 use query::QueryError;
 use structure::StructureError;
 
+/// Document module
 pub mod document;
+/// Drive module
 pub mod drive;
+/// Fee module
 pub mod fee;
+/// Identity module
 pub mod identity;
+/// Query module
 pub mod query;
+/// Structure module
 pub mod structure;
 
+/// Errors
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("query: {0}")]

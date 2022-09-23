@@ -114,6 +114,7 @@ impl<'a, const N: usize> PathInfo<'a, N> {
     }
 }
 
+/// Key info
 #[derive(Clone)]
 pub enum KeyInfo<'a> {
     /// A key
@@ -185,6 +186,7 @@ impl<'a> KeyInfo<'a> {
     }
 }
 
+/// Path key info
 #[derive(Clone)]
 pub enum PathKeyInfo<'a, const N: usize> {
     /// An into iter Path with a Key
@@ -304,6 +306,7 @@ impl<'a, const N: usize> PathKeyInfo<'a, N> {
     }
 }
 
+/// Element info
 pub enum ElementInfo {
     /// An element
     Element(Element),
@@ -311,6 +314,7 @@ pub enum ElementInfo {
     ElementSize(usize),
 }
 
+/// Key element info
 pub enum KeyElementInfo<'a> {
     /// An element
     KeyElement((&'a [u8], Element)),
@@ -318,6 +322,7 @@ pub enum KeyElementInfo<'a> {
     KeyElementSize((usize, usize)),
 }
 
+/// Path key element info
 pub enum PathKeyElementInfo<'a, const N: usize> {
     /// A triple Path Key and Element
     PathFixedSizeKeyElement(([&'a [u8]; N], &'a [u8], Element)),
@@ -402,13 +407,19 @@ impl<'a, const N: usize> PathKeyElementInfo<'a, N> {
     }
 }
 
+/// Document and contract info
 pub struct DocumentAndContractInfo<'a> {
+    /// Document info
     pub document_info: DocumentInfo<'a>,
+    /// Contract
     pub contract: &'a Contract,
+    /// Document type
     pub document_type: &'a DocumentType,
+    /// Owner ID
     pub owner_id: Option<&'a [u8]>,
 }
 
+/// Document info
 #[derive(Clone)]
 pub enum DocumentInfo<'a> {
     /// The document and it's serialized form
@@ -491,6 +502,7 @@ impl<'a> DocumentInfo<'a> {
     }
 }
 
+/// Key value info
 #[derive(Clone)]
 pub enum KeyValueInfo<'a> {
     /// A key by reference
