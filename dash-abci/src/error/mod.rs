@@ -11,10 +11,13 @@ pub mod serialization;
 /// Errors
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+    /// Error
     #[error("storage: {0}")]
     Drive(#[from] DriveError),
+    /// Error
     #[error("execution: {0}")]
     Execution(#[from] ExecutionError),
+    /// Error
     #[error("serialization: {0}")]
     Serialization(#[from] SerializationError),
 }
