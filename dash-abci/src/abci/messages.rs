@@ -87,7 +87,7 @@ pub struct FeesAggregate {
     pub processing_fees: u64,
     /// The aggregate storage fees
     pub storage_fees: u64,
-    /// The aggregate refund amount by epoch
+    // The aggregate refund amount by epoch
     // pub refunds_by_epoch: Vec<EpochRefund>,
 }
 
