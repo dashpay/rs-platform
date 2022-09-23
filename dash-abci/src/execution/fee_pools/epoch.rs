@@ -52,7 +52,7 @@ pub struct EpochInfo {
     /// Previous epoch index
     // Available only on epoch change
     pub previous_epoch_index: Option<u16>,
-    
+
     /// Boolean true if it's the first block of a new epoch
     pub is_epoch_change: bool,
 }

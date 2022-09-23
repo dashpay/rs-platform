@@ -28,7 +28,7 @@
 //
 
 //! Platform Init
-//! 
+//!
 
 use crate::block::BlockExecutionContext;
 use crate::error::Error;

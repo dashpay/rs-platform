@@ -28,7 +28,7 @@
 //
 
 //! Query Tests
-//! 
+//!
 
 use grovedb::TransactionArg;
 use std::collections::HashMap;
@@ -319,7 +319,6 @@ struct Domain {
 }
 
 impl Domain {
-
     /// Creates `count` random names as domain names for the given parent domain
     fn random_domains_in_parent(
         count: u32,

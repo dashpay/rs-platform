@@ -28,7 +28,7 @@
 //
 
 //! Query Tests History
-//! 
+//!
 
 use std::collections::{BTreeMap, HashMap};
 use std::fmt::{Debug, Formatter};

@@ -28,7 +28,7 @@
 //
 
 //! Deterministic Root Hash Tests
-//! 
+//!
 
 use std::option::Option::None;
 

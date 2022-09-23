@@ -1,7 +1,7 @@
 //! Dash Drive
-//! 
+//!
 //! Decentralized storage hosted by Dash masternodes
-//! 
+//!
 
 #![cfg_attr(docsrs, feature(doc_cfg))]
 // Coding conventions
