@@ -27,9 +27,7 @@
 // DEALINGS IN THE SOFTWARE.
 //
 
-//!
-//!
-//!
+//! Fee ops
 //!
 
 use crate::drive::batch::GroveDbOpBatch;
@@ -54,27 +52,49 @@ use crate::fee::op::DriveOperation::{
 /// Base ops
 #[derive(Debug, Enum)]
 pub enum BaseOp {
+    /// Stop
     Stop,
+    /// Add
     Add,
+    /// Multiply
     Mul,
+    /// Subtract
     Sub,
+    /// Divide
     Div,
+    /// Sdiv
     Sdiv,
+    /// Modulo
     Mod,
+    /// Smod
     Smod,
+    /// Addmod
     Addmod,
+    /// Mulmod
     Mulmod,
+    /// Signextend
     Signextend,
+    /// Less than
     Lt,
+    /// Greater than
     Gt,
+    /// Slt
     Slt,
+    /// Sgt
     Sgt,
+    /// Equals
     Eq,
+    /// Is zero
     Iszero,
+    /// And
     And,
+    /// Or
     Or,
+    /// Xor
     Xor,
+    /// Not
     Not,
+    /// Byte
     Byte,
 }
 
@@ -111,9 +131,13 @@ impl BaseOp {
 /// Function ops
 #[derive(Debug, Enum)]
 pub enum FunctionOp {
+    /// Exp
     Exp,
+    /// SHA256
     Sha256,
+    /// SHA256_2
     Sha256_2,
+    /// BLAKE3
     Blake3,
 }
 
@@ -134,6 +158,7 @@ pub struct SizesOfQueryOperation {
 }
 
 trait OperationCostConvert {
+    /// Cost
     fn cost(&self) -> OperationCost;
 }
 
@@ -331,11 +356,17 @@ impl OperationCostConvert for SizesOfDeleteOperation {
 /// Drive operation
 #[derive(Debug)]
 pub enum DriveOperation {
+    /// Grove operation
     GroveOperation(GroveDbOp),
+    /// Calculated cost operation
     CalculatedCostOperation(OperationCost),
+    /// Contract fetch
     ContractFetch,
+    /// Cost calculation insert operation
     CostCalculationInsertOperation(SizesOfInsertOperation),
+    /// Cost calculation delete operation
     CostCalculationDeleteOperation(SizesOfDeleteOperation),
+    /// Cost calculation query operation
     CostCalculationQueryOperation(SizesOfQueryOperation),
 }
 
@@ -453,7 +484,9 @@ impl DriveOperation {
 
 /// Drive cost trait
 pub trait DriveCost {
+    /// Ephemeral cost
     fn ephemeral_cost(&self) -> Result<u64, Error>;
+    /// Storage cost
     fn storage_cost(&self) -> Result<i64, Error>;
 }
 

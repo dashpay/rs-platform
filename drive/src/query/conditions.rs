@@ -72,16 +72,27 @@ fn sql_value_to_cbor(sql_value: ast::Value) -> Option<Value> {
 /// Where operator arguments
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum WhereOperator {
+    /// Equal
     Equal,
+    /// Greater than
     GreaterThan,
+    /// Greater than or equal
     GreaterThanOrEquals,
+    /// Less than
     LessThan,
+    /// Less than or equal
     LessThanOrEquals,
+    /// Between
     Between,
+    /// Between excluding bounds
     BetweenExcludeBounds,
+    /// Between excluding left bound
     BetweenExcludeLeft,
+    /// Between excluding right bound
     BetweenExcludeRight,
+    /// In
     In,
+    /// Starts with
     StartsWith,
 }
 

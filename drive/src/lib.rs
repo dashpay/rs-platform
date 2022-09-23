@@ -1,3 +1,6 @@
+//! Dash Platform Drive
+//! 
+
 #![cfg_attr(docsrs, feature(doc_cfg))]
 // Coding conventions
 #![forbid(unsafe_code)]

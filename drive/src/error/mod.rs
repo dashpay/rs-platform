@@ -22,20 +22,28 @@ pub mod structure;
 /// Errors
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+    /// Query error
     #[error("query: {0}")]
     Query(#[from] QueryError),
+    /// Drive error
     #[error("drive: {0}")]
     Drive(#[from] DriveError),
+    /// GroveDB error
     #[error("grovedb: {0}")]
     GroveDB(#[from] grovedb::Error),
+    /// Contract error
     #[error("contract: {0}")]
     Contract(#[from] ContractError),
+    /// Identity error
     #[error("identity: {0}")]
     Identity(#[from] IdentityError),
+    /// Structure error
     #[error("structure: {0}")]
     Structure(#[from] StructureError),
+    /// Fee error
     #[error("fee: {0}")]
     Fee(#[from] FeeError),
+    /// Document error
     #[error("document: {0}")]
     Document(#[from] DocumentError),
 }

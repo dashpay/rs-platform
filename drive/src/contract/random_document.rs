@@ -42,12 +42,19 @@ use rand::{Rng, SeedableRng};
 // TODO The factory is used in benchmark and tests. Probably it should be available under the test feature
 /// Functions for creating various types of random documents.
 pub trait CreateRandomDocument {
+    /// Random documents
     fn random_documents(&self, count: u32, seed: Option<u64>) -> Vec<Document>;
+    /// Document from bytes
     fn document_from_bytes(&self, bytes: &[u8]) -> Result<Document, Error>;
+    /// Random document
     fn random_document(&self, seed: Option<u64>) -> Document;
+    /// Random document with rng
     fn random_document_with_rng(&self, rng: &mut StdRng) -> Document;
+    /// Random filled documents
     fn random_filled_documents(&self, count: u32, seed: Option<u64>) -> Vec<Document>;
+    /// Random filled document
     fn random_filled_document(&self, seed: Option<u64>) -> Document;
+    /// Random filled document with rng
     fn random_filled_document_with_rng(&self, rng: &mut StdRng) -> Document;
 }
 

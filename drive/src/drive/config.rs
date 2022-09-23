@@ -41,7 +41,9 @@ pub const DEFAULT_GROVE_HAS_RAW_ENABLED: bool = true;
 
 /// Encoding for Drive
 pub enum DriveEncoding {
+    /// Drive CBOR
     DriveCbor,
+    /// Drive protobuf
     DriveProtobuf,
 }
 

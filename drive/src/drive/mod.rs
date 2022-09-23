@@ -98,10 +98,15 @@ pub struct Drive {
 #[repr(u8)]
 pub enum RootTree {
     // Input data errors
+    /// Identities
     Identities = 0,
+    /// Contract Documents
     ContractDocuments = 1,
+    /// Public Key Hashes to Identities
     PublicKeyHashesToIdentities = 2,
+    /// Spent Asset Lock Transactions
     SpentAssetLockTransactions = 3,
+    /// Pools
     Pools = 4,
 }
 
