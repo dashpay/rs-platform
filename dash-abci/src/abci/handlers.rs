@@ -15,6 +15,8 @@ use crate::error::execution::ExecutionError;
 use crate::error::Error;
 use crate::platform::Platform;
 
+const WITHDRAWAL_TRANSACTIONS_QUERY_LIMIT: u16 = 16;
+
 pub trait TenderdashAbci {
     fn init_chain(
         &self,
@@ -83,11 +85,13 @@ impl TenderdashAbci for Platform {
             .replace(Some(block_execution_context));
 
         // Get 16 latest withdrawal transactions from the queue
-        let withdrawal_transactions = self.drive.dequeue_withdrawal_transactions(transaction)?;
+        let withdrawal_transactions = self
+            .drive
+            .dequeue_withdrawal_transactions(WITHDRAWAL_TRANSACTIONS_QUERY_LIMIT, transaction)?;
 
         // Appending request_height and quorum_hash to withdrwal transaction
         // and pass it to JS Drive for singing and broadcasting
-        let withdrawal_transaction_bytes = withdrawal_transactions
+        let unsigned_withdrawal_transaction_bytes = withdrawal_transactions
             .into_iter()
             .map(|(_, bytes)| {
                 let request_info = AssetUnlockRequestInfo {
@@ -110,7 +114,7 @@ impl TenderdashAbci for Platform {
             .collect::<Result<Vec<Vec<u8>>, Error>>()?;
 
         let response = BlockBeginResponse {
-            raw_withdrawal_transactions: withdrawal_transaction_bytes,
+            unsigned_withdrawal_transactions: unsigned_withdrawal_transaction_bytes,
         };
 
         Ok(response)

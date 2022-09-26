@@ -3,11 +3,13 @@ use dashcore::{
     blockdata::transaction::special_transaction::asset_unlock::unqualified_asset_unlock::{
         AssetUnlockBasePayload, AssetUnlockBaseTransactionInfo,
     },
-    consensus::{Decodable, Encodable},
+    consensus::Encodable,
     Script, TxOut,
 };
 
-use crate::{prelude::Identity, state_repository::StateRepositoryLike};
+use crate::{
+    identity::convert_credits_to_satoshi, prelude::Identity, state_repository::StateRepositoryLike,
+};
 
 use super::IdentityCreditWithdrawalTransition;
 
@@ -38,7 +40,7 @@ where
         let output_script = Script(state_transition.output_script.into_boxed_slice());
 
         let tx_out = TxOut {
-            value: state_transition.amount,
+            value: convert_credits_to_satoshi(state_transition.amount),
             script_pubkey: output_script,
         };
 

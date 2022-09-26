@@ -15,9 +15,3 @@ pub enum IdentityError {
     #[error("identity serialization error: {0}")]
     IdentitySerialization(&'static str),
 }
-
-#[derive(Debug, thiserror::Error)]
-pub enum WithdrawalError {
-    #[error("withdrawal serialization error: {0}")]
-    WithdrawalSerialization(&'static str),
-}

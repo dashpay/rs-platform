@@ -25,7 +25,7 @@ pub struct BlockBeginRequest {
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BlockBeginResponse {
-    pub raw_withdrawal_transactions: Vec<Vec<u8>>,
+    pub unsigned_withdrawal_transactions: Vec<Vec<u8>>,
 }
 
 #[derive(Serialize, Deserialize)]

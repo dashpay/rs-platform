@@ -1591,98 +1591,6 @@ impl DriveWrapper {
         // The result is returned through the callback, not through direct return
         Ok(cx.undefined())
     }
-
-    fn js_enqueue_withdrawals(mut cx: FunctionContext) -> JsResult<JsUndefined> {
-        let js_withdrawals = cx.argument::<JsArray>(0)?;
-        let js_using_transaction = cx.argument::<JsBoolean>(1)?;
-        let js_callback = cx.argument::<JsFunction>(2)?.root(&mut cx);
-
-        let db = cx
-            .this()
-            .downcast_or_throw::<JsBox<DriveWrapper>, _>(&mut cx)?;
-
-        let withdrawal_bytes = converter::js_array_of_buffers_to_vec(js_withdrawals, &mut cx)?;
-        let using_transaction = js_using_transaction.value(&mut cx);
-
-        db.send_to_drive_thread(move |platform: &Platform, transaction, channel| {
-            let result = withdrawal_bytes
-                .iter()
-                .map(|bytes| Withdrawal::from_cbor(bytes))
-                .collect::<Result<Vec<Withdrawal>, Error>>()
-                .and_then(|withdrawals| {
-                    platform.drive.enqueue_withdrawal_transactions(
-                        withdrawals,
-                        using_transaction.then(|| transaction).flatten(),
-                    )
-                });
-
-            channel.send(move |mut task_context| {
-                let callback = js_callback.into_inner(&mut task_context);
-                let this = task_context.undefined();
-                let callback_arguments: Vec<Handle<JsValue>> = match result {
-                    Ok(_) => {
-                        // First parameter of JS callbacks is error, which is null in this case
-                        vec![
-                            task_context.null().upcast(),
-                            task_context.undefined().upcast(),
-                        ]
-                    }
-
-                    // Convert the error to a JavaScript exception on failure
-                    Err(err) => vec![task_context.error(err.to_string())?.upcast()],
-                };
-
-                callback.call(&mut task_context, this, callback_arguments)?;
-
-                Ok(())
-            });
-        })
-        .or_else(|err| cx.throw_error(err.to_string()))?;
-
-        Ok(cx.undefined())
-    }
-
-    fn js_dequeue_withdrawals(mut cx: FunctionContext) -> JsResult<JsUndefined> {
-        let js_using_transaction = cx.argument::<JsBoolean>(0)?;
-        let js_callback = cx.argument::<JsFunction>(1)?.root(&mut cx);
-
-        let db = cx
-            .this()
-            .downcast_or_throw::<JsBox<DriveWrapper>, _>(&mut cx)?;
-
-        let using_transaction = js_using_transaction.value(&mut cx);
-
-        db.send_to_drive_thread(move |platform: &Platform, transaction, channel| {
-            let result: Result<Vec<Vec<u8>>, Error> = platform
-                .drive
-                .dequeue_withdrawal_transactions(using_transaction.then(|| transaction).flatten())
-                .and_then(|withdrawals| withdrawals.iter().map(|w| w.to_cbor()).collect());
-
-            channel.send(move |mut task_context| {
-                let callback = js_callback.into_inner(&mut task_context);
-                let this = task_context.undefined();
-                let callback_arguments: Vec<Handle<JsValue>> = match result {
-                    Ok(withdrawals) => {
-                        // First parameter of JS callbacks is error, which is null in this case
-                        vec![
-                            task_context.null().upcast(),
-                            nested_vecs_to_js(withdrawals, &mut task_context)?,
-                        ]
-                    }
-
-                    // Convert the error to a JavaScript exception on failure
-                    Err(err) => vec![task_context.error(err.to_string())?.upcast()],
-                };
-
-                callback.call(&mut task_context, this, callback_arguments)?;
-
-                Ok(())
-            });
-        })
-        .or_else(|err| cx.throw_error(err.to_string()))?;
-
-        Ok(cx.undefined())
-    }
 }
 
 #[neon::main]
@@ -1712,15 +1620,6 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function(
         "driveProveDocumentsQuery",
         DriveWrapper::js_prove_documents_query,
-    )?;
-
-    cx.export_function(
-        "driveEnqueueWithdrawals",
-        DriveWrapper::js_enqueue_withdrawals,
-    )?;
-    cx.export_function(
-        "driveDequeueWithdrawals",
-        DriveWrapper::js_dequeue_withdrawals,
     )?;
 
     cx.export_function("groveDbInsert", DriveWrapper::js_grove_db_insert)?;

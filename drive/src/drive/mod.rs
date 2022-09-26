@@ -50,7 +50,7 @@ pub enum RootTree {
     PublicKeyHashesToIdentities = 2,
     SpentAssetLockTransactions = 3,
     Pools = 4,
-    Withdrawals = 5,
+    WithdrawalTransactions = 5,
 }
 
 pub const STORAGE_COST: i32 = 50;
@@ -75,7 +75,7 @@ impl From<RootTree> for &'static [u8; 1] {
             RootTree::PublicKeyHashesToIdentities => &[2],
             RootTree::SpentAssetLockTransactions => &[3],
             RootTree::Pools => &[4],
-            RootTree::Withdrawals => &[5],
+            RootTree::WithdrawalTransactions => &[5],
         }
     }
 }

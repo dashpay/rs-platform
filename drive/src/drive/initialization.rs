@@ -19,7 +19,7 @@ impl Drive {
 
         batch.add_insert_empty_tree(vec![], vec![RootTree::Pools as u8]);
 
-        batch.add_insert_empty_tree(vec![], vec![RootTree::Withdrawals as u8]);
+        batch.add_insert_empty_tree(vec![], vec![RootTree::WithdrawalTransactions as u8]);
 
         // initialize the pools with epochs
         add_create_fee_pool_trees_operations(&mut batch);

@@ -395,44 +395,6 @@ describe('Drive', () => {
     });
   });
 
-  describe('Withdrawal queue', () => {
-    beforeEach(async () => {
-      await drive.createInitialStateStructure();
-    });
-
-    it('should enqueue and dequeue the withdrawals', async () => {
-      const first_withdrawal = {
-        id: 1,
-        index: 1,
-        fee: 1,
-        request_height: 1,
-        quorum_hash: Buffer.alloc(32),
-        quorum_sig: Buffer.alloc(96),
-        tx_out_hash: Buffer.alloc(32),
-      };
-
-      const second_withdrawal = {
-        id: 2,
-        index: 1,
-        fee: 1,
-        request_height: 1,
-        quorum_hash: Buffer.alloc(32),
-        quorum_sig: Buffer.alloc(96),
-        tx_out_hash: Buffer.alloc(32),
-      };
-
-      await drive.enqueueWithdrawals([first_withdrawal, second_withdrawal], true);
-
-      let withdrawals = await drive.dequeueWithdrawals(true);
-
-      expect(withdrawals).to.have.lengthOf(2);
-
-      withdrawals = await drive.dequeueWithdrawals(true);
-
-      expect(withdrawals).to.have.lengthOf(0);
-    });
-  });
-
   describe('ABCI', () => {
     describe('InitChain', () => {
       it('should successfully init chain', async () => {
