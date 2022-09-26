@@ -37,7 +37,7 @@ where
             .fetch_latest_withdrawal_transaction_index()
             .await?;
 
-        let output_script = Script(state_transition.output_script.into_boxed_slice());
+        let output_script = Script::from(state_transition.output_script.clone());
 
         let tx_out = TxOut {
             value: convert_credits_to_satoshi(state_transition.amount),
