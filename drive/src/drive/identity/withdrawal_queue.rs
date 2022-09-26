@@ -7,15 +7,13 @@ use crate::drive::batch::GroveDbOpBatch;
 use crate::drive::{Drive, RootTree};
 use crate::error::drive::DriveError;
 use crate::error::Error;
-use crate::fee::calculate_fee;
 use crate::fee::op::DriveOperation;
 
 impl Drive {
     pub fn add_enqueue_withdrawal_transaction_operations(
         &self,
-        batch: GroveDbOpBatch,
+        mut batch: GroveDbOpBatch,
         withdrawals: Vec<(Vec<u8>, Vec<u8>)>,
-        transaction: TransactionArg,
     ) -> () {
         for (id, bytes) in withdrawals {
             batch.add_insert(
