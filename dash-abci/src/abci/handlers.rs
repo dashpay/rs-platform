@@ -1,3 +1,37 @@
+// MIT LICENSE
+//
+// Copyright (c) 2021 Dash Core Group
+//
+// Permission is hereby granted, free of charge, to any
+// person obtaining a copy of this software and associated
+// documentation files (the "Software"), to deal in the
+// Software without restriction, including without
+// limitation the rights to use, copy, modify, merge,
+// publish, distribute, sublicense, and/or sell copies of
+// the Software, and to permit persons to whom the Software
+// is furnished to do so, subject to the following
+// conditions:
+//
+// The above copyright notice and this permission notice
+// shall be included in all copies or substantial portions
+// of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+// ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+// TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+// PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+// SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+// CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+// OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+// IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+// DEALINGS IN THE SOFTWARE.
+//
+
+//! Tenderdash ABCI Handlers.
+//!
+//! This module defines the `TenderdashAbci` trait and implements it for type `Platform`.
+//!
+
 use std::ops::Deref;
 
 use crate::abci::messages::{
@@ -17,19 +51,23 @@ use crate::platform::Platform;
 
 const WITHDRAWAL_TRANSACTIONS_QUERY_LIMIT: u16 = 16;
 
+/// A trait for handling the Tenderdash ABCI (Application Blockchain Interface).
 pub trait TenderdashAbci {
+    /// Send request to initialize the blockchain
     fn init_chain(
         &self,
         request: InitChainRequest,
         transaction: TransactionArg,
     ) -> Result<InitChainResponse, Error>;
 
+    /// Send request to begin a block
     fn block_begin(
         &self,
         request: BlockBeginRequest,
         transaction: TransactionArg,
     ) -> Result<BlockBeginResponse, Error>;
 
+    /// Send request to end a block
     fn block_end(
         &self,
         request: BlockEndRequest,
@@ -38,6 +76,7 @@ pub trait TenderdashAbci {
 }
 
 impl TenderdashAbci for Platform {
+    /// Creates initial state structure and returns response
     fn init_chain(
         &self,
         _request: InitChainRequest,
@@ -52,6 +91,7 @@ impl TenderdashAbci for Platform {
         Ok(response)
     }
 
+    /// Set genesis time, block info, and epoch info, and returns response
     fn block_begin(
         &self,
         request: BlockBeginRequest,
@@ -120,6 +160,7 @@ impl TenderdashAbci for Platform {
         Ok(response)
     }
 
+    /// Processes block fees and returns response
     fn block_end(
         &self,
         request: BlockEndRequest,

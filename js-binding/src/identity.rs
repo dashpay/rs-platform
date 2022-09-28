@@ -1,3 +1,4 @@
+use dpp::prelude::Revision;
 use wasm_bindgen::prelude::*;
 
 use dpp::identity::state_transition::asset_lock_proof::AssetLockProof;
@@ -100,13 +101,13 @@ impl IdentityWasm {
     }
 
     #[wasm_bindgen(js_name=setRevision)]
-    pub fn set_revision(mut self, revision: i64) -> Self {
+    pub fn set_revision(mut self, revision: Revision) -> Self {
         self.0 = self.0.set_revision(revision);
         self
     }
 
     #[wasm_bindgen(js_name=getRevision)]
-    pub fn get_revision(&self) -> i64 {
+    pub fn get_revision(&self) -> Revision {
         self.0.get_revision()
     }
 
