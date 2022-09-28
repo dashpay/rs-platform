@@ -346,7 +346,7 @@ class Drive {
 
 /**
  * @typedef BlockBeginResponse
- * @property {Buffer[]} withdrawalTransactions
+ * @property {Buffer[]} unsignedWithdrawalTransactions
  */
 
 /**

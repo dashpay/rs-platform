@@ -2,7 +2,6 @@ mod converter;
 
 use std::{option::Option::None, path::Path, sync::mpsc, thread};
 
-use converter::nested_vecs_to_js;
 use dash_abci::abci::handlers::TenderdashAbci;
 use dash_abci::abci::messages::{
     BlockBeginRequest, BlockEndRequest, InitChainRequest, Serializable,
@@ -12,8 +11,6 @@ use neon::prelude::*;
 use neon::types::JsDate;
 use rs_drive::dpp::identity::Identity;
 use rs_drive::drive::flags::StorageFlags;
-use rs_drive::drive::identity::withdrawal_queue::Withdrawal;
-use rs_drive::error::Error;
 use rs_drive::grovedb::{PathQuery, Transaction, TransactionArg};
 
 const READONLY_MSG: &str =

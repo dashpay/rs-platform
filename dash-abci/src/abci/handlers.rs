@@ -240,6 +240,7 @@ mod tests {
                         previous_block_time_ms,
                         proposer_pro_tx_hash: proposers
                             [block_height as usize % (proposers_count as usize)],
+                        validator_set_quorum_hash: Default::default(),
                     };
 
                     platform
@@ -381,6 +382,7 @@ mod tests {
                         previous_block_time_ms,
                         proposer_pro_tx_hash: proposers
                             [block_height as usize % (proposers_count as usize)],
+                        validator_set_quorum_hash: Default::default(),
                     };
 
                     platform

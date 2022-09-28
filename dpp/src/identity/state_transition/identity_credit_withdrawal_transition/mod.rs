@@ -14,7 +14,8 @@ use crate::{
 };
 
 use super::properties::{
-    PROPERTY_IDENTITY_ID, PROPERTY_OUTPUT, PROPERTY_SIGNATURE, PROPERTY_SIGNATURE_PUBLIC_KEY_ID,
+    PROPERTY_IDENTITY_ID, PROPERTY_OUTPUT_SCRIPT, PROPERTY_SIGNATURE,
+    PROPERTY_SIGNATURE_PUBLIC_KEY_ID,
 };
 
 pub mod apply_identity_credit_withdrawal_transition_factory;
@@ -143,7 +144,7 @@ impl StateTransitionConvert for IdentityCreditWithdrawalTransition {
     }
 
     fn binary_property_paths() -> Vec<&'static str> {
-        vec![PROPERTY_SIGNATURE, PROPERTY_OUTPUT]
+        vec![PROPERTY_SIGNATURE, PROPERTY_OUTPUT_SCRIPT]
     }
 
     fn to_object(&self, skip_signature: bool) -> Result<JsonValue, ProtocolError> {
