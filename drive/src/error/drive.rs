@@ -60,6 +60,7 @@ pub enum DriveError {
     /// Error
     #[error("corrupted identity not an item error: {0}")]
     CorruptedIdentityNotItem(&'static str),
+    /// Error
     #[error("corrupted withdrawal not an item error: {0}")]
     CorruptedWithdrawalNotItem(&'static str),
 
