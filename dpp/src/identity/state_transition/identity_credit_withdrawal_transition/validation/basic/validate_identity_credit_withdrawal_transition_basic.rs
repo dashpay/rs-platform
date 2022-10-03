@@ -4,7 +4,8 @@ use lazy_static::lazy_static;
 use serde_json::Value;
 
 use crate::{
-    util::protocol_data::get_protocol_version,
+    consensus::basic::identity::InvalidIdentityCreditWithdrawalTransitionCoreFeeError,
+    util::{is_fibonacci_number::is_fibonacci_number, protocol_data::get_protocol_version},
     validation::{JsonSchemaValidator, ValidationResult},
     version::ProtocolVersionValidator,
     DashPlatformProtocolInitError, NonConsensusError, SerdeParsingError,
@@ -44,9 +45,12 @@ impl IdentityCreditWithdrawalTransitionBasicValidator {
     ) -> Result<ValidationResult<()>, NonConsensusError> {
         let mut result = self.json_schema_validator.validate(transition_json)?;
 
-        let identity_transition_map = transition_json.as_object().ok_or_else(|| {
-            SerdeParsingError::new("Expected identity transition to be a json object")
-        })?;
+        let identity_credit_withdrawal_transition_map =
+            transition_json.as_object().ok_or_else(|| {
+                SerdeParsingError::new(
+                    "Expected identity credit withdrawal transition to be a json object",
+                )
+            })?;
 
         if !result.is_valid() {
             return Ok(result);
@@ -54,11 +58,28 @@ impl IdentityCreditWithdrawalTransitionBasicValidator {
 
         result.merge(
             self.protocol_version_validator
-                .validate(get_protocol_version(identity_transition_map)?)?,
+                .validate(get_protocol_version(
+                    identity_credit_withdrawal_transition_map,
+                )?)?,
         );
 
         if !result.is_valid() {
             return Ok(result);
+        }
+
+        // validate core_fee is in fibonacci sequence
+        let core_fee = transition_json
+            .get("coreFee")
+            .ok_or_else(|| {
+                SerdeParsingError::new("Expected credit withdrawal transition to have coreFee")
+            })?
+            .as_u64()
+            .ok_or_else(|| SerdeParsingError::new("Expected coreFee to be a uint"))?;
+
+        if is_fibonacci_number(core_fee) == false {
+            result.add_error(InvalidIdentityCreditWithdrawalTransitionCoreFeeError::new(
+                core_fee as u32,
+            ));
         }
 
         Ok(result)
