@@ -108,6 +108,7 @@ pub enum RootTree {
     SpentAssetLockTransactions = 3,
     /// Pools
     Pools = 4,
+    /// Asset Unlock Transactions
     WithdrawalTransactions = 5,
 }
 
