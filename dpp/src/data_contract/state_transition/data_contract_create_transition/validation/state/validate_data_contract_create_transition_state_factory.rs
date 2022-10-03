@@ -41,6 +41,10 @@ where
             )
             .await;
 
+        if state_transition.get_execution_context().is_dry_run() {
+            return result;
+        }
+
         match maybe_existing_data_contract {
             Err(_) | Ok(None) => result.add_error(StateError::DataContractAlreadyPresentError {
                 data_contract_id: state_transition.data_contract.id.clone(),

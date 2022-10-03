@@ -13,7 +13,7 @@ const BLOCKS_SIZE_WINDOW: i64 = 8;
 const PROPERTY_CORE_HEIGHT_CREATED_AT: &str = "coreHeightCreatedAt";
 const PROPERTY_CORE_CHAIN_LOCKED_HEIGHT: &str = "coreChainLockedHeight";
 
-pub async fn create_contract_request_data_trigger<'a, SR>(
+pub async fn create_contact_request_data_trigger<'a, SR>(
     document_transition: &DocumentTransition,
     context: &DataTriggerExecutionContext<'a, SR>,
     _: Option<&Identifier>,
@@ -21,6 +21,10 @@ pub async fn create_contract_request_data_trigger<'a, SR>(
 where
     SR: StateRepositoryLike,
 {
+    if context.state_transition_execution_context.is_dry_run() {
+        return Ok(Default::default());
+    }
+
     let dt_create = match document_transition {
         DocumentTransition::Create(d) => d,
         _ => bail!(

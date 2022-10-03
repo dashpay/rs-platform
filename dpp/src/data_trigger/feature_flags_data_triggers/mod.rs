@@ -21,6 +21,10 @@ where
     SR: StateRepositoryLike,
 {
     let mut result = DataTriggerExecutionResult::default();
+    if context.state_transition_execution_context.is_dry_run() {
+        return Ok(result);
+    }
+
     let top_level_identity = top_level_identity.context("Top Level Identity must be defined")?;
 
     let dt_create = match document_transition {

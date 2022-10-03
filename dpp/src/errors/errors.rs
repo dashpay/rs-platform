@@ -3,6 +3,7 @@ use thiserror::Error;
 
 use crate::consensus::ConsensusError;
 use crate::data_contract::{errors::*, DataContract};
+use crate::document::document_transition::DocumentTransition;
 use crate::document::{errors::*, Document};
 use crate::identity::{IdentityPublicKey, Purpose, SecurityLevel};
 use crate::prelude::Identifier;
@@ -129,6 +130,11 @@ pub enum ProtocolError {
 
     #[error("Public key is disabled")]
     PublicKeyIsDisabledError { public_key: IdentityPublicKey },
+
+    #[error("Document was not provided for apply of state transition")]
+    DocumentNotProvided {
+        document_transition: DocumentTransition,
+    },
 }
 
 impl From<NonConsensusError> for ProtocolError {

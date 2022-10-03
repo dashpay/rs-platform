@@ -38,6 +38,10 @@ where
             )
             .await;
 
+        if state_transition.execution_context.is_dry_run() {
+            return result;
+        }
+
         let existing_data_contract: DataContract = match maybe_existing_data_contract {
             // assumed the conservativeness for the validation. TBD: in the case of
             // general error we want to add the same result
