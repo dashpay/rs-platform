@@ -7,6 +7,7 @@ pub use identity_public_key::*;
 mod identity;
 mod identity_facade;
 mod identity_public_key;
+pub mod script;
 pub mod state_transition;
 pub mod validation;
 

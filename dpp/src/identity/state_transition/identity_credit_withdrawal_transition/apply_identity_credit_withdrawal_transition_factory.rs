@@ -4,7 +4,7 @@ use dashcore::{
         AssetUnlockBasePayload, AssetUnlockBaseTransactionInfo,
     },
     consensus::Encodable,
-    Script, TxOut,
+    TxOut,
 };
 
 use crate::{
@@ -37,7 +37,7 @@ where
             .fetch_latest_withdrawal_transaction_index()
             .await?;
 
-        let output_script = Script::from(state_transition.output_script.clone());
+        let output_script = state_transition.output_script.get_original_script();
 
         let tx_out = TxOut {
             value: convert_credits_to_satoshi(state_transition.amount),
