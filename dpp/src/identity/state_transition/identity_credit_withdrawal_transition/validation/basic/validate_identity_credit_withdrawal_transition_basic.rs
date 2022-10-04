@@ -4,7 +4,11 @@ use lazy_static::lazy_static;
 use serde_json::Value;
 
 use crate::{
-    consensus::basic::identity::InvalidIdentityCreditWithdrawalTransitionCoreFeeError,
+    consensus::basic::identity::{
+        InvalidIdentityCreditWithdrawalTransitionCoreFeeError,
+        InvalidIdentityCreditWithdrawalTransitionOutputScriptError,
+    },
+    identity::script::Script,
     util::{is_fibonacci_number::is_fibonacci_number, protocol_data::get_protocol_version},
     validation::{JsonSchemaValidator, ValidationResult},
     version::ProtocolVersionValidator,
@@ -80,6 +84,25 @@ impl IdentityCreditWithdrawalTransitionBasicValidator {
             result.add_error(InvalidIdentityCreditWithdrawalTransitionCoreFeeError::new(
                 core_fee as u32,
             ));
+        }
+
+        if !result.is_valid() {
+            return Ok(result);
+        }
+
+        // validate output_script types
+        let output_script_value = transition_json.get("outputScript").ok_or_else(|| {
+            SerdeParsingError::new("Expected credit withdrawal transition to have outputScript")
+        })?;
+
+        let output_script_bytes: Vec<u8> = serde_json::from_value(output_script_value.clone())?;
+
+        let output_script = Script::from_bytes(output_script_bytes);
+
+        if !output_script.is_p2pkh() && !output_script.is_p2sh() {
+            result.add_error(
+                InvalidIdentityCreditWithdrawalTransitionOutputScriptError::new(output_script),
+            );
         }
 
         Ok(result)

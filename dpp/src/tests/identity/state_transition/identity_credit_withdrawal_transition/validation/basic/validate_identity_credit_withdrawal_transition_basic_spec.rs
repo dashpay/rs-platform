@@ -420,6 +420,8 @@ mod validate_identity_credit_withdrawal_transition_basic_factory {
     }
 
     mod output_script {
+        use crate::identity::script::Script;
+
         use super::*;
 
         pub async fn should_be_present() {
@@ -490,6 +492,25 @@ mod validate_identity_credit_withdrawal_transition_basic_factory {
 
             assert_eq!(error.instance_path().to_string(), "/outputScript");
             assert_eq!(error.keyword().unwrap(), "maxItems");
+        }
+
+        #[tokio::test]
+        pub async fn should_be_of_a_proper_type() {
+            let (mut raw_state_transition, validator) = setup_test();
+
+            raw_state_transition.set_key_value("outputScript", vec![6; 32]);
+
+            let result = validator.validate(&raw_state_transition).await.unwrap();
+
+            let errors = assert_consensus_errors!(
+                result,
+                ConsensusError::InvalidIdentityCreditWithdrawalTransitionOutputScriptError,
+                1
+            );
+
+            let error = errors.first().unwrap();
+
+            assert_eq!(error.output_script(), Script::from_bytes(vec![6; 32]));
         }
     }
 

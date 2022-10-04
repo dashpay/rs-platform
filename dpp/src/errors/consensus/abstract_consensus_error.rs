@@ -24,6 +24,7 @@ use crate::errors::StateError;
 
 use super::basic::identity::{
     IdentityInsufficientBalanceError, InvalidIdentityCreditWithdrawalTransitionCoreFeeError,
+    InvalidIdentityCreditWithdrawalTransitionOutputScriptError,
 };
 use super::signature::SignatureError;
 
@@ -78,6 +79,11 @@ pub enum ConsensusError {
     #[error("{0}")]
     InvalidIdentityCreditWithdrawalTransitionCoreFeeError(
         InvalidIdentityCreditWithdrawalTransitionCoreFeeError,
+    ),
+
+    #[error("{0}")]
+    InvalidIdentityCreditWithdrawalTransitionOutputScriptError(
+        InvalidIdentityCreditWithdrawalTransitionOutputScriptError,
     ),
 
     #[error(transparent)]
@@ -152,6 +158,7 @@ impl ConsensusError {
             ConsensusError::InvalidIdentityPublicKeySecurityLevelError(_) => 1047,
             ConsensusError::IdentityInsufficientBalanceError(_) => 4023,
             ConsensusError::InvalidIdentityCreditWithdrawalTransitionCoreFeeError(_) => 4024,
+            ConsensusError::InvalidIdentityCreditWithdrawalTransitionOutputScriptError(_) => 4025,
 
             ConsensusError::StateError(e) => e.get_code(),
             ConsensusError::BasicError(e) => e.get_code(),

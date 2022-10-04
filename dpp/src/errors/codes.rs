@@ -43,6 +43,7 @@ impl ErrorWithCode for ConsensusError {
             Self::InvalidIdentityPublicKeySecurityLevelError(_) => 1047,
             Self::IdentityInsufficientBalanceError(_) => 4023,
             Self::InvalidIdentityCreditWithdrawalTransitionCoreFeeError(_) => 4024,
+            Self::InvalidIdentityCreditWithdrawalTransitionOutputScriptError(_) => 4025,
 
             Self::StateError(e) => e.get_code(),
             Self::BasicError(e) => e.get_code(),
