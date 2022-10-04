@@ -20,7 +20,8 @@ mod apply_identity_credit_withdrawal_transition_factory {
 
         state_repository
             .expect_enqueue_withdrawal_transaction()
-            .returning(|_| anyhow::Ok(()));
+            .withf(|index, _| *index == 42)
+            .returning(|_, _| anyhow::Ok(()));
 
         state_repository
             .expect_fetch_identity::<Identity>()

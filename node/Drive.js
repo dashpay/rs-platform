@@ -17,6 +17,8 @@ const {
   driveQueryDocuments,
   driveProveDocumentsQuery,
   driveInsertIdentity,
+  driveFetchLatestWithdrawalTransactionIndex,
+  driveEnqueueWithdrawalTransaction,
   abciInitChain,
   abciBlockBegin,
   abciBlockEnd,
@@ -41,6 +43,12 @@ const driveUpdateDocumentAsync = appendStack(promisify(driveUpdateDocument));
 const driveDeleteDocumentAsync = appendStack(promisify(driveDeleteDocument));
 const driveQueryDocumentsAsync = appendStack(promisify(driveQueryDocuments));
 const driveProveDocumentsQueryAsync = appendStack(promisify(driveProveDocumentsQuery));
+const driveFetchLatestWithdrawalTransactionIndexAsync = appendStack(
+  promisify(driveFetchLatestWithdrawalTransactionIndex),
+);
+const driveEnqueueWithdrawalTransactionAsync = appendStack(
+  promisify(driveEnqueueWithdrawalTransaction),
+);
 const driveInsertIdentityAsync = appendStack(promisify(driveInsertIdentity));
 const abciInitChainAsync = appendStack(promisify(abciInitChain));
 const abciBlockBeginAsync = appendStack(promisify(abciBlockBegin));
@@ -249,6 +257,38 @@ class Drive {
   }
 
   /**
+   * Fetch latest index of the withdrawal transaction in a queue
+   * 
+   * @param {boolean} [useTransaction=false]
+   * 
+   * @returns {Promise<number>}
+   */
+  async fetchLatestWithdrawalTransactionIndex(useTransaction = false) {
+    return driveFetchLatestWithdrawalTransactionIndexAsync.call(
+      this.drive, 
+      useTransaction,
+    );
+  }
+
+  /**
+   * Enqueue withdrawal transaction into the queue
+   * 
+   * @param {number} index
+   * @param {Buffer} transactionBytes
+   * @param {boolean} [useTransaction=false]
+   * 
+   * @returns {Promise<void>}
+   */
+  async enqueueWithdrawalTransaction(index, transactionBytes, useTransaction = false) {
+    return driveEnqueueWithdrawalTransactionAsync.call(
+      this.drive,
+      index,
+      transactionBytes,
+      useTransaction,
+    );
+  }
+
+  /**
    * Get the ABCI interface
    * @returns {RSAbci}
    */
@@ -292,7 +332,7 @@ class Drive {
           ...request,
           // cborium doesn't eat Buffers
           proposerProTxHash: Array.from(request.proposerProTxHash),
-          quorumHash: Array.from(request.quorumHash),
+          validatorSetQuorumHash: Array.from(request.validatorSetQuorumHash),
         });
 
         const responseBytes = await abciBlockBeginAsync.call(
@@ -341,7 +381,7 @@ class Drive {
  * @property {number} blockTimeMs - timestamp in milliseconds
  * @property {number} [previousBlockTimeMs] - timestamp in milliseconds
  * @property {Buffer} proposerProTxHash
- * @property {Buffer} quorumHash
+ * @property {Buffer} validatorSetQuorumHash
  */
 
 /**

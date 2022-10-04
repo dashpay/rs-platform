@@ -106,5 +106,9 @@ pub trait StateRepositoryLike: Send + Sync {
     async fn fetch_latest_withdrawal_transaction_index(&self) -> AnyResult<u64>;
 
     // Enqueue withdrawal transaction
-    async fn enqueue_withdrawal_transaction(&self, transaction_bytes: Vec<u8>) -> AnyResult<()>;
+    async fn enqueue_withdrawal_transaction(
+        &self,
+        index: u64,
+        transaction_bytes: Vec<u8>,
+    ) -> AnyResult<()>;
 }

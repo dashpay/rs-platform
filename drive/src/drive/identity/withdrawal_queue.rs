@@ -48,8 +48,8 @@ impl Drive {
     pub fn fetch_latest_withdrawal_transaction_index(
         &self,
         transaction: TransactionArg,
-    ) -> Result<u32, Error> {
-        let element = self
+    ) -> Result<u64, Error> {
+        let result = self
             .grove
             .get(
                 [Into::<&[u8; 1]>::into(RootTree::WithdrawalTransactionsCounter).as_slice()],
@@ -57,12 +57,18 @@ impl Drive {
                 transaction,
             )
             .unwrap()
-            .map_err(Error::GroveDB)?;
+            .map_err(Error::GroveDB);
+
+        if let Err(Error::GroveDB(grovedb::Error::PathKeyNotFound(_))) = &result {
+            return Ok(0);
+        }
+
+        let element = result?;
 
         if let Element::Item(counter_bytes, _) = element {
-            let counter = u32::from_be_bytes(counter_bytes.try_into().map_err(|_| {
+            let counter = u64::from_be_bytes(counter_bytes.try_into().map_err(|_| {
                 DriveError::CorruptedWithdrawalTransactionsCounterInvalidLength(
-                    "withdrawal transactions counter must be an uint32",
+                    "withdrawal transactions counter must be an u64",
                 )
             })?);
 
@@ -173,10 +179,9 @@ impl Drive {
 #[cfg(test)]
 mod tests {
     use crate::common::helpers::setup::setup_drive_with_initial_state_structure;
+    use crate::drive::batch::GroveDbOpBatch;
 
     mod queue {
-        use crate::drive::batch::GroveDbOpBatch;
-
         use super::*;
 
         #[test]
@@ -215,6 +220,10 @@ mod tests {
 
             assert_eq!(withdrawals.len(), 0);
         }
+    }
+
+    mod index {
+        use super::*;
 
         #[test]
         fn test_withdrawal_transaction_counter() {
@@ -224,7 +233,7 @@ mod tests {
 
             let mut batch = GroveDbOpBatch::new();
 
-            let counter: u32 = 42;
+            let counter: u64 = 42;
 
             drive.add_update_withdrawal_index_counter_operation(
                 &mut batch,
@@ -240,6 +249,19 @@ mod tests {
                 .expect("to withdraw counter");
 
             assert_eq!(stored_counter, counter);
+        }
+
+        #[test]
+        fn test_returns_0_if_empty() {
+            let drive = setup_drive_with_initial_state_structure();
+
+            let transaction = drive.grove.start_transaction();
+
+            let stored_counter = drive
+                .fetch_latest_withdrawal_transaction_index(Some(&transaction))
+                .expect("to withdraw counter");
+
+            assert_eq!(stored_counter, 0);
         }
     }
 }

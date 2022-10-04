@@ -62,7 +62,7 @@ where
             .map_err(|e| anyhow!(e))?;
 
         self.state_repository
-            .enqueue_withdrawal_transaction(transaction_buffer)
+            .enqueue_withdrawal_transaction(latest_withdrawal_index, transaction_buffer)
             .await?;
 
         let maybe_existing_identity: Option<Identity> = self
