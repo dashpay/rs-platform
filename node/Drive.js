@@ -258,25 +258,25 @@ class Drive {
 
   /**
    * Fetch latest index of the withdrawal transaction in a queue
-   * 
+   *
    * @param {boolean} [useTransaction=false]
-   * 
+   *
    * @returns {Promise<number>}
    */
   async fetchLatestWithdrawalTransactionIndex(useTransaction = false) {
     return driveFetchLatestWithdrawalTransactionIndexAsync.call(
-      this.drive, 
+      this.drive,
       useTransaction,
     );
   }
 
   /**
    * Enqueue withdrawal transaction into the queue
-   * 
+   *
    * @param {number} index
    * @param {Buffer} transactionBytes
    * @param {boolean} [useTransaction=false]
-   * 
+   *
    * @returns {Promise<void>}
    */
   async enqueueWithdrawalTransaction(index, transactionBytes, useTransaction = false) {
