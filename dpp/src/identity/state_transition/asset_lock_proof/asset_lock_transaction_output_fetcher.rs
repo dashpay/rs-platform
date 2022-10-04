@@ -38,12 +38,20 @@ impl<SR: StateRepositoryLike> AssetLockTransactionOutputFetcher<SR> {
                 let output_index = out_point.vout as usize;
                 let transaction_hash = out_point.txid;
 
-                if let Some(raw_transaction) = self
+                let maybe_raw_transaction = self
                     .state_repository
                     .fetch_transaction::<Vec<u8>>(&transaction_hash.to_hex(), execution_context)
                     .await
-                    .map_err(|_| DPPError::InvalidAssetLockTransaction)?
-                {
+                    .map_err(|_| DPPError::InvalidAssetLockTransaction)?;
+
+                if execution_context.is_dry_run() {
+                    return Ok(TxOut {
+                        value: 1000,
+                        ..Default::default()
+                    });
+                }
+
+                if let Some(raw_transaction) = maybe_raw_transaction {
                     let transaction = Transaction::deserialize(&raw_transaction)
                         .map_err(|_| DPPError::InvalidAssetLockTransaction)?;
                     transaction

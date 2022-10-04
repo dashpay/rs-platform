@@ -67,6 +67,10 @@ where
         let (futures, futures_meta) = unzip_iter_and_collect(queries);
         let results = join_all(futures).await;
 
+        if execution_context.is_dry_run() {
+            return Ok(validation_result);
+        }
+
         // 3. Create errors if duplicates found
         let result = validate_uniqueness(futures_meta, results)?;
         validation_result.merge(result);

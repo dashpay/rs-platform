@@ -5,7 +5,7 @@ use crate::consensus::ConsensusError;
 use crate::data_contract::{errors::*, DataContract};
 use crate::document::document_transition::DocumentTransition;
 use crate::document::{errors::*, Document};
-use crate::identity::{IdentityPublicKey, Purpose, SecurityLevel};
+use crate::identity::{IdentityPublicKey, KeyType, Purpose, SecurityLevel};
 use crate::prelude::Identifier;
 use crate::state_transition::StateTransition;
 use crate::{CompatibleProtocolVersionIsNotDefinedError, NonConsensusError, SerdeParsingError};
@@ -52,7 +52,7 @@ pub enum ProtocolError {
 
     // State Transition Errors
     #[error("Invalid signature type")]
-    InvalidIdentityPublicKeyTypeError { public_key_type: u32 },
+    InvalidIdentityPublicKeyTypeError { public_key_type: KeyType },
     #[error("State Transition is not signed")]
     StateTransitionIsNotIsSignedError { state_transition: StateTransition },
     #[error(

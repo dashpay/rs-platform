@@ -71,16 +71,48 @@ where
                     .fetch_identity(identity_id, execution_context)
                     .await?
                     .with_context(|| format!("identity with ID {}' doesn't exist", identity_id))?;
+                if execution_context.is_dry_run() {
+                    return Ok(result);
+                }
                 balance + identity.get_balance() as i64
             }
-            StateTransition::DataContractCreate(st) => self.get_identity_owner_balance(st).await?,
-            StateTransition::DataContractUpdate(st) => self.get_identity_owner_balance(st).await?,
-            StateTransition::DocumentsBatch(st) => self.get_identity_owner_balance(st).await?,
-            StateTransition::IdentityUpdate(st) => self.get_identity_owner_balance(st).await?,
+            StateTransition::DataContractCreate(st) => {
+                let balance = self.get_identity_owner_balance(st).await?;
+                if execution_context.is_dry_run() {
+                    return Ok(result);
+                }
+                balance
+            }
+            StateTransition::DataContractUpdate(st) => {
+                let balance = self.get_identity_owner_balance(st).await?;
+                if execution_context.is_dry_run() {
+                    return Ok(result);
+                }
+                balance
+            }
+            StateTransition::DocumentsBatch(st) => {
+                let balance = self.get_identity_owner_balance(st).await?;
+                if execution_context.is_dry_run() {
+                    return Ok(result);
+                }
+                balance
+            }
+
+            StateTransition::IdentityUpdate(st) => {
+                let balance = self.get_identity_owner_balance(st).await?;
+                if execution_context.is_dry_run() {
+                    return Ok(result);
+                }
+                balance
+            }
             StateTransition::IdentityCreditWithdrawal(_) => {
                 return Err(ProtocolError::InvalidStateTransitionTypeError);
             }
         };
+
+        if execution_context.is_dry_run() {
+            return Ok(result);
+        }
 
         let fee = state_transition.calculate_fee();
         if balance < fee {
@@ -138,7 +170,7 @@ mod test {
         storage_cost: i64,
         processing_cost: i64,
     ) -> StateTransitionExecutionContext {
-        let mut ctx = StateTransitionExecutionContext::default();
+        let ctx = StateTransitionExecutionContext::default();
         ctx.add_operation(Operation::PreCalculated(PreCalculatedOperation::new(
             storage_cost,
             processing_cost,

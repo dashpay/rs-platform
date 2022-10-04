@@ -47,6 +47,10 @@ where
             .await
             .map_err(|e| NonConsensusError::StateRepositoryFetchError(e.to_string()))?;
 
+        if state_transition.get_execution_context().is_dry_run() {
+            return Ok(validation_result);
+        }
+
         let stored_identity = match maybe_stored_identity {
             None => {
                 validation_result.add_error(BasicError::IdentityNotFoundError {

@@ -1,5 +1,6 @@
 use crate::{
     consensus::{basic::BasicError, ConsensusError},
+    identity::get_biggest_possible_identity,
     prelude::{Identifier, Identity},
     state_repository::StateRepositoryLike,
     state_transition::StateTransitionLike,
@@ -13,12 +14,17 @@ pub async fn apply_identity_update_transition(
     state_repository: &impl StateRepositoryLike,
     state_transition: IdentityUpdateTransition,
 ) -> Result<(), ProtocolError> {
-    let maybe_identity: Option<Identity> = state_repository
+    let mut maybe_identity: Option<Identity> = state_repository
         .fetch_identity(
             state_transition.get_identity_id(),
             state_transition.get_execution_context(),
         )
         .await?;
+
+    if state_transition.get_execution_context().is_dry_run() {
+        maybe_identity = Some(get_biggest_possible_identity())
+    }
+
     let mut identity = match maybe_identity {
         None => {
             return Err(identity_not_found_error(

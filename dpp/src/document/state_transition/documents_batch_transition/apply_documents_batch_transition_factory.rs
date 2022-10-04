@@ -23,19 +23,17 @@ where
     state_repository: SR,
 }
 
-pub fn apply_documents_batch_transition_factory<SR>(
-    state_repository: SR,
-) -> ApplyDocumentsBatchTransition<SR>
-where
-    SR: StateRepositoryLike,
-{
-    ApplyDocumentsBatchTransition { state_repository }
-}
-
 impl<SR> ApplyDocumentsBatchTransition<SR>
 where
     SR: StateRepositoryLike,
 {
+    pub fn new(state_repository: SR) -> ApplyDocumentsBatchTransition<SR>
+    where
+        SR: StateRepositoryLike,
+    {
+        ApplyDocumentsBatchTransition { state_repository }
+    }
+
     pub async fn apply(
         &self,
         state_transition: &DocumentsBatchTransition,
@@ -131,7 +129,7 @@ fn document_from_transition_create(
         created_at: document_create_transition.created_at,
         updated_at: document_create_transition.updated_at,
         entropy: document_create_transition.entropy,
-        revision: 0,
+        revision: document_create_transition.get_revision(),
         metadata: None,
 
         //? In the JS implementation the `data_contract` property is completely omitted, what suggest we should make

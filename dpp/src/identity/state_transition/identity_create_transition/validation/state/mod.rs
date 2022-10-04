@@ -25,6 +25,10 @@ pub async fn validate_identity_create_transition_state(
         .await
         .map_err(|e| NonConsensusError::StateRepositoryFetchError(e.to_string()))?;
 
+    if state_transition.get_execution_context().is_dry_run() {
+        return Ok(result);
+    }
+
     if let Some(_identity) = maybe_identity {
         result.add_error(IdentityAlreadyExistsError::new(identity_id.to_buffer()));
     }

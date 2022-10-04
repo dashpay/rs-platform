@@ -4,7 +4,7 @@ use anyhow::{anyhow, Result};
 
 use crate::identity::state_transition::asset_lock_proof::AssetLockTransactionOutputFetcher;
 use crate::identity::state_transition::identity_topup_transition::IdentityTopUpTransition;
-use crate::identity::{convert_satoshi_to_credits, Identity};
+use crate::identity::{convert_satoshi_to_credits, get_biggest_possible_identity, Identity};
 use crate::state_repository::StateRepositoryLike;
 use crate::state_transition::StateTransitionLike;
 
@@ -40,10 +40,14 @@ where
             .ok_or_else(|| anyhow!("Out point is missing from asset lock proof"))?;
         let identity_id = state_transition.get_identity_id();
 
-        let maybe_identity = self
+        let mut maybe_identity = self
             .state_repository
             .fetch_identity::<Identity>(identity_id, state_transition.get_execution_context())
             .await?;
+
+        if state_transition.get_execution_context().is_dry_run() {
+            maybe_identity = Some(get_biggest_possible_identity())
+        }
 
         if let Some(identity) = maybe_identity {
             let identity = identity.increase_balance(credits_amount);
