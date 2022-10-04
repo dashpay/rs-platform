@@ -63,6 +63,12 @@ pub enum DriveError {
     /// Error
     #[error("corrupted withdrawal not an item error: {0}")]
     CorruptedWithdrawalNotItem(&'static str),
+    /// Error
+    #[error("corrupted withdrawal transaction count invalid length: {0}")]
+    CorruptedWithdrawalTransactionsCounterInvalidLength(&'static str),
+    /// Error
+    #[error("orrupted withdrawal transaction not an item: {0}")]
+    CorruptedWithdrawalTransactionsCounterNotItem(&'static str),
 
     /// Error
     #[error("corrupted element flags error: {0}")]
