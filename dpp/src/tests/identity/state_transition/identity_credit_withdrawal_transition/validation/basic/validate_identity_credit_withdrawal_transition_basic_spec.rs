@@ -339,6 +339,25 @@ mod validate_identity_credit_withdrawal_transition_basic_factory {
             assert_eq!(error.instance_path().to_string(), "/coreFee");
             assert_eq!(error.keyword().unwrap(), "minimum");
         }
+
+        #[tokio::test]
+        pub async fn should_be_in_a_fibonacci_sequence() {
+            let (mut raw_state_transition, validator) = setup_test();
+
+            raw_state_transition.set_key_value("coreFee", 6);
+
+            let result = validator.validate(&raw_state_transition).await.unwrap();
+
+            let errors = assert_consensus_errors!(
+                result,
+                ConsensusError::InvalidIdentityCreditWithdrawalTransitionCoreFeeError,
+                1
+            );
+
+            let error = errors.first().unwrap();
+
+            assert_eq!(error.core_fee(), 6);
+        }
     }
 
     mod pooling {
@@ -400,7 +419,7 @@ mod validate_identity_credit_withdrawal_transition_basic_factory {
         }
     }
 
-    mod outputScript {
+    mod output_script {
         use super::*;
 
         pub async fn should_be_present() {

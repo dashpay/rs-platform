@@ -66,7 +66,7 @@ pub struct BlockBeginRequest {
 }
 
 /// A struct for handling block begin responses
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct BlockBeginResponse {
     /// List of unsigned withdrawal transaction bytes

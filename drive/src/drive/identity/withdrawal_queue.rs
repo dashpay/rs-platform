@@ -45,7 +45,7 @@ impl Drive {
     /// Add insert operations for withdrawal transactions to the batch
     pub fn add_enqueue_withdrawal_transaction_operations(
         &self,
-        mut batch: GroveDbOpBatch,
+        batch: &mut GroveDbOpBatch,
         withdrawals: Vec<(Vec<u8>, Vec<u8>)>,
     ) -> () {
         for (id, bytes) in withdrawals {
