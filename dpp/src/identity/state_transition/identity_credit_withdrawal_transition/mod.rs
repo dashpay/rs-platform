@@ -4,7 +4,7 @@ use serde_json::Value as JsonValue;
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
 use crate::{
-    identity::{script::Script, KeyID},
+    identity::{core_script::CoreScript, KeyID},
     prelude::Identifier,
     state_transition::{
         StateTransitionConvert, StateTransitionIdentitySigned, StateTransitionLike,
@@ -49,7 +49,7 @@ pub struct IdentityCreditWithdrawalTransition {
     pub amount: u64,
     pub core_fee: u32,
     pub pooling: Pooling,
-    pub output_script: Script,
+    pub output_script: CoreScript,
     pub signature_public_key_id: KeyID,
     pub signature: Vec<u8>,
 }

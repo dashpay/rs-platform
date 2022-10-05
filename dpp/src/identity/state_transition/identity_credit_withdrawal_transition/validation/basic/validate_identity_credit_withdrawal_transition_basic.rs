@@ -8,7 +8,7 @@ use crate::{
         InvalidIdentityCreditWithdrawalTransitionCoreFeeError,
         InvalidIdentityCreditWithdrawalTransitionOutputScriptError,
     },
-    identity::script::Script,
+    identity::core_script::CoreScript,
     util::{is_fibonacci_number::is_fibonacci_number, protocol_data::get_protocol_version},
     validation::{JsonSchemaValidator, ValidationResult},
     version::ProtocolVersionValidator,
@@ -97,7 +97,7 @@ impl IdentityCreditWithdrawalTransitionBasicValidator {
 
         let output_script_bytes: Vec<u8> = serde_json::from_value(output_script_value.clone())?;
 
-        let output_script = Script::from_bytes(output_script_bytes);
+        let output_script = CoreScript::from_bytes(output_script_bytes);
 
         if !output_script.is_p2pkh() && !output_script.is_p2sh() {
             result.add_error(

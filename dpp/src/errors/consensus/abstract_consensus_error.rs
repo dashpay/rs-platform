@@ -156,9 +156,9 @@ impl ConsensusError {
             ConsensusError::InvalidInstantAssetLockProofSignatureError(_) => 1042,
             ConsensusError::MissingMasterPublicKeyError(_) => 1046,
             ConsensusError::InvalidIdentityPublicKeySecurityLevelError(_) => 1047,
-            ConsensusError::IdentityInsufficientBalanceError(_) => 4023,
-            ConsensusError::InvalidIdentityCreditWithdrawalTransitionCoreFeeError(_) => 4024,
-            ConsensusError::InvalidIdentityCreditWithdrawalTransitionOutputScriptError(_) => 4025,
+            ConsensusError::IdentityInsufficientBalanceError(_) => 4024,
+            ConsensusError::InvalidIdentityCreditWithdrawalTransitionCoreFeeError(_) => 4025,
+            ConsensusError::InvalidIdentityCreditWithdrawalTransitionOutputScriptError(_) => 4026,
 
             ConsensusError::StateError(e) => e.get_code(),
             ConsensusError::BasicError(e) => e.get_code(),

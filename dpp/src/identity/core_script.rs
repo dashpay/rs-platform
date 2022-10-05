@@ -1,4 +1,4 @@
-use core::fmt;
+use std::ops::Deref;
 
 use dashcore::Script as DashcoreScript;
 use serde::{Deserialize, Serialize};
@@ -9,17 +9,9 @@ use crate::{
 };
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Script(DashcoreScript);
+pub struct CoreScript(DashcoreScript);
 
-impl Script {
-    pub fn is_p2sh(&self) -> bool {
-        self.0.is_p2sh()
-    }
-
-    pub fn is_p2pkh(&self) -> bool {
-        self.0.is_p2pkh()
-    }
-
+impl CoreScript {
     pub fn to_string(&self, encoding: Encoding) -> String {
         string_encoding::encode(&self.0.to_bytes(), encoding)
     }
@@ -33,19 +25,23 @@ impl Script {
     pub fn from_bytes(bytes: Vec<u8>) -> Self {
         Self(DashcoreScript::from(bytes))
     }
+}
 
-    pub fn get_original_script(&self) -> DashcoreScript {
-        self.0.clone()
+impl Deref for CoreScript {
+    type Target = DashcoreScript;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 
-impl Default for Script {
+impl Default for CoreScript {
     fn default() -> Self {
         Self(Default::default())
     }
 }
 
-impl Serialize for Script {
+impl Serialize for CoreScript {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -54,7 +50,7 @@ impl Serialize for Script {
     }
 }
 
-impl<'de> Deserialize<'de> for Script {
+impl<'de> Deserialize<'de> for CoreScript {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
@@ -66,7 +62,7 @@ impl<'de> Deserialize<'de> for Script {
     }
 }
 
-impl std::fmt::Display for Script {
+impl std::fmt::Display for CoreScript {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.to_string(Encoding::Base64))
     }

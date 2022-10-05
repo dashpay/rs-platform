@@ -420,7 +420,7 @@ mod validate_identity_credit_withdrawal_transition_basic_factory {
     }
 
     mod output_script {
-        use crate::identity::script::Script;
+        use crate::identity::core_script::CoreScript;
 
         use super::*;
 
@@ -450,11 +450,11 @@ mod validate_identity_credit_withdrawal_transition_basic_factory {
         pub async fn should_be_a_byte_array() {
             let (mut raw_state_transition, validator) = setup_test();
 
-            raw_state_transition.set_key_value("outputScript", vec!["string"; 65]);
+            raw_state_transition.set_key_value("outputScript", vec!["string"; 23]);
 
             let result = validator.validate(&raw_state_transition).await.unwrap();
 
-            let errors = assert_consensus_errors!(result, ConsensusError::JsonSchemaError, 65);
+            let errors = assert_consensus_errors!(result, ConsensusError::JsonSchemaError, 23);
 
             let error = errors.first().unwrap();
 
@@ -463,7 +463,7 @@ mod validate_identity_credit_withdrawal_transition_basic_factory {
         }
 
         #[tokio::test]
-        pub async fn should_be_not_shorter_than_10_bytes() {
+        pub async fn should_be_not_shorter_than_23_bytes() {
             let (mut raw_state_transition, validator) = setup_test();
 
             raw_state_transition.set_key_value("outputScript", vec![0; 9]);
@@ -479,7 +479,7 @@ mod validate_identity_credit_withdrawal_transition_basic_factory {
         }
 
         #[tokio::test]
-        pub async fn should_be_not_longer_than_10017_bytes() {
+        pub async fn should_be_not_longer_than_25_bytes() {
             let (mut raw_state_transition, validator) = setup_test();
 
             raw_state_transition.set_key_value("outputScript", vec![0; 10018]);
@@ -498,7 +498,7 @@ mod validate_identity_credit_withdrawal_transition_basic_factory {
         pub async fn should_be_of_a_proper_type() {
             let (mut raw_state_transition, validator) = setup_test();
 
-            raw_state_transition.set_key_value("outputScript", vec![6; 32]);
+            raw_state_transition.set_key_value("outputScript", vec![6; 23]);
 
             let result = validator.validate(&raw_state_transition).await.unwrap();
 
@@ -510,7 +510,7 @@ mod validate_identity_credit_withdrawal_transition_basic_factory {
 
             let error = errors.first().unwrap();
 
-            assert_eq!(error.output_script(), Script::from_bytes(vec![6; 32]));
+            assert_eq!(error.output_script(), CoreScript::from_bytes(vec![6; 23]));
         }
     }
 
