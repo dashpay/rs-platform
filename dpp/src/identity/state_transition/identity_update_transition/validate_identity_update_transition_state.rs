@@ -1,10 +1,10 @@
+use dashcore::BlockHeader;
 use serde_json::Value;
 use std::sync::Arc;
 
 use crate::{
     block_time_window::validate_time_in_block_time_window::validate_time_in_block_time_window,
     consensus::basic::BasicError,
-    document::validation::state::validate_documents_batch_transition_state::BlockHeader,
     identity::validation::{RequiredPurposeAndSecurityLevelValidator, TPublicKeysValidator},
     prelude::Identity,
     state_repository::StateRepositoryLike,
@@ -15,18 +15,18 @@ use crate::{
 
 use super::identity_update_transition::{property_names, IdentityUpdateTransition};
 
-pub struct ValidateIdentityUpdateTransitionState<T, ST> {
+pub struct IdentityUpdateTransitionStateValidator<T, ST> {
     state_repository: Arc<ST>,
     public_keys_validator: Arc<T>,
 }
 
-impl<T, SR> ValidateIdentityUpdateTransitionState<T, SR>
+impl<T, SR> IdentityUpdateTransitionStateValidator<T, SR>
 where
     T: TPublicKeysValidator,
     SR: StateRepositoryLike,
 {
     pub fn new(state_repository: Arc<SR>, public_keys_validator: Arc<T>) -> Self {
-        ValidateIdentityUpdateTransitionState {
+        IdentityUpdateTransitionStateValidator {
             state_repository,
             public_keys_validator,
         }
@@ -108,7 +108,8 @@ where
                 .fetch_latest_platform_block_header()
                 .await
                 .map_err(|e| NonConsensusError::StateRepositoryFetchError(e.to_string()))?;
-            let last_block_header_time = (block_header.time.seconds * 1000) as u64;
+
+            let last_block_header_time = block_header.time as u64 * 1000;
             let disabled_at_time = state_transition.get_public_keys_disabled_at().ok_or(
                 NonConsensusError::RequiredPropertyError {
                     property_name: property_names::PUBLIC_KEYS_DISABLED_AT.to_owned(),

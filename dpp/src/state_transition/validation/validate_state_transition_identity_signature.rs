@@ -422,6 +422,31 @@ mod test {
     }
 
     #[tokio::test]
+    async fn should_not_verify_signature_on_dry_run() {
+        let mut state_repository_mock = MockStateRepositoryLike::new();
+        let raw_identity = identity_fixture_raw_object();
+        let identity = Identity::from_raw_object(raw_identity).unwrap();
+        let owner_id = identity.get_id();
+        let mut state_transition = get_mock_state_transition();
+
+        state_transition.owner_id = owner_id.clone();
+        state_repository_mock
+            .expect_fetch_identity()
+            .returning(move |_, _| Ok(Some(identity.clone())));
+        state_transition.return_error = Some(1);
+        state_transition.get_execution_context().enable_dry_run();
+
+        let result = validate_state_transition_identity_signature(
+            &state_repository_mock,
+            &mut state_transition,
+        )
+        .await
+        .expect("the validation result should be returned");
+
+        assert!(result.is_valid())
+    }
+
+    #[tokio::test]
     async fn should_return_public_key_security_level_not_met() {
         // 'should return PubicKeySecurityLevelNotMetConsensusError if PubicKeySecurityLevelNotMetError was thrown'
         let mut state_repository_mock = MockStateRepositoryLike::new();

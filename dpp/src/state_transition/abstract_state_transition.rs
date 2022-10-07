@@ -11,7 +11,7 @@ use serde::Serialize;
 use serde_json::Value as JsonValue;
 
 use crate::{
-    identity::{state_transition::asset_lock_proof::ExecutionContext, KeyType},
+    identity::KeyType,
     prelude::ProtocolError,
     util::{
         hash,

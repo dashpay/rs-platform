@@ -15,8 +15,7 @@ use crate::{
 };
 
 use super::properties::{
-    PROPERTY_IDENTITY_ID, PROPERTY_OUTPUT, PROPERTY_OWNER_ID, PROPERTY_SIGNATURE,
-    PROPERTY_SIGNATURE_PUBLIC_KEY_ID,
+    PROPERTY_IDENTITY_ID, PROPERTY_OUTPUT, PROPERTY_SIGNATURE, PROPERTY_SIGNATURE_PUBLIC_KEY_ID,
 };
 
 pub mod apply_identity_credit_withdrawal_transition_factory;

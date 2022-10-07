@@ -303,6 +303,38 @@ mod test {
     }
 
     #[tokio::test]
+    async fn documents_batch_transition_should_not_increase_balance_on_dry_run() {
+        let mut identity = identity_fixture();
+        let mut state_repository_mock = MockStateRepositoryLike::new();
+
+        identity.balance = 1;
+        state_repository_mock
+            .expect_fetch_identity()
+            .returning(move |_, _| Ok(Some(identity.clone())));
+
+        let data_contract = get_data_contract_fixture(None);
+        let documents =
+            get_documents_fixture_with_owner_id_from_contract(data_contract.clone()).unwrap();
+        let transitions = get_document_transitions_fixture([(Action::Create, documents)]);
+        let execution_context = execution_context_with_cost(40, 5);
+        execution_context.enable_dry_run();
+
+        let documents_batch_transition = DocumentsBatchTransition {
+            owner_id: data_contract.owner_id().to_owned(),
+            transitions,
+            execution_context,
+            ..Default::default()
+        };
+
+        let validator = StateTransitionFeeValidator::new(Arc::new(state_repository_mock));
+        let result = validator
+            .validate(&documents_batch_transition.into())
+            .await
+            .expect("the validation result should be returned");
+        assert!(result.is_valid());
+    }
+
+    #[tokio::test]
     async fn identity_top_up_transition_should_return_invalid_result_if_balance_is_not_enough() {
         let mut identity = identity_fixture();
         let mut state_repository_mock = MockStateRepositoryLike::new();

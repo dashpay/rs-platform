@@ -167,3 +167,65 @@ fn document_from_transition_replace(
         entropy: Default::default(),
     }
 }
+
+#[cfg(test)]
+mod test {
+    use serde_json::{json, Value};
+
+    use crate::{
+        document::{
+            document_transition::{Action, DocumentTransitionObjectLike},
+            Document, DocumentsBatchTransition,
+        },
+        state_repository::MockStateRepositoryLike,
+        state_transition::StateTransitionLike,
+        tests::{
+            fixtures::{
+                get_data_contract_fixture, get_document_transitions_fixture, get_documents_fixture,
+            },
+            utils::{create_empty_block, generate_random_identifier_struct},
+        },
+    };
+
+    use super::apply_documents_batch_transition;
+
+    #[tokio::test]
+    async fn should_fetch_latest_block_when_replace_and_dry_run_enabled() {
+        let mut state_repository = MockStateRepositoryLike::new();
+
+        let owner_id = generate_random_identifier_struct();
+        let data_contract = get_data_contract_fixture(None);
+        let documents = get_documents_fixture(data_contract.clone()).unwrap();
+        let documents_transitions = get_document_transitions_fixture([
+            (Action::Replace, documents),
+            (Action::Create, vec![]),
+        ]);
+        let raw_document_transitions: Vec<Value> = documents_transitions
+            .iter()
+            .map(|dt| dt.to_object().unwrap())
+            .collect();
+        let owner_id_bytes = owner_id.to_buffer();
+        let state_transition = DocumentsBatchTransition::from_raw_object(
+            json!({
+                "ownerId" : owner_id_bytes,
+                "transitions" : raw_document_transitions,
+            }),
+            vec![data_contract.clone()],
+        )
+        .expect("documents batch state transition should be created");
+
+        state_transition.get_execution_context().enable_dry_run();
+        state_repository
+            .expect_fetch_documents::<Document>()
+            .returning(|_, _, _, _| Ok(vec![]));
+        state_repository
+            .expect_update_document()
+            .returning(|_, _| Ok(()));
+        state_repository
+            .expect_fetch_latest_platform_block_header()
+            .returning(|| Ok(create_empty_block(None)));
+
+        let result = apply_documents_batch_transition(&state_repository, &state_transition).await;
+        assert!(result.is_ok());
+    }
+}

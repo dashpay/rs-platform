@@ -7,7 +7,6 @@ use crate::{
         document_transition::{Action, DocumentTransition, DocumentTransitionExt},
         Document,
     },
-    identity::state_transition::asset_lock_proof::ExecutionContext,
     prelude::{DataContract, Identifier},
     state_repository::StateRepositoryLike,
     state_transition::state_transition_execution_context::StateTransitionExecutionContext,

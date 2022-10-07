@@ -1,4 +1,4 @@
-use dashcore::Block;
+use dashcore::BlockHeader;
 use futures::future::join_all;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
@@ -26,11 +26,6 @@ use super::{
     execute_data_triggers::execute_data_triggers, fetch_documents::fetch_documents,
     validate_documents_uniqueness_by_indices::validate_documents_uniqueness_by_indices,
 };
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct BlockHeader {
-    pub time: HeaderTime,
-}
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct HeaderTime {
@@ -95,10 +90,10 @@ pub async fn validate_document_transitions(
         fetch_documents(state_repository, &transitions, execution_context).await?;
 
     // Calculate time window for timestamp
-    let block: Block = state_repository
+    let block_header: BlockHeader = state_repository
         .fetch_latest_platform_block_header()
         .await?;
-    let last_header_time_millis = (block.header.time * 1000) as u64;
+    let last_header_time_millis = block_header.time as u64 * 1000;
 
     if !execution_context.is_dry_run() {
         for transition in transitions.iter() {

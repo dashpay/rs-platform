@@ -140,9 +140,7 @@ mod test {
 
     use crate::{
         data_contract::DataContract,
-        data_trigger::{
-            dashpay_data_triggers::create_contact_request_data_trigger, DataTriggerExecutionContext,
-        },
+        data_trigger::DataTriggerExecutionContext,
         document::{
             document_transition::{Action, DocumentTransition, DocumentTransitionExt},
             Document,
@@ -435,5 +433,38 @@ mod test {
             "Reward shares cannot contain more than 16 identities",
             error.to_string()
         );
+    }
+
+    #[tokio::test]
+    async fn should_pass_on_dry_run() {
+        let TestData {
+            document_transition,
+            data_contract,
+            top_level_identity,
+            ..
+        } = setup_test();
+
+        let mut state_repository_mock = MockStateRepositoryLike::new();
+        state_repository_mock
+            .expect_fetch_identity::<Vec<u8>>()
+            .returning(move |_, _| Ok(None));
+        state_repository_mock
+            .expect_fetch_documents::<Document>()
+            .returning(move |_, _, _, _| Ok(vec![]));
+
+        let execution_context = StateTransitionExecutionContext::default();
+        execution_context.enable_dry_run();
+
+        let context = DataTriggerExecutionContext {
+            data_contract: &data_contract,
+            owner_id: &top_level_identity,
+            state_repository: &state_repository_mock,
+            state_transition_execution_context: &execution_context,
+        };
+        let result =
+            create_masternode_reward_shares_data_trigger(&document_transition, &context, None)
+                .await
+                .expect("the execution result should be returned");
+        assert!(result.is_ok());
     }
 }

@@ -65,7 +65,7 @@ where
     let mut result = DataTriggerExecutionResult::default();
     let full_domain_name = normalized_label;
 
-    if (!is_dry_run) {
+    if !is_dry_run {
         if full_domain_name.len() > MAX_PRINTABLE_DOMAIN_NAME_LENGTH {
             let err = create_error(
                 context,
@@ -218,4 +218,55 @@ where
     }
 
     Ok(result)
+}
+
+#[cfg(test)]
+mod test {
+    use crate::{
+        data_trigger::DataTriggerExecutionContext,
+        document::{document_transition::Action, Document},
+        state_repository::MockStateRepositoryLike,
+        state_transition::state_transition_execution_context::StateTransitionExecutionContext,
+        tests::{
+            fixtures::{
+                get_document_transitions_fixture, get_dpns_data_contract_fixture,
+                get_dpns_parent_document_fixture, ParentDocumentOptions,
+            },
+            utils::generate_random_identifier_struct,
+        },
+    };
+
+    use super::create_domain_data_trigger;
+
+    #[tokio::test]
+    async fn should_return_execution_result_on_dry_run() {
+        let mut state_repository = MockStateRepositoryLike::new();
+        let transition_execution_context = StateTransitionExecutionContext::default();
+        let owner_id = generate_random_identifier_struct();
+        let document = get_dpns_parent_document_fixture(ParentDocumentOptions {
+            owner_id: owner_id.clone(),
+            ..Default::default()
+        });
+        let data_contract = get_dpns_data_contract_fixture(Some(owner_id.clone()));
+        let transitions = get_document_transitions_fixture([(Action::Create, vec![document])]);
+        let first_transition = transitions.get(0).expect("transition should be present");
+
+        state_repository
+            .expect_fetch_documents::<Document>()
+            .returning(|_, _, _, _| Ok(vec![]));
+        transition_execution_context.enable_dry_run();
+
+        let data_trigger_context = DataTriggerExecutionContext {
+            data_contract: &data_contract,
+            owner_id: &owner_id,
+            state_repository: &state_repository,
+            state_transition_execution_context: &transition_execution_context,
+        };
+
+        let result =
+            create_domain_data_trigger(first_transition, &data_trigger_context, Some(&owner_id))
+                .await
+                .expect("the execution result should be returned");
+        assert!(result.is_ok());
+    }
 }

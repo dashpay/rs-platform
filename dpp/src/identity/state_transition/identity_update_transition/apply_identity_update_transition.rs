@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::{
     consensus::{basic::BasicError, ConsensusError},
     identity::get_biggest_possible_identity,
@@ -8,6 +10,23 @@ use crate::{
 };
 
 use super::identity_update_transition::IdentityUpdateTransition;
+
+struct ApplyIdentityUpdateTransition<SR> {
+    state_repository: Arc<SR>,
+}
+
+impl<SR> ApplyIdentityUpdateTransition<SR>
+where
+    SR: StateRepositoryLike,
+{
+    pub fn new(state_repository: Arc<SR>) -> Self {
+        Self { state_repository }
+    }
+
+    async fn apply(&self, state_transition: IdentityUpdateTransition) -> Result<(), ProtocolError> {
+        apply_identity_update_transition(self.state_repository.as_ref(), state_transition).await
+    }
+}
 
 /// Apply Identity Update state transition
 pub async fn apply_identity_update_transition(

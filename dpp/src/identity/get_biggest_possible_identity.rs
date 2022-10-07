@@ -16,7 +16,7 @@ lazy_static! {
 
 // TODO change into `const` after stabilizing the `Option::unwrap()`
 pub fn get_biggest_possible_identity() -> Identity {
-    let max_items = IDENTITY_CREATE_TRANSITION_SCHEMA["properties"]["publicKeys"]["max_items"]
+    let max_items = IDENTITY_CREATE_TRANSITION_SCHEMA["properties"]["publicKeys"]["maxItems"]
         .as_u64()
         .expect("the property max_items must exist");
 

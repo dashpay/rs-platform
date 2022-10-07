@@ -14,8 +14,8 @@ use crate::NonConsensusError;
 /// 1. We need to check that outpoint exists (not now)
 /// 2. Verify ownership proof signature, as it requires special transaction to be implemented
 pub async fn validate_identity_create_transition_state(
+    state_repository: &impl StateRepositoryLike,
     state_transition: IdentityCreateTransition,
-    state_repository: impl StateRepositoryLike,
 ) -> Result<ValidationResult<()>, NonConsensusError> {
     let mut result = ValidationResult::default();
 
@@ -34,4 +34,31 @@ pub async fn validate_identity_create_transition_state(
     }
 
     Ok(result)
+}
+
+#[cfg(test)]
+mod test {
+    use crate::{
+        identity::state_transition::identity_create_transition::IdentityCreateTransition,
+        prelude::Identity, state_repository::MockStateRepositoryLike,
+        state_transition::StateTransitionLike,
+        tests::fixtures::identity_create_transition_fixture_json,
+    };
+
+    use super::validate_identity_create_transition_state;
+
+    #[tokio::test]
+    async fn should_not_verify_signature_on_dry_run() {
+        let mut state_repository = MockStateRepositoryLike::new();
+        let raw_transition = identity_create_transition_fixture_json(None);
+        let transition = IdentityCreateTransition::new(raw_transition).unwrap();
+
+        transition.get_execution_context().enable_dry_run();
+        state_repository
+            .expect_fetch_identity()
+            .return_once(|_, _| Ok(Some(Identity::default())));
+
+        let result = validate_identity_create_transition_state(&state_repository, transition).await;
+        assert!(result.is_ok());
+    }
 }
