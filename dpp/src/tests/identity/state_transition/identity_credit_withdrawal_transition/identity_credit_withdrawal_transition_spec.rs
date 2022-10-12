@@ -9,7 +9,7 @@ use crate::{
 };
 
 mod deserialization {
-    use dashcore::Script;
+    use dashcore::{hashes::hex::FromHex, PubkeyHash, Script};
 
     use super::*;
 
@@ -24,7 +24,12 @@ mod deserialization {
             Identifier::from_bytes(&vec![1; 32]).unwrap()
         );
 
-        assert_eq!(*state_transition.output_script, Script::from(vec![0; 20]));
+        assert_eq!(
+            *state_transition.output_script,
+            Script::new_p2pkh(
+                &PubkeyHash::from_hex("0000000000000000000000000000000000000000").unwrap()
+            )
+        );
         assert_eq!(state_transition.signature, vec![0; 65]);
     }
 
@@ -38,7 +43,12 @@ mod deserialization {
             Identifier::from_bytes(&vec![1; 32]).unwrap()
         );
 
-        assert_eq!(*state_transition.output_script, Script::from(vec![0; 20]));
+        assert_eq!(
+            *state_transition.output_script,
+            Script::new_p2pkh(
+                &PubkeyHash::from_hex("0000000000000000000000000000000000000000").unwrap()
+            )
+        );
         assert_eq!(state_transition.signature, vec![0; 65]);
     }
 }
