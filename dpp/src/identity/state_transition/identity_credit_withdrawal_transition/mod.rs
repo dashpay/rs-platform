@@ -89,7 +89,7 @@ impl IdentityCreditWithdrawalTransition {
         let output_script_option = raw_object.get(PROPERTY_OUTPUT_SCRIPT);
 
         let output_script_string = output_script_option
-            .ok_or(anyhow!("uanble to get outputScript"))
+            .ok_or_else(|| anyhow!("uanble to get outputScript"))
             .and_then(|value| serde_json::from_value(value.clone()).map_err(|e| anyhow!(e)))
             .map(|bytes: Vec<u8>| string_encoding::encode(&bytes, Encoding::Base64))?;
 
@@ -169,7 +169,7 @@ impl StateTransitionConvert for IdentityCreditWithdrawalTransition {
         let output_script_option = json_value.get(PROPERTY_OUTPUT_SCRIPT);
 
         let output_script_bytes = output_script_option
-            .ok_or(anyhow!("uanble to get outputScript"))
+            .ok_or_else(|| anyhow!("uanble to get outputScript"))
             .and_then(|value| serde_json::from_value(value.clone()).map_err(|e| anyhow!(e)))
             .and_then(|string: String| {
                 string_encoding::decode(&string, Encoding::Base64).map_err(|e| anyhow!(e))
@@ -180,7 +180,7 @@ impl StateTransitionConvert for IdentityCreditWithdrawalTransition {
             JsonValue::Array(
                 output_script_bytes
                     .into_iter()
-                    .map(|b| JsonValue::from(b))
+                    .map(JsonValue::from)
                     .collect(),
             ),
         )?;

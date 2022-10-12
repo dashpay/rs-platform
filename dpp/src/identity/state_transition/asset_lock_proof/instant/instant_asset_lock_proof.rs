@@ -10,7 +10,7 @@ use crate::identifier::Identifier;
 use crate::util::cbor_value::CborCanonicalMap;
 use crate::util::hash::hash;
 use crate::util::vec::vec_to_array;
-use crate::{InvalidVectorSizeError, NonConsensusError, ProtocolError};
+use crate::{NonConsensusError, ProtocolError};
 
 #[derive(Clone, Debug)]
 pub struct InstantAssetLockProof {

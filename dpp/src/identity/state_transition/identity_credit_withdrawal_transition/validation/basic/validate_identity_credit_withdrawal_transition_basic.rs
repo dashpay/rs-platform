@@ -80,7 +80,7 @@ impl IdentityCreditWithdrawalTransitionBasicValidator {
             .as_u64()
             .ok_or_else(|| SerdeParsingError::new("Expected coreFee to be a uint"))?;
 
-        if is_fibonacci_number(core_fee) == false {
+        if !is_fibonacci_number(core_fee) {
             result.add_error(InvalidIdentityCreditWithdrawalTransitionCoreFeeError::new(
                 core_fee as u32,
             ));

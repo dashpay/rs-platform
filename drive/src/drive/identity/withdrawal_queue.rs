@@ -43,6 +43,8 @@ use crate::fee::op::DriveOperation;
 
 const WITHDRAWAL_TRANSACTIONS_COUNTER_ID: [u8; 1] = [0];
 
+type WithdrawalTransaction = (Vec<u8>, Vec<u8>);
+
 impl Drive {
     /// Get latest withdrawal index in a queue
     pub fn fetch_latest_withdrawal_transaction_index(
@@ -87,7 +89,7 @@ impl Drive {
         &self,
         batch: &mut GroveDbOpBatch,
         value: Vec<u8>,
-    ) -> () {
+    ) {
         batch.add_insert(
             vec![vec![RootTree::WithdrawalTransactionsCounter as u8]],
             WITHDRAWAL_TRANSACTIONS_COUNTER_ID.to_vec(),
@@ -100,7 +102,7 @@ impl Drive {
         &self,
         batch: &mut GroveDbOpBatch,
         withdrawals: Vec<(Vec<u8>, Vec<u8>)>,
-    ) -> () {
+    ) {
         for (id, bytes) in withdrawals {
             batch.add_insert(
                 vec![vec![RootTree::WithdrawalTransactions as u8]],
@@ -115,7 +117,7 @@ impl Drive {
         &self,
         num_of_transactions: u16,
         transaction: TransactionArg,
-    ) -> Result<Vec<(Vec<u8>, Vec<u8>)>, Error> {
+    ) -> Result<Vec<WithdrawalTransaction>, Error> {
         let mut query = Query::new();
 
         query.insert_item(QueryItem::RangeFull(RangeFull));
@@ -147,7 +149,7 @@ impl Drive {
             })
             .collect::<Result<Vec<(Vec<u8>, Vec<u8>)>, Error>>()?;
 
-        if withdrawals.len() > 0 {
+        if !withdrawals.is_empty() {
             let mut batch_operations: Vec<DriveOperation> = vec![];
             let mut drive_operations: Vec<DriveOperation> = vec![];
 

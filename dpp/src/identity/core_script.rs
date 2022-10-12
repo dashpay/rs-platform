@@ -8,7 +8,7 @@ use crate::{
     ProtocolError,
 };
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Default)]
 pub struct CoreScript(DashcoreScript);
 
 impl CoreScript {
@@ -32,12 +32,6 @@ impl Deref for CoreScript {
 
     fn deref(&self) -> &Self::Target {
         &self.0
-    }
-}
-
-impl Default for CoreScript {
-    fn default() -> Self {
-        Self(Default::default())
     }
 }
 
