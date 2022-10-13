@@ -99,6 +99,6 @@ mod tests {
                 &mut drive_operations,
             )
             .expect("expected to get root elements");
-        assert_eq!(elements.len(), 5);
+        assert_eq!(elements.len(), 7);
     }
 }
