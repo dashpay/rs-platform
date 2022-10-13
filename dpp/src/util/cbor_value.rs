@@ -138,6 +138,7 @@ pub trait CborMapExtension {
     fn as_bool(&self, key: &str, error_message: &str) -> Result<bool, ProtocolError>;
     fn as_bytes(&self, key: &str, error_message: &str) -> Result<Vec<u8>, ProtocolError>;
     fn as_string(&self, key: &str, error_message: &str) -> Result<String, ProtocolError>;
+    fn as_u64(&self, key: &str, error_message: &str) -> Result<u64, ProtocolError>;
 }
 
 impl CborMapExtension for &Vec<(CborValue, CborValue)> {
@@ -196,6 +197,15 @@ impl CborMapExtension for &Vec<(CborValue, CborValue)> {
             .ok_or_else(|| ProtocolError::DecodingError(String::from(error_message)))?;
         if let CborValue::Text(string_value) = key_value {
             return Ok(string_value.clone());
+        }
+        Err(ProtocolError::DecodingError(String::from(error_message)))
+    }
+
+    fn as_u64(&self, key: &str, error_message: &str) -> Result<u64, ProtocolError> {
+        let key_value = get_key_from_cbor_map(self, key)
+            .ok_or_else(|| ProtocolError::DecodingError(String::from(error_message)))?;
+        if let CborValue::Integer(integer_value) = key_value {
+            return Ok(i128::from(*integer_value) as u64);
         }
         Err(ProtocolError::DecodingError(String::from(error_message)))
     }
@@ -472,7 +482,8 @@ where
     }
 }
 
-pub fn cbor_value_to_json_value(cbor: &CborValue) -> Result<serde_json::Value, ProtocolError> {
+// TODO: the issue with stack overflow should be address through re-implemtation of the algorithm
+pub fn cbor_value_to_json_value(cbor: &CborValue) -> Result<serde_json::Value, anyhow::Error> {
     match cbor {
         CborValue::Integer(num) => Ok(JsonValue::from(i128::from(*num) as i64)),
         CborValue::Bytes(bytes) => Ok(JsonValue::Array(
@@ -485,31 +496,27 @@ pub fn cbor_value_to_json_value(cbor: &CborValue) -> Result<serde_json::Value, P
         CborValue::Array(arr) => Ok(JsonValue::Array(
             arr.iter()
                 .map(cbor_value_to_json_value)
-                .collect::<Result<Vec<JsonValue>, ProtocolError>>()?,
+                .collect::<Result<Vec<JsonValue>, anyhow::Error>>()?,
         )),
         CborValue::Map(map) => cbor_map_to_json_map(map),
-        _ => Err(ProtocolError::DecodingError(String::from(
-            "Can't convert CBOR to JSON: unknown type",
-        ))),
+        _ => Err(anyhow!("Can't convert CBOR to JSON: unknown type")),
     }
 }
 
 pub fn cbor_map_to_json_map(
     cbor_map: &[(CborValue, CborValue)],
-) -> Result<serde_json::Value, ProtocolError> {
+) -> Result<serde_json::Value, anyhow::Error> {
     let mut json_vec = cbor_map
         .iter()
         .map(|(key, value)| {
             Ok((
                 key.as_text()
-                    .ok_or_else(|| {
-                        ProtocolError::DecodingError(String::from("Expect key to be a string"))
-                    })?
+                    .ok_or_else(|| anyhow!("Expect key to be a string"))?
                     .to_string(),
                 cbor_value_to_json_value(value)?,
             ))
         })
-        .collect::<Result<Vec<(String, JsonValue)>, ProtocolError>>()?;
+        .collect::<Result<Vec<(String, JsonValue)>, anyhow::Error>>()?;
 
     let mut json_map = Map::new();
 
