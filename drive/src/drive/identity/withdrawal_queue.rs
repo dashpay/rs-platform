@@ -41,7 +41,10 @@ use crate::error::drive::DriveError;
 use crate::error::Error;
 use crate::fee::op::DriveOperation;
 
-const WITHDRAWAL_TRANSACTIONS_COUNTER_ID: [u8; 1] = [0];
+/// constant id for transaction counter
+pub const WITHDRAWAL_TRANSACTIONS_COUNTER_ID: [u8; 1] = [0];
+/// constant id for subtree containing transactions queue
+pub const WITHDRAWAL_TRANSACTIONS_QUEUE_ID: [u8; 1] = [1];
 
 type WithdrawalTransaction = (Vec<u8>, Vec<u8>);
 
@@ -54,7 +57,7 @@ impl Drive {
         let result = self
             .grove
             .get(
-                [Into::<&[u8; 1]>::into(RootTree::WithdrawalTransactionsCounter).as_slice()],
+                [Into::<&[u8; 1]>::into(RootTree::WithdrawalTransactions).as_slice()],
                 &WITHDRAWAL_TRANSACTIONS_COUNTER_ID,
                 transaction,
             )
@@ -91,7 +94,7 @@ impl Drive {
         value: Vec<u8>,
     ) {
         batch.add_insert(
-            vec![vec![RootTree::WithdrawalTransactionsCounter as u8]],
+            vec![vec![RootTree::WithdrawalTransactions as u8]],
             WITHDRAWAL_TRANSACTIONS_COUNTER_ID.to_vec(),
             Element::Item(value, None),
         );
@@ -105,7 +108,10 @@ impl Drive {
     ) {
         for (id, bytes) in withdrawals {
             batch.add_insert(
-                vec![vec![RootTree::WithdrawalTransactions as u8]],
+                vec![
+                    vec![RootTree::WithdrawalTransactions as u8],
+                    WITHDRAWAL_TRANSACTIONS_QUEUE_ID.to_vec(),
+                ],
                 id,
                 Element::Item(bytes, None),
             );
@@ -123,7 +129,10 @@ impl Drive {
         query.insert_item(QueryItem::RangeFull(RangeFull));
 
         let path_query = PathQuery {
-            path: vec![vec![RootTree::WithdrawalTransactions as u8]],
+            path: vec![
+                vec![RootTree::WithdrawalTransactions as u8],
+                WITHDRAWAL_TRANSACTIONS_QUEUE_ID.to_vec(),
+            ],
             query: SizedQuery {
                 query,
                 limit: Some(num_of_transactions),
@@ -153,8 +162,10 @@ impl Drive {
             let mut batch_operations: Vec<DriveOperation> = vec![];
             let mut drive_operations: Vec<DriveOperation> = vec![];
 
-            let withdrawals_path: [&[u8]; 1] =
-                [Into::<&[u8; 1]>::into(RootTree::WithdrawalTransactions)];
+            let withdrawals_path: [&[u8]; 2] = [
+                Into::<&[u8; 1]>::into(RootTree::WithdrawalTransactions),
+                &WITHDRAWAL_TRANSACTIONS_QUEUE_ID,
+            ];
 
             for (id, _) in withdrawals.iter() {
                 self.batch_delete(
