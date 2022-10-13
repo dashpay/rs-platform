@@ -472,6 +472,7 @@ where
     }
 }
 
+// TODO: the issue with stack overflow should be address through re-implemtation of the algorithm
 pub fn cbor_value_to_json_value(cbor: &CborValue) -> Result<serde_json::Value, anyhow::Error> {
     match cbor {
         CborValue::Integer(num) => Ok(JsonValue::from(i128::from(*num) as i64)),
