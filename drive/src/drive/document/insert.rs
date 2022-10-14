@@ -584,7 +584,7 @@ impl Drive {
                 }
                 Element::Reference(
                     AbsolutePathReference(reference_path),
-                    Some(1),
+                    Some(2),
                     StorageFlags::map_to_some_element_flags(storage_flags),
                 )
             }

@@ -1197,7 +1197,8 @@ mod tests {
             .expect("expected to add document");
     }
 
-    fn test_update_complex_person_with_history(
+    fn test_update_complex_person(
+        using_history: bool,
         using_transaction: bool,
         using_batches: bool,
         using_has_raw: bool,
@@ -1224,10 +1225,16 @@ mod tests {
             .create_initial_state_structure(transaction.as_ref())
             .expect("expected to create root tree successfully");
 
+        let path = if using_history {
+            "tests/supporting_files/contract/family/family-contract-with-history-only-message-index.json"
+        } else {
+            "tests/supporting_files/contract/family/family-contract-only-message-index.json"
+        };
+
         // setup code
         let contract = setup_contract(
             &drive,
-            "tests/supporting_files/contract/family/family-contract-with-history-only-message-index.json",
+            path,
             None,
             transaction.as_ref()
         );
@@ -1248,7 +1255,7 @@ mod tests {
             first_name: "Samuel".to_string(),
             middle_name: "Abraham".to_string(),
             last_name: "Westrich".to_string(),
-            message: Some("Lemons are now my thing".to_string()),
+            message: Some("Lemons are now my thing too".to_string()),
             age: 35,
         };
 
@@ -1258,7 +1265,7 @@ mod tests {
             first_name: "Wisdom".to_string(),
             middle_name: "Madabuchukwu".to_string(),
             last_name: "Ogwu".to_string(),
-            message: Some("Cantaloupe is the best fruit".to_string()),
+            message: Some("Cantaloupe is the best fruit under the sun".to_string()),
             age: 20,
         };
 
@@ -1304,41 +1311,81 @@ mod tests {
 
     #[test]
     fn test_update_complex_person_with_history_no_transaction_using_batches_and_has_raw() {
-        test_update_complex_person_with_history(false, true, true)
+        test_update_complex_person(true,false, true, true)
     }
 
     #[test]
     fn test_update_complex_person_with_history_no_transaction_using_batches_and_get_raw() {
-        test_update_complex_person_with_history(false, true, false)
+        test_update_complex_person(true,false, true, false)
     }
 
     #[test]
     fn test_update_complex_person_with_history_with_transaction_using_batches_and_has_raw() {
-        test_update_complex_person_with_history(true, true, true)
+        test_update_complex_person(true,true, true, true)
     }
 
     #[test]
     fn test_update_complex_person_with_history_with_transaction_using_batches_and_get_raw() {
-        test_update_complex_person_with_history(true, true, false)
+        test_update_complex_person(true,true, true, false)
     }
 
     #[test]
     fn test_update_complex_person_with_history_no_transaction_no_batches_and_has_raw() {
-        test_update_complex_person_with_history(false, false, true)
+        test_update_complex_person(true,false, false, true)
     }
 
     #[test]
     fn test_update_complex_person_with_history_no_transaction_no_batches_and_get_raw() {
-        test_update_complex_person_with_history(false, false, false)
+        test_update_complex_person(true,false, false, false)
     }
 
     #[test]
     fn test_update_complex_person_with_history_with_transaction_no_batches_and_has_raw() {
-        test_update_complex_person_with_history(true, false, true)
+        test_update_complex_person(true,true, false, true)
     }
 
     #[test]
     fn test_update_complex_person_with_history_with_transaction_no_batches_and_get_raw() {
-        test_update_complex_person_with_history(true, false, false)
+        test_update_complex_person(true,true, false, false)
+    }
+
+    #[test]
+    fn test_update_complex_person_no_history_no_transaction_using_batches_and_has_raw() {
+        test_update_complex_person(false,false, true, true)
+    }
+
+    #[test]
+    fn test_update_complex_person_no_history_no_transaction_using_batches_and_get_raw() {
+        test_update_complex_person(false,false, true, false)
+    }
+
+    #[test]
+    fn test_update_complex_person_no_history_with_transaction_using_batches_and_has_raw() {
+        test_update_complex_person(false,true, true, true)
+    }
+
+    #[test]
+    fn test_update_complex_person_no_history_with_transaction_using_batches_and_get_raw() {
+        test_update_complex_person(false,true, true, false)
+    }
+
+    #[test]
+    fn test_update_complex_person_no_history_no_transaction_no_batches_and_has_raw() {
+        test_update_complex_person(false,false, false, true)
+    }
+
+    #[test]
+    fn test_update_complex_person_no_history_no_transaction_no_batches_and_get_raw() {
+        test_update_complex_person(false,false, false, false)
+    }
+
+    #[test]
+    fn test_update_complex_person_no_history_with_transaction_no_batches_and_has_raw() {
+        test_update_complex_person(false,true, false, true)
+    }
+
+    #[test]
+    fn test_update_complex_person_no_history_with_transaction_no_batches_and_get_raw() {
+        test_update_complex_person(false,true, false, false)
     }
 }
