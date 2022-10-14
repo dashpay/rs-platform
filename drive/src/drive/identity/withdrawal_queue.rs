@@ -254,7 +254,7 @@ mod tests {
             );
 
             drive
-                .grove_apply_batch(batch, true, Some(&transaction))
+                .grove_apply_batch(batch, false, Some(&transaction))
                 .expect("to apply ops");
 
             let stored_counter = drive

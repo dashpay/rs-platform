@@ -241,7 +241,7 @@ impl DriveWrapper {
                 platform
                     .drive
                     .create_initial_state_structure(
-                        using_transaction.then(|| transaction).flatten(),
+                        using_transaction.then_some(transaction).flatten(),
                     )
                     .expect("create_root_tree should not fail");
 
@@ -285,7 +285,7 @@ impl DriveWrapper {
                     block_time,
                     apply,
                     StorageFlags::default(),
-                    using_transaction.then(|| transaction).flatten(),
+                    using_transaction.then_some(transaction).flatten(),
                 );
 
                 channel.send(move |mut task_context| {
@@ -360,7 +360,7 @@ impl DriveWrapper {
                         block_time,
                         apply,
                         StorageFlags::default(),
-                        using_transaction.then(|| transaction).flatten(),
+                        using_transaction.then_some(transaction).flatten(),
                     );
 
                 channel.send(move |mut task_context| {
@@ -430,7 +430,7 @@ impl DriveWrapper {
                     block_time,
                     apply,
                     StorageFlags::default(),
-                    using_transaction.then(|| transaction).flatten(),
+                    using_transaction.then_some(transaction).flatten(),
                 );
 
                 channel.send(move |mut task_context| {
@@ -505,7 +505,7 @@ impl DriveWrapper {
                         &document_type_name,
                         None,
                         apply,
-                        using_transaction.then(|| transaction).flatten(),
+                        using_transaction.then_some(transaction).flatten(),
                     );
 
                     channel.send(move |mut task_context| {
@@ -567,7 +567,7 @@ impl DriveWrapper {
                     identity,
                     apply,
                     StorageFlags::default(),
-                    using_transaction.then(|| transaction).flatten(),
+                    using_transaction.then_some(transaction).flatten(),
                 );
 
                 channel.send(move |mut task_context| {
@@ -627,7 +627,7 @@ impl DriveWrapper {
                     &query_cbor,
                     <[u8; 32]>::try_from(contract_id).unwrap(),
                     document_type_name.as_str(),
-                    using_transaction.then(|| transaction).flatten(),
+                    using_transaction.then_some(transaction).flatten(),
                 );
 
                 channel.send(move |mut task_context| {
@@ -683,7 +683,7 @@ impl DriveWrapper {
                     &query_cbor,
                     <[u8; 32]>::try_from(contract_id).unwrap(),
                     document_type_name.as_str(),
-                    using_transaction.then(|| transaction).flatten(),
+                    using_transaction.then_some(transaction).flatten(),
                 );
 
                 channel.send(move |mut task_context| {
@@ -859,7 +859,7 @@ impl DriveWrapper {
                 .get(
                     path_slice,
                     &key,
-                    using_transaction.then(|| transaction).flatten(),
+                    using_transaction.then_some(transaction).flatten(),
                 )
                 .unwrap();
 
@@ -926,7 +926,7 @@ impl DriveWrapper {
                         path_slice,
                         &key,
                         element,
-                        using_transaction.then(|| transaction).flatten(),
+                        using_transaction.then_some(transaction).flatten(),
                     )
                     .unwrap();
 
@@ -987,7 +987,7 @@ impl DriveWrapper {
                         path_slice,
                         key.as_slice(),
                         element,
-                        using_transaction.then(|| transaction).flatten(),
+                        using_transaction.then_some(transaction).flatten(),
                     )
                     .unwrap();
 
@@ -1035,7 +1035,7 @@ impl DriveWrapper {
                 .put_aux(
                     &key,
                     &value,
-                    using_transaction.then(|| transaction).flatten(),
+                    using_transaction.then_some(transaction).flatten(),
                 )
                 .unwrap();
 
@@ -1089,7 +1089,7 @@ impl DriveWrapper {
                 let grove_db = &platform.drive.grove;
 
                 let result = grove_db
-                    .delete_aux(&key, using_transaction.then(|| transaction).flatten())
+                    .delete_aux(&key, using_transaction.then_some(transaction).flatten())
                     .unwrap();
 
                 channel.send(move |mut task_context| {
@@ -1132,7 +1132,7 @@ impl DriveWrapper {
             let grove_db = &platform.drive.grove;
 
             let result = grove_db
-                .get_aux(&key, using_transaction.then(|| transaction).flatten())
+                .get_aux(&key, using_transaction.then_some(transaction).flatten())
                 .unwrap();
 
             channel.send(move |mut task_context| {
@@ -1183,7 +1183,7 @@ impl DriveWrapper {
             let result = grove_db
                 .query(
                     &path_query,
-                    using_transaction.then(|| transaction).flatten(),
+                    using_transaction.then_some(transaction).flatten(),
                 )
                 .unwrap();
 
@@ -1235,7 +1235,7 @@ impl DriveWrapper {
             let result = grove_db
                 .get_proved_path_query(
                     &path_query,
-                    using_transaction.then(|| transaction).flatten(),
+                    using_transaction.then_some(transaction).flatten(),
                 )
                 .unwrap();
 
@@ -1367,7 +1367,7 @@ impl DriveWrapper {
             let grove_db = &platform.drive.grove;
 
             let result = grove_db
-                .root_hash(using_transaction.then(|| transaction).flatten())
+                .root_hash(using_transaction.then_some(transaction).flatten())
                 .unwrap();
 
             channel.send(move |mut task_context| {
@@ -1427,7 +1427,7 @@ impl DriveWrapper {
                     .delete(
                         path_slice,
                         key.as_slice(),
-                        using_transaction.then(|| transaction).flatten(),
+                        using_transaction.then_some(transaction).flatten(),
                     )
                     .unwrap();
 
@@ -1470,7 +1470,7 @@ impl DriveWrapper {
         db.send_to_drive_thread(move |platform: &Platform, transaction, channel| {
             let result = InitChainRequest::from_bytes(&request_bytes)
                 .and_then(|request| {
-                    platform.init_chain(request, using_transaction.then(|| transaction).flatten())
+                    platform.init_chain(request, using_transaction.then_some(transaction).flatten())
                 })
                 .and_then(|response| response.to_bytes());
 
@@ -1515,7 +1515,8 @@ impl DriveWrapper {
         db.send_to_drive_thread(move |platform: &Platform, transaction, channel| {
             let result = BlockBeginRequest::from_bytes(&request_bytes)
                 .and_then(|request| {
-                    platform.block_begin(request, using_transaction.then(|| transaction).flatten())
+                    platform
+                        .block_begin(request, using_transaction.then_some(transaction).flatten())
                 })
                 .and_then(|response| response.to_bytes());
 
@@ -1560,7 +1561,7 @@ impl DriveWrapper {
         db.send_to_drive_thread(move |platform: &Platform, transaction, channel| {
             let result = BlockEndRequest::from_bytes(&request_bytes)
                 .and_then(|request| {
-                    platform.block_end(request, using_transaction.then(|| transaction).flatten())
+                    platform.block_end(request, using_transaction.then_some(transaction).flatten())
                 })
                 .and_then(|response| response.to_bytes());
 
@@ -1604,7 +1605,7 @@ impl DriveWrapper {
 
         db.send_to_drive_thread(move |platform: &Platform, transaction, channel| {
             let result = platform.drive.fetch_latest_withdrawal_transaction_index(
-                using_transaction.then(|| transaction).flatten(),
+                using_transaction.then_some(transaction).flatten(),
             );
 
             channel.send(move |mut task_context| {
@@ -1671,8 +1672,8 @@ impl DriveWrapper {
 
             let result = platform.drive.grove_apply_batch(
                 batch,
-                true,
-                using_transaction.then(|| transaction).flatten(),
+                false,
+                using_transaction.then_some(transaction).flatten(),
             );
 
             channel.send(move |mut task_context| {
