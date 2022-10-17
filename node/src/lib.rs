@@ -1,6 +1,7 @@
 mod converter;
 
 use neon::handle::Managed;
+use std::collections::HashMap;
 use std::ops::Deref;
 use std::{option::Option::None, path::Path, sync::mpsc, thread};
 
@@ -15,33 +16,30 @@ use neon::types::JsDate;
 use rs_drive::dpp::identity::Identity;
 use rs_drive::drive::flags::StorageFlags;
 use rs_drive::grovedb::{PathQuery, Transaction};
+use rs_drive::query::TransactionArg;
 
 const READONLY_MSG: &str =
     "db is in readonly mode due to the active transaction. Please provide transaction or commit it";
 
-type PlatformCallback = Box<dyn for<'a> FnOnce(&'a Platform, &Channel) + Send>;
+type PlatformCallback =
+    Box<dyn for<'a> FnOnce(&'a Platform, &HashMap<usize, Transaction>, &Channel) + Send>;
 type UnitCallback = Box<dyn FnOnce(&Channel) + Send>;
 
-struct PlatformWrapperTransaction<'db>(Transaction<'db>);
+struct PlatformWrapperTransactionAddress(usize);
 
-impl<'db> PlatformWrapperTransaction<'db> {
-    pub fn unwrap(self) -> Transaction<'db> {
-        self.0
-    }
-}
-
-unsafe impl<'db> Sync for PlatformWrapperTransaction<'db> {}
-unsafe impl<'db> Send for PlatformWrapperTransaction<'db> {}
-
-impl<'db> Deref for PlatformWrapperTransaction<'db> {
-    type Target = Transaction<'db>;
+impl Deref for PlatformWrapperTransactionAddress {
+    type Target = usize;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl<'db> Finalize for PlatformWrapperTransaction<'db> {}
+impl Drop for PlatformWrapperTransactionAddress {
+    fn drop(&mut self) {
+        // TODO: we should send a message to channel to remove transaction from the transactions map
+    }
+}
 
 // Messages sent on the drive channel
 enum PlatformWrapperMessage {
@@ -49,10 +47,10 @@ enum PlatformWrapperMessage {
     Callback(PlatformCallback),
     // Indicates that the thread should be stopped and connection closed
     Close(UnitCallback),
-    // StartTransaction(UnitCallback),
-    // CommitTransaction(UnitCallback),
-    // RollbackTransaction(UnitCallback),
-    // AbortTransaction(UnitCallback),
+    StartTransaction(UnitCallback),
+    CommitTransaction(UnitCallback),
+    RollbackTransaction(UnitCallback),
+    AbortTransaction(UnitCallback),
     Flush(UnitCallback),
 }
 
@@ -91,6 +89,9 @@ impl PlatformWrapper {
             // TODO: think how to pass this error to JS
             let platform: Platform = Platform::open(path, None).unwrap();
 
+            // TODO Choose a proper one
+            let mut transactions: HashMap<usize, Transaction> = HashMap::new();
+
             // Blocks until a callback is available
             // When the instance of `Database` is dropped, the channel will be closed
             // and `rx.recv()` will return an `Err`, ending the loop and terminating
@@ -101,11 +102,13 @@ impl PlatformWrapper {
                         // The connection and channel are owned by the thread, but _lent_ to
                         // the callback. The callback has exclusive access to the connection
                         // for the duration of the callback.
-                        callback(&platform, &channel);
+                        callback(&platform, &transactions, &channel);
                     }
                     // Immediately close the connection, even if there are pending messages
                     PlatformWrapperMessage::Close(callback) => {
                         drop(platform);
+                        drop(transactions);
+
                         callback(&channel);
                         break;
                     }
@@ -113,28 +116,42 @@ impl PlatformWrapper {
                     PlatformWrapperMessage::Flush(callback) => {
                         platform.drive.grove.flush().unwrap();
                         callback(&channel);
-                    } // PlatformWrapperMessage::StartTransaction(callback) => {
-                      //     transaction = Some(platform.drive.grove.start_transaction());
-                      //     callback(&channel);
-                      // }
-                      // PlatformWrapperMessage::CommitTransaction(callback) => {
-                      //     platform
-                      //         .drive
-                      //         .commit_transaction(transaction.take().unwrap())
-                      //         .unwrap();
-                      //     callback(&channel);
-                      // }
-                      // PlatformWrapperMessage::RollbackTransaction(callback) => {
-                      //     platform
-                      //         .drive
-                      //         .rollback_transaction(&transaction.take().unwrap())
-                      //         .unwrap();
-                      //     callback(&channel);
-                      // }
-                      // PlatformWrapperMessage::AbortTransaction(callback) => {
-                      //     drop(transaction.take());
-                      //     callback(&channel);
-                      // }
+                    }
+                    PlatformWrapperMessage::StartTransaction(callback) => {
+                        let transaction = platform.drive.grove.start_transaction();
+
+                        let transaction_ref = &transaction;
+                        let transaction_raw_pointer = transaction_ref as *const Transaction;
+                        let transaction_raw_pointer_address = transaction_raw_pointer as usize;
+
+                        transactions.insert(transaction_raw_pointer_address, transaction);
+
+                        // TODO: We need a special callback to pass the address
+                        callback(&channel);
+                    }
+                    PlatformWrapperMessage::CommitTransaction(transaction_raw_pointer_address, callback) => {
+
+                        let transaction = transactions.get(transaction_raw_pointer_address)
+
+                        platform
+                            .drive
+                            .commit_transaction(transaction.take().unwrap())
+                            .unwrap();
+
+                        callback(&channel);
+                    }
+                    PlatformWrapperMessage::RollbackTransaction(transaction_raw_pointer_address, callback) => {
+                        platform
+                            .drive
+                            .rollback_transaction(&transaction.take().unwrap())
+                            .unwrap();
+
+                        callback(&channel);
+                    }
+                    PlatformWrapperMessage::AbortTransaction(transaction_raw_pointer_address, callback) => {
+                        drop(transaction.take());
+                        callback(&channel);
+                    }
                 }
             }
         });
@@ -155,7 +172,7 @@ impl PlatformWrapper {
 
     fn send_to_drive_thread(
         &self,
-        callback: impl for<'a> FnOnce(&'a Platform, &Channel) + Send + 'static,
+        callback: impl for<'a> FnOnce(&'a Platform, &HashMap<usize, Transaction>, &Channel) + Send + 'static,
     ) -> Result<(), mpsc::SendError<PlatformWrapperMessage>> {
         self.tx
             .send(PlatformWrapperMessage::Callback(Box::new(callback)))
@@ -251,10 +268,12 @@ impl PlatformWrapper {
     fn js_create_initial_state_structure(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         let js_transaction = cx.argument::<JsValue>(0)?;
 
-        let maybe_boxed_transaction = if !js_transaction.is_a::<JsUndefined, _>(&mut cx) {
+        let maybe_boxed_transaction_address = if !js_transaction.is_a::<JsUndefined, _>(&mut cx) {
             Some(
                 js_transaction
-                    .downcast_or_throw::<JsBox<PlatformWrapperTransaction>, _>(&mut cx)?,
+                    .downcast_or_throw::<JsBox<PlatformWrapperTransactionAddress>, _>(
+                        &mut cx,
+                    )?.deref().deref().deref(),
             )
         } else {
             None
@@ -267,9 +286,16 @@ impl PlatformWrapper {
             .downcast_or_throw::<JsBox<PlatformWrapper>, _>(&mut cx)?;
 
         drive
-            .send_to_drive_thread(move |platform: &Platform, channel| {
-                let maybe_transaction =
-                    maybe_boxed_transaction.map(|boxed_transaction| &boxed_transaction.unwrap());
+            .send_to_drive_thread(move |platform: &Platform, transactions, channel| {
+                let maybe_transaction = if let Some(address) = maybe_boxed_transaction_address {
+                    let transaction: TransactionArg = transactions.get(&address);
+
+                    transaction
+
+                    // TODO: Send error in channel below in case of None
+                } else {
+                    None
+                };
 
                 platform
                     .drive
