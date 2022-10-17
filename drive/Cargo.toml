@@ -27,7 +27,7 @@ moka = "0.8.1"
 nohash-hasher = "0.2.0"
 chrono = "0.4.20"
 dpp = { path = "../dpp" }
-dashcore = { git="https://github.com/dashevo/rust-dashcore", features=["no-std", "secp-recovery", "rand", "signer"], default-features = false, rev="71573a414126de0e0239bb9ecf2d0e0164d4165e" }
+dashcore = { git="https://github.com/dashevo/rust-dashcore", features=["no-std", "secp-recovery", "rand", "signer"], default-features = false, branch="master" }
 
 [dependencies.grovedb]
 git = "https://github.com/dashevo/grovedb"

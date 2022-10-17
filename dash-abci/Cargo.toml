@@ -20,5 +20,5 @@ tempfile = "3"
 bs58 = "0.4.0"
 base64 = "0.13.0"
 hex = "0.4.3"
-dashcore = { git="https://github.com/dashevo/rust-dashcore", features=["no-std", "secp-recovery", "rand", "signer"], default-features = false, rev="71573a414126de0e0239bb9ecf2d0e0164d4165e" }
+dashcore = { git="https://github.com/dashevo/rust-dashcore", features=["no-std", "secp-recovery", "rand", "signer"], default-features = false, branch="master" }
 

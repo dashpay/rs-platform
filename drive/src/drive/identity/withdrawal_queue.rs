@@ -48,6 +48,22 @@ pub const WITHDRAWAL_TRANSACTIONS_QUEUE_ID: [u8; 1] = [1];
 
 type WithdrawalTransaction = (Vec<u8>, Vec<u8>);
 
+/// Add operations for creating initial withdrawal state structure
+pub fn add_initial_withdrawal_state_structure_operations(batch: &mut GroveDbOpBatch) {
+    batch.add_insert_empty_tree(vec![], vec![RootTree::WithdrawalTransactions as u8]);
+
+    batch.add_insert(
+        vec![vec![RootTree::WithdrawalTransactions as u8]],
+        WITHDRAWAL_TRANSACTIONS_COUNTER_ID.to_vec(),
+        Element::Item(0u64.to_be_bytes().to_vec(), None),
+    );
+
+    batch.add_insert_empty_tree(
+        vec![vec![RootTree::WithdrawalTransactions as u8]],
+        WITHDRAWAL_TRANSACTIONS_QUEUE_ID.to_vec(),
+    );
+}
+
 impl Drive {
     /// Get latest withdrawal index in a queue
     pub fn fetch_latest_withdrawal_transaction_index(

@@ -35,11 +35,9 @@ use crate::drive::contract::add_init_contracts_structure_operations;
 use crate::drive::{Drive, RootTree};
 use crate::error::Error;
 use crate::fee_pools::add_create_fee_pool_trees_operations;
-use grovedb::{Element, TransactionArg};
+use grovedb::TransactionArg;
 
-use super::identity::withdrawal_queue::{
-    WITHDRAWAL_TRANSACTIONS_COUNTER_ID, WITHDRAWAL_TRANSACTIONS_QUEUE_ID,
-};
+use super::identity::withdrawal_queue::add_initial_withdrawal_state_structure_operations;
 
 impl Drive {
     /// Creates the initial state structure.
@@ -56,18 +54,7 @@ impl Drive {
 
         batch.add_insert_empty_tree(vec![], vec![RootTree::Pools as u8]);
 
-        batch.add_insert_empty_tree(vec![], vec![RootTree::WithdrawalTransactions as u8]);
-
-        batch.add_insert(
-            vec![vec![RootTree::WithdrawalTransactions as u8]],
-            WITHDRAWAL_TRANSACTIONS_COUNTER_ID.to_vec(),
-            Element::Item(0u64.to_be_bytes().to_vec(), None),
-        );
-
-        batch.add_insert_empty_tree(
-            vec![vec![RootTree::WithdrawalTransactions as u8]],
-            WITHDRAWAL_TRANSACTIONS_QUEUE_ID.to_vec(),
-        );
+        add_initial_withdrawal_state_structure_operations(&mut batch);
 
         // initialize the pools with epochs
         add_create_fee_pool_trees_operations(&mut batch);
