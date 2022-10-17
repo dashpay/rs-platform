@@ -16,6 +16,7 @@ mod apply_identity_credit_withdrawal_transition_factory {
         state_repository
             .expect_fetch_latest_withdrawal_transaction_index()
             .times(1)
+            // trying to use values other than default to check they are actually set
             .returning(|| anyhow::Ok(42));
 
         state_repository

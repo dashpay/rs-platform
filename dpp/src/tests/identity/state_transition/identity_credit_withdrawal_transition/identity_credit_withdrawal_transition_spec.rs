@@ -10,6 +10,7 @@ use crate::{
 
 mod deserialization {
     use dashcore::{hashes::hex::FromHex, PubkeyHash, Script};
+    use lazy_static::__Deref;
 
     use super::*;
 
@@ -25,8 +26,8 @@ mod deserialization {
         );
 
         assert_eq!(
-            *state_transition.output_script,
-            Script::new_p2pkh(
+            state_transition.output_script.deref(),
+            &Script::new_p2pkh(
                 &PubkeyHash::from_hex("0000000000000000000000000000000000000000").unwrap()
             )
         );
@@ -44,8 +45,8 @@ mod deserialization {
         );
 
         assert_eq!(
-            *state_transition.output_script,
-            Script::new_p2pkh(
+            state_transition.output_script.deref(),
+            &Script::new_p2pkh(
                 &PubkeyHash::from_hex("0000000000000000000000000000000000000000").unwrap()
             )
         );

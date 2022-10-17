@@ -6,6 +6,7 @@ use dashcore::{
     consensus::Encodable,
     Script, TxOut,
 };
+use lazy_static::__Deref;
 
 use crate::{
     identity::convert_credits_to_satoshi, prelude::Identity, state_repository::StateRepositoryLike,
@@ -37,14 +38,14 @@ where
             .fetch_latest_withdrawal_transaction_index()
             .await?;
 
-        let output_script: Script = (*state_transition.output_script).clone();
+        let output_script: Script = state_transition.output_script.deref().clone();
 
         let tx_out = TxOut {
             value: convert_credits_to_satoshi(state_transition.amount),
             script_pubkey: output_script,
         };
 
-        let withdrwal_transaction = AssetUnlockBaseTransactionInfo {
+        let withdrawal_transaction = AssetUnlockBaseTransactionInfo {
             version: 1,
             lock_time: 0,
             output: vec![tx_out],
@@ -57,7 +58,7 @@ where
 
         let mut transaction_buffer: Vec<u8> = vec![];
 
-        withdrwal_transaction
+        withdrawal_transaction
             .consensus_encode(&mut transaction_buffer)
             .map_err(|e| anyhow!(e))?;
 

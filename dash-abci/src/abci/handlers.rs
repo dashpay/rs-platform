@@ -40,16 +40,11 @@ use crate::abci::messages::{
 };
 use crate::block::{BlockExecutionContext, BlockInfo};
 use crate::execution::fee_pools::epoch::EpochInfo;
-use dashcore::blockdata::transaction::special_transaction::asset_unlock::request_info::AssetUnlockRequestInfo;
-use dashcore::hashes::Hash;
-use dashcore::QuorumHash;
 use rs_drive::grovedb::TransactionArg;
 
 use crate::error::execution::ExecutionError;
 use crate::error::Error;
 use crate::platform::Platform;
-
-const WITHDRAWAL_TRANSACTIONS_QUERY_LIMIT: u16 = 16;
 
 /// A trait for handling the Tenderdash ABCI (Application Blockchain Interface).
 pub trait TenderdashAbci {
@@ -124,34 +119,12 @@ impl TenderdashAbci for Platform {
         self.block_execution_context
             .replace(Some(block_execution_context));
 
-        // Get 16 latest withdrawal transactions from the queue
-        let withdrawal_transactions = self
-            .drive
-            .dequeue_withdrawal_transactions(WITHDRAWAL_TRANSACTIONS_QUERY_LIMIT, transaction)?;
-
-        // Appending request_height and quorum_hash to withdrwal transaction
-        // and pass it to JS Drive for singing and broadcasting
-        let unsigned_withdrawal_transaction_bytes = withdrawal_transactions
-            .into_iter()
-            .map(|(_, bytes)| {
-                let request_info = AssetUnlockRequestInfo {
-                    request_height: request.block_height as u32,
-                    quorum_hash: QuorumHash::hash(&request.validator_set_quorum_hash),
-                };
-
-                let mut bytes_buffer = vec![];
-
-                request_info
-                    .consensus_append_to_base_encode(bytes, &mut bytes_buffer)
-                    .map_err(|_| {
-                        Error::Execution(ExecutionError::CorruptedCodeExecution(
-                            "could not add aditional request info to asset unlock transaction",
-                        ))
-                    })?;
-
-                Ok(bytes_buffer)
-            })
-            .collect::<Result<Vec<Vec<u8>>, Error>>()?;
+        let unsigned_withdrawal_transaction_bytes = self
+            .fetch_and_prepare_unsigned_withdrawal_transactions(
+                request.block_height as u32,
+                request.validator_set_quorum_hash,
+                transaction,
+            )?;
 
         let response = BlockBeginResponse {
             unsigned_withdrawal_transactions: unsigned_withdrawal_transaction_bytes,
