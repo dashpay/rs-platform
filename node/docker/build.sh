@@ -15,7 +15,7 @@ apt update
 apt install -y gcc-multilib
 if [[ $target = "aarch64-unknown-linux-gnu" ]]
 then
-    apt install -y gcc-aarch64-linux-gnu libstdc++-9-dev-arm64-cross
+    apt install -y gcc-aarch64-linux-gnu libstdc++-11-dev-arm64-cross
 fi
 
 ## Install Node.JS
