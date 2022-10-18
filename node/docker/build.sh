@@ -22,8 +22,8 @@ fi
 curl -fsSL https://deb.nodesource.com/setup_16.x | sudo -E bash -
 apt install -y nodejs
 
-## Update nightly
-rustup update nightly
+## Update stable
+rustup update stable
 
 ## Install build target
 rustup target install $target
