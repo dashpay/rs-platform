@@ -247,6 +247,8 @@ mod test {
         .await
         .expect("the validation result should be returned");
 
+        println!("result is {:#?}", result);
+
         let basic_error = get_basic_error_from_result(&result, 0);
 
         assert!(matches!(

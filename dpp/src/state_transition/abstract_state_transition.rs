@@ -219,6 +219,8 @@ pub trait StateTransitionConvert: Serialize {
 }
 
 pub mod state_transition_helpers {
+    use itertools::Itertools;
+
     use super::*;
 
     pub fn to_json<'a>(
@@ -239,7 +241,12 @@ pub mod state_transition_helpers {
         skip_signature: bool,
     ) -> Result<JsonValue, ProtocolError> {
         let mut json_value: JsonValue = serde_json::to_value(serializable)?;
-        json_value.replace_identifier_paths(identifier_property_paths, ReplaceWith::Bytes)?;
+
+        // TODO: add error checking to `replace_identifier_paths`
+        // `IdentityCreateTransition` has the custom serialization and converts the `Identifier` into the bytes (`String` is default).
+        // `replace_identifier_paths()` returns an error because it expects a `String`.
+        // When we change the default serialization for `Identifier` to bytes we should bring back the error checking
+        json_value.replace_identifier_paths(identifier_property_paths, ReplaceWith::Bytes);
 
         if skip_signature {
             if let JsonValue::Object(ref mut o) = json_value {
