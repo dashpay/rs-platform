@@ -25,19 +25,25 @@ use rs_drive::query::TransactionArg;
 const READONLY_MSG: &str =
     "db is in readonly mode due to the active transaction. Please provide transaction or commit it";
 
-type TxMutexMap<'a> = Arc<Mutex<HashMap<usize, Transaction<'a>>>>;
-
-type PlatformCallback = Box<dyn for<'a> FnOnce(&'a Platform, TxMutexMap, &Channel) + Send>;
+type PlatformCallback =
+    Box<dyn for<'a> FnOnce(&'a Platform, &HashMap<usize, Transaction>, &Channel) + Send>;
 type UnitCallback = Box<dyn FnOnce(&Channel) + Send>;
-type TrasactionCallback = Box<dyn FnOnce(TxMutexMap, &Transaction, &Channel) + Send>;
+type TrasactionCallback =
+    Box<dyn FnOnce(Sender<PlatformWrapperMessage>, &Transaction, &Channel) + Send>;
 
-struct PlatformWrapperTransactionAddress<'a>(usize, TxMutexMap<'a>);
+struct PlatformWrapperTransactionAddress(usize, Sender<PlatformWrapperMessage>);
 
-impl Finalize for PlatformWrapperTransactionAddress<'_> {
-    fn finalize<'a, C: Context<'a>>(self, cx: &mut C) {}
+impl Finalize for PlatformWrapperTransactionAddress {
+    fn finalize<'a, C: Context<'a>>(self, cx: &mut C) {
+        dbg!("finalizing");
+        self.1.send(PlatformWrapperMessage::AbortTransaction(
+            self.0,
+            Box::new(|channel| {}),
+        ));
+    }
 }
 
-impl Deref for PlatformWrapperTransactionAddress<'_> {
+impl Deref for PlatformWrapperTransactionAddress {
     type Target = usize;
 
     fn deref(&self) -> &Self::Target {
@@ -84,6 +90,8 @@ impl PlatformWrapper {
         // dropped.
         let channel = cx.channel();
 
+        let tclone = tx.clone();
+
         // Spawn a thread for processing database queries
         // This will not block the JavaScript main thread and will continue executing
         // concurrently.
@@ -94,8 +102,7 @@ impl PlatformWrapper {
             let platform: Platform = Platform::open(path, None).unwrap();
 
             // TODO Choose a proper one
-            let mut transactions: Arc<Mutex<HashMap<usize, Transaction>>> =
-                Arc::new(Mutex::new(HashMap::new()));
+            let mut transactions: HashMap<usize, Transaction> = HashMap::new();
 
             // Blocks until a callback is available
             // When the instance of `Database` is dropped, the channel will be closed
@@ -107,7 +114,7 @@ impl PlatformWrapper {
                         // The connection and channel are owned by the thread, but _lent_ to
                         // the callback. The callback has exclusive access to the connection
                         // for the duration of the callback.
-                        callback(&platform, Arc::clone(&transactions), &channel);
+                        callback(&platform, &transactions, &channel);
                     }
                     // Immediately close the connection, even if there are pending messages
                     PlatformWrapperMessage::Close(callback) => {
@@ -129,25 +136,21 @@ impl PlatformWrapper {
                         let transaction_raw_pointer = transaction_ref as *const Transaction;
                         let transaction_raw_pointer_address = transaction_raw_pointer as usize;
 
-                        transactions
-                            .lock()
-                            .unwrap()
-                            .insert(transaction_raw_pointer_address, transaction);
+                        transactions.insert(transaction_raw_pointer_address, transaction);
 
-                        let txs = transactions.lock().unwrap();
+                        let transaction =
+                            transactions.get(&transaction_raw_pointer_address).unwrap();
 
-                        let transaction = txs.get(&transaction_raw_pointer_address).unwrap();
+                        dbg!(&transactions.len());
 
-                        callback(Arc::clone(&transactions), transaction, &channel);
+                        callback(tclone.clone(), transaction, &channel);
                     }
                     PlatformWrapperMessage::CommitTransaction(
                         transaction_raw_pointer_address,
                         callback,
                     ) => {
-                        if let Some(transaction) = transactions
-                            .lock()
-                            .unwrap()
-                            .remove(&transaction_raw_pointer_address)
+                        if let Some(transaction) =
+                            transactions.remove(&transaction_raw_pointer_address)
                         {
                             platform.drive.commit_transaction(transaction).unwrap();
                         }
@@ -158,10 +161,8 @@ impl PlatformWrapper {
                         transaction_raw_pointer_address,
                         callback,
                     ) => {
-                        if let Some(transaction) = transactions
-                            .lock()
-                            .unwrap()
-                            .remove(&transaction_raw_pointer_address)
+                        if let Some(transaction) =
+                            transactions.remove(&transaction_raw_pointer_address)
                         {
                             platform.drive.rollback_transaction(&transaction).unwrap();
                         }
@@ -172,8 +173,6 @@ impl PlatformWrapper {
                         transaction_raw_pointer_address,
                         callback,
                     ) => {
-                        let mut transactions = transactions.lock().unwrap();
-
                         if let Some(transaction) =
                             transactions.remove(&transaction_raw_pointer_address)
                         {
@@ -202,7 +201,9 @@ impl PlatformWrapper {
 
     fn send_to_drive_thread(
         &self,
-        callback: impl for<'a> FnOnce(&'a Platform, TxMutexMap, &Channel) + Send + 'static,
+        callback: impl for<'a> FnOnce(&'a Platform, &HashMap<usize, Transaction>, &Channel)
+            + Send
+            + 'static,
     ) -> Result<(), mpsc::SendError<PlatformWrapperMessage>> {
         self.tx
             .send(PlatformWrapperMessage::Callback(Box::new(callback)))
@@ -210,7 +211,7 @@ impl PlatformWrapper {
 
     fn start_transaction(
         &self,
-        callback: impl FnOnce(TxMutexMap, &Transaction, &Channel) + Send + 'static,
+        callback: impl FnOnce(Sender<PlatformWrapperMessage>, &Transaction, &Channel) + Send + 'static,
     ) -> Result<(), mpsc::SendError<PlatformWrapperMessage>> {
         self.tx
             .send(PlatformWrapperMessage::StartTransaction(Box::new(callback)))
@@ -329,9 +330,7 @@ impl PlatformWrapper {
 
                 platform
                     .drive
-                    .create_initial_state_structure(
-                        transactions.lock().unwrap().get(&transaction_address),
-                    )
+                    .create_initial_state_structure(transactions.get(&transaction_address))
                     .expect("create_root_tree should not fail");
 
                 channel.send(move |mut task_context| {
@@ -386,7 +385,7 @@ impl PlatformWrapper {
                     block_time,
                     apply,
                     StorageFlags::default(),
-                    transactions.lock().unwrap().get(&transaction_address),
+                    transactions.get(&transaction_address),
                 );
 
                 channel.send(move |mut task_context| {
@@ -473,7 +472,7 @@ impl PlatformWrapper {
                         block_time,
                         apply,
                         StorageFlags::default(),
-                        transactions.lock().unwrap().get(&transaction_address),
+                        transactions.get(&transaction_address),
                     );
 
                 channel.send(move |mut task_context| {
@@ -555,7 +554,7 @@ impl PlatformWrapper {
                     block_time,
                     apply,
                     StorageFlags::default(),
-                    transactions.lock().unwrap().get(&transaction_address),
+                    transactions.get(&transaction_address),
                 );
 
                 channel.send(move |mut task_context| {
@@ -631,7 +630,7 @@ impl PlatformWrapper {
                     &document_type_name,
                     None,
                     apply,
-                    transactions.lock().unwrap().get(&transaction_address),
+                    transactions.get(&transaction_address),
                 );
 
                 channel.send(move |mut task_context| {
@@ -704,7 +703,7 @@ impl PlatformWrapper {
                     identity,
                     apply,
                     StorageFlags::default(),
-                    transactions.lock().unwrap().get(&transaction_address),
+                    transactions.get(&transaction_address),
                 );
 
                 channel.send(move |mut task_context| {
@@ -776,7 +775,7 @@ impl PlatformWrapper {
                     &query_cbor,
                     <[u8; 32]>::try_from(contract_id).unwrap(),
                     document_type_name.as_str(),
-                    transactions.lock().unwrap().get(&transaction_address),
+                    transactions.get(&transaction_address),
                 );
 
                 channel.send(move |mut task_context| {
@@ -844,7 +843,7 @@ impl PlatformWrapper {
                     &query_cbor,
                     <[u8; 32]>::try_from(contract_id).unwrap(),
                     document_type_name.as_str(),
-                    transactions.lock().unwrap().get(&transaction_address),
+                    transactions.get(&transaction_address),
                 );
 
                 channel.send(move |mut task_context| {
@@ -883,14 +882,12 @@ impl PlatformWrapper {
             .this()
             .downcast_or_throw::<JsBox<PlatformWrapper>, _>(&mut cx)?;
 
-        db.start_transaction(|transactions, transaction, channel| {
+        db.start_transaction(|tx, transaction, channel| {
             let transaction_raw_pointer = transaction as *const Transaction;
             let transaction_raw_pointer_address = transaction_raw_pointer as usize;
 
-            let transaction_address = PlatformWrapperTransactionAddress(
-                transaction_raw_pointer_address,
-                Arc::clone(&transactions),
-            );
+            let transaction_address =
+                PlatformWrapperTransactionAddress(transaction_raw_pointer_address, tx.clone());
 
             channel.send(move |mut task_context| {
                 let callback = js_callback.into_inner(&mut task_context);
@@ -1052,11 +1049,7 @@ impl PlatformWrapper {
             let grove_db = &platform.drive.grove;
             let path_slice = path.iter().map(|fragment| fragment.as_slice());
             let result = grove_db
-                .get(
-                    path_slice,
-                    &key,
-                    transactions.lock().unwrap().get(&transaction_address),
-                )
+                .get(path_slice, &key, transactions.get(&transaction_address))
                 .unwrap();
 
             channel.send(move |mut task_context| {
@@ -1123,7 +1116,7 @@ impl PlatformWrapper {
                     path_slice,
                     &key,
                     element,
-                    transactions.lock().unwrap().get(&transaction_address),
+                    transactions.get(&transaction_address),
                 )
                 .unwrap();
 
@@ -1183,7 +1176,7 @@ impl PlatformWrapper {
                     path_slice,
                     key.as_slice(),
                     element,
-                    transactions.lock().unwrap().get(&transaction_address),
+                    transactions.get(&transaction_address),
                 )
                 .unwrap();
 
@@ -1240,11 +1233,7 @@ impl PlatformWrapper {
             let grove_db = &platform.drive.grove;
 
             let result = grove_db
-                .put_aux(
-                    &key,
-                    &value,
-                    transactions.lock().unwrap().get(&transaction_address),
-                )
+                .put_aux(&key, &value, transactions.get(&transaction_address))
                 .unwrap();
 
             channel.send(move |mut task_context| {
@@ -1298,7 +1287,7 @@ impl PlatformWrapper {
             let grove_db = &platform.drive.grove;
 
             let result = grove_db
-                .delete_aux(&key, transactions.lock().unwrap().get(&transaction_address))
+                .delete_aux(&key, transactions.get(&transaction_address))
                 .unwrap();
 
             channel.send(move |mut task_context| {
@@ -1352,7 +1341,7 @@ impl PlatformWrapper {
             let grove_db = &platform.drive.grove;
 
             let result = grove_db
-                .get_aux(&key, transactions.lock().unwrap().get(&transaction_address))
+                .get_aux(&key, transactions.get(&transaction_address))
                 .unwrap();
 
             channel.send(move |mut task_context| {
@@ -1413,10 +1402,7 @@ impl PlatformWrapper {
             let grove_db = &platform.drive.grove;
 
             let result = grove_db
-                .query(
-                    &path_query,
-                    transactions.lock().unwrap().get(&transaction_address),
-                )
+                .query(&path_query, transactions.get(&transaction_address))
                 .unwrap();
 
             channel.send(move |mut task_context| {
@@ -1476,10 +1462,7 @@ impl PlatformWrapper {
             let grove_db = &platform.drive.grove;
 
             let result = grove_db
-                .get_proved_path_query(
-                    &path_query,
-                    transactions.lock().unwrap().get(&transaction_address),
-                )
+                .get_proved_path_query(&path_query, transactions.get(&transaction_address))
                 .unwrap();
 
             channel.send(move |mut task_context| {
@@ -1627,7 +1610,7 @@ impl PlatformWrapper {
             let grove_db = &platform.drive.grove;
 
             let result = grove_db
-                .root_hash(transactions.lock().unwrap().get(&transaction_address))
+                .root_hash(transactions.get(&transaction_address))
                 .unwrap();
 
             channel.send(move |mut task_context| {
@@ -1688,7 +1671,7 @@ impl PlatformWrapper {
                 .delete(
                     path_slice,
                     key.as_slice(),
-                    transactions.lock().unwrap().get(&transaction_address),
+                    transactions.get(&transaction_address),
                 )
                 .unwrap();
 
@@ -1742,10 +1725,7 @@ impl PlatformWrapper {
 
             let result = InitChainRequest::from_bytes(&request_bytes)
                 .and_then(|request| {
-                    platform.init_chain(
-                        request,
-                        transactions.lock().unwrap().get(&transaction_address),
-                    )
+                    platform.init_chain(request, transactions.get(&transaction_address))
                 })
                 .and_then(|response| response.to_bytes());
 
@@ -1802,10 +1782,7 @@ impl PlatformWrapper {
 
             let result = BlockBeginRequest::from_bytes(&request_bytes)
                 .and_then(|request| {
-                    platform.block_begin(
-                        request,
-                        transactions.lock().unwrap().get(&transaction_address),
-                    )
+                    platform.block_begin(request, transactions.get(&transaction_address))
                 })
                 .and_then(|response| response.to_bytes());
 
@@ -1862,10 +1839,7 @@ impl PlatformWrapper {
 
             let result = BlockEndRequest::from_bytes(&request_bytes)
                 .and_then(|request| {
-                    platform.block_end(
-                        request,
-                        transactions.lock().unwrap().get(&transaction_address),
-                    )
+                    platform.block_end(request, transactions.get(&transaction_address))
                 })
                 .and_then(|response| response.to_bytes());
 
