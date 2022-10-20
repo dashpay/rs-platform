@@ -13,7 +13,9 @@ use neon::prelude::*;
 use neon::types::JsDate;
 use rs_drive::dpp::identity::Identity;
 use rs_drive::drive::flags::StorageFlags;
-use rs_drive::grovedb::{PathQuery, Transaction};
+use rs_drive::error::drive::DriveError;
+use rs_drive::error::Error;
+use rs_drive::grovedb::{self, PathQuery, Transaction};
 
 type TransactionPointerAddress = usize;
 
@@ -111,6 +113,7 @@ impl PlatformWrapper {
             while let Ok(message) = rx.recv() {
                 match message {
                     PlatformWrapperMessage::Callback(callback) => {
+                        dbg!("callback");
                         // The connection and channel are owned by the thread, but _lent_ to
                         // the callback. The callback has exclusive access to the connection
                         // for the duration of the callback.
@@ -118,6 +121,7 @@ impl PlatformWrapper {
                     }
                     // Immediately close the connection, even if there are pending messages
                     PlatformWrapperMessage::Close(callback) => {
+                        dbg!("close");
                         drop(transactions);
                         drop(platform);
 
@@ -126,10 +130,12 @@ impl PlatformWrapper {
                     }
                     // Flush message
                     PlatformWrapperMessage::Flush(callback) => {
+                        dbg!("flush");
                         platform.drive.grove.flush().unwrap();
                         callback(&channel);
                     }
                     PlatformWrapperMessage::StartTransaction(callback) => {
+                        dbg!("starttx");
                         let transaction = platform.drive.grove.start_transaction();
 
                         let transaction_ref = &transaction;
@@ -150,6 +156,7 @@ impl PlatformWrapper {
                         transaction_raw_pointer_address,
                         callback,
                     ) => {
+                        dbg!("commit");
                         if let Some(transaction) =
                             transactions.remove(&transaction_raw_pointer_address)
                         {
@@ -162,6 +169,7 @@ impl PlatformWrapper {
                         transaction_raw_pointer_address,
                         callback,
                     ) => {
+                        dbg!("rollback");
                         if let Some(transaction) =
                             transactions.remove(&transaction_raw_pointer_address)
                         {
@@ -174,6 +182,7 @@ impl PlatformWrapper {
                         transaction_raw_pointer_address,
                         callback,
                     ) => {
+                        dbg!("abort");
                         if let Some(transaction) =
                             transactions.remove(&transaction_raw_pointer_address)
                         {
@@ -328,20 +337,29 @@ impl PlatformWrapper {
 
         drive
             .send_to_drive_thread(move |platform: &Platform, transactions, channel| {
-                // TODO This is wrong. We need to throw an error in case if transaction is not present
-                let transaction_address =
-                    maybe_transaction_address.expect("transaction address should be available");
+                let execution_result: Result<(), Error> = match maybe_transaction_address {
+                    Some(address) => transactions
+                        .get(&address)
+                        .ok_or(Error::Drive(DriveError::CorruptedCodeExecution(
+                            "invalid transaction pointer address",
+                        )))
+                        .and_then(|transaction| {
+                            platform
+                                .drive
+                                .create_initial_state_structure(Some(transaction))
+                        }),
+                    None => Ok(()),
+                };
 
-                platform
-                    .drive
-                    .create_initial_state_structure(transactions.get(&transaction_address))
-                    .expect("create_root_tree should not fail");
+                dbg!(&execution_result);
 
                 channel.send(move |mut task_context| {
                     let callback = js_callback.into_inner(&mut task_context);
                     let this = task_context.undefined();
-                    let callback_arguments: Vec<Handle<JsValue>> =
-                        vec![task_context.null().upcast()];
+                    let callback_arguments: Vec<Handle<JsValue>> = match execution_result {
+                        Ok(_) => vec![task_context.null().upcast()],
+                        Err(err) => vec![task_context.error(err.to_string())?.upcast()],
+                    };
 
                     callback.call(&mut task_context, this, callback_arguments)?;
 
@@ -380,17 +398,27 @@ impl PlatformWrapper {
 
         drive
             .send_to_drive_thread(move |platform: &Platform, transactions, channel| {
-                let transaction_address = maybe_boxed_transaction_address
-                    .expect("transaction address should be available");
+                let transaction_result: Result<Option<&Transaction>, Error> =
+                    match maybe_boxed_transaction_address {
+                        Some(address) => transactions
+                            .get(&address)
+                            .ok_or(Error::Drive(DriveError::CorruptedCodeExecution(
+                                "invalid transaction pointer address",
+                            )))
+                            .and_then(|transaction| Ok(Some(transaction))),
+                        None => Ok(None),
+                    };
 
-                let result = platform.drive.apply_contract_cbor(
-                    contract_cbor,
-                    None,
-                    block_time,
-                    apply,
-                    StorageFlags::default(),
-                    transactions.get(&transaction_address),
-                );
+                let result = transaction_result.and_then(|transaction_arg| {
+                    platform.drive.apply_contract_cbor(
+                        contract_cbor,
+                        None,
+                        block_time,
+                        apply,
+                        StorageFlags::default(),
+                        transaction_arg,
+                    )
+                });
 
                 channel.send(move |mut task_context| {
                     let callback = js_callback.into_inner(&mut task_context);
@@ -462,22 +490,32 @@ impl PlatformWrapper {
 
         drive
             .send_to_drive_thread(move |platform: &Platform, transactions, channel| {
-                let transaction_address = maybe_boxed_transaction_address
-                    .expect("transaction address should be available");
+                let transaction_result: Result<Option<&Transaction>, Error> =
+                    match maybe_boxed_transaction_address {
+                        Some(address) => transactions
+                            .get(&address)
+                            .ok_or(Error::Drive(DriveError::CorruptedCodeExecution(
+                                "invalid transaction pointer address",
+                            )))
+                            .and_then(|transaction| Ok(Some(transaction))),
+                        None => Ok(None),
+                    };
 
-                let result = platform
-                    .drive
-                    .add_serialized_document_for_serialized_contract(
-                        &document_cbor,
-                        &contract_cbor,
-                        &document_type_name,
-                        Some(&owner_id),
-                        override_document,
-                        block_time,
-                        apply,
-                        StorageFlags::default(),
-                        transactions.get(&transaction_address),
-                    );
+                let result = transaction_result.and_then(|transaction_arg| {
+                    platform
+                        .drive
+                        .add_serialized_document_for_serialized_contract(
+                            &document_cbor,
+                            &contract_cbor,
+                            &document_type_name,
+                            Some(&owner_id),
+                            override_document,
+                            block_time,
+                            apply,
+                            StorageFlags::default(),
+                            transaction_arg,
+                        )
+                });
 
                 channel.send(move |mut task_context| {
                     let callback = js_callback.into_inner(&mut task_context);
@@ -547,19 +585,29 @@ impl PlatformWrapper {
 
         drive
             .send_to_drive_thread(move |platform: &Platform, transactions, channel| {
-                let transaction_address = maybe_boxed_transaction_address
-                    .expect("transaction address should be available");
+                let transaction_result: Result<Option<&Transaction>, Error> =
+                    match maybe_boxed_transaction_address {
+                        Some(address) => transactions
+                            .get(&address)
+                            .ok_or(Error::Drive(DriveError::CorruptedCodeExecution(
+                                "invalid transaction pointer address",
+                            )))
+                            .and_then(|transaction| Ok(Some(transaction))),
+                        None => Ok(None),
+                    };
 
-                let result = platform.drive.update_document_for_contract_cbor(
-                    &document_cbor,
-                    &contract_cbor,
-                    &document_type_name,
-                    Some(&owner_id),
-                    block_time,
-                    apply,
-                    StorageFlags::default(),
-                    transactions.get(&transaction_address),
-                );
+                let result = transaction_result.and_then(|transaction_arg| {
+                    platform.drive.update_document_for_contract_cbor(
+                        &document_cbor,
+                        &contract_cbor,
+                        &document_type_name,
+                        Some(&owner_id),
+                        block_time,
+                        apply,
+                        StorageFlags::default(),
+                        transaction_arg,
+                    )
+                });
 
                 channel.send(move |mut task_context| {
                     let callback = js_callback.into_inner(&mut task_context);
@@ -625,17 +673,27 @@ impl PlatformWrapper {
 
         drive
             .send_to_drive_thread(move |platform: &Platform, transactions, channel| {
-                let transaction_address = maybe_boxed_transaction_address
-                    .expect("transaction address should be available");
+                let transaction_result: Result<Option<&Transaction>, Error> =
+                    match maybe_boxed_transaction_address {
+                        Some(address) => transactions
+                            .get(&address)
+                            .ok_or(Error::Drive(DriveError::CorruptedCodeExecution(
+                                "invalid transaction pointer address",
+                            )))
+                            .and_then(|transaction| Ok(Some(transaction))),
+                        None => Ok(None),
+                    };
 
-                let result = platform.drive.delete_document_for_contract_cbor(
-                    &document_id,
-                    &contract_cbor,
-                    &document_type_name,
-                    None,
-                    apply,
-                    transactions.get(&transaction_address),
-                );
+                let result = transaction_result.and_then(|transaction_arg| {
+                    platform.drive.delete_document_for_contract_cbor(
+                        &document_id,
+                        &contract_cbor,
+                        &document_type_name,
+                        None,
+                        apply,
+                        transaction_arg,
+                    )
+                });
 
                 channel.send(move |mut task_context| {
                     let callback = js_callback.into_inner(&mut task_context);
@@ -700,15 +758,25 @@ impl PlatformWrapper {
 
         drive
             .send_to_drive_thread(move |platform: &Platform, transactions, channel| {
-                let transaction_address = maybe_boxed_transaction_address
-                    .expect("transaction address should be available");
+                let transaction_result: Result<Option<&Transaction>, Error> =
+                    match maybe_boxed_transaction_address {
+                        Some(address) => transactions
+                            .get(&address)
+                            .ok_or(Error::Drive(DriveError::CorruptedCodeExecution(
+                                "invalid transaction pointer address",
+                            )))
+                            .and_then(|transaction| Ok(Some(transaction))),
+                        None => Ok(None),
+                    };
 
-                let result = platform.drive.insert_identity(
-                    identity,
-                    apply,
-                    StorageFlags::default(),
-                    transactions.get(&transaction_address),
-                );
+                let result = transaction_result.and_then(|transaction_arg| {
+                    platform.drive.insert_identity(
+                        identity,
+                        apply,
+                        StorageFlags::default(),
+                        transaction_arg,
+                    )
+                });
 
                 channel.send(move |mut task_context| {
                     let callback = js_callback.into_inner(&mut task_context);
@@ -772,15 +840,25 @@ impl PlatformWrapper {
 
         drive
             .send_to_drive_thread(move |platform: &Platform, transactions, channel| {
-                let transaction_address = maybe_boxed_transaction_address
-                    .expect("transaction address should be available");
+                let transaction_result: Result<Option<&Transaction>, Error> =
+                    match maybe_boxed_transaction_address {
+                        Some(address) => transactions
+                            .get(&address)
+                            .ok_or(Error::Drive(DriveError::CorruptedCodeExecution(
+                                "invalid transaction pointer address",
+                            )))
+                            .and_then(|transaction| Ok(Some(transaction))),
+                        None => Ok(None),
+                    };
 
-                let result = platform.drive.query_documents(
-                    &query_cbor,
-                    <[u8; 32]>::try_from(contract_id).unwrap(),
-                    document_type_name.as_str(),
-                    transactions.get(&transaction_address),
-                );
+                let result = transaction_result.and_then(|transaction_arg| {
+                    platform.drive.query_documents(
+                        &query_cbor,
+                        <[u8; 32]>::try_from(contract_id).unwrap(),
+                        document_type_name.as_str(),
+                        transaction_arg,
+                    )
+                });
 
                 channel.send(move |mut task_context| {
                     let callback = js_callback.into_inner(&mut task_context);
@@ -840,15 +918,25 @@ impl PlatformWrapper {
 
         drive
             .send_to_drive_thread(move |platform: &Platform, transactions, channel| {
-                let transaction_address = maybe_boxed_transaction_address
-                    .expect("transaction address should be available");
+                let transaction_result: Result<Option<&Transaction>, Error> =
+                    match maybe_boxed_transaction_address {
+                        Some(address) => transactions
+                            .get(&address)
+                            .ok_or(Error::Drive(DriveError::CorruptedCodeExecution(
+                                "invalid transaction pointer address",
+                            )))
+                            .and_then(|transaction| Ok(Some(transaction))),
+                        None => Ok(None),
+                    };
 
-                let result = platform.drive.query_documents_as_grove_proof(
-                    &query_cbor,
-                    <[u8; 32]>::try_from(contract_id).unwrap(),
-                    document_type_name.as_str(),
-                    transactions.get(&transaction_address),
-                );
+                let result = transaction_result.and_then(|transaction_arg| {
+                    platform.drive.query_documents_as_grove_proof(
+                        &query_cbor,
+                        <[u8; 32]>::try_from(contract_id).unwrap(),
+                        document_type_name.as_str(),
+                        transaction_arg,
+                    )
+                });
 
                 channel.send(move |mut task_context| {
                     let callback = js_callback.into_inner(&mut task_context);
@@ -1050,14 +1138,25 @@ impl PlatformWrapper {
             .downcast_or_throw::<JsBox<PlatformWrapper>, _>(&mut cx)?;
 
         db.send_to_drive_thread(move |platform: &Platform, transactions, channel| {
-            let transaction_address =
-                maybe_boxed_transaction_address.expect("transaction address should be available");
+            let transaction_result: Result<Option<&Transaction>, Error> =
+                match maybe_boxed_transaction_address {
+                    Some(address) => transactions
+                        .get(&address)
+                        .ok_or(Error::Drive(DriveError::CorruptedCodeExecution(
+                            "invalid transaction pointer address",
+                        )))
+                        .and_then(|transaction| Ok(Some(transaction))),
+                    None => Ok(None),
+                };
 
             let grove_db = &platform.drive.grove;
             let path_slice = path.iter().map(|fragment| fragment.as_slice());
-            let result = grove_db
-                .get(path_slice, &key, transactions.get(&transaction_address))
-                .unwrap();
+            let result = transaction_result.and_then(|transaction_arg| {
+                grove_db
+                    .get(path_slice, &key, transaction_arg)
+                    .unwrap()
+                    .map_err(Error::GroveDB)
+            });
 
             channel.send(move |mut task_context| {
                 let callback = js_callback.into_inner(&mut task_context);
@@ -1113,19 +1212,25 @@ impl PlatformWrapper {
             .downcast_or_throw::<JsBox<PlatformWrapper>, _>(&mut cx)?;
 
         db.send_to_drive_thread(move |platform: &Platform, transactions, channel| {
-            let transaction_address =
-                maybe_boxed_transaction_address.expect("transaction address should be available");
+            let transaction_result: Result<Option<&Transaction>, Error> =
+                match maybe_boxed_transaction_address {
+                    Some(address) => transactions
+                        .get(&address)
+                        .ok_or(Error::Drive(DriveError::CorruptedCodeExecution(
+                            "invalid transaction pointer address",
+                        )))
+                        .and_then(|transaction| Ok(Some(transaction))),
+                    None => Ok(None),
+                };
 
             let grove_db = &platform.drive.grove;
             let path_slice = path.iter().map(|fragment| fragment.as_slice());
-            let result = grove_db
-                .insert(
-                    path_slice,
-                    &key,
-                    element,
-                    transactions.get(&transaction_address),
-                )
-                .unwrap();
+            let result = transaction_result.and_then(|transaction_arg| {
+                grove_db
+                    .insert(path_slice, &key, element, transaction_arg)
+                    .unwrap()
+                    .map_err(Error::GroveDB)
+            });
 
             channel.send(move |mut task_context| {
                 let callback = js_callback.into_inner(&mut task_context);
@@ -1172,20 +1277,26 @@ impl PlatformWrapper {
             .downcast_or_throw::<JsBox<PlatformWrapper>, _>(&mut cx)?;
 
         db.send_to_drive_thread(move |platform: &Platform, transactions, channel| {
-            let transaction_address =
-                maybe_boxed_transaction_address.expect("transaction address should be available");
+            let transaction_result: Result<Option<&Transaction>, Error> =
+                match maybe_boxed_transaction_address {
+                    Some(address) => transactions
+                        .get(&address)
+                        .ok_or(Error::Drive(DriveError::CorruptedCodeExecution(
+                            "invalid transaction pointer address",
+                        )))
+                        .and_then(|transaction| Ok(Some(transaction))),
+                    None => Ok(None),
+                };
 
             let grove_db = &platform.drive.grove;
 
             let path_slice: Vec<&[u8]> = path.iter().map(|fragment| fragment.as_slice()).collect();
-            let result = grove_db
-                .insert_if_not_exists(
-                    path_slice,
-                    key.as_slice(),
-                    element,
-                    transactions.get(&transaction_address),
-                )
-                .unwrap();
+            let result = transaction_result.and_then(|transaction_arg| {
+                grove_db
+                    .insert_if_not_exists(path_slice, key.as_slice(), element, transaction_arg)
+                    .unwrap()
+                    .map_err(Error::GroveDB)
+            });
 
             channel.send(move |mut task_context| {
                 let callback = js_callback.into_inner(&mut task_context);
@@ -1234,14 +1345,25 @@ impl PlatformWrapper {
             .downcast_or_throw::<JsBox<PlatformWrapper>, _>(&mut cx)?;
 
         db.send_to_drive_thread(move |platform: &Platform, transactions, channel| {
-            let transaction_address =
-                maybe_boxed_transaction_address.expect("transaction address should be available");
+            let transaction_result: Result<Option<&Transaction>, Error> =
+                match maybe_boxed_transaction_address {
+                    Some(address) => transactions
+                        .get(&address)
+                        .ok_or(Error::Drive(DriveError::CorruptedCodeExecution(
+                            "invalid transaction pointer address",
+                        )))
+                        .and_then(|transaction| Ok(Some(transaction))),
+                    None => Ok(None),
+                };
 
             let grove_db = &platform.drive.grove;
 
-            let result = grove_db
-                .put_aux(&key, &value, transactions.get(&transaction_address))
-                .unwrap();
+            let result = transaction_result.and_then(|transaction_arg| {
+                grove_db
+                    .put_aux(&key, &value, transaction_arg)
+                    .unwrap()
+                    .map_err(Error::GroveDB)
+            });
 
             channel.send(move |mut task_context| {
                 let callback = js_callback.into_inner(&mut task_context);
@@ -1288,14 +1410,25 @@ impl PlatformWrapper {
             .downcast_or_throw::<JsBox<PlatformWrapper>, _>(&mut cx)?;
 
         db.send_to_drive_thread(move |platform: &Platform, transactions, channel| {
-            let transaction_address =
-                maybe_boxed_transaction_address.expect("transaction address should be available");
+            let transaction_result: Result<Option<&Transaction>, Error> =
+                match maybe_boxed_transaction_address {
+                    Some(address) => transactions
+                        .get(&address)
+                        .ok_or(Error::Drive(DriveError::CorruptedCodeExecution(
+                            "invalid transaction pointer address",
+                        )))
+                        .and_then(|transaction| Ok(Some(transaction))),
+                    None => Ok(None),
+                };
 
             let grove_db = &platform.drive.grove;
 
-            let result = grove_db
-                .delete_aux(&key, transactions.get(&transaction_address))
-                .unwrap();
+            let result = transaction_result.and_then(|transaction_arg| {
+                grove_db
+                    .delete_aux(&key, transaction_arg)
+                    .unwrap()
+                    .map_err(Error::GroveDB)
+            });
 
             channel.send(move |mut task_context| {
                 let callback = js_callback.into_inner(&mut task_context);
@@ -1342,14 +1475,25 @@ impl PlatformWrapper {
             .downcast_or_throw::<JsBox<PlatformWrapper>, _>(&mut cx)?;
 
         db.send_to_drive_thread(move |platform: &Platform, transactions, channel| {
-            let transaction_address =
-                maybe_boxed_transaction_address.expect("transaction address should be available");
+            let transaction_result: Result<Option<&Transaction>, Error> =
+                match maybe_boxed_transaction_address {
+                    Some(address) => transactions
+                        .get(&address)
+                        .ok_or(Error::Drive(DriveError::CorruptedCodeExecution(
+                            "invalid transaction pointer address",
+                        )))
+                        .and_then(|transaction| Ok(Some(transaction))),
+                    None => Ok(None),
+                };
 
             let grove_db = &platform.drive.grove;
 
-            let result = grove_db
-                .get_aux(&key, transactions.get(&transaction_address))
-                .unwrap();
+            let result = transaction_result.and_then(|transaction_arg| {
+                grove_db
+                    .get_aux(&key, transaction_arg)
+                    .unwrap()
+                    .map_err(Error::GroveDB)
+            });
 
             channel.send(move |mut task_context| {
                 let callback = js_callback.into_inner(&mut task_context);
@@ -1403,14 +1547,25 @@ impl PlatformWrapper {
             .downcast_or_throw::<JsBox<PlatformWrapper>, _>(&mut cx)?;
 
         db.send_to_drive_thread(move |platform: &Platform, transactions, channel| {
-            let transaction_address =
-                maybe_boxed_transaction_address.expect("transaction address should be available");
+            let transaction_result: Result<Option<&Transaction>, Error> =
+                match maybe_boxed_transaction_address {
+                    Some(address) => transactions
+                        .get(&address)
+                        .ok_or(Error::Drive(DriveError::CorruptedCodeExecution(
+                            "invalid transaction pointer address",
+                        )))
+                        .and_then(|transaction| Ok(Some(transaction))),
+                    None => Ok(None),
+                };
 
             let grove_db = &platform.drive.grove;
 
-            let result = grove_db
-                .query(&path_query, transactions.get(&transaction_address))
-                .unwrap();
+            let result = transaction_result.and_then(|transaction_arg| {
+                grove_db
+                    .query(&path_query, transaction_arg)
+                    .unwrap()
+                    .map_err(Error::GroveDB)
+            });
 
             channel.send(move |mut task_context| {
                 let callback = js_callback.into_inner(&mut task_context);
@@ -1463,14 +1618,25 @@ impl PlatformWrapper {
             .downcast_or_throw::<JsBox<PlatformWrapper>, _>(&mut cx)?;
 
         db.send_to_drive_thread(move |platform: &Platform, transactions, channel| {
-            let transaction_address =
-                maybe_boxed_transaction_address.expect("transaction address should be available");
+            let transaction_result: Result<Option<&Transaction>, Error> =
+                match maybe_boxed_transaction_address {
+                    Some(address) => transactions
+                        .get(&address)
+                        .ok_or(Error::Drive(DriveError::CorruptedCodeExecution(
+                            "invalid transaction pointer address",
+                        )))
+                        .and_then(|transaction| Ok(Some(transaction))),
+                    None => Ok(None),
+                };
 
             let grove_db = &platform.drive.grove;
 
-            let result = grove_db
-                .get_proved_path_query(&path_query, transactions.get(&transaction_address))
-                .unwrap();
+            let result = transaction_result.and_then(|transaction_arg| {
+                grove_db
+                    .get_proved_path_query(&path_query, transaction_arg)
+                    .unwrap()
+                    .map_err(Error::GroveDB)
+            });
 
             channel.send(move |mut task_context| {
                 let callback = js_callback.into_inner(&mut task_context);
@@ -1611,14 +1777,25 @@ impl PlatformWrapper {
             .downcast_or_throw::<JsBox<PlatformWrapper>, _>(&mut cx)?;
 
         db.send_to_drive_thread(move |platform: &Platform, transactions, channel| {
-            let transaction_address =
-                maybe_boxed_transaction_address.expect("transaction address should be available");
+            let transaction_result: Result<Option<&Transaction>, Error> =
+                match maybe_boxed_transaction_address {
+                    Some(address) => transactions
+                        .get(&address)
+                        .ok_or(Error::Drive(DriveError::CorruptedCodeExecution(
+                            "invalid transaction pointer address",
+                        )))
+                        .and_then(|transaction| Ok(Some(transaction))),
+                    None => Ok(None),
+                };
 
             let grove_db = &platform.drive.grove;
 
-            let result = grove_db
-                .root_hash(transactions.get(&transaction_address))
-                .unwrap();
+            let result = transaction_result.and_then(|transaction_arg| {
+                grove_db
+                    .root_hash(transaction_arg)
+                    .unwrap()
+                    .map_err(Error::GroveDB)
+            });
 
             channel.send(move |mut task_context| {
                 let callback = js_callback.into_inner(&mut task_context);
@@ -1668,19 +1845,26 @@ impl PlatformWrapper {
             .downcast_or_throw::<JsBox<PlatformWrapper>, _>(&mut cx)?;
 
         db.send_to_drive_thread(move |platform: &Platform, transactions, channel| {
-            let transaction_address =
-                maybe_boxed_transaction_address.expect("transaction address should be available");
+            let transaction_result: Result<Option<&Transaction>, Error> =
+                match maybe_boxed_transaction_address {
+                    Some(address) => transactions
+                        .get(&address)
+                        .ok_or(Error::Drive(DriveError::CorruptedCodeExecution(
+                            "invalid transaction pointer address",
+                        )))
+                        .and_then(|transaction| Ok(Some(transaction))),
+                    None => Ok(None),
+                };
 
             let grove_db = &platform.drive.grove;
 
             let path_slice: Vec<&[u8]> = path.iter().map(|fragment| fragment.as_slice()).collect();
-            let result = grove_db
-                .delete(
-                    path_slice,
-                    key.as_slice(),
-                    transactions.get(&transaction_address),
-                )
-                .unwrap();
+            let result = transaction_result.and_then(|transaction_arg| {
+                grove_db
+                    .delete(path_slice, key.as_slice(), transaction_arg)
+                    .unwrap()
+                    .map_err(Error::GroveDB)
+            });
 
             channel.send(move |mut task_context| {
                 let callback = js_callback.into_inner(&mut task_context);
@@ -1727,14 +1911,27 @@ impl PlatformWrapper {
         let request_bytes = converter::js_buffer_to_vec_u8(js_request, &mut cx);
 
         db.send_to_drive_thread(move |platform: &Platform, transactions, channel| {
-            let transaction_address =
-                maybe_boxed_transaction_address.expect("transaction address should be available");
+            let transaction_result: Result<Option<&Transaction>, Error> =
+                match maybe_boxed_transaction_address {
+                    Some(address) => transactions
+                        .get(&address)
+                        .ok_or(Error::Drive(DriveError::CorruptedCodeExecution(
+                            "invalid transaction pointer address",
+                        )))
+                        .and_then(|transaction| Ok(Some(transaction))),
+                    None => Ok(None),
+                };
 
-            let result = InitChainRequest::from_bytes(&request_bytes)
-                .and_then(|request| {
-                    platform.init_chain(request, transactions.get(&transaction_address))
-                })
-                .and_then(|response| response.to_bytes());
+            let result: Result<Vec<u8>, Error> = transaction_result.and_then(|transaction_arg| {
+                InitChainRequest::from_bytes(&request_bytes)
+                    .and_then(|request| platform.init_chain(request, transaction_arg))
+                    .and_then(|response| response.to_bytes())
+                    .map_err(|_| {
+                        Error::Drive(DriveError::CorruptedCodeExecution(
+                            "invalid transaction pointer address",
+                        ))
+                    })
+            });
 
             channel.send(move |mut task_context| {
                 let callback = js_callback.into_inner(&mut task_context);
@@ -1784,14 +1981,22 @@ impl PlatformWrapper {
         let request_bytes = converter::js_buffer_to_vec_u8(js_request, &mut cx);
 
         db.send_to_drive_thread(move |platform: &Platform, transactions, channel| {
-            let transaction_address =
-                maybe_boxed_transaction_address.expect("transaction address should be available");
+            let transaction_result: Result<Option<&Transaction>, Error> =
+                match maybe_boxed_transaction_address {
+                    Some(address) => transactions
+                        .get(&address)
+                        .ok_or(Error::Drive(DriveError::CorruptedCodeExecution(
+                            "invalid transaction pointer address",
+                        )))
+                        .and_then(|transaction| Ok(Some(transaction))),
+                    None => Ok(None),
+                };
 
-            let result = BlockBeginRequest::from_bytes(&request_bytes)
-                .and_then(|request| {
-                    platform.block_begin(request, transactions.get(&transaction_address))
-                })
-                .and_then(|response| response.to_bytes());
+            let result = transaction_result.and_then(|transaction_arg| {
+                BlockBeginRequest::from_bytes(&request_bytes)
+                    .and_then(|request| platform.block_begin(request, transaction_arg))
+                    .and_then(|response| response.to_bytes())
+            });
 
             channel.send(move |mut task_context| {
                 let callback = js_callback.into_inner(&mut task_context);
@@ -1841,14 +2046,22 @@ impl PlatformWrapper {
         let request_bytes = converter::js_buffer_to_vec_u8(js_request, &mut cx);
 
         db.send_to_drive_thread(move |platform: &Platform, transactions, channel| {
-            let transaction_address =
-                maybe_boxed_transaction_address.expect("transaction address should be available");
+            let transaction_result: Result<Option<&Transaction>, Error> =
+                match maybe_boxed_transaction_address {
+                    Some(address) => transactions
+                        .get(&address)
+                        .ok_or(Error::Drive(DriveError::CorruptedCodeExecution(
+                            "invalid transaction pointer address",
+                        )))
+                        .and_then(|transaction| Ok(Some(transaction))),
+                    None => Ok(None),
+                };
 
-            let result = BlockEndRequest::from_bytes(&request_bytes)
-                .and_then(|request| {
-                    platform.block_end(request, transactions.get(&transaction_address))
-                })
-                .and_then(|response| response.to_bytes());
+            let result = transaction_result.and_then(|transaction_arg| {
+                BlockEndRequest::from_bytes(&request_bytes)
+                    .and_then(|request| platform.block_end(request, transaction_arg))
+                    .and_then(|response| response.to_bytes())
+            });
 
             channel.send(move |mut task_context| {
                 let callback = js_callback.into_inner(&mut task_context);

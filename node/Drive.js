@@ -76,7 +76,7 @@ class Drive {
    * @returns {Promise<[number, number]>}
    */
   async createInitialStateStructure(useTransaction = false) {
-    return driveCreateInitialStateStructureAsync.call(this.drive, useTransaction);
+    return driveCreateInitialStateStructureAsync.call(this.drive, undefined);
   }
 
   /**
