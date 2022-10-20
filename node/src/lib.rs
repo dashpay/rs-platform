@@ -15,12 +15,6 @@ use rs_drive::dpp::identity::Identity;
 use rs_drive::drive::flags::StorageFlags;
 use rs_drive::grovedb::{PathQuery, Transaction};
 
-type PlatformCallback =
-    Box<dyn for<'a> FnOnce(&'a Platform, &HashMap<usize, Transaction>, &Channel) + Send>;
-type UnitCallback = Box<dyn FnOnce(&Channel) + Send>;
-type TransactionCallback =
-    Box<dyn FnOnce(mpsc::Sender<PlatformWrapperMessage>, &Transaction, &Channel) + Send>;
-
 type TransactionPointerAddress = usize;
 
 struct PlatformWrapperTransactionAddress {
@@ -31,8 +25,8 @@ struct PlatformWrapperTransactionAddress {
 impl Finalize for PlatformWrapperTransactionAddress {
     fn finalize<'a, C: Context<'a>>(self, cx: &mut C) {
         dbg!("finalizing");
-        let _ = self
-            .tx
+
+        self.tx
             .send(PlatformWrapperMessage::AbortTransaction(
                 self.address,
                 Box::new(|_| {}),
@@ -43,12 +37,20 @@ impl Finalize for PlatformWrapperTransactionAddress {
 }
 
 impl Deref for PlatformWrapperTransactionAddress {
-    type Target = usize;
+    type Target = TransactionPointerAddress;
 
     fn deref(&self) -> &Self::Target {
         &self.address
     }
 }
+
+type PlatformCallback = Box<
+    dyn for<'a> FnOnce(&'a Platform, &HashMap<TransactionPointerAddress, Transaction>, &Channel)
+        + Send,
+>;
+type UnitCallback = Box<dyn FnOnce(&Channel) + Send>;
+type TransactionCallback =
+    Box<dyn FnOnce(mpsc::Sender<PlatformWrapperMessage>, &Transaction, &Channel) + Send>;
 
 // Messages sent on the drive channel
 enum PlatformWrapperMessage {
@@ -57,9 +59,9 @@ enum PlatformWrapperMessage {
     // Indicates that the thread should be stopped and connection closed
     Close(UnitCallback),
     StartTransaction(TransactionCallback),
-    CommitTransaction(usize, UnitCallback),
-    RollbackTransaction(usize, UnitCallback),
-    AbortTransaction(usize, UnitCallback),
+    CommitTransaction(TransactionPointerAddress, UnitCallback),
+    RollbackTransaction(TransactionPointerAddress, UnitCallback),
+    AbortTransaction(TransactionPointerAddress, UnitCallback),
     Flush(UnitCallback),
 }
 
@@ -100,8 +102,7 @@ impl PlatformWrapper {
             // TODO: think how to pass this error to JS
             let platform: Platform = Platform::open(path, None).unwrap();
 
-            // TODO Choose a proper one
-            let mut transactions: HashMap<usize, Transaction> = HashMap::new();
+            let mut transactions: HashMap<TransactionPointerAddress, Transaction> = HashMap::new();
 
             // Blocks until a callback is available
             // When the instance of `Database` is dropped, the channel will be closed
@@ -133,7 +134,8 @@ impl PlatformWrapper {
 
                         let transaction_ref = &transaction;
                         let transaction_raw_pointer = transaction_ref as *const Transaction;
-                        let transaction_raw_pointer_address = transaction_raw_pointer as usize;
+                        let transaction_raw_pointer_address =
+                            transaction_raw_pointer as TransactionPointerAddress;
 
                         transactions.insert(transaction_raw_pointer_address, transaction);
 
@@ -200,7 +202,7 @@ impl PlatformWrapper {
 
     fn send_to_drive_thread(
         &self,
-        callback: impl for<'a> FnOnce(&'a Platform, &HashMap<usize, Transaction>, &Channel)
+        callback: impl for<'a> FnOnce(&'a Platform, &HashMap<TransactionPointerAddress, Transaction>, &Channel)
             + Send
             + 'static,
     ) -> Result<(), mpsc::SendError<PlatformWrapperMessage>> {
@@ -220,7 +222,7 @@ impl PlatformWrapper {
 
     fn commit_transaction(
         &self,
-        transaction_raw_pointer_address: usize,
+        transaction_raw_pointer_address: TransactionPointerAddress,
         callback: impl FnOnce(&Channel) + Send + 'static,
     ) -> Result<(), mpsc::SendError<PlatformWrapperMessage>> {
         self.tx.send(PlatformWrapperMessage::CommitTransaction(
@@ -231,7 +233,7 @@ impl PlatformWrapper {
 
     fn rollback_transaction(
         &self,
-        transaction_raw_pointer_address: usize,
+        transaction_raw_pointer_address: TransactionPointerAddress,
         callback: impl FnOnce(&Channel) + Send + 'static,
     ) -> Result<(), mpsc::SendError<PlatformWrapperMessage>> {
         self.tx.send(PlatformWrapperMessage::RollbackTransaction(
@@ -242,7 +244,7 @@ impl PlatformWrapper {
 
     fn abort_transaction(
         &self,
-        transaction_raw_pointer_address: usize,
+        transaction_raw_pointer_address: TransactionPointerAddress,
         callback: impl FnOnce(&Channel) + Send + 'static,
     ) -> Result<(), mpsc::SendError<PlatformWrapperMessage>> {
         self.tx.send(PlatformWrapperMessage::AbortTransaction(
@@ -309,7 +311,7 @@ impl PlatformWrapper {
     fn js_create_initial_state_structure(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         let js_transaction = cx.argument::<JsValue>(0)?;
 
-        let maybe_boxed_transaction_address = if !js_transaction.is_a::<JsUndefined, _>(&mut cx) {
+        let maybe_transaction_address = if !js_transaction.is_a::<JsUndefined, _>(&mut cx) {
             let handle = js_transaction
                 .downcast_or_throw::<JsBox<PlatformWrapperTransactionAddress>, _>(&mut cx)?;
 
@@ -326,8 +328,9 @@ impl PlatformWrapper {
 
         drive
             .send_to_drive_thread(move |platform: &Platform, transactions, channel| {
-                let transaction_address = maybe_boxed_transaction_address
-                    .expect("transaction address should be available");
+                // TODO This is wrong. We need to throw an error in case if transaction is not present
+                let transaction_address =
+                    maybe_transaction_address.expect("transaction address should be available");
 
                 platform
                     .drive
@@ -885,7 +888,8 @@ impl PlatformWrapper {
 
         db.start_transaction(|tx, transaction, channel| {
             let transaction_raw_pointer = transaction as *const Transaction;
-            let transaction_raw_pointer_address = transaction_raw_pointer as usize;
+            let transaction_raw_pointer_address =
+                transaction_raw_pointer as TransactionPointerAddress;
 
             let transaction_address = PlatformWrapperTransactionAddress {
                 address: transaction_raw_pointer_address,
