@@ -1,12 +1,7 @@
 mod converter;
 
-use neon::handle::Managed;
-use rs_drive::error::Error;
 use std::collections::HashMap;
 use std::ops::Deref;
-use std::slice::SliceIndex;
-use std::sync::mpsc::Sender;
-use std::sync::{Arc, Mutex};
 use std::{option::Option::None, path::Path, sync::mpsc, thread};
 
 use dash_abci::abci::handlers::TenderdashAbci;
@@ -15,31 +10,35 @@ use dash_abci::abci::messages::{
 };
 use dash_abci::platform::Platform;
 use neon::prelude::*;
-use neon::result::Throw;
 use neon::types::JsDate;
 use rs_drive::dpp::identity::Identity;
 use rs_drive::drive::flags::StorageFlags;
 use rs_drive::grovedb::{PathQuery, Transaction};
-use rs_drive::query::TransactionArg;
-
-const READONLY_MSG: &str =
-    "db is in readonly mode due to the active transaction. Please provide transaction or commit it";
 
 type PlatformCallback =
     Box<dyn for<'a> FnOnce(&'a Platform, &HashMap<usize, Transaction>, &Channel) + Send>;
 type UnitCallback = Box<dyn FnOnce(&Channel) + Send>;
-type TrasactionCallback =
-    Box<dyn FnOnce(Sender<PlatformWrapperMessage>, &Transaction, &Channel) + Send>;
+type TransactionCallback =
+    Box<dyn FnOnce(mpsc::Sender<PlatformWrapperMessage>, &Transaction, &Channel) + Send>;
 
-struct PlatformWrapperTransactionAddress(usize, Sender<PlatformWrapperMessage>);
+type TransactionPointerAddress = usize;
+
+struct PlatformWrapperTransactionAddress {
+    address: TransactionPointerAddress,
+    tx: mpsc::Sender<PlatformWrapperMessage>,
+}
 
 impl Finalize for PlatformWrapperTransactionAddress {
     fn finalize<'a, C: Context<'a>>(self, cx: &mut C) {
         dbg!("finalizing");
-        self.1.send(PlatformWrapperMessage::AbortTransaction(
-            self.0,
-            Box::new(|channel| {}),
-        ));
+        let _ = self
+            .tx
+            .send(PlatformWrapperMessage::AbortTransaction(
+                self.address,
+                Box::new(|_| {}),
+            ))
+            .or_else(|err| cx.throw_error(err.to_string()))
+            .unwrap(); // Panic if channel with Platform thread is closed.
     }
 }
 
@@ -47,7 +46,7 @@ impl Deref for PlatformWrapperTransactionAddress {
     type Target = usize;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.address
     }
 }
 
@@ -57,7 +56,7 @@ enum PlatformWrapperMessage {
     Callback(PlatformCallback),
     // Indicates that the thread should be stopped and connection closed
     Close(UnitCallback),
-    StartTransaction(TrasactionCallback),
+    StartTransaction(TransactionCallback),
     CommitTransaction(usize, UnitCallback),
     RollbackTransaction(usize, UnitCallback),
     AbortTransaction(usize, UnitCallback),
@@ -90,7 +89,7 @@ impl PlatformWrapper {
         // dropped.
         let channel = cx.channel();
 
-        let tclone = tx.clone();
+        let sender = tx.clone();
 
         // Spawn a thread for processing database queries
         // This will not block the JavaScript main thread and will continue executing
@@ -143,7 +142,7 @@ impl PlatformWrapper {
 
                         dbg!(&transactions.len());
 
-                        callback(tclone.clone(), transaction, &channel);
+                        callback(sender.clone(), transaction, &channel);
                     }
                     PlatformWrapperMessage::CommitTransaction(
                         transaction_raw_pointer_address,
@@ -211,7 +210,9 @@ impl PlatformWrapper {
 
     fn start_transaction(
         &self,
-        callback: impl FnOnce(Sender<PlatformWrapperMessage>, &Transaction, &Channel) + Send + 'static,
+        callback: impl FnOnce(mpsc::Sender<PlatformWrapperMessage>, &Transaction, &Channel)
+            + Send
+            + 'static,
     ) -> Result<(), mpsc::SendError<PlatformWrapperMessage>> {
         self.tx
             .send(PlatformWrapperMessage::StartTransaction(Box::new(callback)))
@@ -886,8 +887,10 @@ impl PlatformWrapper {
             let transaction_raw_pointer = transaction as *const Transaction;
             let transaction_raw_pointer_address = transaction_raw_pointer as usize;
 
-            let transaction_address =
-                PlatformWrapperTransactionAddress(transaction_raw_pointer_address, tx.clone());
+            let transaction_address = PlatformWrapperTransactionAddress {
+                address: transaction_raw_pointer_address,
+                tx,
+            };
 
             channel.send(move |mut task_context| {
                 let callback = js_callback.into_inner(&mut task_context);
@@ -1525,7 +1528,7 @@ impl PlatformWrapper {
             .this()
             .downcast_or_throw::<JsBox<PlatformWrapper>, _>(&mut cx)?;
 
-        db.send_to_drive_thread(move |platform: &Platform, transactions, channel| {
+        db.send_to_drive_thread(move |platform: &Platform, _, channel| {
             let grove_db = &platform.drive.grove;
 
             let path_queries = path_queries.iter().map(|path_query| path_query).collect();
