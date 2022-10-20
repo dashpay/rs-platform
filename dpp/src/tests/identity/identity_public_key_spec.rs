@@ -1,4 +1,6 @@
 mod from_raw_object {
+    use bls_signatures::Serialize;
+    use dashcore::PublicKey;
     use serde_json::json;
 
     use crate::identity::{KeyType, Purpose, SecurityLevel};
@@ -128,5 +130,63 @@ mod from_raw_object {
             .expect("the public key should be created");
 
         assert!(!public_key.is_master());
+    }
+
+    #[test]
+    pub fn should_return_hash_for_ecdsa_public_key() {
+        let public_key_compressed =
+            "02716899be7008396a0b34dd49d9707b01e86265f9556ab54a493e712d42946e7a";
+        let public_key_compressed_bytes = hex::decode(public_key_compressed).unwrap();
+        let public_key = PublicKey::from_slice(&public_key_compressed_bytes)
+            .unwrap()
+            .to_bytes();
+
+        let public_key_json = json!({
+            "id": 0,
+            "type": KeyType::ECDSA_SECP256K1,
+            "purpose": Purpose::AUTHENTICATION,
+            "securityLevel": SecurityLevel::MASTER,
+            "data": public_key,
+            "readOnly": false
+        });
+
+        let public_key = IdentityPublicKey::from_raw_object(public_key_json)
+            .expect("the public key should be created");
+        assert_eq!(public_key.get_type(), KeyType::ECDSA_SECP256K1);
+        assert_eq!(
+            vec![
+                92, 158, 158, 5, 73, 213, 211, 15, 121, 255, 72, 55, 220, 47, 233, 182, 143, 218,
+                51, 12
+            ],
+            public_key.hash().unwrap()
+        );
+    }
+
+    #[test]
+    pub fn should_return_hash_for_bls_public_key() {
+        let private_key = [1u8; 32];
+        let bls_public_key = bls_signatures::PrivateKey::new(private_key)
+            .public_key()
+            .as_bytes();
+
+        let public_key_json = json!({
+            "id": 0,
+            "type": KeyType::BLS12_381,
+            "purpose": Purpose::AUTHENTICATION,
+            "securityLevel": SecurityLevel::MASTER,
+            "data": bls_public_key,
+            "readOnly": false
+        });
+
+        let public_key = IdentityPublicKey::from_raw_object(public_key_json)
+            .expect("the public key should be created");
+        assert_eq!(public_key.get_type(), KeyType::BLS12_381);
+        assert_eq!(
+            vec![
+                111, 89, 76, 223, 228, 50, 201, 143, 165, 74, 149, 193, 215, 143, 217, 170, 49,
+                108, 229, 150
+            ],
+            public_key.hash().unwrap()
+        );
     }
 }

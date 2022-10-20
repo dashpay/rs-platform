@@ -13,6 +13,7 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 
 use crate::errors::{InvalidVectorSizeError, ProtocolError};
 use crate::util::cbor_value::{CborCanonicalMap, CborMapExtension};
+use crate::util::hash::ripemd160_sha256;
 use crate::util::json_value::{JsonValueExt, ReplaceWith};
 use crate::util::vec;
 use crate::SerdeParsingError;
@@ -183,11 +184,13 @@ pub struct IdentityPublicKey {
     pub security_level: SecurityLevel,
     #[serde(rename = "type")]
     pub key_type: KeyType,
+    //? Consider replacing vec to the enum (33,48,64, None) - to avoid heap allocation
     pub data: Vec<u8>,
     pub read_only: bool,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub disabled_at: Option<TimestampMillis>,
+    //? Consider replacing vec to the enum (EC, BLS, None) - to avoid heap allocation
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub signature: Vec<u8>,
 }
@@ -318,29 +321,13 @@ impl IdentityPublicKey {
             return Ok(self.data.clone());
         }
 
-        let original_key = match self.data.len() {
-            65 => {
-                let public_key = vec::vec_to_array::<65>(&self.data)
-                    .map_err(|e| ProtocolError::ParsingError(e.to_string()))?;
-
-                PublicKey::from_slice(&public_key)
-                    .map_err(|e| anyhow!("unable to create pub key - {}", e))?
-            }
-
-            33 => {
-                let public_key = vec::vec_to_array::<33>(&self.data)
-                    .map_err(|e| ProtocolError::ParsingError(e.to_string()))?;
-                PublicKey::from_slice(&public_key)
-                    .map_err(|e| anyhow!("unable to create pub key - {}", e))?
-            }
-            _ => {
-                return Err(ProtocolError::ParsingError(format!(
-                    "the key length is invalid: {} Allowed sizes: 33 or 65 bytes",
-                    self.data.len()
-                )));
-            }
-        };
-        Ok(original_key.pubkey_hash().to_vec())
+        match self.data.len() {
+            33 | 48 | 65 => Ok(ripemd160_sha256(&self.data)),
+            _ => Err(ProtocolError::ParsingError(format!(
+                "The length of the public key is invalid: {}. Allowed sizes: 33, 48 or 65 bytes",
+                self.data.len()
+            ))),
+        }
     }
 
     pub fn as_ecdsa_array(&self) -> Result<[u8; 33], InvalidVectorSizeError> {
