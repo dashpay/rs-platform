@@ -71,41 +71,41 @@ class Drive {
   }
 
   /**
-   * @param {boolean} [useTransaction=false]
+   * @param {External} [transaction=undefined]
    *
    * @returns {Promise<[number, number]>}
    */
-  async createInitialStateStructure(useTransaction = false) {
+  async createInitialStateStructure(transaction = undefined) {
     return driveCreateInitialStateStructureAsync.call(this.drive, undefined);
   }
 
   /**
    * @param {DataContract} dataContract
    * @param {Date} blockTime
-   * @param {boolean} [useTransaction=false]
+   * @param {External} [transaction=undefined]
    * @param {boolean} [dryRun=false]
    *
    * @returns {Promise<[number, number]>}
    */
-  async applyContract(dataContract, blockTime, useTransaction = false, dryRun = false) {
+  async applyContract(dataContract, blockTime, transaction = undefined, dryRun = false) {
     return driveApplyContractAsync.call(
       this.drive,
       dataContract.toBuffer(),
       blockTime,
       !dryRun,
-      useTransaction,
+      transaction,
     );
   }
 
   /**
    * @param {Document} document
    * @param {Date} blockTime
-   * @param {boolean} [useTransaction=false]
+   * @param {External} [transaction=undefined]
    * @param {boolean} [dryRun=false]
    *
    * @returns {Promise<[number, number]>}
    */
-  async createDocument(document, blockTime, useTransaction = false, dryRun = false) {
+  async createDocument(document, blockTime, transaction = undefined, dryRun = false) {
     return driveCreateDocumentAsync.call(
       this.drive,
       document.toBuffer(),
@@ -115,19 +115,19 @@ class Drive {
       true,
       blockTime,
       !dryRun,
-      useTransaction,
+      transaction,
     );
   }
 
   /**
    * @param {Document} document
    * @param {Date} blockTime
-   * @param {boolean} [useTransaction=false]
+   * @param {External} [transaction=undefined]
    * @param {boolean} [dryRun=false]
    *
    * @returns {Promise<[number, number]>}
    */
-  async updateDocument(document, blockTime, useTransaction = false, dryRun = false) {
+  async updateDocument(document, blockTime, transaction = undefined, dryRun = false) {
     return driveUpdateDocumentAsync.call(
       this.drive,
       document.toBuffer(),
@@ -136,7 +136,7 @@ class Drive {
       document.getOwnerId().toBuffer(),
       blockTime,
       !dryRun,
-      useTransaction,
+      transaction,
     );
   }
 
@@ -144,7 +144,7 @@ class Drive {
    * @param {DataContract} dataContract
    * @param {string} documentType
    * @param {Identifier} documentId
-   * @param {boolean} [useTransaction=false]
+   * @param {External} [transaction=undefined]
    * @param {boolean} [dryRun=false]
    *
    * @returns {Promise<[number, number]>}
@@ -153,7 +153,7 @@ class Drive {
     dataContract,
     documentType,
     documentId,
-    useTransaction = false,
+    transaction = undefined,
     dryRun = false,
   ) {
     return driveDeleteDocumentAsync.call(
@@ -162,7 +162,7 @@ class Drive {
       dataContract.toBuffer(),
       documentType,
       !dryRun,
-      useTransaction,
+      transaction,
     );
   }
 
@@ -176,11 +176,11 @@ class Drive {
    * @param [query.startAt]
    * @param [query.startAfter]
    * @param [query.orderBy]
-   * @param {Boolean} [useTransaction=false]
+   * @param {External} [transaction=undefined]
    *
    * @returns {Promise<[Document[], number]>}
    */
-  async queryDocuments(dataContract, documentType, query = {}, useTransaction = false) {
+  async queryDocuments(dataContract, documentType, query = {}, transaction = undefined) {
     const encodedQuery = await cbor.encodeAsync(query);
 
     const [encodedDocuments, , processingFee] = await driveQueryDocumentsAsync.call(
@@ -188,7 +188,7 @@ class Drive {
       encodedQuery,
       dataContract.id.toBuffer(),
       documentType,
-      useTransaction,
+      transaction,
     );
 
     const documents = encodedDocuments.map((encodedDocument) => {
@@ -215,11 +215,11 @@ class Drive {
    * @param [query.startAt]
    * @param [query.startAfter]
    * @param [query.orderBy]
-   * @param {Boolean} [useTransaction=false]
+   * @param {External} [transaction=undefined]
    *
    * @returns {Promise<[Document[], number]>}
    */
-  async proveDocumentsQuery(dataContract, documentType, query = {}, useTransaction = false) {
+  async proveDocumentsQuery(dataContract, documentType, query = {}, transaction = undefined) {
     const encodedQuery = await cbor.encodeAsync(query);
 
     // eslint-disable-next-line no-return-await
@@ -228,23 +228,23 @@ class Drive {
       encodedQuery,
       dataContract.id.toBuffer(),
       documentType,
-      useTransaction,
+      transaction,
     );
   }
 
   /**
    * @param {Identity} identity
-   * @param {boolean} [useTransaction=false]
+   * @param {External} [transaction=undefined]
    * @param {boolean} [dryRun=false]
    *
    * @returns {Promise<[number, number]>}
    */
-  async insertIdentity(identity, useTransaction = false, dryRun = false) {
+  async insertIdentity(identity, transaction = undefined, dryRun = false) {
     return driveInsertIdentityAsync.call(
       this.drive,
       identity.toBuffer(),
       !dryRun,
-      useTransaction,
+      transaction,
     );
   }
 
@@ -263,17 +263,17 @@ class Drive {
        * ABCI init chain
        *
        * @param {InitChainRequest} request
-       * @param {boolean} [useTransaction=false]
+       * @param {External} [transaction=undefined]
        *
        * @returns {Promise<InitChainResponse>}
        */
-      async initChain(request, useTransaction = false) {
+      async initChain(request, transaction = undefined) {
         const requestBytes = cbor.encode(request);
 
         const responseBytes = await abciInitChainAsync.call(
           drive,
           requestBytes,
-          useTransaction,
+          transaction,
         );
 
         return cbor.decode(responseBytes);
@@ -283,11 +283,11 @@ class Drive {
        * ABCI init chain
        *
        * @param {BlockBeginRequest} request
-       * @param {boolean} [useTransaction=false]
+       * @param {External} [transaction=undefined]
        *
        * @returns {Promise<BlockBeginResponse>}
        */
-      async blockBegin(request, useTransaction = false) {
+      async blockBegin(request, transaction = undefined) {
         const requestBytes = cbor.encode({
           ...request,
           // cborium doesn't eat Buffers
@@ -297,7 +297,7 @@ class Drive {
         const responseBytes = await abciBlockBeginAsync.call(
           drive,
           requestBytes,
-          useTransaction,
+          transaction,
         );
 
         return cbor.decode(responseBytes);
@@ -307,17 +307,17 @@ class Drive {
        * ABCI init chain
        *
        * @param {BlockEndRequest} request
-       * @param {boolean} [useTransaction=false]
+       * @param {External} [transaction=undefined]
        *
        * @returns {Promise<BlockEndResponse>}
        */
-      async blockEnd(request, useTransaction = false) {
+      async blockEnd(request, transaction = undefined) {
         const requestBytes = cbor.encode(request);
 
         const responseBytes = await abciBlockEndAsync.call(
           drive,
           requestBytes,
-          useTransaction,
+          transaction,
         );
 
         return cbor.decode(responseBytes);

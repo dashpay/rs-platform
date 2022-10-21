@@ -50,7 +50,7 @@ type PlatformCallback = Box<
 >;
 type UnitCallback = Box<dyn FnOnce(&Channel) + Send>;
 type TransactionCallback =
-    Box<dyn FnOnce(mpsc::Sender<PlatformWrapperMessage>, &Transaction, &Channel) + Send>;
+    Box<dyn FnOnce(mpsc::Sender<PlatformWrapperMessage>, usize, &Channel) + Send>;
 
 // Messages sent on the drive channel
 enum PlatformWrapperMessage {
@@ -139,10 +139,7 @@ impl PlatformWrapper {
 
                         transactions.insert(transaction_raw_pointer_address, transaction);
 
-                        let transaction =
-                            transactions.get(&transaction_raw_pointer_address).unwrap();
-
-                        callback(sender.clone(), transaction, &channel);
+                        callback(sender.clone(), transaction_raw_pointer_address, &channel);
                     }
                     PlatformWrapperMessage::CommitTransaction(
                         transaction_raw_pointer_address,
@@ -210,9 +207,7 @@ impl PlatformWrapper {
 
     fn start_transaction(
         &self,
-        callback: impl FnOnce(mpsc::Sender<PlatformWrapperMessage>, &Transaction, &Channel)
-            + Send
-            + 'static,
+        callback: impl FnOnce(mpsc::Sender<PlatformWrapperMessage>, usize, &Channel) + Send + 'static,
     ) -> Result<(), mpsc::SendError<PlatformWrapperMessage>> {
         self.tx
             .send(PlatformWrapperMessage::StartTransaction(Box::new(callback)))
@@ -961,11 +956,7 @@ impl PlatformWrapper {
             .this()
             .downcast_or_throw::<JsBox<PlatformWrapper>, _>(&mut cx)?;
 
-        db.start_transaction(|tx, transaction, channel| {
-            let transaction_raw_pointer = transaction as *const Transaction;
-            let transaction_raw_pointer_address =
-                transaction_raw_pointer as TransactionPointerAddress;
-
+        db.start_transaction(|tx, transaction_raw_pointer_address, channel| {
             let transaction_address = PlatformWrapperTransactionAddress {
                 address: transaction_raw_pointer_address,
                 tx,
