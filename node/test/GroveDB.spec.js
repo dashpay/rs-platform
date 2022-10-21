@@ -133,7 +133,7 @@ describe('GroveDB', () => {
 
       expect.fail('Expected to throw en error');
     } catch (e) {
-      expect(e.message).to.be.equal('path key not found: key not found in Merk: 746573745f6b6579');
+      expect(e.message).to.be.equal('grovedb: path key not found: key not found in Merk: 746573745f6b6579');
     }
   });
 
@@ -144,7 +144,7 @@ describe('GroveDB', () => {
 
         expect.fail('should throw an error');
       } catch (e) {
-        expect(e.message).to.equal('path not found: subtree doesn\'t exist');
+        expect(e.message).to.equal('grovedb: path not found: subtree doesn\'t exist');
         // appendStack wrapper should add call stack to neon binding errors
         expect(e.stack).to.not.equal('path not found: subtree doesn\'t exist');
         expect(e.stack).to.be.a('string').and.satisfy((msg) => (
@@ -214,7 +214,7 @@ describe('GroveDB', () => {
 
         expect.fail('Expected to throw an error');
       } catch (e) {
-        expect(e.message).to.be.equal('path key not found: key not found in Merk: 746573745f6b6579');
+        expect(e.message).to.be.equal('grovedb: path key not found: key not found in Merk: 746573745f6b6579');
       }
     });
   });
@@ -228,14 +228,14 @@ describe('GroveDB', () => {
         { type: 'tree', epoch: 0, value: Buffer.alloc(32) },
       );
 
-      await groveDb.startTransaction();
+      const transaction = await groveDb.startTransaction();
 
       // Inserting an item into the subtree
       await groveDb.insert(
         itemTreePath,
         itemKey,
         { type: 'item', epoch: 0, value: itemValue },
-        true,
+        transaction,
       );
 
       // ... and using `get` without the flag should return no value
@@ -244,10 +244,10 @@ describe('GroveDB', () => {
 
         expect.fail('Expected to throw an error');
       } catch (e) {
-        expect(e.message).to.be.equal('path key not found: key not found in Merk: 746573745f6b6579');
+        expect(e.message).to.be.equal('grovedb: path key not found: key not found in Merk: 746573745f6b6579');
       }
 
-      await groveDb.commitTransaction();
+      await groveDb.commitTransaction(transaction);
 
       // When committed, the value should be accessible without running transaction
       const element = await groveDb.get(itemTreePath, itemKey);
@@ -265,25 +265,25 @@ describe('GroveDB', () => {
         { type: 'tree', epoch: 0, value: Buffer.alloc(32) },
       );
 
-      await groveDb.startTransaction();
+      const transaction = await groveDb.startTransaction();
 
       // Inserting an item into the subtree
       await groveDb.insert(
         itemTreePath,
         itemKey,
         { type: 'item', epoch: 0, value: itemValue },
-        true,
+        transaction,
       );
 
       // Should rollback inserted item
-      await groveDb.rollbackTransaction();
+      await groveDb.rollbackTransaction(transaction);
 
       try {
         await groveDb.get(itemTreePath, itemKey);
 
         expect.fail('Expected to throw an error');
       } catch (e) {
-        expect(e.message).to.be.equal('path key not found: key not found in Merk: 746573745f6b6579');
+        expect(e.message).to.be.equal('grovedb: path key not found: key not found in Merk: 746573745f6b6579');
       }
     });
   });
@@ -322,30 +322,25 @@ describe('GroveDB', () => {
         { type: 'tree', epoch: 0, value: Buffer.alloc(32) },
       );
 
-      await groveDb.startTransaction();
+      const transaction = await groveDb.startTransaction();
 
       // Inserting an item into the subtree
       await groveDb.insert(
         itemTreePath,
         itemKey,
         { type: 'item', epoch: 0, value: itemValue },
-        true,
+        transaction,
       );
 
       // Should abort inserted item
-      await groveDb.abortTransaction();
-
-      const isTransactionStarted = await groveDb.isTransactionStarted();
-
-      // eslint-disable-next-line no-unused-expressions
-      expect(isTransactionStarted).to.be.false;
+      await groveDb.abortTransaction(transaction);
 
       try {
         await groveDb.get(itemTreePath, itemKey);
 
         expect.fail('Expected to throw an error');
       } catch (e) {
-        expect(e.message).to.be.equal('path key not found: key not found in Merk: 746573745f6b6579');
+        expect(e.message).to.be.equal('grovedb: path key not found: key not found in Merk: 746573745f6b6579');
       }
     });
   });
@@ -1205,7 +1200,9 @@ describe('GroveDB', () => {
         },
       };
 
-      const result = await groveDb.proveQueryMany([query1, query2]);
+      const transacton = await groveDb.startTransaction();
+
+      const result = await groveDb.proveQueryMany([query1, query2], transacton);
 
       expect(result).to.exist();
 
@@ -1233,9 +1230,9 @@ describe('GroveDB', () => {
       expect(result).to.deep.equal(Buffer.alloc(32));
 
       // Get root hash for transaction too
-      await groveDb.startTransaction();
+      const transaction = await groveDb.startTransaction();
 
-      const transactionalResult = await groveDb.getRootHash(true);
+      const transactionalResult = await groveDb.getRootHash(transaction);
 
       expect(transactionalResult).to.deep.equal(Buffer.alloc(32));
     });
@@ -1255,7 +1252,7 @@ describe('GroveDB', () => {
         { type: 'item', epoch: 0, value: itemValue },
       );
 
-      await groveDb.startTransaction();
+      const transaction = await groveDb.startTransaction();
 
       // Inserting an item into the subtree
       await groveDb.insert(
@@ -1266,7 +1263,7 @@ describe('GroveDB', () => {
       );
 
       const result = await groveDb.getRootHash();
-      const transactionalResult = await groveDb.getRootHash(true);
+      const transactionalResult = await groveDb.getRootHash(transaction);
 
       // Hashes shouldn't be equal
       expect(result).to.not.deep.equal(transactionalResult);
