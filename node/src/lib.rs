@@ -15,7 +15,7 @@ use rs_drive::dpp::identity::Identity;
 use rs_drive::drive::flags::StorageFlags;
 use rs_drive::error::drive::DriveError;
 use rs_drive::error::Error;
-use rs_drive::grovedb::{self, PathQuery, Transaction};
+use rs_drive::grovedb::{PathQuery, Transaction};
 
 type TransactionPointerAddress = usize;
 
@@ -26,8 +26,6 @@ struct PlatformWrapperTransactionAddress {
 
 impl Finalize for PlatformWrapperTransactionAddress {
     fn finalize<'a, C: Context<'a>>(self, cx: &mut C) {
-        dbg!("finalizing");
-
         self.tx
             .send(PlatformWrapperMessage::AbortTransaction(
                 self.address,
@@ -113,7 +111,6 @@ impl PlatformWrapper {
             while let Ok(message) = rx.recv() {
                 match message {
                     PlatformWrapperMessage::Callback(callback) => {
-                        dbg!("callback");
                         // The connection and channel are owned by the thread, but _lent_ to
                         // the callback. The callback has exclusive access to the connection
                         // for the duration of the callback.
@@ -121,7 +118,6 @@ impl PlatformWrapper {
                     }
                     // Immediately close the connection, even if there are pending messages
                     PlatformWrapperMessage::Close(callback) => {
-                        dbg!("close");
                         drop(transactions);
                         drop(platform);
 
@@ -130,12 +126,10 @@ impl PlatformWrapper {
                     }
                     // Flush message
                     PlatformWrapperMessage::Flush(callback) => {
-                        dbg!("flush");
                         platform.drive.grove.flush().unwrap();
                         callback(&channel);
                     }
                     PlatformWrapperMessage::StartTransaction(callback) => {
-                        dbg!("starttx");
                         let transaction = platform.drive.grove.start_transaction();
 
                         let transaction_ref = &transaction;
@@ -148,15 +142,12 @@ impl PlatformWrapper {
                         let transaction =
                             transactions.get(&transaction_raw_pointer_address).unwrap();
 
-                        dbg!(&transactions.len());
-
                         callback(sender.clone(), transaction, &channel);
                     }
                     PlatformWrapperMessage::CommitTransaction(
                         transaction_raw_pointer_address,
                         callback,
                     ) => {
-                        dbg!("commit");
                         if let Some(transaction) =
                             transactions.remove(&transaction_raw_pointer_address)
                         {
@@ -169,7 +160,6 @@ impl PlatformWrapper {
                         transaction_raw_pointer_address,
                         callback,
                     ) => {
-                        dbg!("rollback");
                         if let Some(transaction) =
                             transactions.remove(&transaction_raw_pointer_address)
                         {
@@ -182,7 +172,6 @@ impl PlatformWrapper {
                         transaction_raw_pointer_address,
                         callback,
                     ) => {
-                        dbg!("abort");
                         if let Some(transaction) =
                             transactions.remove(&transaction_raw_pointer_address)
                         {
@@ -350,8 +339,6 @@ impl PlatformWrapper {
                         }),
                     None => Ok(()),
                 };
-
-                dbg!(&execution_result);
 
                 channel.send(move |mut task_context| {
                     let callback = js_callback.into_inner(&mut task_context);
@@ -1922,16 +1909,15 @@ impl PlatformWrapper {
                     None => Ok(None),
                 };
 
-            let result: Result<Vec<u8>, Error> = transaction_result.and_then(|transaction_arg| {
-                InitChainRequest::from_bytes(&request_bytes)
-                    .and_then(|request| platform.init_chain(request, transaction_arg))
-                    .and_then(|response| response.to_bytes())
-                    .map_err(|_| {
-                        Error::Drive(DriveError::CorruptedCodeExecution(
-                            "invalid transaction pointer address",
-                        ))
-                    })
-            });
+            let result =
+                transaction_result
+                    .map_err(|e| e.to_string())
+                    .and_then(|transaction_arg| {
+                        InitChainRequest::from_bytes(&request_bytes)
+                            .and_then(|request| platform.init_chain(request, transaction_arg))
+                            .and_then(|response| response.to_bytes())
+                            .map_err(|e| e.to_string())
+                    });
 
             channel.send(move |mut task_context| {
                 let callback = js_callback.into_inner(&mut task_context);
@@ -1992,11 +1978,15 @@ impl PlatformWrapper {
                     None => Ok(None),
                 };
 
-            let result = transaction_result.and_then(|transaction_arg| {
-                BlockBeginRequest::from_bytes(&request_bytes)
-                    .and_then(|request| platform.block_begin(request, transaction_arg))
-                    .and_then(|response| response.to_bytes())
-            });
+            let result =
+                transaction_result
+                    .map_err(|e| e.to_string())
+                    .and_then(|transaction_arg| {
+                        BlockBeginRequest::from_bytes(&request_bytes)
+                            .and_then(|request| platform.block_begin(request, transaction_arg))
+                            .and_then(|response| response.to_bytes())
+                            .map_err(|e| e.to_string())
+                    });
 
             channel.send(move |mut task_context| {
                 let callback = js_callback.into_inner(&mut task_context);
@@ -2057,11 +2047,15 @@ impl PlatformWrapper {
                     None => Ok(None),
                 };
 
-            let result = transaction_result.and_then(|transaction_arg| {
-                BlockEndRequest::from_bytes(&request_bytes)
-                    .and_then(|request| platform.block_end(request, transaction_arg))
-                    .and_then(|response| response.to_bytes())
-            });
+            let result =
+                transaction_result
+                    .map_err(|e| e.to_string())
+                    .and_then(|transaction_arg| {
+                        BlockEndRequest::from_bytes(&request_bytes)
+                            .and_then(|request| platform.block_end(request, transaction_arg))
+                            .and_then(|response| response.to_bytes())
+                            .map_err(|e| e.to_string())
+                    });
 
             channel.send(move |mut task_context| {
                 let callback = js_callback.into_inner(&mut task_context);
