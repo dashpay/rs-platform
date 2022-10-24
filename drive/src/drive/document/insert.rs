@@ -32,6 +32,7 @@ use crate::fee::calculate_fee;
 use crate::fee::op::DriveOperation;
 use dpp::data_contract::extra::DocumentType;
 
+use crate::drive::block_info::BlockInfo;
 use dpp::data_contract::extra::encode_float;
 use dpp::data_contract::extra::DriveContractExt;
 
@@ -41,7 +42,7 @@ impl Drive {
     pub(crate) fn add_document_to_primary_storage(
         &self,
         document_and_contract_info: &DocumentAndContractInfo,
-        block_time: f64,
+        block_info: &BlockInfo,
         insert_without_check: bool,
         apply: bool,
         transaction: TransactionArg,
@@ -81,7 +82,7 @@ impl Drive {
                 transaction,
                 drive_operations,
             )?;
-            let encoded_time = encode_float(block_time)?;
+            let encoded_time = encode_float(block_info.time)?;
             let path_key_element_info = match &document_and_contract_info.document_info {
                 DocumentRefAndSerialization((document, serialized_document, storage_flags)) => {
                     let element = Element::Item(
@@ -287,7 +288,7 @@ impl Drive {
         document_type_name: &str,
         owner_id: Option<&[u8]>,
         override_document: bool,
-        block_time: f64,
+        block_info: BlockInfo,
         apply: bool,
         storage_flags: Option<&StorageFlags>,
         transaction: TransactionArg,
@@ -309,7 +310,7 @@ impl Drive {
                 owner_id,
             },
             override_document,
-            block_time,
+            block_info,
             apply,
             transaction,
         )
@@ -322,7 +323,7 @@ impl Drive {
         document_type_name: &str,
         owner_id: Option<&[u8]>,
         override_document: bool,
-        block_time: f64,
+        block_info: BlockInfo,
         apply: bool,
         storage_flags: Option<&StorageFlags>,
         transaction: TransactionArg,
@@ -342,7 +343,7 @@ impl Drive {
                 owner_id,
             },
             override_document,
-            block_time,
+            block_info,
             apply,
             transaction,
         )
@@ -352,7 +353,7 @@ impl Drive {
         &self,
         document_and_contract_info: DocumentAndContractInfo,
         override_document: bool,
-        block_time: f64,
+        block_info: BlockInfo,
         apply: bool,
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
@@ -360,12 +361,12 @@ impl Drive {
         self.add_document_for_contract_operations(
             document_and_contract_info,
             override_document,
-            block_time,
+            &block_info,
             apply,
             transaction,
             &mut drive_operations,
         )?;
-        let fees = calculate_fee(None, Some(drive_operations))?;
+        let fees = calculate_fee(None, Some(drive_operations), &block_info.epoch)?;
         Ok(fees)
     }
 
@@ -373,7 +374,7 @@ impl Drive {
         &self,
         document_and_contract_info: DocumentAndContractInfo,
         override_document: bool,
-        block_time: f64,
+        block_info: &BlockInfo,
         apply: bool,
         transaction: TransactionArg,
         drive_operations: &mut Vec<DriveOperation>,
@@ -418,7 +419,7 @@ impl Drive {
         {
             self.update_document_for_contract_operations(
                 document_and_contract_info,
-                block_time,
+                &block_info,
                 apply,
                 transaction,
                 &mut batch_operations,
@@ -428,7 +429,7 @@ impl Drive {
             // if we have override_document set that means we already checked if it exists
             self.add_document_to_primary_storage(
                 &document_and_contract_info,
-                block_time,
+                &block_info,
                 override_document,
                 apply,
                 transaction,
@@ -726,7 +727,7 @@ mod tests {
                 "contactRequest",
                 Some(&random_owner_id),
                 false,
-                0f64,
+                BlockInfo::default(),
                 true,
                 StorageFlags::optional_default_as_ref(),
                 None,
@@ -740,7 +741,7 @@ mod tests {
                 "contactRequest",
                 Some(&random_owner_id),
                 false,
-                0f64,
+                BlockInfo::default(),
                 true,
                 StorageFlags::optional_default_as_ref(),
                 None,
@@ -754,7 +755,7 @@ mod tests {
                 "contactRequest",
                 Some(&random_owner_id),
                 true,
-                0f64,
+                BlockInfo::default(),
                 true,
                 StorageFlags::optional_default_as_ref(),
                 None,
@@ -793,7 +794,7 @@ mod tests {
                 "contactRequest",
                 Some(&random_owner_id),
                 false,
-                0f64,
+                BlockInfo::default(),
                 true,
                 StorageFlags::optional_default_as_ref(),
                 Some(&db_transaction),
@@ -807,7 +808,7 @@ mod tests {
                 "contactRequest",
                 Some(&random_owner_id),
                 false,
-                0f64,
+                BlockInfo::default(),
                 true,
                 StorageFlags::optional_default_as_ref(),
                 Some(&db_transaction),
@@ -821,7 +822,7 @@ mod tests {
                 "contactRequest",
                 Some(&random_owner_id),
                 true,
-                0f64,
+                BlockInfo::default(),
                 true,
                 StorageFlags::optional_default_as_ref(),
                 Some(&db_transaction),
@@ -862,7 +863,7 @@ mod tests {
                 "contactRequest",
                 Some(&random_owner_id),
                 false,
-                0f64,
+                BlockInfo::default(),
                 true,
                 StorageFlags::optional_default_as_ref(),
                 Some(&db_transaction),
@@ -905,7 +906,7 @@ mod tests {
                 "contactRequest",
                 Some(&random_owner_id),
                 false,
-                0f64,
+                BlockInfo::default(),
                 false,
                 StorageFlags::optional_default_as_ref(),
                 Some(&db_transaction),
@@ -919,7 +920,7 @@ mod tests {
                 "contactRequest",
                 Some(&random_owner_id),
                 false,
-                0f64,
+                BlockInfo::default(),
                 true,
                 StorageFlags::optional_default_as_ref(),
                 Some(&db_transaction),
@@ -987,7 +988,7 @@ mod tests {
                     owner_id: Some(&owner_id),
                 },
                 false,
-                0f64,
+                &BlockInfo::default(),
                 false,
                 Some(&db_transaction),
                 &mut fee_drive_operations,
@@ -1011,7 +1012,7 @@ mod tests {
                     owner_id: Some(&owner_id),
                 },
                 false,
-                0f64,
+                &BlockInfo::default(),
                 true,
                 Some(&db_transaction),
                 &mut actual_drive_operations,
@@ -1070,7 +1071,7 @@ mod tests {
                     owner_id: None,
                 },
                 false,
-                0f64,
+                BlockInfo::default(),
                 true,
                 Some(&db_transaction),
             )
@@ -1110,7 +1111,7 @@ mod tests {
                 "contactRequest",
                 Some(&random_owner_id),
                 false,
-                0f64,
+                BlockInfo::default(),
                 true,
                 StorageFlags::optional_default_as_ref(),
                 None,
@@ -1123,7 +1124,7 @@ mod tests {
                 "contactRequest",
                 Some(&random_owner_id),
                 false,
-                0f64,
+                BlockInfo::default(),
                 true,
                 StorageFlags::optional_default_as_ref(),
                 None,
@@ -1136,7 +1137,7 @@ mod tests {
                 "contactRequest",
                 Some(&random_owner_id),
                 false,
-                0f64,
+                BlockInfo::default(),
                 true,
                 StorageFlags::optional_default_as_ref(),
                 None,
@@ -1166,7 +1167,7 @@ mod tests {
                 "contactRequest",
                 Some(&random_owner_id),
                 false,
-                0f64,
+                BlockInfo::default(),
                 true,
                 StorageFlags::optional_default_as_ref(),
                 None,
@@ -1179,7 +1180,7 @@ mod tests {
                 "contactRequest",
                 Some(&random_owner_id),
                 false,
-                0f64,
+                BlockInfo::default(),
                 true,
                 StorageFlags::optional_default_as_ref(),
                 None,
@@ -1206,7 +1207,7 @@ mod tests {
             .apply_contract_cbor(
                 contract_cbor.clone(),
                 None,
-                0f64,
+                BlockInfo::default(),
                 true,
                 StorageFlags::optional_default_as_ref(),
                 Some(&db_transaction),
@@ -1224,7 +1225,7 @@ mod tests {
                 "domain",
                 None,
                 true,
-                0f64,
+                BlockInfo::default(),
                 true,
                 StorageFlags::optional_default_as_ref(),
                 Some(&db_transaction),
@@ -1250,7 +1251,7 @@ mod tests {
                 "domain",
                 None,
                 true,
-                0f64,
+                BlockInfo::default(),
                 true,
                 StorageFlags::optional_default_as_ref(),
                 Some(&db_transaction),

@@ -23,6 +23,7 @@ pub use ordering::OrderClause;
 
 use crate::common::bytes_for_system_value;
 use crate::contract::{document::Document, Contract};
+use crate::drive::block_info::BlockInfo;
 use crate::drive::object_size_info::KeyValueInfo;
 use crate::drive::Drive;
 use crate::error::drive::DriveError;
@@ -1124,11 +1125,17 @@ impl<'a> DriveQuery<'a> {
     pub fn execute_with_proof(
         self,
         drive: &Drive,
+        block_info: Option<BlockInfo>,
         transaction: TransactionArg,
     ) -> Result<(Vec<u8>, u64), Error> {
         let mut drive_operations = vec![];
         let items = self.execute_with_proof_internal(drive, transaction, &mut drive_operations)?;
-        let (_, cost) = calculate_fee(None, Some(drive_operations))?;
+        let cost = if let Some(block_info) = block_info {
+            let (_, cost) = calculate_fee(None, Some(drive_operations), &block_info.epoch)?;
+            cost
+        } else {
+            0
+        };
         Ok((items, cost))
     }
 
@@ -1146,6 +1153,7 @@ impl<'a> DriveQuery<'a> {
     pub fn execute_with_proof_only_get_elements(
         self,
         drive: &Drive,
+        block_info: Option<BlockInfo>,
         transaction: TransactionArg,
     ) -> Result<([u8; 32], Vec<Vec<u8>>, u64), Error> {
         let mut drive_operations = vec![];
@@ -1154,7 +1162,12 @@ impl<'a> DriveQuery<'a> {
             transaction,
             &mut drive_operations,
         )?;
-        let (_, cost) = calculate_fee(None, Some(drive_operations))?;
+        let cost = if let Some(block_info) = block_info {
+            let (_, cost) = calculate_fee(None, Some(drive_operations), &block_info.epoch)?;
+            cost
+        } else {
+            0
+        };
         Ok((root_hash, items, cost))
     }
 
@@ -1191,12 +1204,18 @@ impl<'a> DriveQuery<'a> {
     pub fn execute_no_proof(
         &self,
         drive: &Drive,
+        block_info: Option<BlockInfo>,
         transaction: TransactionArg,
     ) -> Result<(Vec<Vec<u8>>, u16, u64), Error> {
         let mut drive_operations = vec![];
         let (items, skipped) =
             self.execute_no_proof_internal(drive, transaction, &mut drive_operations)?;
-        let (_, cost) = calculate_fee(None, Some(drive_operations))?;
+        let cost = if let Some(block_info) = block_info {
+            let (_, cost) = calculate_fee(None, Some(drive_operations), &block_info.epoch)?;
+            cost
+        } else {
+            0
+        };
         Ok((items, skipped, cost))
     }
 
@@ -1237,6 +1256,7 @@ mod tests {
     use dpp::data_contract::extra::DocumentType;
     use serde_json::Value::Null;
 
+    use crate::drive::block_info::BlockInfo;
     use dpp::data_contract::extra::DriveContractExt;
 
     fn setup_family_contract() -> (Drive, Contract) {
@@ -1259,7 +1279,7 @@ mod tests {
             .apply_contract(
                 &contract,
                 contract_cbor.clone(),
-                0f64,
+                BlockInfo::default(),
                 true,
                 storage_flags.as_ref(),
                 None,
@@ -1289,7 +1309,7 @@ mod tests {
             .apply_contract(
                 &contract,
                 contract_cbor.clone(),
-                0f64,
+                BlockInfo::default(),
                 true,
                 storage_flags.as_ref(),
                 None,
@@ -1431,7 +1451,7 @@ mod tests {
         let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &document_type)
             .expect("fields of queries length must be under 256 bytes long");
         query
-            .execute_no_proof(&drive, None)
+            .execute_no_proof(&drive, None, None)
             .expect_err("fields of queries length must be under 256 bytes long");
     }
 
@@ -1512,7 +1532,7 @@ mod tests {
         let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &document_type)
             .expect("The query itself should be valid for a null type");
         query
-            .execute_no_proof(&drive, None)
+            .execute_no_proof(&drive, None, None)
             .expect("a Null value doesn't make sense for a float");
     }
 
@@ -1539,7 +1559,7 @@ mod tests {
             .expect("query should be valid for empty array");
 
         query
-            .execute_no_proof(&drive, None)
+            .execute_no_proof(&drive, None, None)
             .expect_err("query should not be able to execute for empty array");
     }
 
@@ -1570,7 +1590,7 @@ mod tests {
             .expect("query is valid for too many elements");
 
         query
-            .execute_no_proof(&drive, None)
+            .execute_no_proof(&drive, None, None)
             .expect_err("query should not be able to execute with too many elements");
     }
 
@@ -1601,7 +1621,7 @@ mod tests {
             .expect("the query should be created");
 
         query
-            .execute_no_proof(&drive, None)
+            .execute_no_proof(&drive, None, None)
             .expect_err("there should be no duplicates values for In query");
     }
 

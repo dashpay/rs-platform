@@ -16,6 +16,7 @@ use crate::fee::op::DriveOperation;
 use crate::fee::op::DriveOperation::GroveOperation;
 
 pub mod batch;
+pub mod block_info;
 pub mod config;
 pub mod contract;
 pub mod defaults;
@@ -29,6 +30,8 @@ pub mod initialization;
 pub mod object_size_info;
 pub mod query;
 
+use crate::drive::block_info::BlockInfo;
+use crate::fee_pools::epochs::Epoch;
 use dpp::data_contract::extra::DriveContractExt;
 
 pub struct DriveCache {
@@ -181,6 +184,7 @@ impl Drive {
         &self,
         contract: &Contract,
         document_type_name: &str,
+        epoch_index: u16,
     ) -> Result<(i64, u64), Error> {
         let document_type = contract.document_type_for_name(document_type_name)?;
         self.add_document_for_contract(
@@ -191,7 +195,7 @@ impl Drive {
                 owner_id: None,
             },
             false,
-            0.0,
+            BlockInfo::default_with_epoch(Epoch::new(epoch_index)),
             false,
             None,
         )

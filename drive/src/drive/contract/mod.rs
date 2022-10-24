@@ -11,6 +11,7 @@ use grovedb::{Element, TransactionArg};
 
 use crate::contract::Contract;
 use crate::drive::batch::GroveDbOpBatch;
+use crate::drive::block_info::BlockInfo;
 use crate::drive::defaults::CONTRACT_MAX_SERIALIZED_SIZE;
 use crate::drive::flags::StorageFlags;
 use crate::drive::object_size_info::DriveKeyInfo::{KeyRef, KeySize};
@@ -62,7 +63,7 @@ impl Drive {
         &self,
         contract_element: Element,
         contract: &Contract,
-        block_time: f64,
+        block_info: &BlockInfo,
         apply: bool,
         insert_operations: &mut Vec<DriveOperation>,
     ) -> Result<(), Error> {
@@ -78,7 +79,7 @@ impl Drive {
                 storage_flags.as_ref(),
                 insert_operations,
             )?;
-            let encoded_time = encode_float(block_time)?;
+            let encoded_time = encode_float(block_info.time)?;
             let contract_keeping_history_storage_path =
                 contract_keeping_history_storage_path(contract.id.as_bytes());
             self.batch_insert(
@@ -125,7 +126,7 @@ impl Drive {
         &self,
         contract_element: Element,
         contract: &Contract,
-        block_time: f64,
+        block_info: &BlockInfo,
         apply: bool,
         transaction: TransactionArg,
         drive_operations: &mut Vec<DriveOperation>,
@@ -144,7 +145,7 @@ impl Drive {
         self.add_contract_to_storage(
             contract_element,
             contract,
-            block_time,
+            &block_info,
             apply,
             &mut batch_operations,
         )?;
@@ -212,7 +213,7 @@ impl Drive {
         contract_element: Element,
         contract: &Contract,
         original_contract: &Contract,
-        block_time: f64,
+        block_info: &BlockInfo,
         apply: bool,
         transaction: TransactionArg,
         drive_operations: &mut Vec<DriveOperation>,
@@ -262,7 +263,7 @@ impl Drive {
         self.add_contract_to_storage(
             contract_element,
             contract,
-            block_time,
+            &block_info,
             apply,
             &mut batch_operations,
         )?;
@@ -358,7 +359,7 @@ impl Drive {
         &self,
         contract_cbor: Vec<u8>,
         contract_id: Option<[u8; 32]>,
-        block_time: f64,
+        block_info: BlockInfo,
         apply: bool,
         storage_flags: Option<&StorageFlags>,
         transaction: TransactionArg,
@@ -369,7 +370,7 @@ impl Drive {
         self.apply_contract(
             &contract,
             contract_cbor,
-            block_time,
+            block_info,
             apply,
             storage_flags,
             transaction,
@@ -441,7 +442,7 @@ impl Drive {
         &self,
         contract: &Contract,
         contract_serialization: Vec<u8>,
-        block_time: f64,
+        block_info: BlockInfo,
         apply: bool,
         storage_flags: Option<&StorageFlags>,
         transaction: TransactionArg,
@@ -495,7 +496,7 @@ impl Drive {
                     contract_element,
                     contract,
                     &original_contract,
-                    block_time,
+                    &block_info,
                     apply,
                     transaction,
                     &mut drive_operations,
@@ -505,13 +506,13 @@ impl Drive {
             self.insert_contract(
                 contract_element,
                 contract,
-                block_time,
+                &block_info,
                 apply,
                 transaction,
                 &mut drive_operations,
             )?;
         }
-        let fees = calculate_fee(None, Some(drive_operations))?;
+        let fees = calculate_fee(None, Some(drive_operations), &block_info.epoch)?;
         Ok(fees)
     }
 }
@@ -548,7 +549,7 @@ mod tests {
             .apply_contract(
                 &contract,
                 contract_cbor.clone(),
-                0f64,
+                BlockInfo::default(),
                 true,
                 StorageFlags::optional_default_as_ref(),
                 None,
@@ -576,7 +577,7 @@ mod tests {
             .apply_contract(
                 &contract,
                 contract_cbor.clone(),
-                0f64,
+                BlockInfo::default(),
                 true,
                 StorageFlags::optional_default_as_ref(),
                 None,
@@ -601,7 +602,7 @@ mod tests {
             .apply_contract_cbor(
                 initial_contract_cbor,
                 None,
-                0f64,
+                BlockInfo::default(),
                 true,
                 StorageFlags::optional_default_as_ref(),
                 None,
@@ -614,7 +615,7 @@ mod tests {
             .apply_contract_cbor(
                 updated_contract_cbor,
                 None,
-                0f64,
+                BlockInfo::default(),
                 true,
                 StorageFlags::optional_default_as_ref(),
                 None,
@@ -652,7 +653,7 @@ mod tests {
                     owner_id: Some(&random_owner_id),
                 },
                 false,
-                0f64,
+                BlockInfo::default(),
                 false,
                 None,
             )
@@ -689,7 +690,7 @@ mod tests {
                     owner_id: Some(&random_owner_id),
                 },
                 false,
-                0f64,
+                BlockInfo::default(),
                 false,
                 None,
             )

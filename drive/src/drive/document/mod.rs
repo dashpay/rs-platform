@@ -103,6 +103,7 @@ pub(crate) mod tests {
     use tempfile::TempDir;
 
     use crate::common::json_document_to_cbor;
+    use crate::drive::block_info::BlockInfo;
     use crate::drive::flags::StorageFlags;
     use crate::drive::Drive;
 
@@ -127,7 +128,7 @@ pub(crate) mod tests {
             .apply_contract_cbor(
                 dashpay_cbor.clone(),
                 None,
-                0f64,
+                BlockInfo::default(),
                 true,
                 StorageFlags::optional_default_as_ref(),
                 None,

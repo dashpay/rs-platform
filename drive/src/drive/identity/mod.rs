@@ -3,6 +3,7 @@ use grovedb::query_result_type::QueryResultType::QueryElementResultType;
 use grovedb::{Element, PathQuery, Query, QueryItem, SizedQuery, TransactionArg};
 
 use crate::drive::batch::GroveDbOpBatch;
+use crate::drive::block_info::BlockInfo;
 use crate::drive::flags::StorageFlags;
 use crate::drive::{Drive, RootTree};
 use crate::error::drive::DriveError;
@@ -50,6 +51,7 @@ impl Drive {
     pub fn insert_identity(
         &self,
         identity: Identity,
+        block_info: BlockInfo,
         apply: bool,
         storage_flags: Option<&StorageFlags>,
         transaction: TransactionArg,
@@ -62,7 +64,7 @@ impl Drive {
 
         self.apply_batch_grovedb_operations(apply, transaction, batch, &mut drive_operations)?;
 
-        calculate_fee(None, Some(drive_operations))
+        calculate_fee(None, Some(drive_operations), &block_info.epoch)
     }
 
     pub fn fetch_identity(
@@ -163,6 +165,7 @@ impl Drive {
 #[cfg(test)]
 mod tests {
     use crate::common::helpers::setup::setup_drive;
+    use crate::drive::block_info::BlockInfo;
     use crate::drive::flags::StorageFlags;
     use dpp::identity::Identity;
 
@@ -184,6 +187,7 @@ mod tests {
         drive
             .insert_identity(
                 identity.clone(),
+                BlockInfo::default(),
                 true,
                 StorageFlags::optional_default_as_ref(),
                 Some(&transaction),

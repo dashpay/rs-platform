@@ -17,6 +17,7 @@ use crate::drive::Drive;
 use crate::error::structure::StructureError;
 use crate::error::Error;
 
+use crate::drive::block_info::BlockInfo;
 use dpp::data_contract::extra::DriveContractExt;
 
 pub fn setup_contract(
@@ -32,7 +33,14 @@ pub fn setup_contract(
         DriveContractExt::to_cbor(&contract).expect("contract should be serialized");
 
     drive
-        .apply_contract_cbor(contract_cbor, contract_id, 0f64, true, None, transaction)
+        .apply_contract_cbor(
+            contract_cbor,
+            contract_id,
+            BlockInfo::default(),
+            true,
+            None,
+            transaction,
+        )
         .expect("contract should be applied");
     contract
 }
@@ -46,7 +54,14 @@ pub fn setup_contract_from_hex(
     let contract = <Contract as DriveContractExt>::from_cbor(&contract_cbor, None)
         .expect("contract should be deserialized");
     drive
-        .apply_contract_cbor(contract_cbor, None, 0f64, true, None, transaction)
+        .apply_contract_cbor(
+            contract_cbor,
+            None,
+            BlockInfo::default(),
+            true,
+            None,
+            transaction,
+        )
         .expect("contract should be applied");
     contract
 }

@@ -24,6 +24,7 @@ use crate::error::Error;
 use crate::fee::calculate_fee;
 use crate::fee::op::DriveOperation;
 
+use crate::drive::block_info::BlockInfo;
 use dpp::data_contract::extra::DriveContractExt;
 
 impl Drive {
@@ -33,7 +34,7 @@ impl Drive {
         contract_cbor: &[u8],
         document_type: &str,
         owner_id: Option<&[u8]>,
-        block_time: f64,
+        block_info: BlockInfo,
         apply: bool,
         storage_flags: Option<&StorageFlags>,
         transaction: TransactionArg,
@@ -48,7 +49,7 @@ impl Drive {
             &contract,
             document_type,
             owner_id,
-            block_time,
+            block_info,
             apply,
             storage_flags,
             transaction,
@@ -61,7 +62,7 @@ impl Drive {
         contract: &Contract,
         document_type: &str,
         owner_id: Option<&[u8]>,
-        block_time: f64,
+        block_info: BlockInfo,
         apply: bool,
         storage_flags: Option<&StorageFlags>,
         transaction: TransactionArg,
@@ -74,7 +75,7 @@ impl Drive {
             contract,
             document_type,
             owner_id,
-            block_time,
+            block_info,
             apply,
             storage_flags,
             transaction,
@@ -88,7 +89,7 @@ impl Drive {
         contract: &Contract,
         document_type_name: &str,
         owner_id: Option<&[u8]>,
-        block_time: f64,
+        block_info: BlockInfo,
         apply: bool,
         storage_flags: Option<&StorageFlags>,
         transaction: TransactionArg,
@@ -116,19 +117,19 @@ impl Drive {
                 document_type,
                 owner_id,
             },
-            block_time,
+            &block_info,
             apply,
             transaction,
             &mut drive_operations,
         )?;
-        let fees = calculate_fee(None, Some(drive_operations))?;
+        let fees = calculate_fee(None, Some(drive_operations), &block_info.epoch)?;
         Ok(fees)
     }
 
     pub(crate) fn update_document_for_contract_operations(
         &self,
         document_and_contract_info: DocumentAndContractInfo,
-        block_time: f64,
+        block_info: &BlockInfo,
         apply: bool,
         transaction: TransactionArg,
         drive_operations: &mut Vec<DriveOperation>,
@@ -149,7 +150,7 @@ impl Drive {
             self.add_document_for_contract_operations(
                 document_and_contract_info,
                 false,
-                block_time,
+                block_info,
                 apply,
                 transaction,
                 &mut batch_operations,
@@ -221,7 +222,7 @@ impl Drive {
             // we should be overriding if the document_type does not have history enabled
             self.add_document_to_primary_storage(
                 &document_and_contract_info,
-                block_time,
+                block_info,
                 true,
                 apply,
                 transaction,
@@ -519,7 +520,7 @@ mod tests {
             .apply_contract_cbor(
                 contract_cbor.clone(),
                 None,
-                0f64,
+                BlockInfo::default(),
                 true,
                 StorageFlags::optional_default_as_ref(),
                 Some(&db_transaction),
@@ -537,7 +538,7 @@ mod tests {
                 "profile",
                 None,
                 true,
-                0f64,
+                BlockInfo::default(),
                 true,
                 StorageFlags::optional_default_as_ref(),
                 Some(&db_transaction),
@@ -554,7 +555,7 @@ mod tests {
                 contract_cbor.as_slice(),
                 "profile",
                 None,
-                0f64,
+                BlockInfo::default(),
                 true,
                 StorageFlags::optional_default_as_ref(),
                 Some(&db_transaction),
@@ -579,7 +580,7 @@ mod tests {
             .apply_contract_cbor(
                 contract_cbor.clone(),
                 None,
-                0f64,
+                BlockInfo::default(),
                 true,
                 StorageFlags::optional_default_as_ref(),
                 None,
@@ -612,7 +613,7 @@ mod tests {
                     owner_id: None,
                 },
                 true,
-                0f64,
+                BlockInfo::default(),
                 true,
                 None,
             )
@@ -622,7 +623,7 @@ mod tests {
         let query = DriveQuery::from_sql_expr(sql_string, &contract).expect("should build query");
 
         let (results_no_transaction, _, _) = query
-            .execute_no_proof(&drive, None)
+            .execute_no_proof(&drive, None, None)
             .expect("expected to execute query");
 
         assert_eq!(results_no_transaction.len(), 1);
@@ -637,7 +638,7 @@ mod tests {
                 contract_cbor.as_slice(),
                 "profile",
                 None,
-                0f64,
+                BlockInfo::default(),
                 true,
                 StorageFlags::optional_default_as_ref(),
                 None,
@@ -645,7 +646,7 @@ mod tests {
             .expect("should update alice profile");
 
         let (results_no_transaction, _, _) = query
-            .execute_no_proof(&drive, None)
+            .execute_no_proof(&drive, None, None)
             .expect("expected to execute query");
 
         assert_eq!(results_no_transaction.len(), 1);
@@ -670,7 +671,7 @@ mod tests {
             .apply_contract_cbor(
                 contract_cbor.clone(),
                 None,
-                0f64,
+                BlockInfo::default(),
                 true,
                 StorageFlags::optional_default_as_ref(),
                 Some(&db_transaction),
@@ -703,7 +704,7 @@ mod tests {
                     owner_id: None,
                 },
                 true,
-                0f64,
+                BlockInfo::default(),
                 true,
                 Some(&db_transaction),
             )
@@ -719,7 +720,7 @@ mod tests {
         let query = DriveQuery::from_sql_expr(sql_string, &contract).expect("should build query");
 
         let (results_no_transaction, _, _) = query
-            .execute_no_proof(&drive, None)
+            .execute_no_proof(&drive, None, None)
             .expect("expected to execute query");
 
         assert_eq!(results_no_transaction.len(), 1);
@@ -727,7 +728,7 @@ mod tests {
         let db_transaction = drive.grove.start_transaction();
 
         let (results_on_transaction, _, _) = query
-            .execute_no_proof(&drive, Some(&db_transaction))
+            .execute_no_proof(&drive, None, Some(&db_transaction))
             .expect("expected to execute query");
 
         assert_eq!(results_on_transaction.len(), 1);
@@ -742,7 +743,7 @@ mod tests {
                 contract_cbor.as_slice(),
                 "profile",
                 None,
-                0f64,
+                BlockInfo::default(),
                 true,
                 StorageFlags::optional_default_as_ref(),
                 Some(&db_transaction),
@@ -750,7 +751,7 @@ mod tests {
             .expect("should update alice profile");
 
         let (results_on_transaction, _, _) = query
-            .execute_no_proof(&drive, Some(&db_transaction))
+            .execute_no_proof(&drive, None, Some(&db_transaction))
             .expect("expected to execute query");
 
         assert_eq!(results_on_transaction.len(), 1);
@@ -781,7 +782,7 @@ mod tests {
             .apply_contract_cbor(
                 contract_cbor.clone(),
                 None,
-                0f64,
+                BlockInfo::default(),
                 true,
                 StorageFlags::optional_default_as_ref(),
                 Some(&db_transaction),
@@ -814,7 +815,7 @@ mod tests {
                     owner_id: None,
                 },
                 true,
-                0f64,
+                BlockInfo::default(),
                 true,
                 Some(&db_transaction),
             )
@@ -830,7 +831,7 @@ mod tests {
         let query = DriveQuery::from_sql_expr(sql_string, &contract).expect("should build query");
 
         let (results_no_transaction, _, _) = query
-            .execute_no_proof(&drive, None)
+            .execute_no_proof(&drive, None, None)
             .expect("expected to execute query");
 
         assert_eq!(results_no_transaction.len(), 1);
@@ -838,7 +839,7 @@ mod tests {
         let db_transaction = drive.grove.start_transaction();
 
         let (results_on_transaction, _, _) = query
-            .execute_no_proof(&drive, Some(&db_transaction))
+            .execute_no_proof(&drive, None, Some(&db_transaction))
             .expect("expected to execute query");
 
         assert_eq!(results_on_transaction.len(), 1);
@@ -849,13 +850,14 @@ mod tests {
                 &contract,
                 "profile",
                 None,
+                BlockInfo::default(),
                 true,
                 Some(&db_transaction),
             )
             .expect("expected to delete document");
 
         let (results_on_transaction, _, _) = query
-            .execute_no_proof(&drive, Some(&db_transaction))
+            .execute_no_proof(&drive, None, Some(&db_transaction))
             .expect("expected to execute query");
 
         assert_eq!(results_on_transaction.len(), 0);
@@ -866,7 +868,7 @@ mod tests {
             .expect("expected to rollback transaction");
 
         let (results_on_transaction, _, _) = query
-            .execute_no_proof(&drive, Some(&db_transaction))
+            .execute_no_proof(&drive, None, Some(&db_transaction))
             .expect("expected to execute query");
 
         assert_eq!(results_on_transaction.len(), 1);
@@ -881,7 +883,7 @@ mod tests {
                 contract_cbor.as_slice(),
                 "profile",
                 None,
-                0f64,
+                BlockInfo::default(),
                 true,
                 StorageFlags::optional_default_as_ref(),
                 Some(&db_transaction),
@@ -937,7 +939,7 @@ mod tests {
             .apply_contract_cbor(
                 contract.clone(),
                 None,
-                0f64,
+                BlockInfo::default(),
                 true,
                 StorageFlags::optional_default_as_ref(),
                 None,
@@ -968,7 +970,7 @@ mod tests {
                 "indexedDocument",
                 None,
                 true,
-                0f64,
+                BlockInfo::default(),
                 true,
                 StorageFlags::optional_default_as_ref(),
                 None,
@@ -998,7 +1000,7 @@ mod tests {
                 &contract.as_slice(),
                 "indexedDocument",
                 None,
-                0f64,
+                BlockInfo::default(),
                 true,
                 StorageFlags::optional_default_as_ref(),
                 None,
@@ -1017,6 +1019,7 @@ mod tests {
                 &contract,
                 "indexedDocument",
                 None,
+                BlockInfo::default(),
                 true,
                 None,
             )
@@ -1054,7 +1057,7 @@ mod tests {
                 "contactRequest",
                 Some(&random_owner_id),
                 false,
-                0f64,
+                BlockInfo::default(),
                 true,
                 StorageFlags::optional_default_as_ref(),
                 Some(&db_transaction),
@@ -1067,7 +1070,7 @@ mod tests {
                 &contract,
                 "contactRequest",
                 Some(&random_owner_id),
-                0f64,
+                BlockInfo::default(),
                 true,
                 StorageFlags::optional_default_as_ref(),
                 Some(&db_transaction),
@@ -1081,7 +1084,7 @@ mod tests {
                 "contactRequest",
                 Some(&random_owner_id),
                 true,
-                0f64,
+                BlockInfo::default(),
                 true,
                 StorageFlags::optional_default_as_ref(),
                 Some(&db_transaction),
@@ -1125,7 +1128,7 @@ mod tests {
                 "profile",
                 Some(&random_owner_id),
                 false,
-                0f64,
+                BlockInfo::default(),
                 true,
                 StorageFlags::optional_default_as_ref(),
                 Some(&db_transaction),
@@ -1138,7 +1141,7 @@ mod tests {
                 &contract,
                 "profile",
                 Some(&random_owner_id),
-                0f64,
+                BlockInfo::default(),
                 true,
                 StorageFlags::optional_default_as_ref(),
                 Some(&db_transaction),
@@ -1163,7 +1166,7 @@ mod tests {
     fn apply_person(
         drive: &Drive,
         contract: &Contract,
-        block_time: u64,
+        block_info: BlockInfo,
         person: &Person,
         transaction: TransactionArg,
     ) {
@@ -1190,7 +1193,7 @@ mod tests {
                     owner_id: None,
                 },
                 true,
-                block_time as f64,
+                block_info,
                 true,
                 transaction,
             )
@@ -1277,28 +1280,28 @@ mod tests {
         apply_person(
             &drive,
             &contract,
-            0,
+            BlockInfo::default(),
             &person_0_original,
             transaction.as_ref(),
         );
         apply_person(
             &drive,
             &contract,
-            0,
+            BlockInfo::default(),
             &person_1_original,
             transaction.as_ref(),
         );
         apply_person(
             &drive,
             &contract,
-            100,
+            BlockInfo::default_with_time(100.0),
             &person_0_updated,
             transaction.as_ref(),
         );
         apply_person(
             &drive,
             &contract,
-            100,
+            BlockInfo::default_with_time(100.0),
             &person_1_updated,
             transaction.as_ref(),
         );

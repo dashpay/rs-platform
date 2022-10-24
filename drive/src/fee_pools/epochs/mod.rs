@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 // TODO: I would call it EpochTree because it represent pool,
 //  not just Epoch which is more abstract thing that we will probably need in future too
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Default, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Epoch {
     pub index: u16,

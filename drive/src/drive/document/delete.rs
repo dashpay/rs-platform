@@ -2,6 +2,7 @@ use grovedb::{Element, TransactionArg};
 
 use crate::contract::document::Document;
 use crate::contract::Contract;
+use crate::drive::block_info::BlockInfo;
 use crate::drive::defaults::CONTRACT_DOCUMENTS_PATH_HEIGHT;
 use crate::drive::document::{contract_document_type_path, contract_documents_primary_key_path};
 use crate::drive::flags::StorageFlags;
@@ -23,6 +24,7 @@ impl Drive {
         contract: &Contract,
         document_type_name: &str,
         owner_id: Option<&[u8]>,
+        block_info: BlockInfo,
         apply: bool,
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
@@ -36,7 +38,7 @@ impl Drive {
             transaction,
             &mut drive_operations,
         )?;
-        let fees = calculate_fee(None, Some(drive_operations))?;
+        let fees = calculate_fee(None, Some(drive_operations), &block_info.epoch)?;
         Ok(fees)
     }
 
@@ -46,6 +48,7 @@ impl Drive {
         contract_cbor: &[u8],
         document_type_name: &str,
         owner_id: Option<&[u8]>,
+        block_info: BlockInfo,
         apply: bool,
         transaction: TransactionArg,
     ) -> Result<(i64, u64), Error> {
@@ -55,6 +58,7 @@ impl Drive {
             &contract,
             document_type_name,
             owner_id,
+            block_info,
             apply,
             transaction,
         )
@@ -274,7 +278,7 @@ mod tests {
                     owner_id: None,
                 },
                 false,
-                0f64,
+                BlockInfo::default(),
                 true,
                 None,
             )
@@ -285,13 +289,13 @@ mod tests {
         let query = DriveQuery::from_sql_expr(sql_string, &contract).expect("should build query");
 
         let (results_no_transaction, _, _) = query
-            .execute_no_proof(&drive, None)
+            .execute_no_proof(&drive, None, None)
             .expect("expected to execute query");
 
         assert_eq!(results_no_transaction.len(), 1);
 
         let (results_on_transaction, _, _) = query
-            .execute_no_proof(&drive, None)
+            .execute_no_proof(&drive, None, None)
             .expect("expected to execute query");
 
         assert_eq!(results_on_transaction.len(), 1);
@@ -305,13 +309,14 @@ mod tests {
                 &contract,
                 "person",
                 Some(&random_owner_id),
+                BlockInfo::default(),
                 true,
                 None,
             )
             .expect("expected to be able to delete the document");
 
         let (results_on_transaction, _, _) = query
-            .execute_no_proof(&drive, None)
+            .execute_no_proof(&drive, None, None)
             .expect("expected to execute query");
 
         assert_eq!(results_on_transaction.len(), 0);
@@ -365,7 +370,7 @@ mod tests {
                     owner_id: None,
                 },
                 false,
-                0f64,
+                BlockInfo::default(),
                 true,
                 Some(&db_transaction),
             )
@@ -382,7 +387,7 @@ mod tests {
         let query = DriveQuery::from_sql_expr(sql_string, &contract).expect("should build query");
 
         let (results_no_transaction, _, _) = query
-            .execute_no_proof(&drive, None)
+            .execute_no_proof(&drive, None, None)
             .expect("expected to execute query");
 
         assert_eq!(results_no_transaction.len(), 1);
@@ -390,7 +395,7 @@ mod tests {
         let db_transaction = drive.grove.start_transaction();
 
         let (results_on_transaction, _, _) = query
-            .execute_no_proof(&drive, Some(&db_transaction))
+            .execute_no_proof(&drive, None, Some(&db_transaction))
             .expect("expected to execute query");
 
         assert_eq!(results_on_transaction.len(), 1);
@@ -404,6 +409,7 @@ mod tests {
                 &contract,
                 "person",
                 Some(&random_owner_id),
+                BlockInfo::default(),
                 true,
                 Some(&db_transaction),
             )
@@ -418,7 +424,7 @@ mod tests {
         let db_transaction = drive.grove.start_transaction();
 
         let (results_on_transaction, _, _) = query
-            .execute_no_proof(&drive, Some(&db_transaction))
+            .execute_no_proof(&drive, None, Some(&db_transaction))
             .expect("expected to execute query");
 
         assert_eq!(results_on_transaction.len(), 0);
@@ -472,7 +478,7 @@ mod tests {
                     owner_id: None,
                 },
                 false,
-                0f64,
+                BlockInfo::default(),
                 true,
                 Some(&db_transaction),
             )
@@ -508,7 +514,7 @@ mod tests {
                     owner_id: None,
                 },
                 false,
-                0f64,
+                BlockInfo::default(),
                 true,
                 Some(&db_transaction),
             )
@@ -525,7 +531,7 @@ mod tests {
         let query = DriveQuery::from_sql_expr(sql_string, &contract).expect("should build query");
 
         let (results_no_transaction, _, _) = query
-            .execute_no_proof(&drive, None)
+            .execute_no_proof(&drive, None, None)
             .expect("expected to execute query");
 
         assert_eq!(results_no_transaction.len(), 2);
@@ -542,6 +548,7 @@ mod tests {
                 &contract,
                 "person",
                 Some(&random_owner_id),
+                BlockInfo::default(),
                 true,
                 Some(&db_transaction),
             )
@@ -558,7 +565,7 @@ mod tests {
         let query = DriveQuery::from_sql_expr(sql_string, &contract).expect("should build query");
 
         let (results_no_transaction, _, _) = query
-            .execute_no_proof(&drive, None)
+            .execute_no_proof(&drive, None, None)
             .expect("expected to execute query");
 
         assert_eq!(results_no_transaction.len(), 1);
@@ -575,6 +582,7 @@ mod tests {
                 &contract,
                 "person",
                 Some(&random_owner_id),
+                BlockInfo::default(),
                 true,
                 Some(&db_transaction),
             )
@@ -591,7 +599,7 @@ mod tests {
         let query = DriveQuery::from_sql_expr(sql_string, &contract).expect("should build query");
 
         let (results_no_transaction, _, _) = query
-            .execute_no_proof(&drive, None)
+            .execute_no_proof(&drive, None, None)
             .expect("expected to execute query");
 
         assert_eq!(results_no_transaction.len(), 0);
@@ -645,7 +653,7 @@ mod tests {
                     owner_id: None,
                 },
                 false,
-                0f64,
+                BlockInfo::default(),
                 true,
                 Some(&db_transaction),
             )
@@ -681,7 +689,7 @@ mod tests {
                     owner_id: None,
                 },
                 false,
-                0f64,
+                BlockInfo::default(),
                 true,
                 Some(&db_transaction),
             )
@@ -698,7 +706,7 @@ mod tests {
         let query = DriveQuery::from_sql_expr(sql_string, &contract).expect("should build query");
 
         let (results_no_transaction, _, _) = query
-            .execute_no_proof(&drive, None)
+            .execute_no_proof(&drive, None, None)
             .expect("expected to execute query");
 
         assert_eq!(results_no_transaction.len(), 2);
@@ -715,6 +723,7 @@ mod tests {
                 &contract,
                 "person",
                 Some(&random_owner_id),
+                BlockInfo::default(),
                 true,
                 Some(&db_transaction),
             )
@@ -749,7 +758,7 @@ mod tests {
                     owner_id: None,
                 },
                 false,
-                0f64,
+                BlockInfo::default(),
                 true,
                 Some(&db_transaction),
             )
@@ -771,6 +780,7 @@ mod tests {
                 &contract,
                 "person",
                 Some(&random_owner_id),
+                BlockInfo::default(),
                 true,
                 Some(&db_transaction),
             )
@@ -786,6 +796,7 @@ mod tests {
                 &contract,
                 "person",
                 Some(&random_owner_id),
+                BlockInfo::default(),
                 true,
                 Some(&db_transaction),
             )
@@ -802,7 +813,7 @@ mod tests {
         let query = DriveQuery::from_sql_expr(sql_string, &contract).expect("should build query");
 
         let (results_no_transaction, _, _) = query
-            .execute_no_proof(&drive, None)
+            .execute_no_proof(&drive, None, None)
             .expect("expected to execute query");
 
         assert_eq!(results_no_transaction.len(), 0);
@@ -825,7 +836,7 @@ mod tests {
                 "profile",
                 Some(&random_owner_id),
                 false,
-                0f64,
+                BlockInfo::default(),
                 true,
                 StorageFlags::optional_default_as_ref(),
                 None,
@@ -842,6 +853,7 @@ mod tests {
                 &dashpay_cbor,
                 "profile",
                 Some(&random_owner_id),
+                BlockInfo::default(),
                 true,
                 None,
             )
@@ -879,7 +891,7 @@ mod tests {
                 "profile",
                 Some(&random_owner_id),
                 false,
-                0f64,
+                BlockInfo::default(),
                 true,
                 StorageFlags::optional_default_as_ref(),
                 Some(&db_transaction),
@@ -896,6 +908,7 @@ mod tests {
                 &contract,
                 "profile",
                 Some(&random_owner_id),
+                BlockInfo::default(),
                 true,
                 Some(&db_transaction),
             )
@@ -954,7 +967,7 @@ mod tests {
                             owner_id: None,
                         },
                         false,
-                        0f64,
+                        BlockInfo::default(),
                         true,
                         Some(&db_transaction),
                     )
@@ -986,6 +999,7 @@ mod tests {
                 contract.document_types().get("niceDocument").unwrap(),
                 query_cbor.as_slice(),
                 None,
+                None,
             )
             .expect("expected to execute query");
 
@@ -999,6 +1013,7 @@ mod tests {
                 &contract,
                 "niceDocument",
                 Some(&documents.get(0).unwrap().owner_id),
+                BlockInfo::default(),
                 true,
                 Some(&db_transaction),
             )
@@ -1017,6 +1032,7 @@ mod tests {
                 &contract,
                 contract.document_types().get("niceDocument").unwrap(),
                 query_cbor.as_slice(),
+                None,
                 Some(&db_transaction),
             )
             .expect("expected to execute query");

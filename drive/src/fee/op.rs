@@ -10,13 +10,14 @@ use crate::error::drive::DriveError;
 use crate::error::fee::FeeError;
 use crate::error::Error;
 use crate::fee::default_costs::{
-    HASH_NODE_COST, NON_STORAGE_LOAD_CREDIT_PER_BYTE, STORAGE_DISK_USAGE_CREDIT_PER_BYTE,
+    NON_STORAGE_LOAD_CREDIT_PER_BYTE, STORAGE_DISK_USAGE_CREDIT_PER_BYTE,
     STORAGE_LOAD_CREDIT_PER_BYTE, STORAGE_PROCESSING_CREDIT_PER_BYTE, STORAGE_SEEK_COST,
 };
 use crate::fee::op::DriveOperation::{
     CalculatedCostOperation, ContractFetch, CostCalculationDeleteOperation,
     CostCalculationInsertOperation, CostCalculationQueryOperation, GroveOperation,
 };
+use crate::fee_pools::epochs::Epoch;
 
 #[derive(Debug, Enum)]
 pub enum BaseOp {
@@ -75,14 +76,19 @@ impl BaseOp {
 
 #[derive(Debug, Enum)]
 pub enum FunctionOp {
-    Exp,
     Sha256,
     Sha256_2,
     Blake3,
 }
 
 impl FunctionOp {
-    pub fn cost(&self, _word_count: u32) {}
+    pub fn cost(&self, _epoch: &Epoch) -> u64 {
+        match self {
+            FunctionOp::Sha256 => 4000,
+            FunctionOp::Sha256_2 => 8000,
+            FunctionOp::Blake3 => 1000,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -394,8 +400,8 @@ impl DriveOperation {
 }
 
 pub trait DriveCost {
-    fn ephemeral_cost(&self) -> Result<u64, Error>;
-    fn storage_cost(&self) -> Result<i64, Error>;
+    fn ephemeral_cost(&self, epoch: &Epoch) -> Result<u64, Error>;
+    fn storage_cost(&self, epoch: &Epoch) -> Result<i64, Error>;
 }
 
 fn get_overflow_error(str: &'static str) -> Error {
@@ -403,7 +409,8 @@ fn get_overflow_error(str: &'static str) -> Error {
 }
 
 impl DriveCost for OperationCost {
-    fn ephemeral_cost(&self) -> Result<u64, Error> {
+    fn ephemeral_cost(&self, epoch: &Epoch) -> Result<u64, Error> {
+        //todo: deal with epochs
         let OperationCost {
             seek_count,
             storage_cost,
@@ -426,7 +433,7 @@ impl DriveCost for OperationCost {
             .checked_mul(NON_STORAGE_LOAD_CREDIT_PER_BYTE)
             .ok_or_else(|| get_overflow_error("loaded bytes cost overflow"))?;
         let hash_node_cost = (*hash_node_calls as u64)
-            .checked_mul(HASH_NODE_COST)
+            .checked_mul(FunctionOp::Blake3.cost(epoch))
             .ok_or_else(|| get_overflow_error("hash node cost overflow"))?;
         let cost = seek_cost
             .checked_add(storage_added_bytes_ephemeral_cost)
@@ -442,7 +449,8 @@ impl DriveCost for OperationCost {
         cost
     }
 
-    fn storage_cost(&self) -> Result<i64, Error> {
+    fn storage_cost(&self, _epoch: &Epoch) -> Result<i64, Error> {
+        //todo: deal with epochs
         let OperationCost { storage_cost, .. } = self;
         let storage_written_bytes_disk_cost = (storage_cost.added_bytes as i64)
             .checked_mul(STORAGE_DISK_USAGE_CREDIT_PER_BYTE)

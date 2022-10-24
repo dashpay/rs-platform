@@ -1,4 +1,5 @@
 use crate::drive::batch::GroveDbOpBatch;
+use crate::drive::block_info::BlockInfo;
 use crate::drive::Drive;
 use crate::fee_pools::epochs::Epoch;
 use dpp::identifier::Identifier;
@@ -27,7 +28,13 @@ pub fn create_test_identity(drive: &Drive, id: [u8; 32], transaction: Transactio
     };
 
     drive
-        .insert_identity(identity.clone(), true, None, transaction)
+        .insert_identity(
+            identity.clone(),
+            BlockInfo::default(),
+            true,
+            None,
+            transaction,
+        )
         .expect("should insert identity");
 
     identity
