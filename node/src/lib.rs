@@ -12,6 +12,7 @@ use dash_abci::platform::Platform;
 use neon::prelude::*;
 use neon::types::JsDate;
 use rs_drive::dpp::identity::Identity;
+use rs_drive::drive::batch::GroveDbOpBatch;
 use rs_drive::drive::flags::StorageFlags;
 use rs_drive::error::drive::DriveError;
 use rs_drive::error::Error;
@@ -2076,6 +2077,115 @@ impl PlatformWrapper {
         // The result is returned through the callback, not through direct return
         Ok(cx.undefined())
     }
+
+    fn js_fetch_latest_withdrawal_transaction_index(
+        mut cx: FunctionContext,
+    ) -> JsResult<JsUndefined> {
+        let js_using_transaction = cx.argument::<JsBoolean>(0)?;
+        let js_callback = cx.argument::<JsFunction>(1)?.root(&mut cx);
+
+        let db = cx
+            .this()
+            .downcast_or_throw::<JsBox<DriveWrapper>, _>(&mut cx)?;
+
+        let using_transaction = js_using_transaction.value(&mut cx);
+
+        db.send_to_drive_thread(move |platform: &Platform, transaction, channel| {
+            let result = platform.drive.fetch_latest_withdrawal_transaction_index(
+                using_transaction.then_some(transaction).flatten(),
+            );
+
+            channel.send(move |mut task_context| {
+                let callback = js_callback.into_inner(&mut task_context);
+                let this = task_context.undefined();
+
+                let callback_arguments: Vec<Handle<JsValue>> = match result {
+                    Ok(index) => {
+                        let index_f64 = index as f64;
+                        if index_f64 as u64 != index {
+                            vec![task_context
+                                .error("could not convert withdrawal transaction index to f64")?
+                                .upcast()]
+                        } else {
+                            let value = JsNumber::new(&mut task_context, index_f64);
+
+                            vec![task_context.null().upcast(), value.upcast()]
+                        }
+                    }
+
+                    // Convert the error to a JavaScript exception on failure
+                    Err(err) => vec![task_context.error(err.to_string())?.upcast()],
+                };
+
+                callback.call(&mut task_context, this, callback_arguments)?;
+
+                Ok(())
+            });
+        })
+        .or_else(|err| cx.throw_error(err.to_string()))?;
+
+        // The result is returned through the callback, not through direct return
+        Ok(cx.undefined())
+    }
+
+    fn js_enqueue_withdrawal_transaction(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+        let js_index = cx.argument::<JsNumber>(0)?;
+        let js_transaction = cx.argument::<JsBuffer>(1)?;
+        let js_using_transaction = cx.argument::<JsBoolean>(2)?;
+        let js_callback = cx.argument::<JsFunction>(3)?.root(&mut cx);
+
+        let db = cx
+            .this()
+            .downcast_or_throw::<JsBox<DriveWrapper>, _>(&mut cx)?;
+
+        let index = js_index.value(&mut cx);
+        let transaction_bytes = converter::js_buffer_to_vec_u8(js_transaction, &mut cx);
+        let using_transaction = js_using_transaction.value(&mut cx);
+
+        db.send_to_drive_thread(move |platform: &Platform, transaction, channel| {
+            let mut batch = GroveDbOpBatch::new();
+
+            let index_bytes = (index as u64).to_be_bytes().to_vec();
+
+            let withdrawals = vec![(index_bytes.clone(), transaction_bytes)];
+
+            platform
+                .drive
+                .add_enqueue_withdrawal_transaction_operations(&mut batch, withdrawals);
+
+            platform
+                .drive
+                .add_update_withdrawal_index_counter_operation(&mut batch, index_bytes);
+
+            let result = platform.drive.grove_apply_batch(
+                batch,
+                false,
+                using_transaction.then_some(transaction).flatten(),
+            );
+
+            channel.send(move |mut task_context| {
+                let callback = js_callback.into_inner(&mut task_context);
+                let this = task_context.undefined();
+
+                let callback_arguments: Vec<Handle<JsValue>> = match result {
+                    Ok(_) => {
+                        vec![task_context.null().upcast(), task_context.null().upcast()]
+                    }
+
+                    // Convert the error to a JavaScript exception on failure
+                    Err(err) => vec![task_context.error(err.to_string())?.upcast()],
+                };
+
+                callback.call(&mut task_context, this, callback_arguments)?;
+
+                Ok(())
+            });
+        })
+        .or_else(|err| cx.throw_error(err.to_string()))?;
+
+        // The result is returned through the callback, not through direct return
+        Ok(cx.undefined())
+    }
 }
 
 #[neon::main]
@@ -2108,6 +2218,15 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function(
         "driveProveDocumentsQuery",
         PlatformWrapper::js_prove_documents_query,
+    )?;
+
+    cx.export_function(
+        "driveFetchLatestWithdrawalTransactionIndex",
+        DriveWrapper::js_fetch_latest_withdrawal_transaction_index,
+    )?;
+    cx.export_function(
+        "driveEnqueueWithdrawalTransaction",
+        DriveWrapper::js_enqueue_withdrawal_transaction,
     )?;
 
     cx.export_function("groveDbInsert", PlatformWrapper::js_grove_db_insert)?;

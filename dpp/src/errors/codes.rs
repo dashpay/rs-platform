@@ -41,7 +41,9 @@ impl ErrorWithCode for ConsensusError {
             Self::InvalidInstantAssetLockProofSignatureError(_) => 1042,
             Self::MissingMasterPublicKeyError(_) => 1046,
             Self::InvalidIdentityPublicKeySecurityLevelError(_) => 1047,
-            Self::IdentityInsufficientBalanceError(_) => 4023,
+            Self::IdentityInsufficientBalanceError(_) => 4024,
+            Self::InvalidIdentityCreditWithdrawalTransitionCoreFeeError(_) => 4025,
+            Self::InvalidIdentityCreditWithdrawalTransitionOutputScriptError(_) => 4026,
 
             Self::StateError(e) => e.get_code(),
             Self::BasicError(e) => e.get_code(),
@@ -115,6 +117,8 @@ impl ErrorWithCode for BasicError {
             Self::DuplicateIndexNameError { .. } => 1048,
             Self::InvalidJsonSchemaRefError { .. } => 1014,
             Self::InconsistentCompoundIndexDataError { .. } => 1021,
+            Self::DataContractImmutablePropertiesUpdateError { .. } => 1052,
+            Self::IncompatibleDataContractSchemaError { .. } => 1051,
 
             Self::DataContractUniqueIndicesChangedError { .. } => 4016,
             // TODO  -  they don't have error codes in  https://github.com/dashevo/platform/blob/25ab6d8a38880eaff6ac119126b2ee5991b2a5aa/packages/js-dpp/lib/errors/consensus/codes.js
@@ -127,6 +131,9 @@ impl ErrorWithCode for BasicError {
             Self::InvalidStateTransitionTypeError { .. } => 1043,
             Self::MissingStateTransitionTypeError => 1044,
             Self::StateTransitionMaxSizeExceededError { .. } => 1045,
+
+            // Identity
+            Self::InvalidIdentityPublicKeySignatureError { .. } => 1056,
         }
     }
 }
@@ -152,6 +159,10 @@ impl ErrorWithCode for SignatureError {
             Self::InvalidIdentityPublicKeyTypeError { .. } => 2001,
             Self::InvalidStateTransitionSignatureError => 2002,
             Self::MissingPublicKeyError { .. } => 2003,
+            Self::InvalidSignaturePublicKeySecurityLevelError { .. } => 2004,
+            Self::WrongPublicKeyPurposeError { .. } => 2005,
+            Self::PublicKeyIsDisabledError { .. } => 2006,
+            Self::PublicKeySecurityLevelNotMetError { .. } => 2007,
         }
     }
 }
