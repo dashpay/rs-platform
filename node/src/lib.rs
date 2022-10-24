@@ -2081,7 +2081,7 @@ impl PlatformWrapper {
     fn js_fetch_latest_withdrawal_transaction_index(
         mut cx: FunctionContext,
     ) -> JsResult<JsUndefined> {
-        let js_transaction = cx.argument::<JsBoolean>(0)?;
+        let js_transaction = cx.argument::<JsValue>(0)?;
         let js_callback = cx.argument::<JsFunction>(1)?.root(&mut cx);
 
         let maybe_boxed_transaction_address = if !js_transaction.is_a::<JsUndefined, _>(&mut cx) {
@@ -2150,26 +2150,26 @@ impl PlatformWrapper {
 
     fn js_enqueue_withdrawal_transaction(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         let js_index = cx.argument::<JsNumber>(0)?;
-        let js_transaction = cx.argument::<JsBuffer>(1)?;
-        let js_using_transaction = cx.argument::<JsBoolean>(2)?;
+        let js_core_transaction = cx.argument::<JsBuffer>(1)?;
+        let js_db_transaction = cx.argument::<JsValue>(2)?;
         let js_callback = cx.argument::<JsFunction>(3)?.root(&mut cx);
 
-        let maybe_boxed_transaction_address =
-            if !js_using_transaction.is_a::<JsUndefined, _>(&mut cx) {
-                let handle = js_using_transaction
-                    .downcast_or_throw::<JsBox<PlatformWrapperTransactionAddress>, _>(&mut cx)?;
+        let maybe_boxed_transaction_address = if !js_db_transaction.is_a::<JsUndefined, _>(&mut cx)
+        {
+            let handle = js_db_transaction
+                .downcast_or_throw::<JsBox<PlatformWrapperTransactionAddress>, _>(&mut cx)?;
 
-                Some(***handle)
-            } else {
-                None
-            };
+            Some(***handle)
+        } else {
+            None
+        };
 
         let db = cx
             .this()
             .downcast_or_throw::<JsBox<PlatformWrapper>, _>(&mut cx)?;
 
         let index = js_index.value(&mut cx);
-        let transaction_bytes = converter::js_buffer_to_vec_u8(js_transaction, &mut cx);
+        let transaction_bytes = converter::js_buffer_to_vec_u8(js_core_transaction, &mut cx);
 
         db.send_to_drive_thread(move |platform: &Platform, transactions, channel| {
             let transaction_result: Result<Option<&Transaction>, Error> =

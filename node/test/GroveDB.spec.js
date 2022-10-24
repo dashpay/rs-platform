@@ -1259,7 +1259,7 @@ describe('GroveDB', () => {
         itemTreePath,
         Buffer.from('transactional_test_key'),
         { type: 'item', epoch: 0, value: itemValue },
-        true,
+        transaction,
       );
 
       const result = await groveDb.getRootHash();
