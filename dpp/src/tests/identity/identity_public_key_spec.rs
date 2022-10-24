@@ -15,7 +15,7 @@ mod from_raw_object {
             "readOnly": false
         });
 
-        let public_key = IdentityPublicKey::from_raw_object(public_key_json).unwrap();
+        let public_key = IdentityPublicKey::from_json_object(public_key_json).unwrap();
 
         assert_eq!(public_key.id, 0);
         assert_eq!(public_key.key_type, KeyType::ECDSA_SECP256K1);
@@ -42,7 +42,7 @@ mod from_raw_object {
             "readOnly": false
         });
 
-        let public_key = IdentityPublicKey::from_raw_object(public_key_json).unwrap();
+        let public_key = IdentityPublicKey::from_json_object(public_key_json).unwrap();
 
         assert_eq!(public_key.id, 0);
         assert_eq!(public_key.key_type, KeyType::ECDSA_SECP256K1);
@@ -69,7 +69,7 @@ mod from_raw_object {
             "readOnly": false
         });
 
-        let public_key = IdentityPublicKey::from_raw_object(public_key_json)
+        let public_key = IdentityPublicKey::from_json_object(public_key_json)
             .expect("the public key should be created");
         assert_eq!(public_key.get_type(), KeyType::BIP13_SCRIPT_HASH);
         assert_eq!(
@@ -103,4 +103,38 @@ mod from_raw_object {
     }
 
     //"{\"id\":0,\"type\":0,\"data\":\"YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFh\",\"purpose\":0,\"securityLevel\":0,\"readOnly\":false}"
+
+    #[test]
+    pub fn should_return_true_if_public_key_is_master() {
+        let public_key_json = json!({
+            "id": 0,
+            "type": KeyType::BIP13_SCRIPT_HASH,
+            "purpose": Purpose::AUTHENTICATION,
+            "securityLevel": SecurityLevel::MASTER,
+            "data": "AuryIuMtRrl/VviQuyLD1l4nmxi9ogPzC9LT7tdpo0di",
+            "readOnly": false
+        });
+
+        let public_key = IdentityPublicKey::from_json_object(public_key_json)
+            .expect("the public key should be created");
+        assert!(public_key.is_master());
+    }
+
+    #[test]
+    pub fn should_return_false_if_public_key_is_not_master() {
+        let public_key_json = json!({
+            "id": 0,
+            "type": KeyType::BIP13_SCRIPT_HASH,
+            "purpose": Purpose::AUTHENTICATION,
+            "securityLevel": SecurityLevel::CRITICAL,
+
+            "data": "AuryIuMtRrl/VviQuyLD1l4nmxi9ogPzC9LT7tdpo0di",
+            "readOnly": false
+        });
+
+        let public_key = IdentityPublicKey::from_json_object(public_key_json)
+            .expect("the public key should be created");
+
+        assert!(!public_key.is_master());
+    }
 }

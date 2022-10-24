@@ -193,7 +193,7 @@ impl IdentityCreateTransition {
         let pk_values = self
             .public_keys
             .iter()
-            .map(|pk| pk.to_raw_json_object())
+            .map(|pk| pk.to_raw_json_object(options.skip_signature))
             .collect::<Result<Vec<JsonValue>, SerdeParsingError>>()?;
 
         json_map.insert(
