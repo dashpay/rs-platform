@@ -2081,19 +2081,39 @@ impl PlatformWrapper {
     fn js_fetch_latest_withdrawal_transaction_index(
         mut cx: FunctionContext,
     ) -> JsResult<JsUndefined> {
-        let js_using_transaction = cx.argument::<JsBoolean>(0)?;
+        let js_transaction = cx.argument::<JsBoolean>(0)?;
         let js_callback = cx.argument::<JsFunction>(1)?.root(&mut cx);
+
+        let maybe_boxed_transaction_address = if !js_transaction.is_a::<JsUndefined, _>(&mut cx) {
+            let handle = js_transaction
+                .downcast_or_throw::<JsBox<PlatformWrapperTransactionAddress>, _>(&mut cx)?;
+
+            Some(***handle)
+        } else {
+            None
+        };
 
         let db = cx
             .this()
-            .downcast_or_throw::<JsBox<DriveWrapper>, _>(&mut cx)?;
+            .downcast_or_throw::<JsBox<PlatformWrapper>, _>(&mut cx)?;
 
-        let using_transaction = js_using_transaction.value(&mut cx);
+        db.send_to_drive_thread(move |platform: &Platform, transactions, channel| {
+            let transaction_result: Result<Option<&Transaction>, Error> =
+                match maybe_boxed_transaction_address {
+                    Some(address) => transactions
+                        .get(&address)
+                        .ok_or(Error::Drive(DriveError::CorruptedCodeExecution(
+                            "invalid transaction pointer address",
+                        )))
+                        .and_then(|transaction| Ok(Some(transaction))),
+                    None => Ok(None),
+                };
 
-        db.send_to_drive_thread(move |platform: &Platform, transaction, channel| {
-            let result = platform.drive.fetch_latest_withdrawal_transaction_index(
-                using_transaction.then_some(transaction).flatten(),
-            );
+            let result = transaction_result.and_then(|transaction_arg| {
+                platform
+                    .drive
+                    .fetch_latest_withdrawal_transaction_index(transaction_arg)
+            });
 
             channel.send(move |mut task_context| {
                 let callback = js_callback.into_inner(&mut task_context);
@@ -2134,15 +2154,35 @@ impl PlatformWrapper {
         let js_using_transaction = cx.argument::<JsBoolean>(2)?;
         let js_callback = cx.argument::<JsFunction>(3)?.root(&mut cx);
 
+        let maybe_boxed_transaction_address =
+            if !js_using_transaction.is_a::<JsUndefined, _>(&mut cx) {
+                let handle = js_using_transaction
+                    .downcast_or_throw::<JsBox<PlatformWrapperTransactionAddress>, _>(&mut cx)?;
+
+                Some(***handle)
+            } else {
+                None
+            };
+
         let db = cx
             .this()
-            .downcast_or_throw::<JsBox<DriveWrapper>, _>(&mut cx)?;
+            .downcast_or_throw::<JsBox<PlatformWrapper>, _>(&mut cx)?;
 
         let index = js_index.value(&mut cx);
         let transaction_bytes = converter::js_buffer_to_vec_u8(js_transaction, &mut cx);
-        let using_transaction = js_using_transaction.value(&mut cx);
 
-        db.send_to_drive_thread(move |platform: &Platform, transaction, channel| {
+        db.send_to_drive_thread(move |platform: &Platform, transactions, channel| {
+            let transaction_result: Result<Option<&Transaction>, Error> =
+                match maybe_boxed_transaction_address {
+                    Some(address) => transactions
+                        .get(&address)
+                        .ok_or(Error::Drive(DriveError::CorruptedCodeExecution(
+                            "invalid transaction pointer address",
+                        )))
+                        .and_then(|transaction| Ok(Some(transaction))),
+                    None => Ok(None),
+                };
+
             let mut batch = GroveDbOpBatch::new();
 
             let index_bytes = (index as u64).to_be_bytes().to_vec();
@@ -2157,11 +2197,11 @@ impl PlatformWrapper {
                 .drive
                 .add_update_withdrawal_index_counter_operation(&mut batch, index_bytes);
 
-            let result = platform.drive.grove_apply_batch(
-                batch,
-                false,
-                using_transaction.then_some(transaction).flatten(),
-            );
+            let result = transaction_result.and_then(|transaction_arg| {
+                platform
+                    .drive
+                    .grove_apply_batch(batch, false, transaction_arg)
+            });
 
             channel.send(move |mut task_context| {
                 let callback = js_callback.into_inner(&mut task_context);
@@ -2222,11 +2262,11 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
 
     cx.export_function(
         "driveFetchLatestWithdrawalTransactionIndex",
-        DriveWrapper::js_fetch_latest_withdrawal_transaction_index,
+        PlatformWrapper::js_fetch_latest_withdrawal_transaction_index,
     )?;
     cx.export_function(
         "driveEnqueueWithdrawalTransaction",
-        DriveWrapper::js_enqueue_withdrawal_transaction,
+        PlatformWrapper::js_enqueue_withdrawal_transaction,
     )?;
 
     cx.export_function("groveDbInsert", PlatformWrapper::js_grove_db_insert)?;
