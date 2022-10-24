@@ -11,7 +11,6 @@ use intmap::IntMap;
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
 
-use crate::error::drive::DriveError;
 use crate::error::storage_flags::StorageFlagsError;
 use crate::error::Error;
 

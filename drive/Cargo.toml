@@ -30,15 +30,15 @@ dpp = { path = "../dpp" }
 
 [dependencies.grovedb]
 git = "https://github.com/dashevo/grovedb"
-branch = "feat/worst-case-costs-3"
+branch = "feat/change-to-better-roots-3"
 
 [dependencies.storage]
 git = "https://github.com/dashevo/grovedb"
-branch = "feat/worst-case-costs-3"
+branch = "feat/change-to-better-roots-3"
 
 [dependencies.costs]
 git = "https://github.com/dashevo/grovedb"
-branch = "feat/worst-case-costs-3"
+branch = "feat/change-to-better-roots-3"
 
 [dev-dependencies]
 criterion = "0.3.5"

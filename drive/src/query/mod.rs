@@ -1173,7 +1173,7 @@ impl<'a> DriveQuery<'a> {
             GroveDb::verify_query(proof.as_slice(), &path_query).map_err(Error::GroveDB)?;
 
         let mut values = vec![];
-        for (_, value) in key_value_elements.iter_mut() {
+        for (_, value, _) in key_value_elements.iter_mut() {
             let element = Element::deserialize(&value).unwrap();
             match element {
                 Element::Item(val, _) => values.push(val),

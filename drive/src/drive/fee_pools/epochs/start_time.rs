@@ -35,8 +35,6 @@ impl Drive {
 #[cfg(test)]
 mod tests {
     use crate::common::helpers::setup::setup_drive_with_initial_state_structure;
-    use crate::drive::batch::GroveDbOpBatch;
-    use chrono::Utc;
     use grovedb::Element;
 
     use crate::error;
@@ -95,6 +93,7 @@ mod tests {
                     epoch.get_path(),
                     KEY_START_TIME.as_slice(),
                     super::Element::empty_tree(),
+                    None,
                     Some(&transaction),
                 )
                 .unwrap()
@@ -124,6 +123,7 @@ mod tests {
                     epoch_tree.get_path(),
                     KEY_START_TIME.as_slice(),
                     super::Element::Item(u128::MAX.to_be_bytes().to_vec(), None),
+                    None,
                     Some(&transaction),
                 )
                 .unwrap()

@@ -162,6 +162,7 @@ mod tests {
                     epoch.get_path(),
                     KEY_STORAGE_FEE_POOL.as_slice(),
                     super::Element::Item(u128::MAX.to_be_bytes().to_vec(), None),
+                    None,
                     Some(&transaction),
                 )
                 .unwrap()
@@ -195,6 +196,7 @@ mod tests {
                     epoch.get_path(),
                     super::epoch_key_constants::KEY_POOL_PROCESSING_FEES.as_slice(),
                     super::Element::Item(u128::MAX.to_be_bytes().to_vec(), None),
+                    None,
                     Some(&transaction),
                 )
                 .unwrap()
@@ -274,6 +276,7 @@ mod tests {
                     epoch.get_path(),
                     super::epoch_key_constants::KEY_FEE_MULTIPLIER.as_slice(),
                     super::Element::Item(u128::MAX.to_be_bytes().to_vec(), None),
+                    None,
                     Some(&transaction),
                 )
                 .unwrap()

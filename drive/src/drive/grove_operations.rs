@@ -21,6 +21,7 @@ use crate::error::drive::DriveError;
 use crate::error::Error;
 use crate::fee::op::DriveOperation::{CalculatedCostOperation, CostCalculationQueryOperation};
 use crate::fee::op::{DriveOperation, SizesOfQueryOperation};
+use grovedb::operations::insert::InsertOptions;
 use grovedb::query_result_type::{QueryResultElements, QueryResultType};
 use grovedb::Error as GroveError;
 
@@ -72,6 +73,7 @@ impl Drive {
                             path,
                             key,
                             Element::empty_tree_with_flags(storage_flags.to_some_element_flags()),
+                            None,
                             transaction,
                         )
                         .map_err(Error::GroveDB);
@@ -248,6 +250,7 @@ impl Drive {
         path_key_element_info: PathKeyElementInfo<'c, N>,
         transaction: TransactionArg,
         apply: bool,
+        options: Option<InsertOptions>,
         drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<(), Error> {
         match path_key_element_info {
@@ -255,7 +258,9 @@ impl Drive {
                 if apply {
                     // println!("element {:#?}", element);
                     let path_iter: Vec<&[u8]> = path.iter().map(|x| x.as_slice()).collect();
-                    let cost_context = self.grove.insert(path_iter, key, element, transaction);
+                    let cost_context =
+                        self.grove
+                            .insert(path_iter, key, element, options, transaction);
                     push_drive_operation_result(cost_context, drive_operations)
                 } else {
                     let path_size = path.iter().map(|x| x.len() as u32).sum();
@@ -278,7 +283,7 @@ impl Drive {
             }
             PathFixedSizeKeyElement((path, key, element)) => {
                 if apply {
-                    let cost_context = self.grove.insert(path, key, element, transaction);
+                    let cost_context = self.grove.insert(path, key, element, options, transaction);
                     push_drive_operation_result(cost_context, drive_operations)
                 } else {
                     let path_size = path.into_iter().map(|a| a.len() as u32).sum();
@@ -926,6 +931,7 @@ impl Drive {
                 ops.operations,
                 Some(BatchApplyOptions {
                     validate_insertion_does_not_override: validate,
+                    validate_insertion_does_not_override_tree: validate,
                     disable_operation_consistency_check: false,
                 }),
                 |cost, old_flags, mut new_flags| {
@@ -979,6 +985,14 @@ impl Drive {
             );
             push_drive_operation_result(cost_context, drive_operations)
         } else {
+            let options = if validate {
+                Some(InsertOptions {
+                    validate_insertion_does_not_override: false,
+                    validate_insertion_does_not_override_tree: true,
+                })
+            } else {
+                None
+            };
             //println!("changes {} {:#?}", ops.len(), ops);
             for op in ops.operations.into_iter() {
                 //println!("on {:#?}", op);
@@ -998,6 +1012,7 @@ impl Drive {
                                 )),
                                 transaction,
                                 true,
+                                options.clone(),
                                 drive_operations,
                             )?,
                             Op::Delete => self.grove_delete(
@@ -1022,6 +1037,7 @@ impl Drive {
                                 )),
                                 transaction,
                                 false,
+                                options.clone(),
                                 drive_operations,
                             )?,
                             Op::Delete => self.grove_delete(
@@ -1109,6 +1125,7 @@ impl Drive {
             ops.operations,
             Some(BatchApplyOptions {
                 validate_insertion_does_not_override: validate,
+                validate_insertion_does_not_override_tree: validate,
                 disable_operation_consistency_check: false,
             }),
             |_, _, _| Ok(false),

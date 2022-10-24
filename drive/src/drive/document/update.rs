@@ -104,7 +104,7 @@ impl Drive {
                 serialized_document.to_vec(),
                 StorageFlags::map_to_some_element_flags(storage_flags),
             )
-            .serialized_byte_size();
+            .serialized_size();
 
             DocumentSize(element_size as u32)
         };
@@ -1232,12 +1232,7 @@ mod tests {
         };
 
         // setup code
-        let contract = setup_contract(
-            &drive,
-            path,
-            None,
-            transaction.as_ref()
-        );
+        let contract = setup_contract(&drive, path, None, transaction.as_ref());
 
         let person_0_original = Person {
             id: [0u8; 32].to_vec(),
@@ -1311,81 +1306,81 @@ mod tests {
 
     #[test]
     fn test_update_complex_person_with_history_no_transaction_using_batches_and_has_raw() {
-        test_update_complex_person(true,false, true, true)
+        test_update_complex_person(true, false, true, true)
     }
 
     #[test]
     fn test_update_complex_person_with_history_no_transaction_using_batches_and_get_raw() {
-        test_update_complex_person(true,false, true, false)
+        test_update_complex_person(true, false, true, false)
     }
 
     #[test]
     fn test_update_complex_person_with_history_with_transaction_using_batches_and_has_raw() {
-        test_update_complex_person(true,true, true, true)
+        test_update_complex_person(true, true, true, true)
     }
 
     #[test]
     fn test_update_complex_person_with_history_with_transaction_using_batches_and_get_raw() {
-        test_update_complex_person(true,true, true, false)
+        test_update_complex_person(true, true, true, false)
     }
 
     #[test]
     fn test_update_complex_person_with_history_no_transaction_no_batches_and_has_raw() {
-        test_update_complex_person(true,false, false, true)
+        test_update_complex_person(true, false, false, true)
     }
 
     #[test]
     fn test_update_complex_person_with_history_no_transaction_no_batches_and_get_raw() {
-        test_update_complex_person(true,false, false, false)
+        test_update_complex_person(true, false, false, false)
     }
 
     #[test]
     fn test_update_complex_person_with_history_with_transaction_no_batches_and_has_raw() {
-        test_update_complex_person(true,true, false, true)
+        test_update_complex_person(true, true, false, true)
     }
 
     #[test]
     fn test_update_complex_person_with_history_with_transaction_no_batches_and_get_raw() {
-        test_update_complex_person(true,true, false, false)
+        test_update_complex_person(true, true, false, false)
     }
 
     #[test]
     fn test_update_complex_person_no_history_no_transaction_using_batches_and_has_raw() {
-        test_update_complex_person(false,false, true, true)
+        test_update_complex_person(false, false, true, true)
     }
 
     #[test]
     fn test_update_complex_person_no_history_no_transaction_using_batches_and_get_raw() {
-        test_update_complex_person(false,false, true, false)
+        test_update_complex_person(false, false, true, false)
     }
 
     #[test]
     fn test_update_complex_person_no_history_with_transaction_using_batches_and_has_raw() {
-        test_update_complex_person(false,true, true, true)
+        test_update_complex_person(false, true, true, true)
     }
 
     #[test]
     fn test_update_complex_person_no_history_with_transaction_using_batches_and_get_raw() {
-        test_update_complex_person(false,true, true, false)
+        test_update_complex_person(false, true, true, false)
     }
 
     #[test]
     fn test_update_complex_person_no_history_no_transaction_no_batches_and_has_raw() {
-        test_update_complex_person(false,false, false, true)
+        test_update_complex_person(false, false, false, true)
     }
 
     #[test]
     fn test_update_complex_person_no_history_no_transaction_no_batches_and_get_raw() {
-        test_update_complex_person(false,false, false, false)
+        test_update_complex_person(false, false, false, false)
     }
 
     #[test]
     fn test_update_complex_person_no_history_with_transaction_no_batches_and_has_raw() {
-        test_update_complex_person(false,true, false, true)
+        test_update_complex_person(false, true, false, true)
     }
 
     #[test]
     fn test_update_complex_person_no_history_with_transaction_no_batches_and_get_raw() {
-        test_update_complex_person(false,true, false, false)
+        test_update_complex_person(false, true, false, false)
     }
 }

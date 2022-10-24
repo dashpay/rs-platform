@@ -32,7 +32,6 @@ use crate::fee::calculate_fee;
 use crate::fee::op::DriveOperation;
 use dpp::data_contract::extra::DocumentType;
 
-use crate::error::Error::GroveDB;
 use dpp::data_contract::extra::encode_float;
 use dpp::data_contract::extra::DriveContractExt;
 

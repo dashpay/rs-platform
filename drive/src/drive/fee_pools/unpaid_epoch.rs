@@ -69,6 +69,7 @@ mod tests {
                     pools_path(),
                     KEY_UNPAID_EPOCH_INDEX.as_slice(),
                     Element::empty_tree(),
+                    None,
                     Some(&transaction),
                 )
                 .unwrap()
@@ -96,6 +97,7 @@ mod tests {
                     pools_path(),
                     KEY_UNPAID_EPOCH_INDEX.as_slice(),
                     Element::Item(u128::MAX.to_be_bytes().to_vec(), None),
+                    None,
                     Some(&transaction),
                 )
                 .unwrap()
