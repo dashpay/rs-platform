@@ -25,14 +25,17 @@ struct PlatformWrapperTransactionAddress {
 }
 
 impl Finalize for PlatformWrapperTransactionAddress {
-    fn finalize<'a, C: Context<'a>>(self, cx: &mut C) {
+    fn finalize<'a, C: Context<'a>>(self, _: &mut C) {
+        // Ignoring the result of the `send` function as
+        // it only fails if other side closed a connection
+        // that would mean there is no reason using `cx.throw`
+        // as thread is probably closed already
         self.tx
             .send(PlatformWrapperMessage::AbortTransaction(
                 self.address,
                 Box::new(|_| {}),
             ))
-            .or_else(|err| cx.throw_error(err.to_string()))
-            .unwrap(); // Panic if channel with Platform thread is closed.
+            .ok();
     }
 }
 
