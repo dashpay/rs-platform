@@ -148,73 +148,8 @@ describe('GroveDB', () => {
         // appendStack wrapper should add call stack to neon binding errors
         expect(e.stack).to.not.equal('path not found: subtree doesn\'t exist');
         expect(e.stack).to.be.a('string').and.satisfy((msg) => (
-          msg.startsWith('Error: path not found: subtree doesn\'t exist')
+          msg.startsWith('Error: grovedb: path not found: subtree doesn\'t exist')
         ));
-      }
-    });
-  });
-
-  describe('#startTransaction', () => {
-    it('should not allow to insert data to main database after it called', async () => {
-      // Making a subtree to insert items into
-      await groveDb.insert(
-        rootTreePath,
-        treeKey,
-        { type: 'tree', epoch: 0, value: Buffer.alloc(32) },
-      );
-
-      await groveDb.startTransaction();
-
-      try {
-        // Inserting an item into the subtree without transaction
-        await groveDb.insert(
-          itemTreePath,
-          itemKey,
-          {
-            type: 'item',
-            epoch: 0,
-            value: itemValue,
-          },
-        );
-
-        expect.fail('should throw an error');
-      } catch (e) {
-        expect(e.message).to.equal('db is in readonly mode due to the active transaction. Please provide transaction or commit it');
-      }
-    });
-
-    it('should not allow to read transactional data from main database until it\'s committed', async () => {
-      // Making a subtree to insert items into
-      await groveDb.insert(
-        rootTreePath,
-        treeKey,
-        { type: 'tree', epoch: 0, value: Buffer.alloc(32) },
-      );
-
-      await groveDb.startTransaction();
-
-      // Inserting an item into the subtree
-      await groveDb.insert(
-        itemTreePath,
-        itemKey,
-        { type: 'item', epoch: 0, value: itemValue },
-        true,
-      );
-
-      // Inserted value is not yet commited, but can be retrieved by `get`
-      // with `useTransaction` flag.
-      const elementInTransaction = await groveDb.get(itemTreePath, itemKey, true);
-
-      expect(elementInTransaction.type).to.be.equal('item');
-      expect(elementInTransaction.value).to.deep.equal(itemValue);
-
-      // ... and using `get` without the flag should return no value
-      try {
-        await groveDb.get(itemTreePath, itemKey);
-
-        expect.fail('Expected to throw an error');
-      } catch (e) {
-        expect(e.message).to.be.equal('grovedb: path key not found: key not found in Merk: 746573745f6b6579');
       }
     });
   });
