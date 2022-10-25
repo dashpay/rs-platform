@@ -325,19 +325,22 @@ impl PlatformWrapper {
 
         drive
             .send_to_drive_thread(move |platform: &Platform, transactions, channel| {
-                let execution_result: Result<(), Error> = match maybe_transaction_address {
-                    Some(address) => transactions
-                        .get(&address)
-                        .ok_or(Error::Drive(DriveError::CorruptedCodeExecution(
-                            "invalid transaction pointer address",
-                        )))
-                        .and_then(|transaction| {
-                            platform
-                                .drive
-                                .create_initial_state_structure(Some(transaction))
-                        }),
-                    None => Ok(()),
-                };
+                let transaction_result: Result<Option<&Transaction>, Error> =
+                    match maybe_transaction_address {
+                        Some(address) => transactions
+                            .get(&address)
+                            .ok_or(Error::Drive(DriveError::CorruptedCodeExecution(
+                                "invalid transaction pointer address",
+                            )))
+                            .and_then(|transaction| Ok(Some(transaction))),
+                        None => Ok(None),
+                    };
+
+                let execution_result = transaction_result.and_then(|transaction_arg| {
+                    platform
+                        .drive
+                        .create_initial_state_structure(transaction_arg)
+                });
 
                 channel.send(move |mut task_context| {
                     let callback = js_callback.into_inner(&mut task_context);
@@ -635,7 +638,7 @@ impl PlatformWrapper {
         let js_contract_cbor = cx.argument::<JsBuffer>(1)?;
         let js_document_type_name = cx.argument::<JsString>(2)?;
         let js_apply = cx.argument::<JsBoolean>(3)?;
-        let js_transaction = cx.argument::<JsValue>(0)?;
+        let js_transaction = cx.argument::<JsValue>(4)?;
 
         let maybe_boxed_transaction_address = if !js_transaction.is_a::<JsUndefined, _>(&mut cx) {
             let handle = js_transaction
