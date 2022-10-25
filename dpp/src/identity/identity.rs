@@ -267,8 +267,9 @@ impl Identity {
         let pks = raw_object.get("publicKeys").unwrap().as_array().unwrap();
 
         for pk in pks {
-            let _pkd: IdentityPublicKey = serde_json::from_value(pk.clone())
-                .map_err(|_e| ProtocolError::Generic(format!("Can't parse publick key: {}", pk.to_string())))?;
+            let _pkd: IdentityPublicKey = serde_json::from_value(pk.clone()).map_err(|_e| {
+                ProtocolError::Generic(format!("Can't parse publick key: {}", pk.to_string()))
+            })?;
         }
 
         let identity: Identity = serde_json::from_value(raw_object)?;
