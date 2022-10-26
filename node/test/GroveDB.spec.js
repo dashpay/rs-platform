@@ -223,31 +223,6 @@ describe('GroveDB', () => {
     });
   });
 
-  describe('#isTransactionStarted', () => {
-    it('should return true if transaction is started', async () => {
-      // Making a subtree to insert items into
-      await groveDb.insert(
-        rootTreePath,
-        treeKey,
-        { type: 'tree', epoch: 0, value: Buffer.alloc(32) },
-      );
-
-      await groveDb.startTransaction();
-
-      const result = await groveDb.isTransactionStarted();
-
-      // eslint-disable-next-line no-unused-expressions
-      expect(result).to.be.true;
-    });
-
-    it('should return false if transaction is not started', async () => {
-      const result = await groveDb.isTransactionStarted();
-
-      // eslint-disable-next-line no-unused-expressions
-      expect(result).to.be.false;
-    });
-  });
-
   describe('#abortTransaction', () => {
     it('should abort transaction', async () => {
       // Making a subtree to insert items into
