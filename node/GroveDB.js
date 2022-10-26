@@ -55,7 +55,7 @@ class GroveDB {
   /**
    * @param {Buffer[]} path
    * @param {Buffer} key
-   * @param {External} [transaction=undefined]
+   * @param {GroveDBTransaction} [transaction=undefined]
    * @returns {Promise<Element>}
    */
   async get(path, key, transaction = undefined) {
@@ -66,7 +66,7 @@ class GroveDB {
    * @param {Buffer[]} path
    * @param {Buffer} key
    * @param {Element} value
-   * @param {External} [transaction=undefined]
+   * @param {GroveDBTransaction} [transaction=undefined]
    * @returns {Promise<*>}
    */
   async insert(path, key, value, transaction = undefined) {
@@ -77,7 +77,7 @@ class GroveDB {
    * @param {Buffer[]} path
    * @param {Buffer} key
    * @param {Element} value
-   * @param {External} [transaction=undefined]
+   * @param {GroveDBTransaction} [transaction=undefined]
    * @return {Promise<*>}
    */
   async insertIfNotExists(path, key, value, transaction = undefined) {
@@ -88,7 +88,7 @@ class GroveDB {
    *
    * @param {Buffer[]} path
    * @param {Buffer} key
-   * @param {External} [transaction=undefined]
+   * @param {GroveDBTransaction} [transaction=undefined]
    * @return {Promise<*>}
    */
   async delete(path, key, transaction = undefined) {
@@ -110,7 +110,7 @@ class GroveDB {
    * Write operations will be allowed only for the transaction
    * until it's committed
    *
-   * @return {Promise<External>}
+   * @return {Promise<GroveDBTransaction>}
    */
   async startTransaction() {
     return groveDbStartTransactionAsync.call(this.db);
@@ -121,7 +121,7 @@ class GroveDB {
    *
    * Transaction should be started before
    *
-   * @param {External} [transaction = undefined]
+   * @param {GroveDBTransaction} [transaction=undefined]
    *
    * @return {Promise<void>}
    */
@@ -132,7 +132,7 @@ class GroveDB {
   /**
    * Rollback transaction to this initial state when it was created
    *
-   * @param {External} [transaction = undefined]
+   * @param {GroveDBTransaction} [transaction=undefined]
    *
    * @returns {Promise<void>}
    */
@@ -143,7 +143,7 @@ class GroveDB {
   /**
    * Aborts transaction
    *
-   * @param {External} [transaction = undefined]
+   * @param {GroveDBTransaction} [transaction=undefined]
    *
    * @returns {Promise<void>}
    */
@@ -156,7 +156,7 @@ class GroveDB {
    *
    * @param {Buffer} key
    * @param {Buffer} value
-   * @param {External} [transaction=undefined]
+   * @param {GroveDBTransaction} [transaction=undefined]
    * @return {Promise<*>}
    */
   async putAux(key, value, transaction = undefined) {
@@ -167,7 +167,7 @@ class GroveDB {
    * Delete auxiliary data
    *
    * @param {Buffer} key
-   * @param {External} [transaction=undefined]
+   * @param {GroveDBTransaction} [transaction=undefined]
    * @return {Promise<*>}
    */
   async deleteAux(key, transaction = undefined) {
@@ -178,7 +178,7 @@ class GroveDB {
    * Get auxiliary data
    *
    * @param {Buffer} key
-   * @param {External} [transaction=undefined]
+   * @param {GroveDBTransaction} [transaction=undefined]
    * @return {Promise<Buffer>}
    */
   async getAux(key, transaction = undefined) {
@@ -189,7 +189,7 @@ class GroveDB {
    * Get data using query.
    *
    * @param {PathQuery} query
-   * @param {External} [transaction=undefined]
+   * @param {GroveDBTransaction} [transaction=undefined]
    * @return {Promise<*>}
    */
   async query(query, transaction = undefined) {
@@ -200,7 +200,7 @@ class GroveDB {
    * Get proof using query.
    *
    * @param {PathQuery} query
-   * @param {External} [transaction=undefined]
+   * @param {GroveDBTransaction} [transaction=undefined]
    * @return {Promise<*>}
    */
   async proveQuery(query, transaction = undefined) {
@@ -211,7 +211,7 @@ class GroveDB {
    * Get proof using query.
    *
    * @param {PathQuery[]} queries
-   * @param {External} [transaction=undefined]
+   * @param {GroveDBTransaction} [transaction=undefined]
    * @return {Promise<Buffer>}
    */
   async proveQueryMany(queries, transaction = undefined) {
@@ -221,13 +221,17 @@ class GroveDB {
   /**
    * Get root hash
    *
-   * @param {External} [transaction=undefined]
+   * @param {GroveDBTransaction} [transaction=undefined]
    * @returns {Promise<void>}
    */
   async getRootHash(transaction = undefined) {
     return groveDbRootHashAsync.call(this.db, transaction);
   }
 }
+
+/**
+ * @typedef GroveDBTransaction
+ */
 
 /**
  * @typedef Element

@@ -79,7 +79,7 @@ class Drive {
   }
 
   /**
-   * @param {External} [transaction=undefined]
+   * @param {GroveDBTransaction} [transaction=undefined]
    *
    * @returns {Promise<[number, number]>}
    */
@@ -90,7 +90,7 @@ class Drive {
   /**
    * @param {DataContract} dataContract
    * @param {Date} blockTime
-   * @param {External} [transaction=undefined]
+   * @param {GroveDBTransaction} [transaction=undefined]
    * @param {boolean} [dryRun=false]
    *
    * @returns {Promise<[number, number]>}
@@ -108,7 +108,7 @@ class Drive {
   /**
    * @param {Document} document
    * @param {Date} blockTime
-   * @param {External} [transaction=undefined]
+   * @param {GroveDBTransaction} [transaction=undefined]
    * @param {boolean} [dryRun=false]
    *
    * @returns {Promise<[number, number]>}
@@ -130,7 +130,7 @@ class Drive {
   /**
    * @param {Document} document
    * @param {Date} blockTime
-   * @param {External} [transaction=undefined]
+   * @param {GroveDBTransaction} [transaction=undefined]
    * @param {boolean} [dryRun=false]
    *
    * @returns {Promise<[number, number]>}
@@ -152,7 +152,7 @@ class Drive {
    * @param {DataContract} dataContract
    * @param {string} documentType
    * @param {Identifier} documentId
-   * @param {External} [transaction=undefined]
+   * @param {GroveDBTransaction} [transaction=undefined]
    * @param {boolean} [dryRun=false]
    *
    * @returns {Promise<[number, number]>}
@@ -184,7 +184,7 @@ class Drive {
    * @param [query.startAt]
    * @param [query.startAfter]
    * @param [query.orderBy]
-   * @param {External} [transaction=undefined]
+   * @param {GroveDBTransaction} [transaction=undefined]
    *
    * @returns {Promise<[Document[], number]>}
    */
@@ -223,7 +223,7 @@ class Drive {
    * @param [query.startAt]
    * @param [query.startAfter]
    * @param [query.orderBy]
-   * @param {External} [transaction=undefined]
+   * @param {GroveDBTransaction} [transaction=undefined]
    *
    * @returns {Promise<[Document[], number]>}
    */
@@ -242,7 +242,7 @@ class Drive {
 
   /**
    * @param {Identity} identity
-   * @param {External} [transaction=undefined]
+   * @param {GroveDBTransaction} [transaction=undefined]
    * @param {boolean} [dryRun=false]
    *
    * @returns {Promise<[number, number]>}
@@ -259,7 +259,7 @@ class Drive {
   /**
    * Fetch latest index of the withdrawal transaction in a queue
    *
-   * @param {External} [transaction=undefined]
+   * @param {GroveDBTransaction} [transaction=undefined]
    *
    * @returns {Promise<number>}
    */
@@ -275,7 +275,7 @@ class Drive {
    *
    * @param {number} index
    * @param {Buffer} transactionBytes
-   * @param {External} [transaction=undefined]
+   * @param {GroveDBTransaction} [transaction=undefined]
    *
    * @returns {Promise<void>}
    */
@@ -303,7 +303,7 @@ class Drive {
        * ABCI init chain
        *
        * @param {InitChainRequest} request
-       * @param {External} [transaction=undefined]
+       * @param {GroveDBTransaction} [transaction=undefined]
        *
        * @returns {Promise<InitChainResponse>}
        */
@@ -323,7 +323,7 @@ class Drive {
        * ABCI init chain
        *
        * @param {BlockBeginRequest} request
-       * @param {External} [transaction=undefined]
+       * @param {GroveDBTransaction} [transaction=undefined]
        *
        * @returns {Promise<BlockBeginResponse>}
        */
@@ -348,7 +348,7 @@ class Drive {
        * ABCI init chain
        *
        * @param {BlockEndRequest} request
-       * @param {External} [transaction=undefined]
+       * @param {GroveDBTransaction} [transaction=undefined]
        *
        * @returns {Promise<BlockEndResponse>}
        */
