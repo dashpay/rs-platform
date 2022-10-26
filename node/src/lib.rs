@@ -53,7 +53,7 @@ type PlatformCallback = Box<
         + Send,
 >;
 type UnitCallback = Box<dyn FnOnce(&Channel) + Send>;
-type ErrorCallback = Box<dyn FnOnce(&Channel, Option<String>) + Send>;
+type ErrorCallback = Box<dyn FnOnce(&Channel, Result<(), String>) + Send>;
 type TransactionCallback =
     Box<dyn FnOnce(mpsc::Sender<PlatformWrapperMessage>, usize, &Channel) + Send>;
 
@@ -155,9 +155,9 @@ impl PlatformWrapper {
                         {
                             platform.drive.commit_transaction(transaction).unwrap();
 
-                            None
+                            Ok(())
                         } else {
-                            Some("invalid transaction_raw_pointer_address, transaction was not found".to_string())
+                            Err("invalid transaction_raw_pointer_address, transaction was not found".to_string())
                         };
 
                         callback(&channel, error);
@@ -171,9 +171,9 @@ impl PlatformWrapper {
                         {
                             platform.drive.rollback_transaction(&transaction).unwrap();
 
-                            None
+                            Ok(())
                         } else {
-                            Some("invalid transaction_raw_pointer_address, transaction was not found".to_string())
+                            Err("invalid transaction_raw_pointer_address, transaction was not found".to_string())
                         };
 
                         callback(&channel, error);
@@ -187,9 +187,9 @@ impl PlatformWrapper {
                         {
                             drop(transaction);
 
-                            None
+                            Ok(())
                         } else {
-                            Some("invalid transaction_raw_pointer_address, transaction was not found".to_string())
+                            Err("invalid transaction_raw_pointer_address, transaction was not found".to_string())
                         };
 
                         callback(&channel, error);
@@ -233,7 +233,7 @@ impl PlatformWrapper {
     fn commit_transaction(
         &self,
         transaction_raw_pointer_address: TransactionPointerAddress,
-        callback: impl FnOnce(&Channel, Option<String>) + Send + 'static,
+        callback: impl FnOnce(&Channel, Result<(), String>) + Send + 'static,
     ) -> Result<(), mpsc::SendError<PlatformWrapperMessage>> {
         self.tx.send(PlatformWrapperMessage::CommitTransaction(
             transaction_raw_pointer_address,
@@ -244,7 +244,7 @@ impl PlatformWrapper {
     fn rollback_transaction(
         &self,
         transaction_raw_pointer_address: TransactionPointerAddress,
-        callback: impl FnOnce(&Channel, Option<String>) + Send + 'static,
+        callback: impl FnOnce(&Channel, Result<(), String>) + Send + 'static,
     ) -> Result<(), mpsc::SendError<PlatformWrapperMessage>> {
         self.tx.send(PlatformWrapperMessage::RollbackTransaction(
             transaction_raw_pointer_address,
@@ -255,7 +255,7 @@ impl PlatformWrapper {
     fn abort_transaction(
         &self,
         transaction_raw_pointer_address: TransactionPointerAddress,
-        callback: impl FnOnce(&Channel, Option<String>) + Send + 'static,
+        callback: impl FnOnce(&Channel, Result<(), String>) + Send + 'static,
     ) -> Result<(), mpsc::SendError<PlatformWrapperMessage>> {
         self.tx.send(PlatformWrapperMessage::AbortTransaction(
             transaction_raw_pointer_address,
@@ -1026,8 +1026,8 @@ impl PlatformWrapper {
                 let callback = js_callback.into_inner(&mut task_context);
                 let this = task_context.undefined();
                 let callback_arguments: Vec<Handle<JsValue>> = match maybe_error {
-                    Some(err) => vec![task_context.error(err)?.upcast()],
-                    None => vec![task_context.null().upcast()],
+                    Ok(_) => vec![task_context.null().upcast()],
+                    Err(err) => vec![task_context.error(err)?.upcast()],
                 };
 
                 callback.call(&mut task_context, this, callback_arguments)?;
@@ -1066,8 +1066,8 @@ impl PlatformWrapper {
                 let callback = js_callback.into_inner(&mut task_context);
                 let this = task_context.undefined();
                 let callback_arguments: Vec<Handle<JsValue>> = match maybe_error {
-                    Some(err) => vec![task_context.error(err)?.upcast()],
-                    None => vec![task_context.null().upcast()],
+                    Ok(_) => vec![task_context.null().upcast()],
+                    Err(err) => vec![task_context.error(err)?.upcast()],
                 };
 
                 callback.call(&mut task_context, this, callback_arguments)?;
@@ -1106,8 +1106,8 @@ impl PlatformWrapper {
                 let callback = js_callback.into_inner(&mut task_context);
                 let this = task_context.undefined();
                 let callback_arguments: Vec<Handle<JsValue>> = match maybe_error {
-                    Some(err) => vec![task_context.error(err)?.upcast()],
-                    None => vec![task_context.null().upcast()],
+                    Ok(_) => vec![task_context.null().upcast()],
+                    Err(err) => vec![task_context.error(err)?.upcast()],
                 };
 
                 callback.call(&mut task_context, this, callback_arguments)?;
