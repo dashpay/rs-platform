@@ -345,7 +345,7 @@ impl PlatformWrapper {
                             .ok_or(Error::Drive(DriveError::CorruptedCodeExecution(
                                 "invalid transaction pointer address",
                             )))
-                            .map(|transaction| Some(transaction)),
+                            .map(Some),
                         None => Ok(None),
                     };
 
@@ -407,7 +407,7 @@ impl PlatformWrapper {
                             .ok_or(Error::Drive(DriveError::CorruptedCodeExecution(
                                 "invalid transaction pointer address",
                             )))
-                            .map(|transaction| Some(transaction)),
+                            .map(Some),
                         None => Ok(None),
                     };
 
@@ -499,7 +499,7 @@ impl PlatformWrapper {
                             .ok_or(Error::Drive(DriveError::CorruptedCodeExecution(
                                 "invalid transaction pointer address",
                             )))
-                            .map(|transaction| Some(transaction)),
+                            .map(Some),
                         None => Ok(None),
                     };
 
@@ -594,7 +594,7 @@ impl PlatformWrapper {
                             .ok_or(Error::Drive(DriveError::CorruptedCodeExecution(
                                 "invalid transaction pointer address",
                             )))
-                            .map(|transaction| Some(transaction)),
+                            .map(Some),
                         None => Ok(None),
                     };
 
@@ -682,7 +682,7 @@ impl PlatformWrapper {
                             .ok_or(Error::Drive(DriveError::CorruptedCodeExecution(
                                 "invalid transaction pointer address",
                             )))
-                            .map(|transaction| Some(transaction)),
+                            .map(Some),
                         None => Ok(None),
                     };
 
@@ -767,7 +767,7 @@ impl PlatformWrapper {
                             .ok_or(Error::Drive(DriveError::CorruptedCodeExecution(
                                 "invalid transaction pointer address",
                             )))
-                            .map(|transaction| Some(transaction)),
+                            .map(Some),
                         None => Ok(None),
                     };
 
@@ -849,7 +849,7 @@ impl PlatformWrapper {
                             .ok_or(Error::Drive(DriveError::CorruptedCodeExecution(
                                 "invalid transaction pointer address",
                             )))
-                            .map(|transaction| Some(transaction)),
+                            .map(Some),
                         None => Ok(None),
                     };
 
@@ -927,7 +927,7 @@ impl PlatformWrapper {
                             .ok_or(Error::Drive(DriveError::CorruptedCodeExecution(
                                 "invalid transaction pointer address",
                             )))
-                            .map(|transaction| Some(transaction)),
+                            .map(Some),
                         None => Ok(None),
                     };
 
@@ -1152,7 +1152,7 @@ impl PlatformWrapper {
                         .ok_or(Error::Drive(DriveError::CorruptedCodeExecution(
                             "invalid transaction pointer address",
                         )))
-                        .map(|transaction| Some(transaction)),
+                        .map(Some),
                     None => Ok(None),
                 };
 
@@ -1226,7 +1226,7 @@ impl PlatformWrapper {
                         .ok_or(Error::Drive(DriveError::CorruptedCodeExecution(
                             "invalid transaction pointer address",
                         )))
-                        .map(|transaction| Some(transaction)),
+                        .map(Some),
                     None => Ok(None),
                 };
 
@@ -1291,7 +1291,7 @@ impl PlatformWrapper {
                         .ok_or(Error::Drive(DriveError::CorruptedCodeExecution(
                             "invalid transaction pointer address",
                         )))
-                        .map(|transaction| Some(transaction)),
+                        .map(Some),
                     None => Ok(None),
                 };
 
@@ -1359,7 +1359,7 @@ impl PlatformWrapper {
                         .ok_or(Error::Drive(DriveError::CorruptedCodeExecution(
                             "invalid transaction pointer address",
                         )))
-                        .map(|transaction| Some(transaction)),
+                        .map(Some),
                     None => Ok(None),
                 };
 
@@ -1424,7 +1424,7 @@ impl PlatformWrapper {
                         .ok_or(Error::Drive(DriveError::CorruptedCodeExecution(
                             "invalid transaction pointer address",
                         )))
-                        .map(|transaction| Some(transaction)),
+                        .map(Some),
                     None => Ok(None),
                 };
 
@@ -1489,7 +1489,7 @@ impl PlatformWrapper {
                         .ok_or(Error::Drive(DriveError::CorruptedCodeExecution(
                             "invalid transaction pointer address",
                         )))
-                        .map(|transaction| Some(transaction)),
+                        .map(Some),
                     None => Ok(None),
                 };
 
@@ -1561,7 +1561,7 @@ impl PlatformWrapper {
                         .ok_or(Error::Drive(DriveError::CorruptedCodeExecution(
                             "invalid transaction pointer address",
                         )))
-                        .map(|transaction| Some(transaction)),
+                        .map(Some),
                     None => Ok(None),
                 };
 
@@ -1632,7 +1632,7 @@ impl PlatformWrapper {
                         .ok_or(Error::Drive(DriveError::CorruptedCodeExecution(
                             "invalid transaction pointer address",
                         )))
-                        .map(|transaction| Some(transaction)),
+                        .map(Some),
                     None => Ok(None),
                 };
 
@@ -1791,7 +1791,7 @@ impl PlatformWrapper {
                         .ok_or(Error::Drive(DriveError::CorruptedCodeExecution(
                             "invalid transaction pointer address",
                         )))
-                        .map(|transaction| Some(transaction)),
+                        .map(Some),
                     None => Ok(None),
                 };
 
@@ -1859,7 +1859,7 @@ impl PlatformWrapper {
                         .ok_or(Error::Drive(DriveError::CorruptedCodeExecution(
                             "invalid transaction pointer address",
                         )))
-                        .map(|transaction| Some(transaction)),
+                        .map(Some),
                     None => Ok(None),
                 };
 
@@ -1925,7 +1925,7 @@ impl PlatformWrapper {
                         .ok_or(Error::Drive(DriveError::CorruptedCodeExecution(
                             "invalid transaction pointer address",
                         )))
-                        .map(|transaction| Some(transaction)),
+                        .map(Some),
                     None => Ok(None),
                 };
 
@@ -1994,7 +1994,7 @@ impl PlatformWrapper {
                         .ok_or(Error::Drive(DriveError::CorruptedCodeExecution(
                             "invalid transaction pointer address",
                         )))
-                        .map(|transaction| Some(transaction)),
+                        .map(Some),
                     None => Ok(None),
                 };
 
@@ -2063,7 +2063,7 @@ impl PlatformWrapper {
                         .ok_or(Error::Drive(DriveError::CorruptedCodeExecution(
                             "invalid transaction pointer address",
                         )))
-                        .map(|transaction| Some(transaction)),
+                        .map(Some),
                     None => Ok(None),
                 };
 
@@ -2130,7 +2130,7 @@ impl PlatformWrapper {
                         .ok_or(Error::Drive(DriveError::CorruptedCodeExecution(
                             "invalid transaction pointer address",
                         )))
-                        .map(|transaction| Some(transaction)),
+                        .map(Some),
                     None => Ok(None),
                 };
 
@@ -2204,7 +2204,7 @@ impl PlatformWrapper {
                         .ok_or(Error::Drive(DriveError::CorruptedCodeExecution(
                             "invalid transaction pointer address",
                         )))
-                        .map(|transaction| Some(transaction)),
+                        .map(Some),
                     None => Ok(None),
                 };
 
