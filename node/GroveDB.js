@@ -120,7 +120,7 @@ class GroveDB {
    * Commit transaction
    *
    * Transaction should be started before
-   * 
+   *
    * @param {External} [transaction = undefined]
    *
    * @return {Promise<void>}
@@ -131,7 +131,7 @@ class GroveDB {
 
   /**
    * Rollback transaction to this initial state when it was created
-   * 
+   *
    * @param {External} [transaction = undefined]
    *
    * @returns {Promise<void>}
@@ -151,7 +151,7 @@ class GroveDB {
 
   /**
    * Aborts transaction
-   * 
+   *
    * @param {External} [transaction = undefined]
    *
    * @returns {Promise<void>}
