@@ -34,7 +34,7 @@ impl Finalize for PlatformWrapperTransactionAddress {
         self.tx
             .send(PlatformWrapperMessage::AbortTransaction(
                 self.address,
-                Box::new(|_| {}),
+                Box::new(|_, _| {}),
             ))
             .ok();
     }
@@ -53,6 +53,7 @@ type PlatformCallback = Box<
         + Send,
 >;
 type UnitCallback = Box<dyn FnOnce(&Channel) + Send>;
+type ErrorCallback = Box<dyn FnOnce(&Channel, Option<String>) + Send>;
 type TransactionCallback =
     Box<dyn FnOnce(mpsc::Sender<PlatformWrapperMessage>, usize, &Channel) + Send>;
 
@@ -63,9 +64,9 @@ enum PlatformWrapperMessage {
     // Indicates that the thread should be stopped and connection closed
     Close(UnitCallback),
     StartTransaction(TransactionCallback),
-    CommitTransaction(TransactionPointerAddress, UnitCallback),
-    RollbackTransaction(TransactionPointerAddress, UnitCallback),
-    AbortTransaction(TransactionPointerAddress, UnitCallback),
+    CommitTransaction(TransactionPointerAddress, ErrorCallback),
+    RollbackTransaction(TransactionPointerAddress, ErrorCallback),
+    AbortTransaction(TransactionPointerAddress, ErrorCallback),
     Flush(UnitCallback),
 }
 
@@ -149,37 +150,49 @@ impl PlatformWrapper {
                         transaction_raw_pointer_address,
                         callback,
                     ) => {
-                        if let Some(transaction) =
+                        let error = if let Some(transaction) =
                             transactions.remove(&transaction_raw_pointer_address)
                         {
                             platform.drive.commit_transaction(transaction).unwrap();
-                        }
 
-                        callback(&channel);
+                            None
+                        } else {
+                            Some("invalid transaction_raw_pointer_address, transaction was not found".to_string())
+                        };
+
+                        callback(&channel, error);
                     }
                     PlatformWrapperMessage::RollbackTransaction(
                         transaction_raw_pointer_address,
                         callback,
                     ) => {
-                        if let Some(transaction) =
+                        let error = if let Some(transaction) =
                             transactions.remove(&transaction_raw_pointer_address)
                         {
                             platform.drive.rollback_transaction(&transaction).unwrap();
-                        }
 
-                        callback(&channel);
+                            None
+                        } else {
+                            Some("invalid transaction_raw_pointer_address, transaction was not found".to_string())
+                        };
+
+                        callback(&channel, error);
                     }
                     PlatformWrapperMessage::AbortTransaction(
                         transaction_raw_pointer_address,
                         callback,
                     ) => {
-                        if let Some(transaction) =
+                        let error = if let Some(transaction) =
                             transactions.remove(&transaction_raw_pointer_address)
                         {
                             drop(transaction);
-                        }
 
-                        callback(&channel);
+                            None
+                        } else {
+                            Some("invalid transaction_raw_pointer_address, transaction was not found".to_string())
+                        };
+
+                        callback(&channel, error);
                     }
                 }
             }
@@ -220,7 +233,7 @@ impl PlatformWrapper {
     fn commit_transaction(
         &self,
         transaction_raw_pointer_address: TransactionPointerAddress,
-        callback: impl FnOnce(&Channel) + Send + 'static,
+        callback: impl FnOnce(&Channel, Option<String>) + Send + 'static,
     ) -> Result<(), mpsc::SendError<PlatformWrapperMessage>> {
         self.tx.send(PlatformWrapperMessage::CommitTransaction(
             transaction_raw_pointer_address,
@@ -231,7 +244,7 @@ impl PlatformWrapper {
     fn rollback_transaction(
         &self,
         transaction_raw_pointer_address: TransactionPointerAddress,
-        callback: impl FnOnce(&Channel) + Send + 'static,
+        callback: impl FnOnce(&Channel, Option<String>) + Send + 'static,
     ) -> Result<(), mpsc::SendError<PlatformWrapperMessage>> {
         self.tx.send(PlatformWrapperMessage::RollbackTransaction(
             transaction_raw_pointer_address,
@@ -242,7 +255,7 @@ impl PlatformWrapper {
     fn abort_transaction(
         &self,
         transaction_raw_pointer_address: TransactionPointerAddress,
-        callback: impl FnOnce(&Channel) + Send + 'static,
+        callback: impl FnOnce(&Channel, Option<String>) + Send + 'static,
     ) -> Result<(), mpsc::SendError<PlatformWrapperMessage>> {
         self.tx.send(PlatformWrapperMessage::AbortTransaction(
             transaction_raw_pointer_address,
@@ -1008,11 +1021,14 @@ impl PlatformWrapper {
             .this()
             .downcast_or_throw::<JsBox<PlatformWrapper>, _>(&mut cx)?;
 
-        db.commit_transaction(transaction_address, |channel| {
+        db.commit_transaction(transaction_address, |channel, maybe_error| {
             channel.send(move |mut task_context| {
                 let callback = js_callback.into_inner(&mut task_context);
                 let this = task_context.undefined();
-                let callback_arguments: Vec<Handle<JsValue>> = vec![task_context.null().upcast()];
+                let callback_arguments: Vec<Handle<JsValue>> = match maybe_error {
+                    Some(err) => vec![task_context.error(err)?.upcast()],
+                    None => vec![task_context.null().upcast()],
+                };
 
                 callback.call(&mut task_context, this, callback_arguments)?;
 
@@ -1045,11 +1061,14 @@ impl PlatformWrapper {
             .this()
             .downcast_or_throw::<JsBox<PlatformWrapper>, _>(&mut cx)?;
 
-        db.rollback_transaction(transaction_address, |channel| {
+        db.rollback_transaction(transaction_address, |channel, maybe_error| {
             channel.send(move |mut task_context| {
                 let callback = js_callback.into_inner(&mut task_context);
                 let this = task_context.undefined();
-                let callback_arguments: Vec<Handle<JsValue>> = vec![task_context.null().upcast()];
+                let callback_arguments: Vec<Handle<JsValue>> = match maybe_error {
+                    Some(err) => vec![task_context.error(err)?.upcast()],
+                    None => vec![task_context.null().upcast()],
+                };
 
                 callback.call(&mut task_context, this, callback_arguments)?;
 
@@ -1082,11 +1101,14 @@ impl PlatformWrapper {
             .this()
             .downcast_or_throw::<JsBox<PlatformWrapper>, _>(&mut cx)?;
 
-        db.abort_transaction(transaction_address, |channel| {
+        db.abort_transaction(transaction_address, |channel, maybe_error| {
             channel.send(move |mut task_context| {
                 let callback = js_callback.into_inner(&mut task_context);
                 let this = task_context.undefined();
-                let callback_arguments: Vec<Handle<JsValue>> = vec![task_context.null().upcast()];
+                let callback_arguments: Vec<Handle<JsValue>> = match maybe_error {
+                    Some(err) => vec![task_context.error(err)?.upcast()],
+                    None => vec![task_context.null().upcast()],
+                };
 
                 callback.call(&mut task_context, this, callback_arguments)?;
 
