@@ -141,15 +141,6 @@ class GroveDB {
   }
 
   /**
-   * Returns true if transaction started
-   *
-   * @returns {Promise<void>}
-   */
-  async isTransactionStarted() {
-    return undefined;
-  }
-
-  /**
    * Aborts transaction
    *
    * @param {External} [transaction = undefined]
