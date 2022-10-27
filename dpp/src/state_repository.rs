@@ -59,7 +59,7 @@ pub trait StateRepositoryLike: Send + Sync {
     /// Remove Document
     async fn remove_document(
         &self,
-        contract_id: &DataContract,
+        data_contract: &DataContract,
         data_contract_type: &str,
         document_id: &Identifier,
         execution_context: &StateTransitionExecutionContext,
