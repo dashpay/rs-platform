@@ -368,6 +368,7 @@ pub enum DriveOperation {
     CostCalculationDeleteOperation(SizesOfDeleteOperation),
     /// Cost calculation query operation
     CostCalculationQueryOperation(SizesOfQueryOperation),
+    // TODO: Add WithdrawlTransactionFee operation
 }
 
 impl DriveOperation {
