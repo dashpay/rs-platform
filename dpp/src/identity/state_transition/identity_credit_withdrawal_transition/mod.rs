@@ -5,7 +5,7 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 
 use crate::{
     identity::{core_script::CoreScript, KeyID},
-    prelude::Identifier,
+    prelude::{Identifier, Revision},
     state_transition::{
         StateTransitionConvert, StateTransitionIdentitySigned, StateTransitionLike,
         StateTransitionType,
@@ -50,6 +50,7 @@ pub struct IdentityCreditWithdrawalTransition {
     pub core_fee_per_byte: u32,
     pub pooling: Pooling,
     pub output_script: CoreScript,
+    pub revision: Revision,
     pub signature_public_key_id: KeyID,
     pub signature: Vec<u8>,
 }
@@ -64,6 +65,7 @@ impl std::default::Default for IdentityCreditWithdrawalTransition {
             core_fee_per_byte: Default::default(),
             pooling: Default::default(),
             output_script: Default::default(),
+            revision: Default::default(),
             signature_public_key_id: Default::default(),
             signature: Default::default(),
         }
@@ -107,6 +109,14 @@ impl IdentityCreditWithdrawalTransition {
     /// Returns ID of the created contract
     pub fn get_modified_data_ids(&self) -> Vec<&Identifier> {
         vec![&self.identity_id]
+    }
+
+    pub fn set_revision(&mut self, revision: Revision) {
+        self.revision = revision;
+    }
+
+    pub fn get_revision(&self) -> Revision {
+        self.revision
     }
 }
 
