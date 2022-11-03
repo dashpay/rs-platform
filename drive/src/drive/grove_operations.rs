@@ -2,7 +2,7 @@ use crate::drive::batch::GroveDbOpBatch;
 use costs::storage_cost::removal::StorageRemovedBytes::BasicStorageRemoval;
 use costs::storage_cost::transition::OperationStorageTransitionType;
 use costs::{CostContext, CostsExt, OperationCost};
-use grovedb::batch::{BatchApplyOptions, GroveDbOp, GroveDbOpMode, KeyInfo, KeyInfoPath, Op};
+use grovedb::batch::{BatchApplyOptions, GroveDbOp, GroveDbOpMode, KeyInfoPath, Op, key_info::KeyInfo};
 use grovedb::{Element, GroveDb, PathQuery, TransactionArg};
 
 use crate::drive::defaults::{MAX_ELEMENT_SIZE, SOME_TREE_SIZE};
@@ -24,6 +24,7 @@ use crate::fee::op::{DriveOperation, SizesOfQueryOperation};
 use grovedb::operations::insert::InsertOptions;
 use grovedb::query_result_type::{QueryResultElements, QueryResultType};
 use grovedb::Error as GroveError;
+use grovedb::operations::delete::DeleteOptions;
 
 fn push_drive_operation_result<T>(
     cost_context: CostContext<Result<T, GroveError>>,
@@ -136,7 +137,7 @@ impl Drive {
                             Some(storage_flags),
                         ));
                         drive_operations.push(CostCalculationQueryOperation(
-                            SizesOfQueryOperation::for_key_check_in_path(key.len(), path_iter),
+                            SizesOfQueryOperation::for_key_check_in_path(key.len() as u32, path_iter),
                         ));
                     }
                     // worst case is always that it was inserted
@@ -179,7 +180,7 @@ impl Drive {
                             Some(storage_flags),
                         ));
                         drive_operations.push(CostCalculationQueryOperation(
-                            SizesOfQueryOperation::for_key_check_in_path(key.len(), path_iter),
+                            SizesOfQueryOperation::for_key_check_in_path(key.len() as u32, path_iter),
                         ));
                     }
                     // wost case scenario is true
@@ -207,7 +208,7 @@ impl Drive {
                             Some(storage_flags),
                         ));
                         drive_operations.push(CostCalculationQueryOperation(
-                            SizesOfQueryOperation::for_key_check_in_path(key.len(), path),
+                            SizesOfQueryOperation::for_key_check_in_path(key.len() as u32, path),
                         ));
                     }
                     // wost case scenario is true
@@ -235,7 +236,7 @@ impl Drive {
                             Some(storage_flags),
                         ));
                         drive_operations.push(CostCalculationQueryOperation(
-                            SizesOfQueryOperation::for_key_check_in_path(key.len(), path),
+                            SizesOfQueryOperation::for_key_check_in_path(key.len() as u32, path),
                         ));
                     }
                     true
@@ -268,7 +269,7 @@ impl Drive {
                     drive_operations.push(DriveOperation::for_insert_path_key_value_size(
                         path_size,
                         key_len as u16,
-                        element.node_byte_size(key_len) as u32,
+                        element.node_byte_size(key_len as u32),
                     ));
                     Ok(())
                 }
@@ -291,7 +292,7 @@ impl Drive {
                     drive_operations.push(DriveOperation::for_insert_path_key_value_size(
                         path_size,
                         key_len as u16,
-                        element.node_byte_size(key_len) as u32,
+                        element.node_byte_size(key_len as u32),
                     ));
                     Ok(())
                 }
@@ -311,7 +312,7 @@ impl Drive {
                 let (path_iter, path_lengths): (Vec<&[u8]>, Vec<u32>) =
                     path.iter().map(|x| (x.as_slice(), x.len() as u32)).unzip();
                 let element_node_byte_size = if drive_operations.is_some() {
-                    element.node_byte_size(key.len()) as u32
+                    element.node_byte_size(key.len() as u32)
                 } else {
                     0 //doesn't matter
                 };
@@ -326,7 +327,7 @@ impl Drive {
                 } else {
                     if let Some(drive_operations) = drive_operations {
                         let query_operation =
-                            SizesOfQueryOperation::for_key_check_in_path(key.len(), path_iter);
+                            SizesOfQueryOperation::for_key_check_in_path(key.len() as u32, path_iter);
                         drive_operations.push(CostCalculationQueryOperation(query_operation));
                         let insert_operation = DriveOperation::for_insert_path_key_value_size(
                             path_lengths.iter().sum(),
@@ -358,7 +359,7 @@ impl Drive {
             PathFixedSizeKeyElement((path, key, element)) => {
                 let path_iter = path.into_iter();
                 let element_node_byte_size = if drive_operations.is_some() {
-                    element.node_byte_size(key.len()) as u32
+                    element.node_byte_size(key.len() as u32)
                 } else {
                     0 //doesn't matter
                 };
@@ -370,7 +371,7 @@ impl Drive {
                 } else {
                     if let Some(drive_operations) = drive_operations {
                         let query_operation =
-                            SizesOfQueryOperation::for_key_check_in_path(key.len(), path_iter);
+                            SizesOfQueryOperation::for_key_check_in_path(key.len() as u32, path_iter);
                         drive_operations.push(CostCalculationQueryOperation(query_operation));
                         let insert_operation = DriveOperation::for_insert_path_key_value_size(
                             path.iter().map(|a| a.len() as u32).sum(),
@@ -396,7 +397,12 @@ impl Drive {
     ) -> Result<(), Error> {
         if apply {
             let path_iter: Vec<&[u8]> = path.iter().map(|x| x.as_slice()).collect();
-            let cost_context = self.grove.delete(path_iter, key, transaction);
+            let options = DeleteOptions {
+                allow_deleting_non_empty_trees: false,
+                deleting_non_empty_trees_returns_error: true,
+                base_root_storage_is_free: true
+            };
+            let cost_context = self.grove.delete(path_iter, key, Some(options), transaction);
             push_drive_operation_result(cost_context, drive_operations)
         } else {
             // TODO this is wrong
@@ -792,11 +798,16 @@ impl Drive {
         <P as IntoIterator>::IntoIter: ExactSizeIterator + DoubleEndedIterator + Clone,
     {
         let current_batch_operations = DriveOperation::grovedb_operations_batch(drive_operations);
+        let options = DeleteOptions {
+            allow_deleting_non_empty_trees: false,
+            deleting_non_empty_trees_returns_error: true,
+            base_root_storage_is_free: true
+        };
         if apply {
             let cost_context = self.grove.delete_operation_for_delete_internal(
                 path,
                 key,
-                only_delete_tree_if_empty,
+                options,
                 true,
                 &current_batch_operations.operations,
                 transaction,
@@ -932,7 +943,10 @@ impl Drive {
                 Some(BatchApplyOptions {
                     validate_insertion_does_not_override: validate,
                     validate_insertion_does_not_override_tree: validate,
+                    allow_deleting_non_empty_trees: false,
+                    deleting_non_empty_trees_returns_error: true,
                     disable_operation_consistency_check: false,
+                    base_root_storage_is_free: true
                 }),
                 |cost, old_flags, mut new_flags| {
 
@@ -989,6 +1003,7 @@ impl Drive {
                 Some(InsertOptions {
                     validate_insertion_does_not_override: false,
                     validate_insertion_does_not_override_tree: true,
+                    base_root_storage_is_free: true
                 })
             } else {
                 None
@@ -1053,62 +1068,7 @@ impl Drive {
                                 )))
                             }
                         },
-                    }, /*
-                       GroveDbOp { path, key, op, mode } => match op {
-                           Op::Insert { element } => self.grove_insert(
-                               PathKeyElementInfo::<0>::PathKeyElement((
-                                   path,
-                                   key.as_slice(),
-                                   element,
-                               )),
-                               transaction,
-                               true,
-                               drive_operations,
-                           )?,
-                           Op::Delete => self.grove_delete(
-                               path,
-                               key.as_slice(),
-                               true,
-                               transaction,
-                               drive_operations,
-                           )?,
-                           _ => {
-                               return Err(Error::Drive(DriveError::UnsupportedPrivate(
-                                   "Only Insert and Deletion operations are allowed",
-                               )))
-                           }
-                       },
-                       GroveDbOp::WorstCaseOp {
-                           path,
-                           key,
-                           op,
-                           unique_path,
-                           unique_key,
-                       } => match op {
-                           Op::Insert { element } => self.grove_insert(
-                               PathKeyElementInfo::<0>::PathKeyElement((
-                                   path,
-                                   key.as_slice(),
-                                   element,
-                               )),
-                               transaction,
-                               false,
-                               drive_operations,
-                           )?,
-                           Op::Delete => self.grove_delete(
-                               path,
-                               key.as_slice(),
-                               false,
-                               transaction,
-                               drive_operations,
-                           )?,
-                           _ => {
-                               return Err(Error::Drive(DriveError::UnsupportedPrivate(
-                                   "Only Insert and Deletion operations are allowed",
-                               )))
-                           }
-                       },
-                        */
+                    },
                 }
             }
             Ok(())
@@ -1126,7 +1086,10 @@ impl Drive {
             Some(BatchApplyOptions {
                 validate_insertion_does_not_override: validate,
                 validate_insertion_does_not_override_tree: validate,
+                allow_deleting_non_empty_trees: false,
+                deleting_non_empty_trees_returns_error: true,
                 disable_operation_consistency_check: false,
+                base_root_storage_is_free: true
             }),
             |_, _, _| Ok(false),
             |_, _| Err(GroveError::InternalError("not implemented")),

@@ -23,7 +23,7 @@ use crate::drive::object_size_info::PathKeyInfo::PathFixedSizeKeyRef;
 use crate::drive::{contract_documents_path, defaults, Drive, DriveCache, RootTree};
 use crate::error::drive::DriveError;
 use crate::error::Error;
-use crate::fee::calculate_fee;
+use crate::fee::{calculate_fee, FeeResult};
 use crate::fee::op::DriveOperation;
 use crate::fee::op::DriveOperation::ContractFetch;
 
@@ -363,7 +363,7 @@ impl Drive {
         apply: bool,
         storage_flags: Option<&StorageFlags>,
         transaction: TransactionArg,
-    ) -> Result<(i64, u64), Error> {
+    ) -> Result<FeeResult, Error> {
         // first we need to deserialize the contract
         let contract = <Contract as DriveContractExt>::from_cbor(&contract_cbor, contract_id)?;
 
@@ -446,7 +446,7 @@ impl Drive {
         apply: bool,
         storage_flags: Option<&StorageFlags>,
         transaction: TransactionArg,
-    ) -> Result<(i64, u64), Error> {
+    ) -> Result<FeeResult, Error> {
         let mut drive_operations: Vec<DriveOperation> = vec![];
 
         // overlying structure

@@ -10,7 +10,7 @@ use crate::error::drive::DriveError;
 use crate::error::fee::FeeError;
 use crate::error::Error;
 use crate::fee::default_costs::{
-    NON_STORAGE_LOAD_CREDIT_PER_BYTE, STORAGE_DISK_USAGE_CREDIT_PER_BYTE,
+    STORAGE_DISK_USAGE_CREDIT_PER_BYTE,
     STORAGE_LOAD_CREDIT_PER_BYTE, STORAGE_PROCESSING_CREDIT_PER_BYTE, STORAGE_SEEK_COST,
 };
 use crate::fee::op::DriveOperation::{
@@ -103,7 +103,7 @@ trait OperationCostConvert {
 }
 
 impl SizesOfQueryOperation {
-    pub fn for_key_check_in_path<'a: 'b, 'b, 'c, P>(key_len: usize, path: P) -> Self
+    pub fn for_key_check_in_path<'a: 'b, 'b, 'c, P>(key_len: u32, path: P) -> Self
     where
         P: IntoIterator<Item = &'c [u8]>,
         <P as IntoIterator>::IntoIter: ExactSizeIterator + DoubleEndedIterator + Clone,
@@ -113,16 +113,16 @@ impl SizesOfQueryOperation {
             .map(|inner: &[u8]| inner.len() as u32)
             .sum();
         SizesOfQueryOperation {
-            key_size: key_len as u32,
+            key_size: key_len,
             path_size,
             value_size: 0,
         }
     }
 
-    pub fn for_key_check_with_path_length(key_len: usize, path_len: usize) -> Self {
+    pub fn for_key_check_with_path_length(key_len: u32, path_len: u32) -> Self {
         SizesOfQueryOperation {
-            key_size: key_len as u32,
-            path_size: path_len as u32,
+            key_size: key_len,
+            path_size: path_len,
             value_size: 0,
         }
     }
@@ -401,7 +401,7 @@ impl DriveOperation {
 
 pub trait DriveCost {
     fn ephemeral_cost(&self, epoch: &Epoch) -> Result<u64, Error>;
-    fn storage_cost(&self, epoch: &Epoch) -> Result<i64, Error>;
+    fn storage_cost(&self, epoch: &Epoch) -> Result<u64, Error>;
 }
 
 fn get_overflow_error(str: &'static str) -> Error {
@@ -426,12 +426,12 @@ impl DriveCost for OperationCost {
         let storage_replaced_bytes_ephemeral_cost = (storage_cost.replaced_bytes as u64)
             .checked_mul(STORAGE_PROCESSING_CREDIT_PER_BYTE)
             .ok_or_else(|| get_overflow_error("storage written bytes cost overflow"))?;
-        let _storage_loaded_bytes_cost = (*storage_loaded_bytes as u64)
+        let storage_removed_bytes_ephemeral_cost = (storage_cost.removed_bytes.total_removed_bytes() as u64)
+            .checked_mul(STORAGE_PROCESSING_CREDIT_PER_BYTE)
+            .ok_or_else(|| get_overflow_error("storage written bytes cost overflow"))?;
+        let storage_loaded_bytes_cost = (*storage_loaded_bytes as u64)
             .checked_mul(STORAGE_LOAD_CREDIT_PER_BYTE)
             .ok_or_else(|| get_overflow_error("storage loaded cost overflow"))?;
-        let storage_loaded_bytes_cost = (*storage_loaded_bytes as u64)
-            .checked_mul(NON_STORAGE_LOAD_CREDIT_PER_BYTE)
-            .ok_or_else(|| get_overflow_error("loaded bytes cost overflow"))?;
         let hash_node_cost = (*hash_node_calls as u64)
             .checked_mul(FunctionOp::Blake3.cost(epoch))
             .ok_or_else(|| get_overflow_error("hash node cost overflow"))?;
@@ -441,7 +441,7 @@ impl DriveCost for OperationCost {
             .flatten()
             .map(|c| c.checked_add(storage_loaded_bytes_cost))
             .flatten()
-            .map(|c| c.checked_add(storage_loaded_bytes_cost))
+            .map(|c| c.checked_add(storage_removed_bytes_ephemeral_cost))
             .flatten()
             .map(|c| c.checked_add(hash_node_cost))
             .flatten()
@@ -449,10 +449,10 @@ impl DriveCost for OperationCost {
         cost
     }
 
-    fn storage_cost(&self, _epoch: &Epoch) -> Result<i64, Error> {
+    fn storage_cost(&self, _epoch: &Epoch) -> Result<u64, Error> {
         //todo: deal with epochs
         let OperationCost { storage_cost, .. } = self;
-        let storage_written_bytes_disk_cost = (storage_cost.added_bytes as i64)
+        let storage_written_bytes_disk_cost = (storage_cost.added_bytes as u64)
             .checked_mul(STORAGE_DISK_USAGE_CREDIT_PER_BYTE)
             .ok_or_else(|| get_overflow_error("storage written bytes cost overflow"));
         storage_written_bytes_disk_cost

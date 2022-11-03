@@ -36,8 +36,8 @@ impl Drive {
             &mut drive_operations,
         )?;
         let cost = if let Some(block_info) = block_info {
-            let (_, cost) = calculate_fee(None, Some(drive_operations), &block_info.epoch)?;
-            cost
+            let fee_result = calculate_fee(None, Some(drive_operations), &block_info.epoch)?;
+            fee_result.processing_fee
         } else {
             0
         };
@@ -66,8 +66,8 @@ impl Drive {
             &mut drive_operations,
         )?;
         let cost = if let Some(block_info) = block_info {
-            let (_, cost) = calculate_fee(None, Some(drive_operations), &block_info.epoch)?;
-            cost
+            let fee_result = calculate_fee(None, Some(drive_operations), &block_info.epoch)?;
+            fee_result.processing_fee
         } else {
             0
         };
@@ -91,8 +91,8 @@ impl Drive {
             &mut drive_operations,
         )?;
         let cost = if let Some(block_info) = block_info {
-            let (_, cost) = calculate_fee(None, Some(drive_operations), &block_info.epoch)?;
-            cost
+            let fee_result = calculate_fee(None, Some(drive_operations), &block_info.epoch)?;
+            fee_result.processing_fee
         } else {
             0
         };
@@ -135,8 +135,8 @@ impl Drive {
             &mut drive_operations,
         )?;
         let cost = if let Some(block_info) = block_info {
-            let (_, cost) = calculate_fee(None, Some(drive_operations), &block_info.epoch)?;
-            cost
+            let fee_result = calculate_fee(None, Some(drive_operations), &block_info.epoch)?;
+            fee_result.processing_fee
         } else {
             0
         };
@@ -164,8 +164,8 @@ impl Drive {
             &mut drive_operations,
         )?;
         let cost = if let Some(block_info) = block_info {
-            let (_, cost) = calculate_fee(None, Some(drive_operations), &block_info.epoch)?;
-            cost
+            let fee_result = calculate_fee(None, Some(drive_operations), &block_info.epoch)?;
+            fee_result.processing_fee
         } else {
             0
         };
@@ -190,8 +190,8 @@ impl Drive {
             &mut drive_operations,
         )?;
         let cost = if let Some(block_info) = block_info {
-            let (_, cost) = calculate_fee(None, Some(drive_operations), &block_info.epoch)?;
-            cost
+            let fee_result = calculate_fee(None, Some(drive_operations), &block_info.epoch)?;
+            fee_result.processing_fee
         } else {
             0
         };
@@ -230,8 +230,8 @@ impl Drive {
                 &mut drive_operations,
             )?;
         let cost = if let Some(block_info) = block_info {
-            let (_, cost) = calculate_fee(None, Some(drive_operations), &block_info.epoch)?;
-            cost
+            let fee_result = calculate_fee(None, Some(drive_operations), &block_info.epoch)?;
+            fee_result.processing_fee
         } else {
             0
         };

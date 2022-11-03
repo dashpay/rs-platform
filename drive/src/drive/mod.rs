@@ -33,6 +33,7 @@ pub mod query;
 use crate::drive::block_info::BlockInfo;
 use crate::fee_pools::epochs::Epoch;
 use dpp::data_contract::extra::DriveContractExt;
+use crate::fee::FeeResult;
 
 pub struct DriveCache {
     pub cached_contracts: Cache<[u8; 32], Arc<Contract>>,
@@ -185,7 +186,7 @@ impl Drive {
         contract: &Contract,
         document_type_name: &str,
         epoch_index: u16,
-    ) -> Result<(i64, u64), Error> {
+    ) -> Result<FeeResult, Error> {
         let document_type = contract.document_type_for_name(document_type_name)?;
         self.add_document_for_contract(
             DocumentAndContractInfo {

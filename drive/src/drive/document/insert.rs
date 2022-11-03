@@ -28,7 +28,7 @@ use crate::drive::object_size_info::{DocumentAndContractInfo, PathInfo, PathKeyE
 use crate::drive::{defaults, Drive};
 use crate::error::drive::DriveError;
 use crate::error::Error;
-use crate::fee::calculate_fee;
+use crate::fee::{calculate_fee, FeeResult};
 use crate::fee::op::DriveOperation;
 use dpp::data_contract::extra::DocumentType;
 
@@ -68,7 +68,7 @@ impl Drive {
                     (
                         PathKeySize((
                             defaults::BASE_CONTRACT_DOCUMENTS_PRIMARY_KEY_PATH
-                                + document_type.name.len(),
+                                + document_type.name.len() as u32,
                             DEFAULT_HASH_SIZE,
                         )),
                         StorageFlags::optional_default_as_ref(),
@@ -142,12 +142,12 @@ impl Drive {
                 DocumentSize(max_size) => {
                     let path_max_length =
                         contract_documents_keeping_history_primary_key_path_for_document_id_size(
-                            document_type.name.len(),
+                            document_type.name.len() as u32,
                         );
                     PathKeyElementSize((
                         path_max_length,
-                        8_usize,
-                        Element::required_item_space(*max_size as usize, STORAGE_FLAGS_SIZE),
+                        8,
+                        Element::required_item_space(*max_size, STORAGE_FLAGS_SIZE),
                     ))
                 }
             };
@@ -177,11 +177,11 @@ impl Drive {
                 } else {
                     let path_max_length =
                         contract_documents_keeping_history_primary_key_path_for_document_id_size(
-                            document_type.name.len(),
+                            document_type.name.len() as u32,
                         );
                     let reference_max_size =
                         contract_documents_keeping_history_storage_time_reference_path_size(
-                            document_type.name.len(),
+                            document_type.name.len() as u32,
                         );
                     PathKeyElementSize((
                         path_max_length,
@@ -210,9 +210,9 @@ impl Drive {
                     PathFixedSizeKeyElement((primary_key_path, document.id.as_slice(), element))
                 }
                 DocumentSize(max_size) => PathKeyElementSize((
-                    defaults::BASE_CONTRACT_DOCUMENTS_PRIMARY_KEY_PATH + document_type.name.len(),
+                    defaults::BASE_CONTRACT_DOCUMENTS_PRIMARY_KEY_PATH + document_type.name.len() as u32,
                     DEFAULT_HASH_SIZE,
-                    Element::required_item_space(*max_size as usize, STORAGE_FLAGS_SIZE),
+                    Element::required_item_space(*max_size, STORAGE_FLAGS_SIZE),
                 )),
                 DocumentWithoutSerialization((document, storage_flags)) => {
                     let serialized_document =
@@ -253,9 +253,9 @@ impl Drive {
                     PathFixedSizeKeyElement((primary_key_path, document.id.as_slice(), element))
                 }
                 DocumentSize(max_size) => PathKeyElementSize((
-                    defaults::BASE_CONTRACT_DOCUMENTS_PRIMARY_KEY_PATH + document_type.name.len(),
+                    defaults::BASE_CONTRACT_DOCUMENTS_PRIMARY_KEY_PATH + document_type.name.len() as u32,
                     DEFAULT_HASH_SIZE,
-                    Element::required_item_space(*max_size as usize, STORAGE_FLAGS_SIZE),
+                    Element::required_item_space(*max_size, STORAGE_FLAGS_SIZE),
                 )),
             };
             let inserted = self.batch_insert_if_not_exists(
@@ -292,7 +292,7 @@ impl Drive {
         apply: bool,
         storage_flags: Option<&StorageFlags>,
         transaction: TransactionArg,
-    ) -> Result<(i64, u64), Error> {
+    ) -> Result<FeeResult, Error> {
         let contract = <Contract as DriveContractExt>::from_cbor(serialized_contract, None)?;
 
         let document = Document::from_cbor(serialized_document, None, owner_id)?;
@@ -327,7 +327,7 @@ impl Drive {
         apply: bool,
         storage_flags: Option<&StorageFlags>,
         transaction: TransactionArg,
-    ) -> Result<(i64, u64), Error> {
+    ) -> Result<FeeResult, Error> {
         let document = Document::from_cbor(serialized_document, None, owner_id)?;
 
         let document_info =
@@ -356,7 +356,7 @@ impl Drive {
         block_info: BlockInfo,
         apply: bool,
         transaction: TransactionArg,
-    ) -> Result<(i64, u64), Error> {
+    ) -> Result<FeeResult, Error> {
         let mut drive_operations: Vec<DriveOperation> = vec![];
         self.add_document_for_contract_operations(
             document_and_contract_info,
@@ -495,7 +495,7 @@ impl Drive {
             {
                 PathInfo::PathIterator::<0>(index_path)
             } else {
-                PathInfo::PathSize(index_path.iter().map(|x| x.len()).sum())
+                PathInfo::PathSize(index_path.iter().map(|x| x.len() as u32).sum())
             };
 
             // we push the actual value of the index path
@@ -628,7 +628,7 @@ impl Drive {
                     }
                     DocumentSize(max_size) => KeyElementSize((
                         DEFAULT_HASH_SIZE,
-                        Element::required_item_space(*max_size as usize, STORAGE_FLAGS_SIZE),
+                        Element::required_item_space(*max_size, STORAGE_FLAGS_SIZE),
                     )),
                 };
 
@@ -662,7 +662,7 @@ impl Drive {
                     }
                     DocumentSize(max_size) => KeyElementSize((
                         1,
-                        Element::required_item_space(*max_size as usize, STORAGE_FLAGS_SIZE),
+                        Element::required_item_space(*max_size, STORAGE_FLAGS_SIZE),
                     )),
                 };
 
@@ -856,7 +856,9 @@ mod tests {
 
         let random_owner_id = rand::thread_rng().gen::<[u8; 32]>();
 
-        let (actual_storage_fee, actual_processing_fee) = drive
+        let FeeResult{
+            storage_fee, processing_fee, removed_from_identities
+        } = drive
             .add_serialized_document_for_contract(
                 &dashpay_cr_serialized_document,
                 &contract,
@@ -870,8 +872,8 @@ mod tests {
             )
             .expect("expected to insert a document successfully");
 
-        assert_eq!(1, actual_storage_fee);
-        assert_eq!(1, actual_processing_fee);
+        assert_eq!(1, storage_fee);
+        assert_eq!(1, processing_fee);
     }
 
     #[ignore]
@@ -899,7 +901,7 @@ mod tests {
         );
 
         let random_owner_id = rand::thread_rng().gen::<[u8; 32]>();
-        let (storage_fee, processing_fee) = drive
+        let fees= drive
             .add_serialized_document_for_contract(
                 &dashpay_cr_serialized_document,
                 &contract,
@@ -913,7 +915,7 @@ mod tests {
             )
             .expect("expected to get back fee for document insertion successfully");
 
-        let (actual_storage_fee, actual_processing_fee) = drive
+        let actual_fees = drive
             .add_serialized_document_for_contract(
                 &dashpay_cr_serialized_document,
                 &contract,
@@ -927,8 +929,7 @@ mod tests {
             )
             .expect("expected to insert a document successfully");
 
-        assert_eq!(storage_fee, actual_storage_fee);
-        assert_eq!(processing_fee, actual_processing_fee);
+        assert_eq!(fees, actual_fees);
     }
 
     #[ignore]

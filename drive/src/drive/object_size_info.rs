@@ -27,16 +27,16 @@ pub enum PathInfo<'a, const N: usize> {
     PathIterator(Vec<Vec<u8>>),
 
     /// A path size
-    PathSize(usize),
+    PathSize(u32),
 }
 
 impl<'a, const N: usize> PathInfo<'a, N> {
-    pub fn len(&self) -> usize {
+    pub fn len(&self) -> u32 {
         match self {
             PathFixedSizeIterator(path_iterator) => {
-                (*path_iterator).into_iter().map(|a| a.len()).sum()
+                (*path_iterator).into_iter().map(|a| a.len() as u32).sum()
             }
-            PathIterator(path_iterator) => path_iterator.clone().into_iter().map(|a| a.len()).sum(),
+            PathIterator(path_iterator) => path_iterator.clone().into_iter().map(|a| a.len() as u32).sum(),
             PathSize(path_size) => *path_size,
         }
     }
@@ -68,8 +68,8 @@ impl<'a, const N: usize> PathInfo<'a, N> {
                 }
             },
             PathSize(mut path_size) => match key_info {
-                Key(key) => path_size.add_assign(key.len()),
-                KeyRef(key_ref) => path_size.add_assign(key_ref.len()),
+                Key(key) => path_size.add_assign(key.len() as u32),
+                KeyRef(key_ref) => path_size.add_assign(key_ref.len() as u32),
                 KeySize(key_size) => path_size.add_assign(key_size),
             },
         }
@@ -84,7 +84,7 @@ pub enum DriveKeyInfo<'a> {
     /// A key by reference
     KeyRef(&'a [u8]),
     /// A key size
-    KeySize(usize),
+    KeySize(u32),
 }
 
 impl<'a> Default for DriveKeyInfo<'a> {
@@ -98,7 +98,7 @@ impl<'a> DriveKeyInfo<'a> {
         match self {
             Key(key) => key.len(),
             KeyRef(key) => key.len(),
-            KeySize(key_size) => *key_size,
+            KeySize(key_size) => *key_size as usize,
         }
     }
 
@@ -115,12 +115,12 @@ impl<'a> DriveKeyInfo<'a> {
             Key(key) => match path_info {
                 PathFixedSizeIterator(iter) => PathFixedSizeKey((iter, key)),
                 PathIterator(iter) => PathKey((iter, key)),
-                PathSize(size) => PathKeySize((size, key.len())),
+                PathSize(size) => PathKeySize((size, key.len() as u32)),
             },
             KeyRef(key_ref) => match path_info {
                 PathFixedSizeIterator(iter) => PathFixedSizeKeyRef((iter, key_ref)),
                 PathIterator(iter) => PathKeyRef((iter, key_ref)),
-                PathSize(size) => PathKeySize((size, key_ref.len())),
+                PathSize(size) => PathKeySize((size, key_ref.len() as u32)),
             },
             KeySize(key_size) => PathKeySize((path_info.len(), key_size)),
         }
@@ -130,7 +130,7 @@ impl<'a> DriveKeyInfo<'a> {
         match self {
             Key(key) => PathFixedSizeKey((path, key)),
             KeyRef(key_ref) => PathFixedSizeKeyRef((path, key_ref)),
-            KeySize(key_size) => PathKeySize((path.len(), key_size)),
+            KeySize(key_size) => PathKeySize((path.len() as u32, key_size)),
         }
     }
 
@@ -138,7 +138,7 @@ impl<'a> DriveKeyInfo<'a> {
         match self {
             Key(key) => PathKey((path, key)),
             KeyRef(key_ref) => PathKeyRef((path, key_ref)),
-            KeySize(key_size) => PathKeySize((path.len(), key_size)),
+            KeySize(key_size) => PathKeySize((path.len() as u32, key_size)),
         }
     }
 }
@@ -155,7 +155,7 @@ pub enum PathKeyInfo<'a, const N: usize> {
     /// An into iter Path with a Key
     PathKeyRef((Vec<Vec<u8>>, &'a [u8])),
     /// A path size
-    PathKeySize((usize, usize)),
+    PathKeySize((u32, u32)),
 }
 
 impl<'a, const N: usize> PathKeyInfo<'a, N> {
@@ -183,7 +183,7 @@ impl<'a, const N: usize> PathKeyInfo<'a, N> {
             PathFixedSizeKeyRef((path_iterator, key)) => {
                 (*path_iterator).into_iter().map(|a| a.len()).sum::<usize>() + key.len()
             }
-            PathKeySize((path_size, key_size)) => *path_size + *key_size,
+            PathKeySize((path_size, key_size)) => *path_size as usize + *key_size as usize,
         }
     }
 
@@ -262,14 +262,14 @@ pub enum ElementInfo {
     /// An element
     Element(Element),
     /// An element size
-    ElementSize(usize),
+    ElementSize(u32),
 }
 
 pub enum KeyElementInfo<'a> {
     /// An element
     KeyElement((&'a [u8], Element)),
     /// An element size
-    KeyElementSize((usize, usize)),
+    KeyElementSize((u32, u32)),
 }
 
 pub enum PathKeyElementInfo<'a, const N: usize> {
@@ -278,7 +278,7 @@ pub enum PathKeyElementInfo<'a, const N: usize> {
     /// A triple Path Key and Element
     PathKeyElement((Vec<Vec<u8>>, &'a [u8], Element)),
     /// A triple of sum of Path lengths, Key length and Element size
-    PathKeyElementSize((usize, usize, usize)),
+    PathKeyElementSize((u32, u32, u32)),
 }
 
 impl<'a, const N: usize> PathKeyElementInfo<'a, N> {
@@ -298,8 +298,8 @@ impl<'a, const N: usize> PathKeyElementInfo<'a, N> {
             PathSize(path_size) => match key_element {
                 KeyElementInfo::KeyElement((key, element)) => Ok(PathKeyElementSize((
                     path_size,
-                    key.len(),
-                    element.node_byte_size(key.len()),
+                    key.len() as u32,
+                    element.node_byte_size(key.len() as u32),
                 ))),
                 KeyElementInfo::KeyElementSize((key_len, element_size)) => {
                     Ok(PathKeyElementSize((path_size, key_len, element_size)))
@@ -342,12 +342,12 @@ impl<'a, const N: usize> PathKeyElementInfo<'a, N> {
         }
     }
 
-    pub fn insert_len(&'a self) -> usize {
+    pub fn insert_len(&'a self) -> u32 {
         match self {
             //todo v23: this is an incorrect approximation
-            PathKeyElement((_, key, element)) => element.node_byte_size(key.len()),
+            PathKeyElement((_, key, element)) => element.node_byte_size(key.len() as u32),
             PathKeyElementSize((_, key_size, element_size)) => *key_size + *element_size,
-            PathFixedSizeKeyElement((_, key, element)) => element.node_byte_size(key.len()),
+            PathFixedSizeKeyElement((_, key, element)) => element.node_byte_size(key.len() as u32),
         }
     }
 }
@@ -431,7 +431,7 @@ impl<'a> DocumentInfo<'a> {
                             "document type must have a max size",
                         ))
                     })?;
-                    Ok(Some(KeySize(max_size as usize)))
+                    Ok(Some(KeySize(max_size as u32)))
                 }
             },
         }

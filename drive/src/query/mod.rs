@@ -1131,8 +1131,8 @@ impl<'a> DriveQuery<'a> {
         let mut drive_operations = vec![];
         let items = self.execute_with_proof_internal(drive, transaction, &mut drive_operations)?;
         let cost = if let Some(block_info) = block_info {
-            let (_, cost) = calculate_fee(None, Some(drive_operations), &block_info.epoch)?;
-            cost
+            let fee_result = calculate_fee(None, Some(drive_operations), &block_info.epoch)?;
+            fee_result.processing_fee
         } else {
             0
         };
@@ -1163,8 +1163,8 @@ impl<'a> DriveQuery<'a> {
             &mut drive_operations,
         )?;
         let cost = if let Some(block_info) = block_info {
-            let (_, cost) = calculate_fee(None, Some(drive_operations), &block_info.epoch)?;
-            cost
+            let fee_result = calculate_fee(None, Some(drive_operations), &block_info.epoch)?;
+            fee_result.processing_fee
         } else {
             0
         };
@@ -1211,8 +1211,8 @@ impl<'a> DriveQuery<'a> {
         let (items, skipped) =
             self.execute_no_proof_internal(drive, transaction, &mut drive_operations)?;
         let cost = if let Some(block_info) = block_info {
-            let (_, cost) = calculate_fee(None, Some(drive_operations), &block_info.epoch)?;
-            cost
+            let fee_result = calculate_fee(None, Some(drive_operations), &block_info.epoch)?;
+            fee_result.processing_fee
         } else {
             0
         };

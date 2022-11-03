@@ -13,7 +13,7 @@ use crate::drive::object_size_info::KeyValueInfo::KeyRefRequest;
 use crate::drive::Drive;
 use crate::error::drive::DriveError;
 use crate::error::Error;
-use crate::fee::calculate_fee;
+use crate::fee::{calculate_fee, FeeResult};
 use crate::fee::op::DriveOperation;
 use dpp::data_contract::extra::DriveContractExt;
 
@@ -27,7 +27,7 @@ impl Drive {
         block_info: BlockInfo,
         apply: bool,
         transaction: TransactionArg,
-    ) -> Result<(i64, u64), Error> {
+    ) -> Result<FeeResult, Error> {
         let mut drive_operations: Vec<DriveOperation> = vec![];
         self.delete_document_for_contract_operations(
             document_id,
@@ -51,7 +51,7 @@ impl Drive {
         block_info: BlockInfo,
         apply: bool,
         transaction: TransactionArg,
-    ) -> Result<(i64, u64), Error> {
+    ) -> Result<FeeResult, Error> {
         let contract = <Contract as DriveContractExt>::from_cbor(contract_cbor, None)?;
         self.delete_document_for_contract(
             document_id,

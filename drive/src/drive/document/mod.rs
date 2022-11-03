@@ -50,15 +50,15 @@ fn contract_documents_keeping_history_primary_key_path_for_document_id<'a>(
 }
 
 fn contract_documents_keeping_history_primary_key_path_for_document_id_size(
-    document_type_name_len: usize,
-) -> usize {
+    document_type_name_len: u32,
+) -> u32 {
     defaults::BASE_CONTRACT_DOCUMENTS_KEEPING_HISTORY_PRIMARY_KEY_PATH_FOR_DOCUMENT_ID_SIZE
         + document_type_name_len
 }
 
 fn contract_documents_keeping_history_storage_time_reference_path_size(
-    document_type_name_len: usize,
-) -> usize {
+    document_type_name_len: u32,
+) -> u32 {
     defaults::BASE_CONTRACT_DOCUMENTS_KEEPING_HISTORY_STORAGE_TIME_REFERENCE_PATH
         + document_type_name_len
 }
