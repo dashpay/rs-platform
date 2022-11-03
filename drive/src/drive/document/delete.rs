@@ -230,6 +230,8 @@ mod tests {
     use crate::drive::object_size_info::DocumentAndContractInfo;
     use crate::drive::object_size_info::DocumentInfo::DocumentRefAndSerialization;
     use crate::drive::Drive;
+    use crate::fee::default_costs::STORAGE_DISK_USAGE_CREDIT_PER_BYTE;
+    use crate::fee_pools::epochs::Epoch;
     use crate::query::DriveQuery;
 
     #[test]
@@ -884,7 +886,8 @@ mod tests {
         );
 
         let random_owner_id = rand::thread_rng().gen::<[u8; 32]>();
-        drive
+        let storage_flags = StorageFlags::SingleEpochOwned(0, random_owner_id);
+        let fee_result = drive
             .add_serialized_document_for_contract(
                 &dashpay_profile_serialized_document,
                 &contract,
@@ -893,26 +896,32 @@ mod tests {
                 false,
                 BlockInfo::default(),
                 true,
-                StorageFlags::optional_default_as_ref(),
+                Some(&storage_flags),
                 Some(&db_transaction),
             )
             .expect("expected to insert a document successfully");
+
+        // We added 1756 bytes
+        assert_eq!(fee_result.storage_fee / STORAGE_DISK_USAGE_CREDIT_PER_BYTE, 1756);
 
         let document_id = bs58::decode("AM47xnyLfTAC9f61ZQPGfMK5Datk2FeYZwgYvcAnzqFY")
             .into_vec()
             .expect("this should decode");
 
-        drive
+        // Let's delete the document at the third epoch
+        let fee_result = drive
             .delete_document_for_contract(
                 &document_id,
                 &contract,
                 "profile",
                 Some(&random_owner_id),
-                BlockInfo::default(),
+                BlockInfo::default_with_epoch(Epoch::new(3)),
                 true,
                 Some(&db_transaction),
             )
             .expect("expected to be able to delete the document");
+
+        assert!(fee_result.removed_from_identities.get(&random_owner_id).is_some());
     }
 
     #[test]
