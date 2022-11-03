@@ -140,7 +140,7 @@ impl Epoch {
     }
 
     pub fn delete_proposers_tree_operation(&self) -> GroveDbOp {
-        GroveDbOp::delete_run_op(
+        GroveDbOp::delete_tree_run_op(
             self.get_vec_path(),
             epoch_key_constants::KEY_PROPOSERS.to_vec(),
         )
@@ -270,7 +270,7 @@ mod tests {
             match drive.grove_apply_batch(batch, false, Some(&transaction)) {
                 Ok(_) => assert!(false, "should not be able to init epochs without FeePools"),
                 Err(e) => match e {
-                    error::Error::GroveDB(grovedb::Error::PathKeyNotFound(_)) => {
+                    error::Error::GroveDB(grovedb::Error::InvalidPath(_)) => {
                         assert!(true)
                     }
                     _ => assert!(false, "invalid error type"),
@@ -518,7 +518,7 @@ mod tests {
                     "should not be able to update processing fee on uninit epochs pool"
                 ),
                 Err(e) => match e {
-                    error::Error::GroveDB(grovedb::Error::PathKeyNotFound(_)) => {
+                    error::Error::GroveDB(grovedb::Error::InvalidPath(_)) => {
                         assert!(true)
                     }
                     _ => assert!(false, "invalid error type"),
@@ -567,10 +567,10 @@ mod tests {
                     "should not be able to update storage fee on uninit epochs pool"
                 ),
                 Err(e) => match e {
-                    error::Error::GroveDB(grovedb::Error::PathKeyNotFound(_)) => {
+                    error::Error::GroveDB(grovedb::Error::InvalidPath(_)) => {
                         assert!(true)
                     }
-                    _ => assert!(false, "invalid error type"),
+                    _ => assert!(false, "{}", format!("invalid error type {}", e)),
                 },
             }
         }

@@ -49,6 +49,10 @@ impl GroveDbOpBatch {
         self.operations.push(GroveDbOp::delete_run_op(path, key))
     }
 
+    pub fn add_delete_tree(&mut self, path: Vec<Vec<u8>>, key: Vec<u8>) {
+        self.operations.push(GroveDbOp::delete_tree_run_op(path, key))
+    }
+
     pub fn add_insert(&mut self, path: Vec<Vec<u8>>, key: Vec<u8>, element: Element) {
         self.operations
             .push(GroveDbOp::insert_run_op(path, key, element))
