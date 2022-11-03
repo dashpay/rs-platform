@@ -37,6 +37,7 @@ use std::collections::HashSet;
 use std::ops::Deref;
 use std::sync::Arc;
 
+use crate::common::encode::encode_unsigned_integer;
 use costs::CostContext;
 use dpp::data_contract::extra::encode_float;
 use dpp::data_contract::extra::DriveContractExt;
@@ -120,7 +121,7 @@ impl Drive {
                 storage_flags.as_ref(),
                 insert_operations,
             )?;
-            let encoded_time = encode_float(block_info.time)?;
+            let encoded_time = encode_unsigned_integer(block_info.time_ms)?;
             let contract_keeping_history_storage_path =
                 contract_keeping_history_storage_path(contract.id.as_bytes());
             self.batch_insert(

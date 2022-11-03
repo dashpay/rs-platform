@@ -3,8 +3,8 @@ use crate::fee_pools::epochs::Epoch;
 /// Block information
 #[derive(Clone, Default)]
 pub struct BlockInfo {
-    /// Block time
-    pub time: f64,
+    /// Block time in milliseconds
+    pub time_ms: u64,
 
     /// Block height
     pub height: u64,
@@ -20,9 +20,9 @@ impl BlockInfo {
     }
 
     /// Create default block with specified time
-    pub fn default_with_time(time: f64) -> BlockInfo {
+    pub fn default_with_time(time_ms: u64) -> BlockInfo {
         BlockInfo {
-            time,
+            time_ms,
             ..Default::default()
         }
     }

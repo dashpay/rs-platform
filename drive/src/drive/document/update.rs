@@ -1332,14 +1332,14 @@ mod tests {
         apply_person(
             &drive,
             &contract,
-            BlockInfo::default_with_time(100.0),
+            BlockInfo::default_with_time(100),
             &person_0_updated,
             transaction.as_ref(),
         );
         apply_person(
             &drive,
             &contract,
-            BlockInfo::default_with_time(100.0),
+            BlockInfo::default_with_time(100),
             &person_1_updated,
             transaction.as_ref(),
         );
