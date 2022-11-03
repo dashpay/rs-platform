@@ -531,7 +531,7 @@ pub enum KeyValueInfo<'a> {
 }
 
 impl<'a> KeyValueInfo<'a> {
-    /// Returns key length
+    /// Returns key ref request
     pub fn as_key_ref_request(&'a self) -> Result<&'a [u8], Error> {
         match self {
             KeyRefRequest(key) => Ok(key),
@@ -541,6 +541,7 @@ impl<'a> KeyValueInfo<'a> {
         }
     }
 
+    /// Returns key length
     pub fn key_len(&'a self) -> u16 {
         match self {
             KeyRefRequest(key) => key.len() as u16,
@@ -549,6 +550,7 @@ impl<'a> KeyValueInfo<'a> {
     }
 }
 
+/// Deletion Info
 pub struct DeletionInfo<'a, const N: usize> {
     upper_path: PathInfo<'a, N>,
     lower_path: Vec<KeyValueInfo<'a>>,

@@ -48,10 +48,14 @@ pub mod default_costs;
 /// Op module
 pub mod op;
 
+/// Fee Result
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct FeeResult {
+    /// Storage fee
     pub storage_fee: u64,
+    /// Processing fee
     pub processing_fee: u64,
+    /// Removed bytes from identities
     pub removed_from_identities: BTreeMap<Identifier, IntMap<u32>>,
 }
 

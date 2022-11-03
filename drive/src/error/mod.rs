@@ -17,6 +17,7 @@ pub mod fee;
 pub mod identity;
 /// Query module
 pub mod query;
+/// Storage flags module
 pub mod storage_flags;
 /// Structure module
 pub mod structure;
@@ -27,6 +28,7 @@ pub enum Error {
     /// Query error
     #[error("query: {0}")]
     Query(#[from] QueryError),
+    /// Storage Flags error
     #[error("storage flags: {0}")]
     StorageFlags(#[from] StorageFlagsError),
     /// Drive error

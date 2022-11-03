@@ -92,6 +92,7 @@ impl GroveDbOpBatch {
         self.operations.push(GroveDbOp::delete_run_op(path, key))
     }
 
+    /// Adds a `Delete` tree operation to a list of GroveDB ops.
     pub fn add_delete_tree(&mut self, path: Vec<Vec<u8>>, key: Vec<u8>) {
         self.operations
             .push(GroveDbOp::delete_tree_run_op(path, key))
@@ -134,6 +135,7 @@ impl GroveDbOpBatch {
         ));
     }
 
+    /// Adds a worst case `Insert` operation with element to a list of GroveDB ops
     pub fn add_worst_case_insert(&mut self, path: Vec<KeyInfo>, key: KeyInfo, element: Element) {
         self.operations.push(GroveDbOp::insert_worst_case_op(
             KeyInfoPath::from_vec(path),

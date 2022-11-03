@@ -57,13 +57,25 @@ type OwnerId = [u8; 32];
 /// Storage flags
 #[derive(Clone, Debug, PartialEq)]
 pub enum StorageFlags {
-    SingleEpoch(BaseEpoch),                                         //0
-    MultiEpoch(BaseEpoch, BTreeMap<EpochIndex, BytesAddedInEpoch>), //1
-    SingleEpochOwned(BaseEpoch, OwnerId),                           //2
-    MultiEpochOwned(BaseEpoch, BTreeMap<EpochIndex, BytesAddedInEpoch>, OwnerId), //3
+    /// Single epoch
+    /// represented as byte 0
+    SingleEpoch(BaseEpoch),
+
+    /// Multi epoch
+    /// represented as byte 1
+    MultiEpoch(BaseEpoch, BTreeMap<EpochIndex, BytesAddedInEpoch>),
+
+    /// Single epoch owned
+    /// represented as byte 2
+    SingleEpochOwned(BaseEpoch, OwnerId),
+
+    /// Multi epoch owned
+    /// represented as byte 3
+    MultiEpochOwned(BaseEpoch, BTreeMap<EpochIndex, BytesAddedInEpoch>, OwnerId),
 }
 
 impl StorageFlags {
+    /// Create new single epoch storage flags
     pub fn new_single_epoch(epoch: BaseEpoch, maybe_owner_id: Option<OwnerId>) -> Self {
         match maybe_owner_id {
             None => SingleEpoch(epoch),
@@ -222,6 +234,7 @@ impl StorageFlags {
         }
     }
 
+    /// Optional combine added bytes
     pub fn optional_combine_added_bytes(
         ours: Option<Self>,
         theirs: Self,
@@ -233,6 +246,7 @@ impl StorageFlags {
         }
     }
 
+    /// Optional combine removed bytes
     pub fn optional_combine_removed_bytes(
         ours: Option<Self>,
         theirs: Self,
@@ -244,6 +258,7 @@ impl StorageFlags {
         }
     }
 
+    /// Combine added bytes
     pub fn combine_added_bytes(self, rhs: Self, added_bytes: u32) -> Result<Self, Error> {
         match self.base_epoch().cmp(rhs.base_epoch()) {
             Ordering::Equal => self.combine_same_base_epoch(rhs),
@@ -256,6 +271,7 @@ impl StorageFlags {
         }
     }
 
+    /// Combine removed bytes
     pub fn combine_removed_bytes(
         self,
         rhs: Self,
@@ -272,6 +288,7 @@ impl StorageFlags {
         }
     }
 
+    /// Returns base epoch
     pub fn base_epoch(&self) -> &BaseEpoch {
         match self {
             SingleEpoch(base_epoch)
@@ -281,6 +298,7 @@ impl StorageFlags {
         }
     }
 
+    /// Returns owner id
     pub fn owner_id(&self) -> Option<&OwnerId> {
         match self {
             SingleEpochOwned(_, owner_id) | MultiEpochOwned(_, _, owner_id) => Some(owner_id),
@@ -288,6 +306,7 @@ impl StorageFlags {
         }
     }
 
+    /// Returns epoch index map
     pub fn epoch_index_map(&self) -> Option<&BTreeMap<EpochIndex, BytesAddedInEpoch>> {
         match self {
             MultiEpoch(_, epoch_int_map) | MultiEpochOwned(_, epoch_int_map, _) => {
@@ -297,14 +316,17 @@ impl StorageFlags {
         }
     }
 
+    /// Returns optional default storage flags
     pub fn optional_default() -> Option<Self> {
         None
     }
 
+    /// Returns default optional storage flag as ref
     pub fn optional_default_as_ref() -> Option<&'static Self> {
         None
     }
 
+    /// Returns type byte
     pub fn type_byte(&self) -> u8 {
         match self {
             SingleEpoch(_) => 0,
@@ -344,6 +366,7 @@ impl StorageFlags {
         }
     }
 
+    /// Serialize storage flags
     pub fn serialize(&self) -> Vec<u8> {
         let mut buffer = vec![self.type_byte()];
         self.maybe_append_to_vec_owner_id(&mut buffer);
@@ -352,6 +375,7 @@ impl StorageFlags {
         buffer
     }
 
+    /// Deserialize single epoch storage flags from bytes
     pub fn deserialize_single_epoch(data: &[u8]) -> Result<Self, Error> {
         if data.len() != 3 {
             Err(Error::StorageFlags(
@@ -367,6 +391,7 @@ impl StorageFlags {
         }
     }
 
+    /// Deserialize multi epoch storage flags from bytes
     pub fn deserialize_multi_epoch(data: &[u8]) -> Result<Self, Error> {
         let len = data.len();
         if len < 6 {
@@ -404,6 +429,7 @@ impl StorageFlags {
         }
     }
 
+    /// Deserialize single epoch owned storage flags from bytes
     pub fn deserialize_single_epoch_owned(data: &[u8]) -> Result<Self, Error> {
         if data.len() != 35 {
             Err(Error::StorageFlags(
@@ -426,6 +452,7 @@ impl StorageFlags {
         }
     }
 
+    /// Deserialize multi epoch owned storage flags from bytes
     pub fn deserialize_multi_epoch_owned(data: &[u8]) -> Result<Self, Error> {
         let len = data.len();
         if len < 38 {
@@ -468,6 +495,7 @@ impl StorageFlags {
         }
     }
 
+    /// Deserialize storage flags from bytes
     pub fn deserialize(data: &[u8]) -> Result<Option<Self>, Error> {
         let first_byte = data.get(0);
         match first_byte {
@@ -496,6 +524,7 @@ impl StorageFlags {
         Self::from_slice(data.as_slice())
     }
 
+    /// Create Storage flags from optional element flags ref
     pub fn from_some_element_flags_ref(data: &Option<ElementFlags>) -> Result<Option<Self>, Error> {
         match data {
             None => Ok(None),
@@ -503,16 +532,19 @@ impl StorageFlags {
         }
     }
 
+    /// Map to owned optional element flags
     pub fn map_owned_to_element_flags(maybe_storage_flags: Option<Self>) -> ElementFlags {
         maybe_storage_flags
             .map(|storage_flags| storage_flags.serialize())
             .unwrap_or_default()
     }
 
+    /// Map to optional element flags
     pub fn map_to_some_element_flags(maybe_storage_flags: Option<&Self>) -> Option<ElementFlags> {
         maybe_storage_flags.map(|storage_flags| storage_flags.serialize())
     }
 
+    /// Creates optional element flags
     pub fn to_some_element_flags(&self) -> Option<ElementFlags> {
         Some(self.serialize())
     }

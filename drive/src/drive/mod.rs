@@ -49,6 +49,7 @@ use crate::fee::op::DriveOperation::GroveOperation;
 
 /// Batch module
 pub mod batch;
+/// Block info module
 pub mod block_info;
 /// Config module
 pub mod config;
