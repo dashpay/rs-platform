@@ -1,8 +1,10 @@
-use std::collections::BTreeMap;
+use costs::storage_cost::removal::StorageRemovedBytes::{
+    BasicStorageRemoval, NoStorageRemoval, SectionedStorageRemoval,
+};
 use costs::storage_cost::removal::{Identifier, StorageRemovedBytes};
-use costs::storage_cost::removal::StorageRemovedBytes::{BasicStorageRemoval, NoStorageRemoval, SectionedStorageRemoval};
 use enum_map::EnumMap;
 use intmap::IntMap;
+use std::collections::BTreeMap;
 
 use crate::error::fee::FeeError;
 use crate::error::Error;
@@ -16,7 +18,7 @@ pub mod op;
 pub struct FeeResult {
     pub storage_fee: u64,
     pub processing_fee: u64,
-    pub removed_from_identities: BTreeMap<Identifier, IntMap<u32>>
+    pub removed_from_identities: BTreeMap<Identifier, IntMap<u32>>,
 }
 
 pub fn calculate_fee(
@@ -26,7 +28,7 @@ pub fn calculate_fee(
 ) -> Result<FeeResult, Error> {
     let mut storage_cost = 0u64;
     let mut processing_cost = 0u64;
-    let mut storage_removed_bytes : StorageRemovedBytes = NoStorageRemoval;
+    let mut storage_removed_bytes: StorageRemovedBytes = NoStorageRemoval;
     if let Some(base_operations) = base_operations {
         for (base_op, count) in base_operations.iter() {
             match base_op.cost().checked_mul(*count) {
@@ -57,18 +59,18 @@ pub fn calculate_fee(
     }
 
     let removed_from_identities = match storage_removed_bytes {
-        NoStorageRemoval => { BTreeMap::default() }
+        NoStorageRemoval => BTreeMap::default(),
         BasicStorageRemoval(_) => {
             // this is not always considered an error
             BTreeMap::default()
         }
-        SectionedStorageRemoval(s) => { s }
+        SectionedStorageRemoval(s) => s,
     };
 
     let fee_result = FeeResult {
         storage_fee: storage_cost,
         processing_fee: processing_cost,
-        removed_from_identities
+        removed_from_identities,
     };
 
     Ok(fee_result)

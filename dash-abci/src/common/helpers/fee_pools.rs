@@ -7,6 +7,7 @@ use rs_drive::common::helpers::identities::create_test_identity;
 use rs_drive::contract::document::Document;
 use rs_drive::contract::Contract;
 use rs_drive::dpp::data_contract::extra::DriveContractExt;
+use rs_drive::drive::block_info::BlockInfo;
 use rs_drive::drive::flags::StorageFlags;
 use rs_drive::drive::object_size_info::DocumentAndContractInfo;
 use rs_drive::drive::object_size_info::DocumentInfo::DocumentRefAndSerialization;
@@ -61,7 +62,7 @@ fn create_test_mn_share_document(
                 owner_id: None,
             },
             false,
-            0f64,
+            BlockInfo::genesis(),
             true,
             transaction,
         )

@@ -8,6 +8,10 @@ pub struct BlockInfo {
 }
 
 impl BlockInfo {
+    pub fn genesis() -> BlockInfo {
+        BlockInfo::default()
+    }
+
     pub fn default_with_time(time: f64) -> BlockInfo {
         BlockInfo {
             time,

@@ -1478,7 +1478,7 @@ mod tests {
     //     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &document_type)
     //         .expect("The query itself should be valid for a null type");
     //     query
-    //         .execute_no_proof(&drive, None)
+    //         .execute_no_proof(&drive, None, None)
     //         .expect_err("a Null value doesn't make sense for an integer");
     // }
 
@@ -1506,7 +1506,7 @@ mod tests {
     //     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &document_type)
     //         .expect("The query itself should be valid for a null type");
     //     query
-    //         .execute_no_proof(&drive, None)
+    //         .execute_no_proof(&drive, None, None)
     //         .expect_err("the value can not be less than Null");
     // }
 

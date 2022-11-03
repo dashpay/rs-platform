@@ -13,8 +13,8 @@ use crate::drive::object_size_info::KeyValueInfo::KeyRefRequest;
 use crate::drive::Drive;
 use crate::error::drive::DriveError;
 use crate::error::Error;
-use crate::fee::{calculate_fee, FeeResult};
 use crate::fee::op::DriveOperation;
+use crate::fee::{calculate_fee, FeeResult};
 use dpp::data_contract::extra::DriveContractExt;
 
 impl Drive {

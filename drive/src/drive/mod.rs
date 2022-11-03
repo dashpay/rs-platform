@@ -31,9 +31,9 @@ pub mod object_size_info;
 pub mod query;
 
 use crate::drive::block_info::BlockInfo;
+use crate::fee::FeeResult;
 use crate::fee_pools::epochs::Epoch;
 use dpp::data_contract::extra::DriveContractExt;
-use crate::fee::FeeResult;
 
 pub struct DriveCache {
     pub cached_contracts: Cache<[u8; 32], Arc<Contract>>,

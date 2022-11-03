@@ -10,8 +10,8 @@ use crate::error::drive::DriveError;
 use crate::error::fee::FeeError;
 use crate::error::Error;
 use crate::fee::default_costs::{
-    STORAGE_DISK_USAGE_CREDIT_PER_BYTE,
-    STORAGE_LOAD_CREDIT_PER_BYTE, STORAGE_PROCESSING_CREDIT_PER_BYTE, STORAGE_SEEK_COST,
+    STORAGE_DISK_USAGE_CREDIT_PER_BYTE, STORAGE_LOAD_CREDIT_PER_BYTE,
+    STORAGE_PROCESSING_CREDIT_PER_BYTE, STORAGE_SEEK_COST,
 };
 use crate::fee::op::DriveOperation::{
     CalculatedCostOperation, ContractFetch, CostCalculationDeleteOperation,
@@ -426,9 +426,10 @@ impl DriveCost for OperationCost {
         let storage_replaced_bytes_ephemeral_cost = (storage_cost.replaced_bytes as u64)
             .checked_mul(STORAGE_PROCESSING_CREDIT_PER_BYTE)
             .ok_or_else(|| get_overflow_error("storage written bytes cost overflow"))?;
-        let storage_removed_bytes_ephemeral_cost = (storage_cost.removed_bytes.total_removed_bytes() as u64)
-            .checked_mul(STORAGE_PROCESSING_CREDIT_PER_BYTE)
-            .ok_or_else(|| get_overflow_error("storage written bytes cost overflow"))?;
+        let storage_removed_bytes_ephemeral_cost =
+            (storage_cost.removed_bytes.total_removed_bytes() as u64)
+                .checked_mul(STORAGE_PROCESSING_CREDIT_PER_BYTE)
+                .ok_or_else(|| get_overflow_error("storage written bytes cost overflow"))?;
         let storage_loaded_bytes_cost = (*storage_loaded_bytes as u64)
             .checked_mul(STORAGE_LOAD_CREDIT_PER_BYTE)
             .ok_or_else(|| get_overflow_error("storage loaded cost overflow"))?;

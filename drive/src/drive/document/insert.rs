@@ -28,8 +28,8 @@ use crate::drive::object_size_info::{DocumentAndContractInfo, PathInfo, PathKeyE
 use crate::drive::{defaults, Drive};
 use crate::error::drive::DriveError;
 use crate::error::Error;
-use crate::fee::{calculate_fee, FeeResult};
 use crate::fee::op::DriveOperation;
+use crate::fee::{calculate_fee, FeeResult};
 use dpp::data_contract::extra::DocumentType;
 
 use crate::drive::block_info::BlockInfo;
@@ -210,7 +210,8 @@ impl Drive {
                     PathFixedSizeKeyElement((primary_key_path, document.id.as_slice(), element))
                 }
                 DocumentSize(max_size) => PathKeyElementSize((
-                    defaults::BASE_CONTRACT_DOCUMENTS_PRIMARY_KEY_PATH + document_type.name.len() as u32,
+                    defaults::BASE_CONTRACT_DOCUMENTS_PRIMARY_KEY_PATH
+                        + document_type.name.len() as u32,
                     DEFAULT_HASH_SIZE,
                     Element::required_item_space(*max_size, STORAGE_FLAGS_SIZE),
                 )),
@@ -253,7 +254,8 @@ impl Drive {
                     PathFixedSizeKeyElement((primary_key_path, document.id.as_slice(), element))
                 }
                 DocumentSize(max_size) => PathKeyElementSize((
-                    defaults::BASE_CONTRACT_DOCUMENTS_PRIMARY_KEY_PATH + document_type.name.len() as u32,
+                    defaults::BASE_CONTRACT_DOCUMENTS_PRIMARY_KEY_PATH
+                        + document_type.name.len() as u32,
                     DEFAULT_HASH_SIZE,
                     Element::required_item_space(*max_size, STORAGE_FLAGS_SIZE),
                 )),
@@ -856,8 +858,10 @@ mod tests {
 
         let random_owner_id = rand::thread_rng().gen::<[u8; 32]>();
 
-        let FeeResult{
-            storage_fee, processing_fee, removed_from_identities
+        let FeeResult {
+            storage_fee,
+            processing_fee,
+            removed_from_identities,
         } = drive
             .add_serialized_document_for_contract(
                 &dashpay_cr_serialized_document,
@@ -901,7 +905,7 @@ mod tests {
         );
 
         let random_owner_id = rand::thread_rng().gen::<[u8; 32]>();
-        let fees= drive
+        let fees = drive
             .add_serialized_document_for_contract(
                 &dashpay_cr_serialized_document,
                 &contract,

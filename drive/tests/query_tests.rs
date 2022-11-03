@@ -26,6 +26,7 @@ use rs_drive::error::{query::QueryError, Error};
 use rs_drive::query::DriveQuery;
 
 use dpp::data_contract::extra::DriveContractExt;
+use rs_drive::drive::block_info::BlockInfo;
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -173,7 +174,7 @@ pub fn setup_family_tests(count: u32, with_batching: bool, seed: u64) -> (Drive,
                     owner_id: None,
                 },
                 true,
-                0f64,
+                BlockInfo::genesis(),
                 true,
                 Some(&db_transaction),
             )
@@ -246,7 +247,7 @@ pub fn setup_family_tests_with_nulls(
                     owner_id: None,
                 },
                 true,
-                0f64,
+                BlockInfo::genesis(),
                 true,
                 Some(&db_transaction),
             )
@@ -347,7 +348,7 @@ pub fn add_domains_to_contract(
                     owner_id: None,
                 },
                 true,
-                0f64,
+                BlockInfo::genesis(),
                 true,
                 transaction,
             )
@@ -442,7 +443,7 @@ pub fn setup_dpns_test_with_data(path: &str) -> (Drive, Contract) {
                         owner_id: None,
                     },
                     false,
-                    0f64,
+                    BlockInfo::genesis(),
                     true,
                     Some(&db_transaction),
                 )
@@ -490,7 +491,7 @@ fn test_query_many() {
                     owner_id: None,
                 },
                 true,
-                0f64,
+                BlockInfo::genesis(),
                 true,
                 Some(&db_transaction),
             )
@@ -553,7 +554,7 @@ fn test_family_basic_queries() {
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &person_document_type)
         .expect("query should be built");
     let (results, _, _) = query
-        .execute_no_proof(&drive, Some(&db_transaction))
+        .execute_no_proof(&drive, None, Some(&db_transaction))
         .expect("proof should be executed");
     let names: Vec<String> = results
         .iter()
@@ -574,7 +575,7 @@ fn test_family_basic_queries() {
     assert_eq!(names, all_names);
 
     let (proof_root_hash, proof_results, _) = query
-        .execute_with_proof_only_get_elements(&drive, None)
+        .execute_with_proof_only_get_elements(&drive, None, None)
         .expect("we should be able to a proof");
     assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
@@ -594,7 +595,13 @@ fn test_family_basic_queries() {
         .expect("contract should have a person document type");
 
     let (results, _, _) = drive
-        .query_documents_from_contract(&contract, person_document_type, query_cbor.as_slice(), None)
+        .query_documents_from_contract(
+            &contract,
+            person_document_type,
+            query_cbor.as_slice(),
+            None,
+            None,
+        )
         .expect("query should be executed");
     assert_eq!(results.len(), 1);
 
@@ -603,6 +610,7 @@ fn test_family_basic_queries() {
             &contract,
             person_document_type,
             query_cbor.as_slice(),
+            None,
             None,
         )
         .expect("query should be executed");
@@ -626,7 +634,13 @@ fn test_family_basic_queries() {
         .expect("contract should have a person document type");
 
     let (results, _, _) = drive
-        .query_documents_from_contract(&contract, person_document_type, query_cbor.as_slice(), None)
+        .query_documents_from_contract(
+            &contract,
+            person_document_type,
+            query_cbor.as_slice(),
+            None,
+            None,
+        )
         .expect("query should be executed");
 
     assert_eq!(results.len(), 1);
@@ -636,6 +650,7 @@ fn test_family_basic_queries() {
             &contract,
             person_document_type,
             query_cbor.as_slice(),
+            None,
             None,
         )
         .expect("query should be executed");
@@ -674,7 +689,13 @@ fn test_family_basic_queries() {
         .expect("contract should have a person document type");
 
     let (results, _, _) = drive
-        .query_documents_from_contract(&contract, person_document_type, query_cbor.as_slice(), None)
+        .query_documents_from_contract(
+            &contract,
+            person_document_type,
+            query_cbor.as_slice(),
+            None,
+            None,
+        )
         .expect("query should be executed");
 
     assert_eq!(results.len(), 1);
@@ -684,6 +705,7 @@ fn test_family_basic_queries() {
             &contract,
             person_document_type,
             query_cbor.as_slice(),
+            None,
             None,
         )
         .expect("query should be executed");
@@ -709,7 +731,13 @@ fn test_family_basic_queries() {
         .expect("contract should have a person document type");
 
     let (results, _, _) = drive
-        .query_documents_from_contract(&contract, person_document_type, query_cbor.as_slice(), None)
+        .query_documents_from_contract(
+            &contract,
+            person_document_type,
+            query_cbor.as_slice(),
+            None,
+            None,
+        )
         .expect("query should be executed");
 
     assert_eq!(results.len(), 1);
@@ -719,6 +747,7 @@ fn test_family_basic_queries() {
             &contract,
             person_document_type,
             query_cbor.as_slice(),
+            None,
             None,
         )
         .expect("query should be executed");
@@ -752,7 +781,13 @@ fn test_family_basic_queries() {
         .expect("contract should have a person document type");
 
     let (results, _, _) = drive
-        .query_documents_from_contract(&contract, person_document_type, query_cbor.as_slice(), None)
+        .query_documents_from_contract(
+            &contract,
+            person_document_type,
+            query_cbor.as_slice(),
+            None,
+            None,
+        )
         .expect("query should be executed");
 
     assert_eq!(results.len(), 0);
@@ -762,6 +797,7 @@ fn test_family_basic_queries() {
             &contract,
             person_document_type,
             query_cbor.as_slice(),
+            None,
             None,
         )
         .expect("query should be executed");
@@ -784,7 +820,13 @@ fn test_family_basic_queries() {
         .expect("contract should have a person document type");
 
     let (results, _, _) = drive
-        .query_documents_from_contract(&contract, person_document_type, query_cbor.as_slice(), None)
+        .query_documents_from_contract(
+            &contract,
+            person_document_type,
+            query_cbor.as_slice(),
+            None,
+            None,
+        )
         .expect("query should be executed");
 
     assert_eq!(results.len(), 1);
@@ -794,6 +836,7 @@ fn test_family_basic_queries() {
             &contract,
             person_document_type,
             query_cbor.as_slice(),
+            None,
             None,
         )
         .expect("query should be executed");
@@ -819,7 +862,7 @@ fn test_family_basic_queries() {
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
         .expect("query should be built");
     let (results, _, _) = query
-        .execute_no_proof(&drive, None)
+        .execute_no_proof(&drive, None, None)
         .expect("proof should be executed");
     let names: Vec<String> = results
         .iter()
@@ -846,7 +889,7 @@ fn test_family_basic_queries() {
     assert_eq!(names, expected_names_before_chris);
 
     let (proof_root_hash, proof_results, _) = query
-        .execute_with_proof_only_get_elements(&drive, None)
+        .execute_with_proof_only_get_elements(&drive, None, None)
         .expect("we should be able to a proof");
     assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
@@ -870,7 +913,7 @@ fn test_family_basic_queries() {
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
         .expect("query should be built");
     let (results, _, _) = query
-        .execute_no_proof(&drive, None)
+        .execute_no_proof(&drive, None, None)
         .expect("proof should be executed");
     let names: Vec<String> = results
         .iter()
@@ -892,7 +935,7 @@ fn test_family_basic_queries() {
     assert_eq!(names, expected_names_starting_with_c);
 
     let (proof_root_hash, proof_results, _) = query
-        .execute_with_proof_only_get_elements(&drive, None)
+        .execute_with_proof_only_get_elements(&drive, None, None)
         .expect("we should be able to a proof");
     assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
@@ -916,7 +959,7 @@ fn test_family_basic_queries() {
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
         .expect("query should be built");
     let (results, _, _) = query
-        .execute_no_proof(&drive, None)
+        .execute_no_proof(&drive, None, None)
         .expect("proof should be executed");
     let names: Vec<String> = results
         .iter()
@@ -938,7 +981,7 @@ fn test_family_basic_queries() {
     assert_eq!(names, expected_names_starting_with_c_desc_1);
 
     let (proof_root_hash, proof_results, _) = query
-        .execute_with_proof_only_get_elements(&drive, None)
+        .execute_with_proof_only_get_elements(&drive, None, None)
         .expect("we should be able to a proof");
     assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
@@ -963,7 +1006,7 @@ fn test_family_basic_queries() {
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
         .expect("query should be built");
     let (results, _, _) = query
-        .execute_no_proof(&drive, None)
+        .execute_no_proof(&drive, None, None)
         .expect("proof should be executed");
     assert_eq!(results.len(), 5);
 
@@ -994,7 +1037,7 @@ fn test_family_basic_queries() {
     assert_eq!(names, expected_between_names);
 
     let (proof_root_hash, proof_results, _) = query
-        .execute_with_proof_only_get_elements(&drive, None)
+        .execute_with_proof_only_get_elements(&drive, None, None)
         .expect("we should be able to a proof");
     assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
@@ -1018,7 +1061,7 @@ fn test_family_basic_queries() {
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
         .expect("query should be built");
     let (results, _, _) = query
-        .execute_no_proof(&drive, None)
+        .execute_no_proof(&drive, None, None)
         .expect("proof should be executed");
     let names: Vec<String> = results
         .iter()
@@ -1039,7 +1082,7 @@ fn test_family_basic_queries() {
     assert_eq!(names, expected_between_names);
 
     let (proof_root_hash, proof_results, _) = query
-        .execute_with_proof_only_get_elements(&drive, None)
+        .execute_with_proof_only_get_elements(&drive, None, None)
         .expect("we should be able to a proof");
     assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
@@ -1061,7 +1104,7 @@ fn test_family_basic_queries() {
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
         .expect("query should be built");
     let (results, _, _) = query
-        .execute_no_proof(&drive, None)
+        .execute_no_proof(&drive, None, None)
         .expect("proof should be executed");
     let names: Vec<String> = results
         .iter()
@@ -1090,7 +1133,7 @@ fn test_family_basic_queries() {
     assert_eq!(names, expected_reversed_between_names);
 
     let (proof_root_hash, proof_results, _) = query
-        .execute_with_proof_only_get_elements(&drive, None)
+        .execute_with_proof_only_get_elements(&drive, None, None)
         .expect("we should be able to a proof");
     assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
@@ -1116,7 +1159,7 @@ fn test_family_basic_queries() {
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
         .expect("query should be built");
     let (results, _, _) = query
-        .execute_no_proof(&drive, None)
+        .execute_no_proof(&drive, None, None)
         .expect("proof should be executed");
     let names: Vec<String> = results
         .iter()
@@ -1144,7 +1187,7 @@ fn test_family_basic_queries() {
     assert_eq!(names, expected_names_45_over);
 
     let (proof_root_hash, proof_results, _) = query
-        .execute_with_proof_only_get_elements(&drive, None)
+        .execute_with_proof_only_get_elements(&drive, None, None)
         .expect("we should be able to a proof");
     assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
@@ -1170,7 +1213,7 @@ fn test_family_basic_queries() {
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
         .expect("query should be built");
     let (results, _, _) = query
-        .execute_no_proof(&drive, None)
+        .execute_no_proof(&drive, None, None)
         .expect("proof should be executed");
     let names: Vec<String> = results
         .iter()
@@ -1199,7 +1242,7 @@ fn test_family_basic_queries() {
     assert_eq!(names, expected_names_over_48);
 
     let (proof_root_hash, proof_results, _) = query
-        .execute_with_proof_only_get_elements(&drive, None)
+        .execute_with_proof_only_get_elements(&drive, None, None)
         .expect("we should be able to a proof");
     assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
@@ -1278,7 +1321,7 @@ fn test_family_basic_queries() {
                 owner_id: None,
             },
             true,
-            0f64,
+            BlockInfo::genesis(),
             true,
             Some(&db_transaction),
         )
@@ -1325,7 +1368,7 @@ fn test_family_basic_queries() {
                 owner_id: None,
             },
             true,
-            0f64,
+            BlockInfo::genesis(),
             true,
             Some(&db_transaction),
         )
@@ -1349,6 +1392,7 @@ fn test_family_basic_queries() {
             &contract,
             person_document_type,
             query_cbor.as_slice(),
+            None,
             Some(&db_transaction),
         )
         .expect("query should be executed");
@@ -1390,6 +1434,7 @@ fn test_family_basic_queries() {
             &contract,
             person_document_type,
             query_cbor.as_slice(),
+            None,
             Some(&db_transaction),
         )
         .expect("query should be executed");
@@ -1429,6 +1474,7 @@ fn test_family_basic_queries() {
             &contract,
             person_document_type,
             query_cbor.as_slice(),
+            None,
             Some(&db_transaction),
         )
         .expect("query should be executed");
@@ -1464,6 +1510,7 @@ fn test_family_basic_queries() {
             &contract,
             person_document_type,
             query_cbor.as_slice(),
+            None,
             Some(&db_transaction),
         )
         .expect("query should be executed");
@@ -1489,6 +1536,7 @@ fn test_family_basic_queries() {
             &contract,
             person_document_type,
             query_cbor.as_slice(),
+            None,
             Some(&db_transaction),
         )
         .expect("query should be executed");
@@ -1529,6 +1577,7 @@ fn test_family_basic_queries() {
             &contract,
             person_document_type,
             query_cbor.as_slice(),
+            None,
             Some(&db_transaction),
         )
         .expect("query should be executed");
@@ -1557,6 +1606,7 @@ fn test_family_basic_queries() {
             &contract,
             person_document_type,
             query_cbor.as_slice(),
+            None,
             Some(&db_transaction),
         )
         .expect("query should be executed");
@@ -1571,7 +1621,7 @@ fn test_family_basic_queries() {
         .apply_contract_cbor(
             contract_cbor.clone(),
             None,
-            0f64,
+            BlockInfo::genesis(),
             true,
             StorageFlags::optional_default_as_ref(),
             Some(&db_transaction),
@@ -1592,6 +1642,7 @@ fn test_family_basic_queries() {
             contract_cbor.as_slice(),
             String::from("contact"),
             query_cbor.as_slice(),
+            None,
             Some(&db_transaction),
         )
         .expect("query should be executed");
@@ -1619,6 +1670,7 @@ fn test_family_basic_queries() {
             &contract,
             person_document_type,
             query_cbor.as_slice(),
+            None,
             Some(&db_transaction),
         )
         .expect("query should be executed");
@@ -1646,6 +1698,7 @@ fn test_family_basic_queries() {
         &contract,
         person_document_type,
         query_cbor.as_slice(),
+        None,
         Some(&db_transaction),
     );
 
@@ -1674,6 +1727,7 @@ fn test_family_basic_queries() {
         &contract,
         person_document_type,
         query_cbor.as_slice(),
+        None,
         Some(&db_transaction),
     );
 
@@ -1751,7 +1805,7 @@ fn test_family_starts_at_queries() {
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
         .expect("query should be built");
     let (results, _, _) = query
-        .execute_no_proof(&drive, None)
+        .execute_no_proof(&drive, None, None)
         .expect("proof should be executed");
 
     let reduced_names_after: Vec<String> = results
@@ -1779,7 +1833,7 @@ fn test_family_starts_at_queries() {
     assert_eq!(reduced_names_after, expected_reduced_names);
 
     let (proof_root_hash, proof_results, _) = query
-        .execute_with_proof_only_get_elements(&drive, None)
+        .execute_with_proof_only_get_elements(&drive, None, None)
         .expect("we should be able to a proof");
     assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
@@ -1805,7 +1859,7 @@ fn test_family_starts_at_queries() {
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
         .expect("query should be built");
     let (results, _, _) = query
-        .execute_no_proof(&drive, None)
+        .execute_no_proof(&drive, None, None)
         .expect("proof should be executed");
 
     let reduced_names_after: Vec<String> = results
@@ -1829,7 +1883,7 @@ fn test_family_starts_at_queries() {
     assert_eq!(reduced_names_after, expected_reduced_names);
 
     let (proof_root_hash, proof_results, _) = query
-        .execute_with_proof_only_get_elements(&drive, None)
+        .execute_with_proof_only_get_elements(&drive, None, None)
         .expect("we should be able to a proof");
     assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
@@ -1853,7 +1907,7 @@ fn test_family_starts_at_queries() {
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
         .expect("query should be built");
     let (results, _, _) = query
-        .execute_no_proof(&drive, None)
+        .execute_no_proof(&drive, None, None)
         .expect("proof should be executed");
 
     let reduced_names_after: Vec<String> = results
@@ -1881,7 +1935,7 @@ fn test_family_starts_at_queries() {
     assert_eq!(reduced_names_after, expected_reduced_names);
 
     let (proof_root_hash, proof_results, _) = query
-        .execute_with_proof_only_get_elements(&drive, None)
+        .execute_with_proof_only_get_elements(&drive, None, None)
         .expect("we should be able to a proof");
     assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
@@ -1907,7 +1961,7 @@ fn test_family_starts_at_queries() {
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
         .expect("query should be built");
     let (results, _, _) = query
-        .execute_no_proof(&drive, None)
+        .execute_no_proof(&drive, None, None)
         .expect("proof should be executed");
     assert_eq!(results.len(), 2);
 
@@ -1932,7 +1986,7 @@ fn test_family_starts_at_queries() {
     assert_eq!(reduced_names_after, expected_reduced_names);
 
     let (proof_root_hash, proof_results, _) = query
-        .execute_with_proof_only_get_elements(&drive, None)
+        .execute_with_proof_only_get_elements(&drive, None, None)
         .expect("we should be able to a proof");
     assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
@@ -2125,7 +2179,7 @@ fn test_family_with_nulls_query() {
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &person_document_type)
         .expect("query should be built");
     let (results, _, _) = query
-        .execute_no_proof(&drive, Some(&db_transaction))
+        .execute_no_proof(&drive, None, Some(&db_transaction))
         .expect("proof should be executed");
     let names: Vec<String> = results
         .clone()
@@ -2151,7 +2205,7 @@ fn test_family_with_nulls_query() {
     assert_eq!(names, all_names);
 
     let (proof_root_hash, proof_results, _) = query
-        .execute_with_proof_only_get_elements(&drive, None)
+        .execute_with_proof_only_get_elements(&drive, None, None)
         .expect("we should be able to a proof");
     assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
@@ -2174,6 +2228,7 @@ fn test_family_with_nulls_query() {
                 &contract,
                 "person",
                 None,
+                BlockInfo::genesis(),
                 true,
                 Some(&db_transaction),
             )
@@ -2228,6 +2283,7 @@ fn test_query_with_cached_contract() {
             where_cbor.as_slice(),
             contract.id.as_bytes().clone(),
             "person",
+            None,
             Some(&db_transaction),
         )
         .expect("query should be executed");
@@ -2241,7 +2297,7 @@ fn test_query_with_cached_contract() {
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &person_document_type)
         .expect("query should be built");
     let (proof_root_hash, proof_results, _) = query
-        .execute_with_proof_only_get_elements(&drive, None)
+        .execute_with_proof_only_get_elements(&drive, None, None)
         .expect("we should be able to a proof");
     assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
@@ -2304,7 +2360,7 @@ fn test_dpns_query() {
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &domain_document_type)
         .expect("query should be built");
     let (results, _, _) = query
-        .execute_no_proof(&drive, Some(&db_transaction))
+        .execute_no_proof(&drive, None, Some(&db_transaction))
         .expect("proof should be executed");
     let names: Vec<String> = results
         .iter()
@@ -2325,7 +2381,7 @@ fn test_dpns_query() {
     assert_eq!(names, all_names);
 
     let (proof_root_hash, proof_results, _) = query
-        .execute_with_proof_only_get_elements(&drive, None)
+        .execute_with_proof_only_get_elements(&drive, None, None)
         .expect("we should be able to a proof");
     assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
@@ -2350,7 +2406,7 @@ fn test_dpns_query() {
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &domain_document_type)
         .expect("query should be built");
     let (results, _, _) = query
-        .execute_no_proof(&drive, Some(&db_transaction))
+        .execute_no_proof(&drive, None, Some(&db_transaction))
         .expect("proof should be executed");
     let names: Vec<String> = results
         .iter()
@@ -2377,7 +2433,7 @@ fn test_dpns_query() {
     assert_eq!(names, a_names);
 
     let (proof_root_hash, proof_results, _) = query
-        .execute_with_proof_only_get_elements(&drive, None)
+        .execute_with_proof_only_get_elements(&drive, None, None)
         .expect("we should be able to a proof");
     assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
@@ -2424,7 +2480,7 @@ fn test_dpns_query() {
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &domain_document_type)
         .expect("query should be built");
     let (results, _, _) = query
-        .execute_no_proof(&drive, Some(&db_transaction))
+        .execute_no_proof(&drive, None, Some(&db_transaction))
         .expect("proof should be executed");
     let names: Vec<String> = results
         .iter()
@@ -2447,7 +2503,7 @@ fn test_dpns_query() {
     assert_eq!(names, a_names);
 
     let (proof_root_hash, proof_results, _) = query
-        .execute_with_proof_only_get_elements(&drive, None)
+        .execute_with_proof_only_get_elements(&drive, None, None)
         .expect("we should be able to a proof");
     assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
@@ -2477,7 +2533,7 @@ fn test_dpns_query() {
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &domain_document_type)
         .expect("query should be built");
     let (results, _, _) = query
-        .execute_no_proof(&drive, Some(&db_transaction))
+        .execute_no_proof(&drive, None, Some(&db_transaction))
         .expect("proof should be executed");
     let names: Vec<String> = results
         .iter()
@@ -2500,7 +2556,7 @@ fn test_dpns_query() {
     assert_eq!(names, a_names);
 
     let (proof_root_hash, proof_results, _) = query
-        .execute_with_proof_only_get_elements(&drive, None)
+        .execute_with_proof_only_get_elements(&drive, None, None)
         .expect("we should be able to a proof");
     assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
@@ -2546,7 +2602,7 @@ fn test_dpns_query() {
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &domain_document_type)
         .expect("query should be built");
     let (results, _, _) = query
-        .execute_no_proof(&drive, Some(&db_transaction))
+        .execute_no_proof(&drive, None, Some(&db_transaction))
         .expect("proof should be executed");
     let names: Vec<String> = results
         .iter()
@@ -2573,7 +2629,7 @@ fn test_dpns_query() {
     assert_eq!(names, a_names);
 
     let (proof_root_hash, proof_results, _) = query
-        .execute_with_proof_only_get_elements(&drive, None)
+        .execute_with_proof_only_get_elements(&drive, None, None)
         .expect("we should be able to a proof");
     assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
@@ -2597,7 +2653,7 @@ fn test_dpns_query() {
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &domain_document_type)
         .expect("query should be built");
     let (results, _, _) = query
-        .execute_no_proof(&drive, Some(&db_transaction))
+        .execute_no_proof(&drive, None, Some(&db_transaction))
         .expect("proof should be executed");
     let names: Vec<String> = results
         .iter()
@@ -2620,7 +2676,7 @@ fn test_dpns_query() {
     assert_eq!(names, a_names);
 
     let (proof_root_hash, proof_results, _) = query
-        .execute_with_proof_only_get_elements(&drive, None)
+        .execute_with_proof_only_get_elements(&drive, None, None)
         .expect("we should be able to a proof");
     assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
@@ -2640,13 +2696,13 @@ fn test_dpns_query() {
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &domain_document_type)
         .expect("query should be built");
     let (results, _, _) = query
-        .execute_no_proof(&drive, Some(&db_transaction))
+        .execute_no_proof(&drive, None, Some(&db_transaction))
         .expect("proof should be executed");
 
     assert_eq!(results.len(), 10);
 
     let (proof_root_hash, proof_results, _) = query
-        .execute_with_proof_only_get_elements(&drive, None)
+        .execute_with_proof_only_get_elements(&drive, None, None)
         .expect("we should be able to a proof");
     assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
@@ -2676,6 +2732,7 @@ fn test_dpns_insertion_no_aliases() {
             &contract,
             domain_document_type,
             query_cbor.as_slice(),
+            None,
             Some(&db_transaction),
         )
         .expect("should perform query");
@@ -2687,6 +2744,7 @@ fn test_dpns_insertion_no_aliases() {
             &contract,
             domain_document_type,
             query_cbor.as_slice(),
+            None,
             None,
         )
         .expect("query should be executed");
@@ -2725,6 +2783,7 @@ fn test_dpns_insertion_with_aliases() {
             &contract,
             domain_document_type,
             query_cbor.as_slice(),
+            None,
             Some(&db_transaction),
         )
         .expect("should perform query");
@@ -2736,6 +2795,7 @@ fn test_dpns_insertion_with_aliases() {
             &contract,
             domain_document_type,
             query_cbor.as_slice(),
+            None,
             None,
         )
         .expect("query should be executed");
@@ -2807,7 +2867,7 @@ fn test_dpns_query_start_at() {
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &domain_document_type)
         .expect("query should be built");
     let (results, _, _) = query
-        .execute_no_proof(&drive, Some(&db_transaction))
+        .execute_no_proof(&drive, None, Some(&db_transaction))
         .expect("proof should be executed");
     let names: Vec<String> = results
         .iter()
@@ -2830,7 +2890,7 @@ fn test_dpns_query_start_at() {
     assert_eq!(names, a_names);
 
     let (proof_root_hash, proof_results, _) = query
-        .execute_with_proof_only_get_elements(&drive, None)
+        .execute_with_proof_only_get_elements(&drive, None, None)
         .expect("we should be able to a proof");
     assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
@@ -2893,7 +2953,7 @@ fn test_dpns_query_start_after() {
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &domain_document_type)
         .expect("query should be built");
     let (results, _, _) = query
-        .execute_no_proof(&drive, Some(&db_transaction))
+        .execute_no_proof(&drive, None, Some(&db_transaction))
         .expect("proof should be executed");
     let names: Vec<String> = results
         .iter()
@@ -2916,7 +2976,7 @@ fn test_dpns_query_start_after() {
     assert_eq!(names, a_names);
 
     let (proof_root_hash, proof_results, _) = query
-        .execute_with_proof_only_get_elements(&drive, None)
+        .execute_with_proof_only_get_elements(&drive, None, None)
         .expect("we should be able to a proof");
     assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
@@ -2979,7 +3039,7 @@ fn test_dpns_query_start_at_desc() {
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &domain_document_type)
         .expect("query should be built");
     let (results, _, _) = query
-        .execute_no_proof(&drive, Some(&db_transaction))
+        .execute_no_proof(&drive, None, Some(&db_transaction))
         .expect("proof should be executed");
     let names: Vec<String> = results
         .iter()
@@ -3002,7 +3062,7 @@ fn test_dpns_query_start_at_desc() {
     assert_eq!(names, a_names);
 
     let (proof_root_hash, proof_results, _) = query
-        .execute_with_proof_only_get_elements(&drive, None)
+        .execute_with_proof_only_get_elements(&drive, None, None)
         .expect("we should be able to a proof");
     assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
@@ -3065,7 +3125,7 @@ fn test_dpns_query_start_after_desc() {
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &domain_document_type)
         .expect("query should be built");
     let (results, _, _) = query
-        .execute_no_proof(&drive, Some(&db_transaction))
+        .execute_no_proof(&drive, None, Some(&db_transaction))
         .expect("proof should be executed");
     let names: Vec<String> = results
         .iter()
@@ -3088,7 +3148,7 @@ fn test_dpns_query_start_after_desc() {
     assert_eq!(names, a_names);
 
     let (proof_root_hash, proof_results, _) = query
-        .execute_with_proof_only_get_elements(&drive, None)
+        .execute_with_proof_only_get_elements(&drive, None, None)
         .expect("we should be able to a proof");
     assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
@@ -3144,7 +3204,7 @@ fn test_dpns_query_start_at_with_null_id() {
                 owner_id: None,
             },
             true,
-            0f64,
+            BlockInfo::genesis(),
             true,
             Some(&db_transaction),
         )
@@ -3185,7 +3245,7 @@ fn test_dpns_query_start_at_with_null_id() {
                 owner_id: None,
             },
             true,
-            0f64,
+            BlockInfo::genesis(),
             true,
             Some(&db_transaction),
         )
@@ -3249,7 +3309,7 @@ fn test_dpns_query_start_at_with_null_id() {
         .expect("query should be built");
 
     let (results, _, _) = query
-        .execute_no_proof(&drive, Some(&db_transaction))
+        .execute_no_proof(&drive, None, Some(&db_transaction))
         .expect("proof should be executed");
     let names: Vec<String> = results
         .iter()
@@ -3280,7 +3340,7 @@ fn test_dpns_query_start_at_with_null_id() {
     assert_eq!(names, a_names);
 
     let (proof_root_hash, proof_results, _) = query
-        .execute_with_proof_only_get_elements(&drive, None)
+        .execute_with_proof_only_get_elements(&drive, None, None)
         .expect("we should be able to a proof");
     assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
@@ -3336,7 +3396,7 @@ fn test_dpns_query_start_after_with_null_id() {
                 owner_id: None,
             },
             true,
-            0f64,
+            BlockInfo::genesis(),
             true,
             Some(&db_transaction),
         )
@@ -3378,7 +3438,7 @@ fn test_dpns_query_start_after_with_null_id() {
                 owner_id: None,
             },
             true,
-            0f64,
+            BlockInfo::genesis(),
             true,
             Some(&db_transaction),
         )
@@ -3448,7 +3508,7 @@ fn test_dpns_query_start_after_with_null_id() {
     //     .expect("expected to construct a path query");
     // println!("{:#?}", path_query);
     let (results, _, _) = query
-        .execute_no_proof(&drive, Some(&db_transaction))
+        .execute_no_proof(&drive, None, Some(&db_transaction))
         .expect("proof should be executed");
     let names: Vec<String> = results
         .iter()
@@ -3475,7 +3535,7 @@ fn test_dpns_query_start_after_with_null_id() {
     assert_eq!(names, a_names);
 
     let (proof_root_hash, proof_results, _) = query
-        .execute_with_proof_only_get_elements(&drive, None)
+        .execute_with_proof_only_get_elements(&drive, None, None)
         .expect("we should be able to a proof");
     assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
@@ -3531,7 +3591,7 @@ fn test_dpns_query_start_after_with_null_id_desc() {
                 owner_id: None,
             },
             true,
-            0f64,
+            BlockInfo::genesis(),
             true,
             Some(&db_transaction),
         )
@@ -3573,7 +3633,7 @@ fn test_dpns_query_start_after_with_null_id_desc() {
                 owner_id: None,
             },
             true,
-            0f64,
+            BlockInfo::genesis(),
             true,
             Some(&db_transaction),
         )
@@ -3646,7 +3706,7 @@ fn test_dpns_query_start_after_with_null_id_desc() {
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &domain_document_type)
         .expect("query should be built");
     let (results, _, _) = query
-        .execute_no_proof(&drive, Some(&db_transaction))
+        .execute_no_proof(&drive, None, Some(&db_transaction))
         .expect("proof should be executed");
     let docs: Vec<Vec<u8>> = results
         .clone()
@@ -3659,7 +3719,7 @@ fn test_dpns_query_start_after_with_null_id_desc() {
         .collect();
 
     let (proof_root_hash, proof_results, _) = query
-        .execute_with_proof_only_get_elements(&drive, None)
+        .execute_with_proof_only_get_elements(&drive, None, None)
         .expect("we should be able to a proof");
     assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
@@ -3694,7 +3754,7 @@ fn test_dpns_query_start_after_with_null_id_desc() {
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &domain_document_type)
         .expect("query should be built");
     let (results, _, _) = query
-        .execute_no_proof(&drive, Some(&db_transaction))
+        .execute_no_proof(&drive, None, Some(&db_transaction))
         .expect("proof should be executed");
     let docs: Vec<Vec<u8>> = results
         .iter()
@@ -3713,7 +3773,7 @@ fn test_dpns_query_start_after_with_null_id_desc() {
 
     assert_eq!(docs, expected_docs);
     let (proof_root_hash, proof_results, _) = query
-        .execute_with_proof_only_get_elements(&drive, None)
+        .execute_with_proof_only_get_elements(&drive, None, None)
         .expect("we should be able to a proof");
     assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
@@ -3742,7 +3802,7 @@ fn test_dpns_query_start_after_with_null_id_desc() {
     let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &domain_document_type)
         .expect("query should be built");
     let (results, _, _) = query
-        .execute_no_proof(&drive, Some(&db_transaction))
+        .execute_no_proof(&drive, None, Some(&db_transaction))
         .expect("proof should be executed");
     let names: Vec<String> = results
         .iter()
@@ -3769,7 +3829,7 @@ fn test_dpns_query_start_after_with_null_id_desc() {
     assert_eq!(names, a_names);
 
     let (proof_root_hash, proof_results, _) = query
-        .execute_with_proof_only_get_elements(&drive, None)
+        .execute_with_proof_only_get_elements(&drive, None, None)
         .expect("we should be able to a proof");
     assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);

@@ -21,8 +21,8 @@ use crate::drive::object_size_info::{DocumentAndContractInfo, DriveKeyInfo, Path
 use crate::drive::Drive;
 use crate::error::drive::DriveError;
 use crate::error::Error;
-use crate::fee::{calculate_fee, FeeResult};
 use crate::fee::op::DriveOperation;
+use crate::fee::{calculate_fee, FeeResult};
 
 use crate::drive::block_info::BlockInfo;
 use dpp::data_contract::extra::DriveContractExt;

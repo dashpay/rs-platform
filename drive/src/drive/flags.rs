@@ -1,10 +1,10 @@
 use crate::drive::flags::StorageFlags::{
     MultiEpoch, MultiEpochOwned, SingleEpoch, SingleEpochOwned,
 };
-use costs::storage_cost::removal::{StorageRemovalPerEpochByIdentifier, StorageRemovedBytes};
 use costs::storage_cost::removal::StorageRemovedBytes::{
     BasicStorageRemoval, SectionedStorageRemoval,
 };
+use costs::storage_cost::removal::{StorageRemovalPerEpochByIdentifier, StorageRemovedBytes};
 use grovedb::ElementFlags;
 use integer_encoding::VarInt;
 use intmap::IntMap;
@@ -142,14 +142,21 @@ impl StorageFlags {
         match removed_bytes {
             SectionedStorageRemoval(sectioned_bytes_by_identifier) => {
                 if sectioned_bytes_by_identifier.len() > 1 {
-                    return Err(Error::StorageFlags(StorageFlagsError::MergingStorageFlagsFromDifferentOwners(
-                        "can not remove bytes when there is no epoch",
-                    )));
+                    return Err(Error::StorageFlags(
+                        StorageFlagsError::MergingStorageFlagsFromDifferentOwners(
+                            "can not remove bytes when there is no epoch",
+                        ),
+                    ));
                 }
                 let identifier = owner_id.map(|o| o.clone()).unwrap_or_default();
-                let sectioned_bytes = sectioned_bytes_by_identifier.get(&identifier).ok_or(Error::StorageFlags(StorageFlagsError::MergingStorageFlagsFromDifferentOwners(
-                    "can not remove bytes when there is no epoch",
-                )))?;
+                let sectioned_bytes =
+                    sectioned_bytes_by_identifier
+                        .get(&identifier)
+                        .ok_or(Error::StorageFlags(
+                            StorageFlagsError::MergingStorageFlagsFromDifferentOwners(
+                                "can not remove bytes when there is no epoch",
+                            ),
+                        ))?;
                 sectioned_bytes
                     .iter()
                     .map(|(epoch, removed_bytes)| {
@@ -480,11 +487,14 @@ impl StorageFlags {
         self.serialize()
     }
 
-
     /// split_storage_removed_bytes removes bytes as LIFO
     pub fn split_storage_removed_bytes(&self, removed_bytes: u32) -> StorageRemovedBytes {
-
-        fn sectioned_storage_removal(removed_bytes: u32, base_epoch: &BaseEpoch, other_epoch_bytes: &BTreeMap<EpochIndex, BytesAddedInEpoch>, owner_id: Option<&OwnerId>) -> StorageRemovedBytes {
+        fn sectioned_storage_removal(
+            removed_bytes: u32,
+            base_epoch: &BaseEpoch,
+            other_epoch_bytes: &BTreeMap<EpochIndex, BytesAddedInEpoch>,
+            owner_id: Option<&OwnerId>,
+        ) -> StorageRemovedBytes {
             let mut bytes_left = removed_bytes;
             let mut rev_iter = other_epoch_bytes.iter().rev();
             let mut sectioned_storage_removal: IntMap<u32> = IntMap::default();
@@ -497,8 +507,7 @@ impl StorageFlags {
                     } else if *bytes_in_epoch >= bytes_left {
                         //take all bytes
                         bytes_left = 0;
-                        sectioned_storage_removal
-                            .insert(epoch_index.clone() as u64, bytes_left);
+                        sectioned_storage_removal.insert(epoch_index.clone() as u64, bytes_left);
                     }
                 } else {
                     break;
@@ -508,11 +517,13 @@ impl StorageFlags {
                 // We need to take some from the base epoch
                 sectioned_storage_removal.insert(base_epoch.clone() as u64, bytes_left);
             }
-            let mut sectioned_storage_removal_by_identifier : StorageRemovalPerEpochByIdentifier = BTreeMap::new();
+            let mut sectioned_storage_removal_by_identifier: StorageRemovalPerEpochByIdentifier =
+                BTreeMap::new();
             if let Some(owner_id) = owner_id {
-                sectioned_storage_removal_by_identifier.insert(owner_id.clone(), sectioned_storage_removal);
+                sectioned_storage_removal_by_identifier
+                    .insert(owner_id.clone(), sectioned_storage_removal);
             } else {
-                let default = [0u8;32];
+                let default = [0u8; 32];
                 sectioned_storage_removal_by_identifier.insert(default, sectioned_storage_removal);
             }
             SectionedStorageRemoval(sectioned_storage_removal_by_identifier)
@@ -522,9 +533,12 @@ impl StorageFlags {
             MultiEpoch(base_epoch, other_epoch_bytes) => {
                 sectioned_storage_removal(removed_bytes, base_epoch, other_epoch_bytes, None)
             }
-            MultiEpochOwned(base_epoch, other_epoch_bytes, owner_id) => {
-                sectioned_storage_removal(removed_bytes, base_epoch, other_epoch_bytes, Some(owner_id))
-            }
+            MultiEpochOwned(base_epoch, other_epoch_bytes, owner_id) => sectioned_storage_removal(
+                removed_bytes,
+                base_epoch,
+                other_epoch_bytes,
+                Some(owner_id),
+            ),
         }
     }
 }

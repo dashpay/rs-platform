@@ -7,6 +7,7 @@ use rs_drive::dpp::data_contract::extra::DriveContractExt;
 use rs_drive::drive::flags::StorageFlags;
 use rs_drive::grovedb::TransactionArg;
 use serde_json::json;
+use rs_drive::drive::block_info::BlockInfo;
 
 pub const MN_REWARD_SHARES_CONTRACT_ID: [u8; 32] = [
     0x0c, 0xac, 0xe2, 0x05, 0x24, 0x66, 0x93, 0xa7, 0xc8, 0x15, 0x65, 0x23, 0x62, 0x0d, 0xaa, 0x93,
@@ -33,6 +34,7 @@ impl Platform {
             &query_cbor,
             MN_REWARD_SHARES_CONTRACT_ID,
             MN_REWARD_SHARES_DOCUMENT_TYPE,
+            None,
             transaction,
         )?;
 
@@ -56,7 +58,7 @@ impl Platform {
             .apply_contract(
                 &contract,
                 contract_cbor.clone(),
-                0f64,
+                BlockInfo::genesis(),
                 true,
                 storage_flags.as_ref(),
                 transaction,

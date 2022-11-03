@@ -17,6 +17,7 @@ use rs_drive::drive::object_size_info::DocumentInfo::DocumentRefAndSerialization
 use rs_drive::drive::{Drive, RootTree};
 
 use dpp::data_contract::extra::DriveContractExt;
+use rs_drive::drive::block_info::BlockInfo;
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -104,7 +105,7 @@ pub fn add_domains_to_contract(
                     owner_id: None,
                 },
                 true,
-                0f64,
+                BlockInfo::genesis(),
                 true,
                 transaction,
             )
@@ -366,7 +367,7 @@ fn test_root_hash_with_batches(drive: &Drive, db_transaction: &Transaction) {
         .apply_contract_cbor(
             encoded_dpns_contract,
             None,
-            0f64,
+            BlockInfo::genesis(),
             true,
             StorageFlags::optional_default_as_ref(),
             Some(db_transaction),

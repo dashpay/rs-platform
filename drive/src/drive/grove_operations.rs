@@ -2,7 +2,9 @@ use crate::drive::batch::GroveDbOpBatch;
 use costs::storage_cost::removal::StorageRemovedBytes::BasicStorageRemoval;
 use costs::storage_cost::transition::OperationStorageTransitionType;
 use costs::{CostContext, CostsExt, OperationCost};
-use grovedb::batch::{BatchApplyOptions, GroveDbOp, GroveDbOpMode, KeyInfoPath, Op, key_info::KeyInfo};
+use grovedb::batch::{
+    key_info::KeyInfo, BatchApplyOptions, GroveDbOp, GroveDbOpMode, KeyInfoPath, Op,
+};
 use grovedb::{Element, GroveDb, PathQuery, TransactionArg};
 
 use crate::drive::defaults::{MAX_ELEMENT_SIZE, SOME_TREE_SIZE};
@@ -21,10 +23,10 @@ use crate::error::drive::DriveError;
 use crate::error::Error;
 use crate::fee::op::DriveOperation::{CalculatedCostOperation, CostCalculationQueryOperation};
 use crate::fee::op::{DriveOperation, SizesOfQueryOperation};
+use grovedb::operations::delete::DeleteOptions;
 use grovedb::operations::insert::InsertOptions;
 use grovedb::query_result_type::{QueryResultElements, QueryResultType};
 use grovedb::Error as GroveError;
-use grovedb::operations::delete::DeleteOptions;
 
 fn push_drive_operation_result<T>(
     cost_context: CostContext<Result<T, GroveError>>,
@@ -137,7 +139,10 @@ impl Drive {
                             Some(storage_flags),
                         ));
                         drive_operations.push(CostCalculationQueryOperation(
-                            SizesOfQueryOperation::for_key_check_in_path(key.len() as u32, path_iter),
+                            SizesOfQueryOperation::for_key_check_in_path(
+                                key.len() as u32,
+                                path_iter,
+                            ),
                         ));
                     }
                     // worst case is always that it was inserted
@@ -180,7 +185,10 @@ impl Drive {
                             Some(storage_flags),
                         ));
                         drive_operations.push(CostCalculationQueryOperation(
-                            SizesOfQueryOperation::for_key_check_in_path(key.len() as u32, path_iter),
+                            SizesOfQueryOperation::for_key_check_in_path(
+                                key.len() as u32,
+                                path_iter,
+                            ),
                         ));
                     }
                     // wost case scenario is true
@@ -326,8 +334,10 @@ impl Drive {
                     push_drive_operation_result_optional(cost_context, drive_operations)?
                 } else {
                     if let Some(drive_operations) = drive_operations {
-                        let query_operation =
-                            SizesOfQueryOperation::for_key_check_in_path(key.len() as u32, path_iter);
+                        let query_operation = SizesOfQueryOperation::for_key_check_in_path(
+                            key.len() as u32,
+                            path_iter,
+                        );
                         drive_operations.push(CostCalculationQueryOperation(query_operation));
                         let insert_operation = DriveOperation::for_insert_path_key_value_size(
                             path_lengths.iter().sum(),
@@ -370,8 +380,10 @@ impl Drive {
                     push_drive_operation_result_optional(cost_context, drive_operations)?
                 } else {
                     if let Some(drive_operations) = drive_operations {
-                        let query_operation =
-                            SizesOfQueryOperation::for_key_check_in_path(key.len() as u32, path_iter);
+                        let query_operation = SizesOfQueryOperation::for_key_check_in_path(
+                            key.len() as u32,
+                            path_iter,
+                        );
                         drive_operations.push(CostCalculationQueryOperation(query_operation));
                         let insert_operation = DriveOperation::for_insert_path_key_value_size(
                             path.iter().map(|a| a.len() as u32).sum(),
@@ -400,9 +412,11 @@ impl Drive {
             let options = DeleteOptions {
                 allow_deleting_non_empty_trees: false,
                 deleting_non_empty_trees_returns_error: true,
-                base_root_storage_is_free: true
+                base_root_storage_is_free: true,
             };
-            let cost_context = self.grove.delete(path_iter, key, Some(options), transaction);
+            let cost_context = self
+                .grove
+                .delete(path_iter, key, Some(options), transaction);
             push_drive_operation_result(cost_context, drive_operations)
         } else {
             // TODO this is wrong
@@ -801,7 +815,7 @@ impl Drive {
         let options = DeleteOptions {
             allow_deleting_non_empty_trees: false,
             deleting_non_empty_trees_returns_error: true,
-            base_root_storage_is_free: true
+            base_root_storage_is_free: true,
         };
         if apply {
             let cost_context = self.grove.delete_operation_for_delete_internal(
@@ -1003,7 +1017,7 @@ impl Drive {
                 Some(InsertOptions {
                     validate_insertion_does_not_override: false,
                     validate_insertion_does_not_override_tree: true,
-                    base_root_storage_is_free: true
+                    base_root_storage_is_free: true,
                 })
             } else {
                 None
@@ -1089,7 +1103,7 @@ impl Drive {
                 allow_deleting_non_empty_trees: false,
                 deleting_non_empty_trees_returns_error: true,
                 disable_operation_consistency_check: false,
-                base_root_storage_is_free: true
+                base_root_storage_is_free: true,
             }),
             |_, _, _| Ok(false),
             |_, _| Err(GroveError::InternalError("not implemented")),

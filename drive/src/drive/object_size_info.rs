@@ -36,7 +36,11 @@ impl<'a, const N: usize> PathInfo<'a, N> {
             PathFixedSizeIterator(path_iterator) => {
                 (*path_iterator).into_iter().map(|a| a.len() as u32).sum()
             }
-            PathIterator(path_iterator) => path_iterator.clone().into_iter().map(|a| a.len() as u32).sum(),
+            PathIterator(path_iterator) => path_iterator
+                .clone()
+                .into_iter()
+                .map(|a| a.len() as u32)
+                .sum(),
             PathSize(path_size) => *path_size,
         }
     }
