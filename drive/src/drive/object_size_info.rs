@@ -1,3 +1,37 @@
+// MIT LICENSE
+//
+// Copyright (c) 2021 Dash Core Group
+//
+// Permission is hereby granted, free of charge, to any
+// person obtaining a copy of this software and associated
+// documentation files (the "Software"), to deal in the
+// Software without restriction, including without
+// limitation the rights to use, copy, modify, merge,
+// publish, distribute, sublicense, and/or sell copies of
+// the Software, and to permit persons to whom the Software
+// is furnished to do so, subject to the following
+// conditions:
+//
+// The above copyright notice and this permission notice
+// shall be included in all copies or substantial portions
+// of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+// ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+// TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+// PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+// SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+// CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+// OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+// IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+// DEALINGS IN THE SOFTWARE.
+//
+
+//! Object Size Info
+//!
+//! This module defines enums and implements functions relevant to the sizes of objects.
+//!
+
 use grovedb::Element;
 use std::collections::HashSet;
 use std::ops::AddAssign;
@@ -18,6 +52,7 @@ use dpp::data_contract::extra::DocumentType;
 
 use dpp::data_contract::extra::ContractError;
 
+/// Info about a path.
 #[derive(Clone)]
 pub enum PathInfo<'a, const N: usize> {
     /// An into iter Path
@@ -31,6 +66,7 @@ pub enum PathInfo<'a, const N: usize> {
 }
 
 impl<'a, const N: usize> PathInfo<'a, N> {
+    /// Returns the length of the path as a usize.
     pub fn len(&self) -> u32 {
         match self {
             PathFixedSizeIterator(path_iterator) => {
@@ -45,6 +81,7 @@ impl<'a, const N: usize> PathInfo<'a, N> {
         }
     }
 
+    /// Returns true if the path is empty.
     pub fn is_empty(&self) -> bool {
         match self {
             PathFixedSizeIterator(path_iterator) => {
@@ -55,6 +92,7 @@ impl<'a, const N: usize> PathInfo<'a, N> {
         }
     }
 
+    /// Pushes the given key into the path.
     pub fn push(&mut self, key_info: DriveKeyInfo<'a>) -> Result<(), Error> {
         match self {
             PathFixedSizeIterator(_) => {
@@ -81,6 +119,7 @@ impl<'a, const N: usize> PathInfo<'a, N> {
     }
 }
 
+/// Key info
 #[derive(Clone)]
 pub enum DriveKeyInfo<'a> {
     /// A key
@@ -98,6 +137,7 @@ impl<'a> Default for DriveKeyInfo<'a> {
 }
 
 impl<'a> DriveKeyInfo<'a> {
+    /// Returns the length of the key as a usize.
     pub fn len(&'a self) -> usize {
         match self {
             Key(key) => key.len(),
@@ -106,6 +146,7 @@ impl<'a> DriveKeyInfo<'a> {
         }
     }
 
+    /// Returns true if the key is empty.
     pub fn is_empty(&'a self) -> bool {
         match self {
             Key(key) => key.is_empty(),
@@ -114,6 +155,7 @@ impl<'a> DriveKeyInfo<'a> {
         }
     }
 
+    /// Adds path info to the key. Returns `PathKeyInfo`.
     pub fn add_path_info<const N: usize>(self, path_info: PathInfo<'a, N>) -> PathKeyInfo<'a, N> {
         match self {
             Key(key) => match path_info {
@@ -130,6 +172,7 @@ impl<'a> DriveKeyInfo<'a> {
         }
     }
 
+    /// Adds a fixed size path to the key. Returns `PathKeyInfo`.
     pub fn add_fixed_size_path<const N: usize>(self, path: [&'a [u8]; N]) -> PathKeyInfo<'a, N> {
         match self {
             Key(key) => PathFixedSizeKey((path, key)),
@@ -138,6 +181,7 @@ impl<'a> DriveKeyInfo<'a> {
         }
     }
 
+    /// Adds a path to the key. Returns `PathKeyInfo`.
     pub fn add_path<const N: usize>(self, path: Vec<Vec<u8>>) -> PathKeyInfo<'a, N> {
         match self {
             Key(key) => PathKey((path, key)),
@@ -147,6 +191,7 @@ impl<'a> DriveKeyInfo<'a> {
     }
 }
 
+/// Path key info
 #[derive(Clone)]
 pub enum PathKeyInfo<'a, const N: usize> {
     /// An into iter Path with a Key
@@ -163,6 +208,7 @@ pub enum PathKeyInfo<'a, const N: usize> {
 }
 
 impl<'a, const N: usize> PathKeyInfo<'a, N> {
+    /// Returns the length of the path with key as a usize.
     pub fn len(&'a self) -> usize {
         match self {
             PathKey((path_iterator, key)) => {
@@ -191,6 +237,7 @@ impl<'a, const N: usize> PathKeyInfo<'a, N> {
         }
     }
 
+    /// Returns true if the path with key is empty.
     pub fn is_empty(&'a self) -> bool {
         match self {
             PathKey((path_iterator, key)) => {
@@ -209,6 +256,7 @@ impl<'a, const N: usize> PathKeyInfo<'a, N> {
         }
     }
 
+    /// Returns true if the path with key is in cache.
     pub fn is_contained_in_cache(&'a self, qualified_paths: &HashSet<Vec<Vec<u8>>>) -> bool {
         match self {
             PathKey((path, key)) => {
@@ -235,6 +283,7 @@ impl<'a, const N: usize> PathKeyInfo<'a, N> {
         }
     }
 
+    /// Adds the path with key to cache.
     pub fn add_to_cache(&'a self, qualified_paths: &mut HashSet<Vec<Vec<u8>>>) -> bool {
         match self {
             PathKey((path, key)) => {
@@ -262,6 +311,7 @@ impl<'a, const N: usize> PathKeyInfo<'a, N> {
     }
 }
 
+/// Element info
 pub enum ElementInfo {
     /// An element
     Element(Element),
@@ -269,6 +319,7 @@ pub enum ElementInfo {
     ElementSize(u32),
 }
 
+/// Key element info
 pub enum KeyElementInfo<'a> {
     /// An element
     KeyElement((&'a [u8], Element)),
@@ -276,6 +327,7 @@ pub enum KeyElementInfo<'a> {
     KeyElementSize((u32, u32)),
 }
 
+/// Path key element info
 pub enum PathKeyElementInfo<'a, const N: usize> {
     /// A triple Path Key and Element
     PathFixedSizeKeyElement(([&'a [u8]; N], &'a [u8], Element)),
@@ -286,6 +338,7 @@ pub enum PathKeyElementInfo<'a, const N: usize> {
 }
 
 impl<'a, const N: usize> PathKeyElementInfo<'a, N> {
+    /// Create and return a `PathKeyElement` from `PathInfo` and `KeyElementInfo`
     pub fn from_path_info_and_key_element(
         path_info: PathInfo<'a, N>,
         key_element: KeyElementInfo<'a>,
@@ -320,6 +373,7 @@ impl<'a, const N: usize> PathKeyElementInfo<'a, N> {
         }
     }
 
+    /// Create and return a `PathFixedSizeKeyElement` from a fixed-size path and `KeyElementInfo`
     pub fn from_fixed_size_path_and_key_element(
         path: [&'a [u8]; N],
         key_element: KeyElementInfo<'a>,
@@ -334,6 +388,7 @@ impl<'a, const N: usize> PathKeyElementInfo<'a, N> {
         }
     }
 
+    /// Create and return a `PathKeyElement` from a path and `KeyElementInfo`
     pub fn from_path_and_key_element(
         path: Vec<Vec<u8>>,
         key_element: KeyElementInfo<'a>,
@@ -346,6 +401,7 @@ impl<'a, const N: usize> PathKeyElementInfo<'a, N> {
         }
     }
 
+    /// Returns length of self
     pub fn insert_len(&'a self) -> u32 {
         match self {
             //todo v23: this is an incorrect approximation
@@ -356,13 +412,19 @@ impl<'a, const N: usize> PathKeyElementInfo<'a, N> {
     }
 }
 
+/// Document and contract info
 pub struct DocumentAndContractInfo<'a> {
+    /// Document info
     pub document_info: DocumentInfo<'a>,
+    /// Contract
     pub contract: &'a Contract,
+    /// Document type
     pub document_type: &'a DocumentType,
+    /// Owner ID
     pub owner_id: Option<&'a [u8]>,
 }
 
+/// Document info
 #[derive(Clone)]
 pub enum DocumentInfo<'a> {
     /// The borrowed document and it's serialized form
@@ -376,6 +438,7 @@ pub enum DocumentInfo<'a> {
 }
 
 impl<'a> DocumentInfo<'a> {
+    /// Returns true if self is a document with serialization.
     pub fn is_document_and_serialization(&self) -> bool {
         match self {
             DocumentInfo::DocumentRefAndSerialization(..) => true,
@@ -383,6 +446,7 @@ impl<'a> DocumentInfo<'a> {
         }
     }
 
+    /// Makes the document ID the key.
     pub fn id_key_value_info(&self) -> KeyValueInfo {
         match self {
             DocumentInfo::DocumentRefAndSerialization((document, _, _))
@@ -398,6 +462,7 @@ impl<'a> DocumentInfo<'a> {
         }
     }
 
+    /// Gets the raw path for the given document type
     pub fn get_raw_for_document_type(
         &self,
         key_path: &str,
@@ -441,6 +506,7 @@ impl<'a> DocumentInfo<'a> {
         }
     }
 
+    /// Gets storage flags
     pub fn get_storage_flags_ref(&self) -> Option<&StorageFlags> {
         match self {
             DocumentInfo::DocumentRefAndSerialization((_, _, storage_flags))
@@ -455,6 +521,7 @@ impl<'a> DocumentInfo<'a> {
     }
 }
 
+/// Key value info
 #[derive(Clone)]
 pub enum KeyValueInfo<'a> {
     /// A key by reference
@@ -464,6 +531,7 @@ pub enum KeyValueInfo<'a> {
 }
 
 impl<'a> KeyValueInfo<'a> {
+    /// Returns key length
     pub fn as_key_ref_request(&'a self) -> Result<&'a [u8], Error> {
         match self {
             KeyRefRequest(key) => Ok(key),

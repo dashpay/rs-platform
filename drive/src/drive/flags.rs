@@ -1,3 +1,35 @@
+// MIT LICENSE
+//
+// Copyright (c) 2021 Dash Core Group
+//
+// Permission is hereby granted, free of charge, to any
+// person obtaining a copy of this software and associated
+// documentation files (the "Software"), to deal in the
+// Software without restriction, including without
+// limitation the rights to use, copy, modify, merge,
+// publish, distribute, sublicense, and/or sell copies of
+// the Software, and to permit persons to whom the Software
+// is furnished to do so, subject to the following
+// conditions:
+//
+// The above copyright notice and this permission notice
+// shall be included in all copies or substantial portions
+// of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+// ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+// TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+// PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+// SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+// CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+// OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+// IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+// DEALINGS IN THE SOFTWARE.
+//
+
+//! Flags
+//!
+
 use crate::drive::flags::StorageFlags::{
     MultiEpoch, MultiEpochOwned, SingleEpoch, SingleEpochOwned,
 };
@@ -22,7 +54,7 @@ type BytesAddedInEpoch = u32;
 
 type OwnerId = [u8; 32];
 
-// Struct Definitions
+/// Storage flags
 #[derive(Clone, Debug, PartialEq)]
 pub enum StorageFlags {
     SingleEpoch(BaseEpoch),                                         //0
@@ -454,10 +486,12 @@ impl StorageFlags {
         }
     }
 
+    /// Creates storage flags from a slice.
     pub fn from_slice(data: &[u8]) -> Result<Option<Self>, Error> {
         Self::deserialize(data)
     }
 
+    /// Creates storage flags from element flags.
     pub fn from_element_flags_ref(data: &ElementFlags) -> Result<Option<Self>, Error> {
         Self::from_slice(data.as_slice())
     }
@@ -483,6 +517,7 @@ impl StorageFlags {
         Some(self.serialize())
     }
 
+    /// Creates element flags.
     pub fn to_element_flags(&self) -> ElementFlags {
         self.serialize()
     }
