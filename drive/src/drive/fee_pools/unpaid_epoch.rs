@@ -64,8 +64,15 @@ mod tests {
             let transaction = drive.grove.start_transaction();
 
             // We need to first delete the item, because you can not replace an item with a tree
-            drive.grove.delete(pools_path(),
-                               KEY_UNPAID_EPOCH_INDEX.as_slice(), None,Some(&transaction)).unwrap()
+            drive
+                .grove
+                .delete(
+                    pools_path(),
+                    KEY_UNPAID_EPOCH_INDEX.as_slice(),
+                    None,
+                    Some(&transaction),
+                )
+                .unwrap()
                 .expect("should delete old item");
 
             drive
