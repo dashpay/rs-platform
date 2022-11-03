@@ -1,7 +1,10 @@
 use neon::prelude::*;
 use neon::types::buffer::TypedArray;
 use num::FromPrimitive;
+use rs_drive::drive::block_info::BlockInfo;
 use rs_drive::drive::flags::StorageFlags;
+use rs_drive::fee::FeeResult;
+use rs_drive::fee_pools::epochs::Epoch;
 use rs_drive::grovedb::reference_path::ReferencePathType;
 use rs_drive::grovedb::{Element, PathQuery, Query, SizedQuery};
 use std::borrow::Borrow;
@@ -59,12 +62,7 @@ pub fn js_object_to_element<'a, C: Context<'a>>(
             let tree_vec = js_buffer_to_vec_u8(js_buffer, cx);
 
             Ok(Element::new_tree_with_flags(
-                tree_vec.try_into().or_else(|v: Vec<u8>| {
-                    cx.throw_error(format!(
-                        "Tree buffer is expected to be 32 bytes long, but got {}",
-                        v.len()
-                    ))
-                })?,
+                Some(tree_vec),
                 storage_flags.to_some_element_flags(),
             ))
         }
@@ -149,7 +147,7 @@ pub fn element_to_js_object<'a, C: Context<'a>>(
         }
         Element::Reference(reference, _, _) => reference_to_dictionary(reference, cx)?,
         Element::Tree(tree, _) => {
-            let js_buffer = JsBuffer::external(cx, tree);
+            let js_buffer = JsBuffer::external(cx, tree.expect("tree path should present"));
             js_buffer.upcast()
         }
     };
@@ -388,4 +386,58 @@ pub fn js_path_query_to_path_query<'a, C: Context<'a>>(
     let query = js_object_to_sized_query(js_path_query.get(cx, "query")?, cx)?;
 
     Ok(PathQuery::new(path, query))
+}
+
+pub fn js_object_to_block_info<'a, C: Context<'a>>(
+    js_object: Handle<JsObject>,
+    cx: &mut C,
+) -> NeonResult<BlockInfo> {
+    let js_height: Handle<JsNumber> = js_object.get(cx, "height")?;
+    let js_epoch: Handle<JsNumber> = js_object.get(cx, "epoch")?;
+    let js_time: Handle<JsNumber> = js_object.get(cx, "time")?;
+
+    let epoch = Epoch::new(js_epoch.value(cx) as u16);
+
+    let block_info = BlockInfo {
+        height: js_height.value(cx) as u64,
+        time_ms: js_time.value(cx) as u64,
+        epoch,
+    };
+
+    Ok(block_info)
+}
+
+pub fn fee_result_to_js_object<'a, C: Context<'a>>(
+    fee_result: FeeResult,
+    cx: &mut C,
+) -> NeonResult<Handle<'a, JsObject>> {
+    // TODO: We can't go with f64 because we can lose costs
+    let js_processing_fee = cx.number(fee_result.processing_fee as f64);
+    let js_storage_fee = cx.number(fee_result.storage_fee as f64);
+
+    let js_removed_from_identities: Handle<JsObject> = cx.empty_object();
+
+    for (identifier, epoch_index_map) in fee_result.removed_from_identities {
+        let js_epoch_index_map = cx.empty_object();
+        for (epoch, bytes) in epoch_index_map {
+            let js_bytes = cx.number(bytes);
+
+            js_epoch_index_map.set(cx, epoch.to_string().as_str(), js_bytes)?;
+        }
+
+        let js_identity_to_epochs = cx.empty_object();
+
+        let js_identifier = JsBuffer::external(cx, identifier);
+
+        js_identity_to_epochs.set(cx, "identifier", js_identifier)?;
+        js_identity_to_epochs.set(cx, "epochsToBytes", js_epoch_index_map)?;
+    }
+
+    let js_fee_results: Handle<JsObject> = cx.empty_object();
+
+    js_fee_results.set(cx, "processingFee", js_processing_fee)?;
+    js_fee_results.set(cx, "storageFee", js_storage_fee)?;
+    js_fee_results.set(cx, "removedFromIdentities", js_removed_from_identities)?;
+
+    Ok(js_fee_results)
 }

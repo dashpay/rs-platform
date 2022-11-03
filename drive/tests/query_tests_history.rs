@@ -221,7 +221,7 @@ pub fn setup(
                         owner_id: None,
                     },
                     true,
-                    BlockInfo::default_with_time(block_time as f64),
+                    BlockInfo::default_with_time(block_time),
                     true,
                     Some(&db_transaction),
                 )

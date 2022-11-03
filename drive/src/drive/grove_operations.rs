@@ -1113,7 +1113,7 @@ impl Drive {
                                 options.clone(),
                                 drive_operations,
                             )?,
-                            Op::Delete => self.grove_delete(
+                            Op::Delete | Op::DeleteTree => self.grove_delete(
                                 path.to_path(),
                                 key.as_slice(),
                                 true,
@@ -1138,7 +1138,7 @@ impl Drive {
                                 options.clone(),
                                 drive_operations,
                             )?,
-                            Op::Delete => self.grove_delete(
+                            Op::Delete | Op::DeleteTree => self.grove_delete(
                                 path.to_path(),
                                 key.as_slice(),
                                 false,

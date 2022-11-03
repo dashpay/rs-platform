@@ -263,7 +263,7 @@ impl DriveWrapper {
 
     fn js_apply_contract(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         let js_contract_cbor = cx.argument::<JsBuffer>(0)?;
-        let js_block_time = cx.argument::<JsDate>(1)?;
+        let js_block_info = cx.argument::<JsObject>(1)?;
         let js_apply = cx.argument::<JsBoolean>(2)?;
         let js_using_transaction = cx.argument::<JsBoolean>(3)?;
         let js_callback = cx.argument::<JsFunction>(4)?.root(&mut cx);
@@ -275,14 +275,14 @@ impl DriveWrapper {
         let contract_cbor = converter::js_buffer_to_vec_u8(js_contract_cbor, &mut cx);
         let apply = js_apply.value(&mut cx);
         let using_transaction = js_using_transaction.value(&mut cx);
-        let block_time = js_block_time.value(&mut cx);
+        let block_info = converter::js_object_to_block_info(js_block_info, &mut cx)?;
 
         drive
             .send_to_drive_thread(move |platform: &Platform, transaction, channel| {
                 let result = platform.drive.apply_contract_cbor(
                     contract_cbor,
                     None,
-                    block_time,
+                    block_info,
                     apply,
                     StorageFlags::optional_default_as_ref(),
                     using_transaction.then_some(transaction).flatten(),
@@ -293,20 +293,12 @@ impl DriveWrapper {
                     let this = task_context.undefined();
 
                     let callback_arguments: Vec<Handle<JsValue>> = match result {
-                        Ok((storage_fee, processing_fee)) => {
-                            let js_array: Handle<JsArray> = task_context.empty_array();
-
-                            let storage_fee_value =
-                                task_context.number(storage_fee as f64).upcast::<JsValue>();
-                            let processing_fee_value = task_context
-                                .number(processing_fee as f64)
-                                .upcast::<JsValue>();
-
-                            js_array.set(&mut task_context, 0, storage_fee_value)?;
-                            js_array.set(&mut task_context, 1, processing_fee_value)?;
+                        Ok(fee_result) => {
+                            let js_fee_result =
+                                converter::fee_result_to_js_object(fee_result, &mut task_context)?;
 
                             // First parameter of JS callbacks is error, which is null in this case
-                            vec![task_context.null().upcast(), js_array.upcast()]
+                            vec![task_context.null().upcast(), js_fee_result.upcast()]
                         }
 
                         // Convert the error to a JavaScript exception on failure
@@ -329,7 +321,7 @@ impl DriveWrapper {
         let js_document_type_name = cx.argument::<JsString>(2)?;
         let js_owner_id = cx.argument::<JsBuffer>(3)?;
         let js_override_document = cx.argument::<JsBoolean>(4)?;
-        let js_block_time = cx.argument::<JsDate>(5)?;
+        let js_block_info = cx.argument::<JsObject>(5)?;
         let js_apply = cx.argument::<JsBoolean>(6)?;
         let js_using_transaction = cx.argument::<JsBoolean>(7)?;
         let js_callback = cx.argument::<JsFunction>(8)?.root(&mut cx);
@@ -343,7 +335,7 @@ impl DriveWrapper {
         let document_type_name = js_document_type_name.value(&mut cx);
         let owner_id = converter::js_buffer_to_vec_u8(js_owner_id, &mut cx);
         let override_document = js_override_document.value(&mut cx);
-        let block_time = js_block_time.value(&mut cx);
+        let block_info = converter::js_object_to_block_info(js_block_info, &mut cx)?;
         let apply = js_apply.value(&mut cx);
         let using_transaction = js_using_transaction.value(&mut cx);
 
@@ -357,7 +349,7 @@ impl DriveWrapper {
                         &document_type_name,
                         Some(&owner_id),
                         override_document,
-                        block_time,
+                        block_info,
                         apply,
                         StorageFlags::optional_default_as_ref(),
                         using_transaction.then_some(transaction).flatten(),
@@ -368,20 +360,12 @@ impl DriveWrapper {
                     let this = task_context.undefined();
 
                     let callback_arguments: Vec<Handle<JsValue>> = match result {
-                        Ok((storage_fee, processing_fee)) => {
-                            let js_array: Handle<JsArray> = task_context.empty_array();
-
-                            let storage_fee_value =
-                                task_context.number(storage_fee as f64).upcast::<JsValue>();
-                            let processing_fee_value = task_context
-                                .number(processing_fee as f64)
-                                .upcast::<JsValue>();
-
-                            js_array.set(&mut task_context, 0, storage_fee_value)?;
-                            js_array.set(&mut task_context, 1, processing_fee_value)?;
+                        Ok(fee_result) => {
+                            let js_fee_result =
+                                converter::fee_result_to_js_object(fee_result, &mut task_context)?;
 
                             // First parameter of JS callbacks is error, which is null in this case
-                            vec![task_context.null().upcast(), js_array.upcast()]
+                            vec![task_context.null().upcast(), js_fee_result.upcast()]
                         }
 
                         // Convert the error to a JavaScript exception on failure
@@ -403,7 +387,7 @@ impl DriveWrapper {
         let js_contract_cbor = cx.argument::<JsBuffer>(1)?;
         let js_document_type_name = cx.argument::<JsString>(2)?;
         let js_owner_id = cx.argument::<JsBuffer>(3)?;
-        let js_block_time = cx.argument::<JsDate>(4)?;
+        let js_block_info = cx.argument::<JsObject>(4)?;
         let js_apply = cx.argument::<JsBoolean>(5)?;
         let js_using_transaction = cx.argument::<JsBoolean>(6)?;
         let js_callback = cx.argument::<JsFunction>(7)?.root(&mut cx);
@@ -416,7 +400,7 @@ impl DriveWrapper {
         let contract_cbor = converter::js_buffer_to_vec_u8(js_contract_cbor, &mut cx);
         let document_type_name = js_document_type_name.value(&mut cx);
         let owner_id = converter::js_buffer_to_vec_u8(js_owner_id, &mut cx);
-        let block_time = js_block_time.value(&mut cx);
+        let block_info = converter::js_object_to_block_info(js_block_info, &mut cx)?;
         let apply = js_apply.value(&mut cx);
         let using_transaction = js_using_transaction.value(&mut cx);
 
@@ -427,7 +411,7 @@ impl DriveWrapper {
                     &contract_cbor,
                     &document_type_name,
                     Some(&owner_id),
-                    block_time,
+                    block_info,
                     apply,
                     StorageFlags::optional_default_as_ref(),
                     using_transaction.then_some(transaction).flatten(),
@@ -438,20 +422,12 @@ impl DriveWrapper {
                     let this = task_context.undefined();
 
                     let callback_arguments: Vec<Handle<JsValue>> = match result {
-                        Ok((storage_fee, processing_fee)) => {
-                            let js_array: Handle<JsArray> = task_context.empty_array();
-
-                            let storage_fee_value =
-                                task_context.number(storage_fee as f64).upcast::<JsValue>();
-                            let processing_fee_value = task_context
-                                .number(processing_fee as f64)
-                                .upcast::<JsValue>();
-
-                            js_array.set(&mut task_context, 0, storage_fee_value)?;
-                            js_array.set(&mut task_context, 1, processing_fee_value)?;
+                        Ok(fee_result) => {
+                            let js_fee_result =
+                                converter::fee_result_to_js_object(fee_result, &mut task_context)?;
 
                             // First parameter of JS callbacks is error, which is null in this case
-                            vec![task_context.null().upcast(), js_array.upcast()]
+                            vec![task_context.null().upcast(), js_fee_result.upcast()]
                         }
 
                         // Convert the error to a JavaScript exception on failure
@@ -472,9 +448,10 @@ impl DriveWrapper {
         let js_document_id = cx.argument::<JsBuffer>(0)?;
         let js_contract_cbor = cx.argument::<JsBuffer>(1)?;
         let js_document_type_name = cx.argument::<JsString>(2)?;
-        let js_apply = cx.argument::<JsBoolean>(3)?;
-        let js_using_transaction = cx.argument::<JsBoolean>(4)?;
-        let js_callback = cx.argument::<JsFunction>(5)?.root(&mut cx);
+        let js_block_info = cx.argument::<JsObject>(3)?;
+        let js_apply = cx.argument::<JsBoolean>(4)?;
+        let js_using_transaction = cx.argument::<JsBoolean>(5)?;
+        let js_callback = cx.argument::<JsFunction>(6)?.root(&mut cx);
 
         let drive = cx
             .this()
@@ -483,6 +460,7 @@ impl DriveWrapper {
         let document_id = converter::js_buffer_to_vec_u8(js_document_id, &mut cx);
         let contract_cbor = converter::js_buffer_to_vec_u8(js_contract_cbor, &mut cx);
         let document_type_name = js_document_type_name.value(&mut cx);
+        let block_info = converter::js_object_to_block_info(js_block_info, &mut cx)?;
         let apply = js_apply.value(&mut cx);
         let using_transaction = js_using_transaction.value(&mut cx);
 
@@ -504,6 +482,7 @@ impl DriveWrapper {
                         &contract_cbor,
                         &document_type_name,
                         None,
+                        block_info,
                         apply,
                         using_transaction.then_some(transaction).flatten(),
                     );
@@ -513,20 +492,14 @@ impl DriveWrapper {
                         let this = task_context.undefined();
 
                         let callback_arguments: Vec<Handle<JsValue>> = match result {
-                            Ok((storage_fee, processing_fee)) => {
-                                let js_array: Handle<JsArray> = task_context.empty_array();
-
-                                let storage_fee_value =
-                                    task_context.number(storage_fee as f64).upcast::<JsValue>();
-                                let processing_fee_value = task_context
-                                    .number(processing_fee as f64)
-                                    .upcast::<JsValue>();
-
-                                js_array.set(&mut task_context, 0, storage_fee_value)?;
-                                js_array.set(&mut task_context, 1, processing_fee_value)?;
+                            Ok(fee_result) => {
+                                let js_fee_result = converter::fee_result_to_js_object(
+                                    fee_result,
+                                    &mut task_context,
+                                )?;
 
                                 // First parameter of JS callbacks is error, which is null in this case
-                                vec![task_context.null().upcast(), js_array.upcast()]
+                                vec![task_context.null().upcast(), js_fee_result.upcast()]
                             }
 
                             // Convert the error to a JavaScript exception on failure
@@ -546,15 +519,17 @@ impl DriveWrapper {
 
     fn js_insert_identity_cbor(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         let js_identity_cbor = cx.argument::<JsBuffer>(0)?;
-        let js_apply = cx.argument::<JsBoolean>(1)?;
-        let js_using_transaction = cx.argument::<JsBoolean>(2)?;
-        let js_callback = cx.argument::<JsFunction>(3)?.root(&mut cx);
+        let js_block_info = cx.argument::<JsObject>(1)?;
+        let js_apply = cx.argument::<JsBoolean>(2)?;
+        let js_using_transaction = cx.argument::<JsBoolean>(3)?;
+        let js_callback = cx.argument::<JsFunction>(4)?.root(&mut cx);
 
         let drive = cx
             .this()
             .downcast_or_throw::<JsBox<DriveWrapper>, _>(&mut cx)?;
 
         let identity_cbor = converter::js_buffer_to_vec_u8(js_identity_cbor, &mut cx);
+        let block_info = converter::js_object_to_block_info(js_block_info, &mut cx)?;
         let apply = js_apply.value(&mut cx);
         let using_transaction = js_using_transaction.value(&mut cx);
 
@@ -565,6 +540,7 @@ impl DriveWrapper {
             .send_to_drive_thread(move |platform: &Platform, transaction, channel| {
                 let result = platform.drive.insert_identity(
                     identity,
+                    block_info,
                     apply,
                     StorageFlags::optional_default_as_ref(),
                     using_transaction.then_some(transaction).flatten(),
@@ -575,20 +551,12 @@ impl DriveWrapper {
                     let this = task_context.undefined();
 
                     let callback_arguments: Vec<Handle<JsValue>> = match result {
-                        Ok((storage_fee, processing_fee)) => {
-                            let js_array: Handle<JsArray> = task_context.empty_array();
-
-                            let storage_fee_value =
-                                task_context.number(storage_fee as f64).upcast::<JsValue>();
-                            let processing_fee_value = task_context
-                                .number(processing_fee as f64)
-                                .upcast::<JsValue>();
-
-                            js_array.set(&mut task_context, 0, storage_fee_value)?;
-                            js_array.set(&mut task_context, 1, processing_fee_value)?;
+                        Ok(fee_result) => {
+                            let js_fee_result =
+                                converter::fee_result_to_js_object(fee_result, &mut task_context)?;
 
                             // First parameter of JS callbacks is error, which is null in this case
-                            vec![task_context.null().upcast(), js_array.upcast()]
+                            vec![task_context.null().upcast(), js_fee_result.upcast()]
                         }
 
                         // Convert the error to a JavaScript exception on failure
@@ -609,8 +577,9 @@ impl DriveWrapper {
         let js_query_cbor = cx.argument::<JsBuffer>(0)?;
         let js_contract_id = cx.argument::<JsBuffer>(1)?;
         let js_document_type_name = cx.argument::<JsString>(2)?;
-        let js_using_transaction = cx.argument::<JsBoolean>(3)?;
-        let js_callback = cx.argument::<JsFunction>(4)?.root(&mut cx);
+        let js_block_info = cx.argument::<JsObject>(3)?;
+        let js_using_transaction = cx.argument::<JsBoolean>(4)?;
+        let js_callback = cx.argument::<JsFunction>(5)?.root(&mut cx);
 
         let drive = cx
             .this()
@@ -619,6 +588,7 @@ impl DriveWrapper {
         let query_cbor = converter::js_buffer_to_vec_u8(js_query_cbor, &mut cx);
         let contract_id = converter::js_buffer_to_vec_u8(js_contract_id, &mut cx);
         let document_type_name = js_document_type_name.value(&mut cx);
+        let block_info = converter::js_object_to_block_info(js_block_info, &mut cx)?;
         let using_transaction = js_using_transaction.value(&mut cx);
 
         drive
@@ -627,6 +597,7 @@ impl DriveWrapper {
                     &query_cbor,
                     <[u8; 32]>::try_from(contract_id).unwrap(),
                     document_type_name.as_str(),
+                    Some(block_info),
                     using_transaction.then_some(transaction).flatten(),
                 );
 
@@ -665,8 +636,9 @@ impl DriveWrapper {
         let js_query_cbor = cx.argument::<JsBuffer>(0)?;
         let js_contract_id = cx.argument::<JsBuffer>(1)?;
         let js_document_type_name = cx.argument::<JsString>(2)?;
-        let js_using_transaction = cx.argument::<JsBoolean>(3)?;
-        let js_callback = cx.argument::<JsFunction>(4)?.root(&mut cx);
+        let js_block_info = cx.argument::<JsObject>(3)?;
+        let js_using_transaction = cx.argument::<JsBoolean>(4)?;
+        let js_callback = cx.argument::<JsFunction>(5)?.root(&mut cx);
 
         let drive = cx
             .this()
@@ -675,6 +647,7 @@ impl DriveWrapper {
         let query_cbor = converter::js_buffer_to_vec_u8(js_query_cbor, &mut cx);
         let contract_id = converter::js_buffer_to_vec_u8(js_contract_id, &mut cx);
         let document_type_name = js_document_type_name.value(&mut cx);
+        let block_info = converter::js_object_to_block_info(js_block_info, &mut cx)?;
         let using_transaction = js_using_transaction.value(&mut cx);
 
         drive
@@ -683,6 +656,7 @@ impl DriveWrapper {
                     &query_cbor,
                     <[u8; 32]>::try_from(contract_id).unwrap(),
                     document_type_name.as_str(),
+                    Some(block_info),
                     using_transaction.then_some(transaction).flatten(),
                 );
 
@@ -926,6 +900,7 @@ impl DriveWrapper {
                         path_slice,
                         &key,
                         element,
+                        None,
                         using_transaction.then_some(transaction).flatten(),
                     )
                     .unwrap();
@@ -1090,7 +1065,11 @@ impl DriveWrapper {
                 let grove_db = &platform.drive.grove;
 
                 let result = grove_db
-                    .delete_aux(&key, using_transaction.then_some(transaction).flatten())
+                    .delete_aux(
+                        &key,
+                        None,
+                        using_transaction.then_some(transaction).flatten(),
+                    )
                     .unwrap();
 
                 channel.send(move |mut task_context| {
@@ -1428,6 +1407,7 @@ impl DriveWrapper {
                     .delete(
                         path_slice,
                         key.as_slice(),
+                        None,
                         using_transaction.then_some(transaction).flatten(),
                     )
                     .unwrap();

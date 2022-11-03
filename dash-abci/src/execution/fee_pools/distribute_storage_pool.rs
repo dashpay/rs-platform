@@ -421,7 +421,7 @@ mod tests {
                     "should not be able to update genesis time on uninit fee pools"
                 ),
                 Err(e) => match e {
-                    DriveError::GroveDB(grovedb::Error::PathKeyNotFound(_)) => {
+                    DriveError::GroveDB(grovedb::Error::InvalidPath(_)) => {
                         assert!(true)
                     }
                     _ => assert!(false, "invalid error type"),
