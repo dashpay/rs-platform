@@ -19,7 +19,7 @@ use crate::{
     prelude::{Identifier, Identity},
     state_repository::StateRepositoryLike,
     state_transition::StateTransitionConvert,
-    util::entropy_generator::generate,
+    util::{entropy_generator::generate, json_value::JsonValueExt},
 };
 
 use super::IdentityCreditWithdrawalTransition;
@@ -32,6 +32,8 @@ const WITHDRAWAL_DATA_CONTRACT_OWNER_ID_BYTES: [u8; 32] = [
     170, 138, 235, 213, 173, 122, 202, 36, 243, 48, 61, 185, 146, 50, 146, 255, 194, 133, 221, 176,
     188, 82, 144, 69, 234, 198, 106, 35, 245, 167, 46, 192,
 ];
+const PLATFORM_BLOCK_HEADER_TIME_PROPERTY: &str = "time";
+const PLATFORM_BLOCK_HEADER_TIME_SECONDS_PROPERTY: &str = "seconds";
 
 pub struct ApplyIdentityCreditWithdrawalTransition<SR>
 where
@@ -96,13 +98,21 @@ where
         let withdrawals_data_contract = maybe_withdrawals_data_contract
             .ok_or_else(|| anyhow!("Withdrawals data contract not found"))?;
 
+        let latest_platform_block_header: JsonValue = self
+            .state_repository
+            .fetch_latest_platform_block_header()
+            .await?;
+
         let document_type = String::from("withdrawal");
         let document_entropy = generate();
-        let document_created_at = Utc::now();
+        let document_created_at_millis = latest_platform_block_header
+            .get(PLATFORM_BLOCK_HEADER_TIME_PROPERTY)
+            .ok_or_else(|| anyhow!("time property is not set in block header"))?
+            .get_i64(PLATFORM_BLOCK_HEADER_TIME_SECONDS_PROPERTY)?
+            * 1000;
 
         let mut document_data_map = Map::new();
 
-        // TODO: figure out about transactionId
         document_data_map.insert(
             "amount".to_string(),
             serde_json::to_value(state_transition.amount)?,
@@ -132,8 +142,8 @@ where
             revision: 0,
             data_contract_id,
             owner_id: data_contract_owner_id.clone(),
-            created_at: Some(document_created_at.timestamp_millis()),
-            updated_at: Some(document_created_at.timestamp_millis()),
+            created_at: Some(document_created_at_millis),
+            updated_at: Some(document_created_at_millis),
             data: document_data,
             data_contract: withdrawals_data_contract,
             metadata: None,
