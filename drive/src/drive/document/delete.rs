@@ -940,7 +940,10 @@ mod tests {
             .expect("expected to insert a document successfully");
 
         // We added 1756 bytes
-        assert_eq!(fee_result.storage_fee / STORAGE_DISK_USAGE_CREDIT_PER_BYTE, 1756);
+        assert_eq!(
+            fee_result.storage_fee / STORAGE_DISK_USAGE_CREDIT_PER_BYTE,
+            1756
+        );
 
         let document_id = bs58::decode("AM47xnyLfTAC9f61ZQPGfMK5Datk2FeYZwgYvcAnzqFY")
             .into_vec()
@@ -959,7 +962,10 @@ mod tests {
             )
             .expect("expected to be able to delete the document");
 
-        assert!(fee_result.removed_from_identities.get(&random_owner_id).is_some());
+        assert!(fee_result
+            .removed_from_identities
+            .get(&random_owner_id)
+            .is_some());
     }
 
     #[test]

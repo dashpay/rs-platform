@@ -43,10 +43,10 @@ use rs_drive::common::value_to_cbor;
 use rs_drive::contract::document::Document;
 use rs_drive::contract::{Contract, DataContract};
 use rs_drive::dpp::data_contract::extra::DriveContractExt;
+use rs_drive::drive::block_info::BlockInfo;
 use rs_drive::drive::flags::StorageFlags;
 use rs_drive::grovedb::TransactionArg;
 use serde_json::json;
-use rs_drive::drive::block_info::BlockInfo;
 
 /// Masternode reward shares contract ID
 pub const MN_REWARD_SHARES_CONTRACT_ID: [u8; 32] = [
