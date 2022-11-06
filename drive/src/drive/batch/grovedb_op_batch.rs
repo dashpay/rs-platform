@@ -1,6 +1,6 @@
 // MIT LICENSE
 //
-// Copyright (c) 2021 Dash Core Group
+// Copyright (c) 2022 Dash Core Group
 //
 // Permission is hereby granted, free of charge, to any
 // person obtaining a copy of this software and associated
@@ -33,7 +33,7 @@
 //!
 
 use crate::drive::flags::StorageFlags;
-use grovedb::batch::{key_info::KeyInfo, GroveDbOp, GroveDbOpConsistencyResults, KeyInfoPath};
+use grovedb::batch::{GroveDbOp, GroveDbOpConsistencyResults, key_info::KeyInfo, KeyInfoPath};
 use grovedb::Element;
 
 /// A batch of GroveDB operations as a vector.
