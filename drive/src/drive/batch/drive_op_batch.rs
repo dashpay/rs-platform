@@ -69,7 +69,7 @@ pub enum ContractOperationType<'a> {
         /// The contract
         contract: &'a Contract,
         /// The serialized contract
-        contract_serialization: Vec<u8>,
+        serialized_contract: Vec<u8>,
         /// Storage flags for the contract
         storage_flags: Option<&'a StorageFlags>,
     },
@@ -104,7 +104,7 @@ impl DriveOperationConverter for ContractOperationType<'_> {
             }
             ContractOperationType::ApplyContractWithSerialization {
                 contract,
-                contract_serialization,
+                serialized_contract: contract_serialization,
                 storage_flags,
             } => drive.apply_contract_operations(
                 &contract,
@@ -510,5 +510,115 @@ impl Drive {
             &mut cost_operations,
         )?;
         calculate_fee(None, Some(cost_operations), &block_info.epoch)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use grovedb::Element;
+    use std::option::Option::None;
+
+    use super::*;
+    use crate::common;
+    use rand::Rng;
+    use serde_json::json;
+    use tempfile::TempDir;
+
+    use crate::common::json_document_to_cbor;
+    use crate::drive::batch::ContractOperationType::ApplyContractWithSerialization;
+    use crate::drive::batch::DocumentOperationType::AddSerializedDocumentForContract;
+    use crate::drive::batch::DriveOperationType::{ContractOperation, DocumentOperation};
+    use crate::drive::contract::contract_root_path;
+    use crate::drive::flags::StorageFlags;
+    use crate::drive::Drive;
+
+    #[test]
+    fn test_add_dashpay_documents() {
+        let tmp_dir = TempDir::new().unwrap();
+        let drive: Drive = Drive::open(tmp_dir, None).expect("expected to open Drive successfully");
+
+        let mut drive_operations = vec![];
+        let db_transaction = drive.grove.start_transaction();
+
+        drive
+            .create_initial_state_structure(Some(&db_transaction))
+            .expect("expected to create root tree successfully");
+
+        let contract_cbor = json_document_to_cbor(
+            "tests/supporting_files/contract/dashpay/dashpay-contract-all-mutable.json",
+            Some(crate::drive::defaults::PROTOCOL_VERSION),
+        );
+        let contract = <Contract as DriveContractExt>::from_cbor(&contract_cbor, None)
+            .expect("contract should be deserialized");
+        let serialized_contract =
+            DriveContractExt::to_cbor(&contract).expect("contract should be serialized");
+
+        let document_type = contract
+            .document_type_for_name("contactRequest")
+            .expect("expected to get document type");
+
+        drive_operations.push(ContractOperation(ApplyContractWithSerialization {
+            contract: &contract,
+            serialized_contract: serialized_contract.clone(),
+            storage_flags: None,
+        }));
+
+        let dashpay_cr_serialized_document = json_document_to_cbor(
+            "tests/supporting_files/contract/dashpay/contact-request0.json",
+            Some(1),
+        );
+
+        let random_owner_id = rand::thread_rng().gen::<[u8; 32]>();
+
+        drive_operations.push(DocumentOperation(AddSerializedDocumentForContract {
+            serialized_document: dashpay_cr_serialized_document.as_slice(),
+            contract: &contract,
+            document_type_name: "contactRequest",
+            owner_id: Some(&random_owner_id),
+            override_document: false,
+            storage_flags: StorageFlags::optional_default_as_ref(),
+        }));
+
+        drive
+            .apply_drive_operations(
+                drive_operations,
+                true,
+                &BlockInfo::default(),
+                Some(&db_transaction),
+            )
+            .expect("expected to insert contract and document");
+
+        let element = drive
+            .grove
+            .get(
+                contract_root_path(&contract.id.buffer),
+                &[0],
+                Some(&db_transaction),
+            )
+            .unwrap()
+            .expect("expected to get contract back");
+
+        assert_eq!(element, Element::Item(serialized_contract, None));
+
+        let query_value = json!({
+            "where": [
+            ],
+            "limit": 100,
+            "orderBy": [
+                ["$ownerId", "asc"],
+            ]
+        });
+        let where_cbor = common::value_to_cbor(query_value, None);
+
+        let (docs, _, _) = drive
+            .query_documents_from_contract(
+                &contract,
+                document_type,
+                where_cbor.as_slice(),
+                None,
+                Some(&db_transaction),
+            )
+            .expect("expected to query");
+        assert_eq!(docs.len(), 1);
     }
 }

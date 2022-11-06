@@ -63,7 +63,7 @@ use crate::fee::op::DriveOperation::{CalculatedCostOperation, ContractFetch};
 use crate::fee::{calculate_fee, FeeResult};
 
 /// Takes a contract ID and returns the contract's root path.
-fn contract_root_path(contract_id: &[u8]) -> [&[u8]; 2] {
+pub(crate) fn contract_root_path(contract_id: &[u8]) -> [&[u8]; 2] {
     [
         Into::<&[u8; 1]>::into(RootTree::ContractDocuments),
         contract_id,
@@ -71,7 +71,7 @@ fn contract_root_path(contract_id: &[u8]) -> [&[u8]; 2] {
 }
 
 /// Takes a contract ID and returns the contract's storage history path.
-fn contract_keeping_history_storage_path(contract_id: &[u8]) -> [&[u8]; 3] {
+pub(crate) fn contract_keeping_history_storage_path(contract_id: &[u8]) -> [&[u8]; 3] {
     [
         Into::<&[u8; 1]>::into(RootTree::ContractDocuments),
         contract_id,
@@ -81,7 +81,7 @@ fn contract_keeping_history_storage_path(contract_id: &[u8]) -> [&[u8]; 3] {
 
 /// Takes a contract ID and an encoded timestamp and returns the contract's storage history path
 /// for that timestamp.
-fn contract_keeping_history_storage_time_reference_path(
+pub(crate) fn contract_keeping_history_storage_time_reference_path(
     contract_id: &[u8],
     encoded_time: Vec<u8>,
 ) -> Vec<Vec<u8>> {
