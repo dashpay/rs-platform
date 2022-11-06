@@ -886,7 +886,7 @@ impl Drive {
             let cost_context = self.grove.delete_operation_for_delete_internal(
                 path,
                 key,
-                options,
+                &options,
                 true,
                 &current_batch_operations.operations,
                 transaction,
@@ -940,10 +940,16 @@ impl Drive {
                     ))),
                 })
                 .collect::<Result<Vec<&[u8]>, Error>>()?;
+            let options = DeleteOptions {
+                allow_deleting_non_empty_trees: false,
+                deleting_non_empty_trees_returns_error: true,
+                base_root_storage_is_free: true,
+            };
             let cost_context = self.grove.delete_operations_for_delete_up_tree_while_empty(
                 path,
                 key,
                 stop_path_height,
+                &options,
                 true,
                 current_batch_operations.operations,
                 transaction,
@@ -1066,14 +1072,13 @@ impl Drive {
                         _ => Ok(false),
                     }
                 },
-                |flags, removed| {
+                |flags, removed_key_bytes, removed_value_bytes| {
                     let maybe_storage_flags = StorageFlags::from_element_flags_ref(flags).map_err(|_| GroveError::SplitRemovalBytesClientError("drive did not understand flags of item being updated"))?;
                     // if there were no flags before then the new flags are used
                     match maybe_storage_flags {
-                        None => { Ok(BasicStorageRemoval(removed))}
+                        None => { Ok((BasicStorageRemoval(removed_key_bytes), BasicStorageRemoval(removed_value_bytes)))}
                         Some(storage_flags) => {
-                            let storage_removed_bytes = storage_flags.split_storage_removed_bytes(removed);
-                            Ok(storage_removed_bytes)
+                            storage_flags.split_storage_removed_bytes(removed_key_bytes, removed_value_bytes)
                         }
                     }
 
@@ -1176,7 +1181,7 @@ impl Drive {
                 base_root_storage_is_free: true,
             }),
             |_, _, _| Ok(false),
-            |_, _| Err(GroveError::InternalError("not implemented")),
+            |_, _, _| Err(GroveError::InternalError("not implemented")),
         );
         push_drive_operation_result(cost_context, drive_operations)
     }

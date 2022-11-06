@@ -42,6 +42,7 @@ use integer_encoding::VarInt;
 use intmap::IntMap;
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
+use dashcore::anyhow;
 
 use crate::error::storage_flags::StorageFlagsError;
 use crate::error::Error;
@@ -555,7 +556,30 @@ impl StorageFlags {
     }
 
     /// split_storage_removed_bytes removes bytes as LIFO
-    pub fn split_storage_removed_bytes(&self, removed_bytes: u32) -> StorageRemovedBytes {
+    pub fn split_storage_removed_bytes(&self, removed_key_bytes: u32, removed_value_bytes: u32) -> Result<(StorageRemovedBytes,StorageRemovedBytes), grovedb::Error> {
+        fn single_storage_removal(
+            removed_bytes: u32,
+            base_epoch: &BaseEpoch,
+            owner_id: Option<&OwnerId>,
+        ) -> StorageRemovedBytes {
+            let mut bytes_left = removed_bytes;
+            let mut sectioned_storage_removal: IntMap<u32> = IntMap::default();
+            if bytes_left > 0 {
+                // We need to take some from the base epoch
+                sectioned_storage_removal.insert(base_epoch.clone() as u64, removed_bytes);
+            }
+            let mut sectioned_storage_removal_by_identifier: StorageRemovalPerEpochByIdentifier =
+                BTreeMap::new();
+            if let Some(owner_id) = owner_id {
+                sectioned_storage_removal_by_identifier
+                    .insert(owner_id.clone(), sectioned_storage_removal);
+            } else {
+                let default = [0u8; 32];
+                sectioned_storage_removal_by_identifier.insert(default, sectioned_storage_removal);
+            }
+            SectionedStorageRemoval(sectioned_storage_removal_by_identifier)
+        }
+
         fn sectioned_storage_removal(
             removed_bytes: u32,
             base_epoch: &BaseEpoch,
@@ -596,16 +620,44 @@ impl StorageFlags {
             SectionedStorageRemoval(sectioned_storage_removal_by_identifier)
         }
         match self {
-            SingleEpoch(_) | SingleEpochOwned(_, _) => BasicStorageRemoval(removed_bytes),
-            MultiEpoch(base_epoch, other_epoch_bytes) => {
-                sectioned_storage_removal(removed_bytes, base_epoch, other_epoch_bytes, None)
+            SingleEpoch(base_epoch) => {
+                let value_storage_removal =
+                    single_storage_removal(removed_value_bytes, base_epoch, None);
+                let key_storage_removal =
+                    single_storage_removal(removed_key_bytes, base_epoch, None);
+                Ok((key_storage_removal, value_storage_removal))
             }
-            MultiEpochOwned(base_epoch, other_epoch_bytes, owner_id) => sectioned_storage_removal(
-                removed_bytes,
-                base_epoch,
-                other_epoch_bytes,
-                Some(owner_id),
-            ),
+            SingleEpochOwned(base_epoch, owner_id) => {
+                let value_storage_removal =
+                    single_storage_removal(removed_value_bytes, base_epoch, Some(owner_id));
+                let key_storage_removal =
+                    single_storage_removal(removed_key_bytes, base_epoch, Some(owner_id));
+                Ok((key_storage_removal, value_storage_removal))
+            }
+            MultiEpoch(base_epoch, other_epoch_bytes) => {
+                let value_storage_removal =
+                sectioned_storage_removal(removed_value_bytes, base_epoch, other_epoch_bytes, None);
+                let key_storage_removal =
+                    sectioned_storage_removal(removed_key_bytes, base_epoch, other_epoch_bytes, None);
+                Ok((key_storage_removal, value_storage_removal))
+            }
+            MultiEpochOwned(base_epoch, other_epoch_bytes, owner_id) => {
+                let value_storage_removal =
+                    sectioned_storage_removal(
+                        removed_value_bytes,
+                    base_epoch,
+                    other_epoch_bytes,
+                    Some(owner_id),
+                );
+                let key_storage_removal =
+                    sectioned_storage_removal(
+                        removed_key_bytes,
+                        base_epoch,
+                        other_epoch_bytes,
+                        Some(owner_id),
+                    );
+                Ok((key_storage_removal, value_storage_removal))
+            },
         }
     }
 }
