@@ -33,7 +33,6 @@
 //!
 
 use std::collections::HashSet;
-use std::option::Option::None;
 
 use grovedb::{Element, TransactionArg};
 

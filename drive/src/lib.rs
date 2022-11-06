@@ -22,8 +22,11 @@ pub mod error;
 pub mod fee;
 /// Fee pools module
 pub mod fee_pools;
+/// Operation module
+pub mod operation;
 /// Query module
 pub mod query;
+
 /// DPP module
 pub use dpp;
 /// GroveDB module
