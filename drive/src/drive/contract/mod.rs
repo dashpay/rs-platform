@@ -59,7 +59,7 @@ use crate::drive::{contract_documents_path, defaults, Drive, DriveCache, RootTre
 use crate::error::drive::DriveError;
 use crate::error::Error;
 use crate::fee::op::DriveOperation;
-use crate::fee::op::DriveOperation::ContractFetch;
+use crate::fee::op::DriveOperation::{CalculatedCostOperation, ContractFetch};
 use crate::fee::{calculate_fee, FeeResult};
 
 /// Takes a contract ID and returns the contract's root path.
@@ -175,6 +175,50 @@ impl Drive {
         transaction: TransactionArg,
         drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<(), Error> {
+        let batch_operations = self.insert_contract_operations(
+            contract_element,
+            contract,
+            block_info,
+            apply,
+            transaction,
+        )?;
+        self.apply_batch_drive_operations(apply, transaction, batch_operations, drive_operations)
+    }
+
+    /// The operations for adding a contract.
+    /// These operations add a contract to storage using `add_contract_to_storage`
+    /// and insert the empty trees which will be necessary to later insert documents.
+    fn insert_contract_add_operations(
+        &self,
+        contract_element: Element,
+        contract: &Contract,
+        block_info: &BlockInfo,
+        apply: bool,
+        transaction: TransactionArg,
+        drive_operations: &mut Vec<DriveOperation>,
+    ) -> Result<(), Error> {
+        let batch_operations = self.insert_contract_operations(
+            contract_element,
+            contract,
+            block_info,
+            apply,
+            transaction,
+        )?;
+        drive_operations.extend(batch_operations);
+        Ok(())
+    }
+
+    /// The operations for adding a contract.
+    /// These operations add a contract to storage using `add_contract_to_storage`
+    /// and insert the empty trees which will be necessary to later insert documents.
+    fn insert_contract_operations(
+        &self,
+        contract_element: Element,
+        contract: &Contract,
+        block_info: &BlockInfo,
+        apply: bool,
+        transaction: TransactionArg,
+    ) -> Result<(Vec<DriveOperation>), Error> {
         let mut batch_operations: Vec<DriveOperation> = vec![];
         let storage_flags =
             StorageFlags::from_some_element_flags_ref(contract_element.get_flags())?;
@@ -249,7 +293,7 @@ impl Drive {
                 }
             }
         }
-        self.apply_batch_drive_operations(apply, transaction, batch_operations, drive_operations)
+        Ok(batch_operations)
     }
 
     /// Updates a contract.
@@ -263,6 +307,50 @@ impl Drive {
         transaction: TransactionArg,
         drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<(), Error> {
+        let batch_operations = self.update_contract_operations(
+            contract_element,
+            contract,
+            original_contract,
+            block_info,
+            apply,
+            transaction,
+        )?;
+        self.apply_batch_drive_operations(apply, transaction, batch_operations, drive_operations)
+    }
+
+    /// Updates a contract.
+    fn update_contract_add_operations(
+        &self,
+        contract_element: Element,
+        contract: &Contract,
+        original_contract: &Contract,
+        block_info: &BlockInfo,
+        apply: bool,
+        transaction: TransactionArg,
+        drive_operations: &mut Vec<DriveOperation>,
+    ) -> Result<(), Error> {
+        let batch_operations = self.update_contract_operations(
+            contract_element,
+            contract,
+            original_contract,
+            block_info,
+            apply,
+            transaction,
+        )?;
+        drive_operations.extend(batch_operations);
+        Ok(())
+    }
+
+    /// operations for updating a contract.
+    fn update_contract_operations(
+        &self,
+        contract_element: Element,
+        contract: &Contract,
+        original_contract: &Contract,
+        block_info: &BlockInfo,
+        apply: bool,
+        transaction: TransactionArg,
+    ) -> Result<(Vec<DriveOperation>), Error> {
         let mut batch_operations: Vec<DriveOperation> = vec![];
         if original_contract.readonly() {
             return Err(Error::Drive(DriveError::UpdatingReadOnlyImmutableContract(
@@ -396,8 +484,7 @@ impl Drive {
                 }
             }
         }
-
-        self.apply_batch_drive_operations(apply, transaction, batch_operations, drive_operations)
+        Ok(batch_operations)
     }
 
     /// Applies a contract CBOR.
@@ -498,6 +585,39 @@ impl Drive {
         storage_flags: Option<&StorageFlags>,
         transaction: TransactionArg,
     ) -> Result<FeeResult, Error> {
+        let mut cost_operations = vec![];
+        let batch_operations = self.apply_contract_operations(
+            contract,
+            contract_serialization,
+            &block_info,
+            apply,
+            storage_flags,
+            transaction,
+        )?;
+        let fetch_cost = DriveOperation::combine_cost_operations(&batch_operations);
+        self.apply_batch_drive_operations(
+            apply,
+            transaction,
+            batch_operations,
+            &mut cost_operations,
+        )?;
+        cost_operations.push(CalculatedCostOperation(fetch_cost));
+        let fees = calculate_fee(None, Some(cost_operations), &block_info.epoch)?;
+        Ok(fees)
+    }
+
+    /// Gets the operations for applying a contract
+    /// If the contract already exists, we get operations for an update
+    /// Otherwise we get operations for an insert
+    pub(crate) fn apply_contract_operations(
+        &self,
+        contract: &Contract,
+        contract_serialization: Vec<u8>,
+        block_info: &BlockInfo,
+        apply: bool,
+        storage_flags: Option<&StorageFlags>,
+        transaction: TransactionArg,
+    ) -> Result<Vec<DriveOperation>, Error> {
         let mut drive_operations: Vec<DriveOperation> = vec![];
 
         // overlying structure
@@ -543,28 +663,27 @@ impl Drive {
                     None,
                 )?;
                 // if the contract is not mutable update_contract will return an error
-                self.update_contract(
+                self.update_contract_add_operations(
                     contract_element,
                     contract,
                     &original_contract,
-                    &block_info,
+                    block_info,
                     apply,
                     transaction,
                     &mut drive_operations,
                 )?;
             }
         } else {
-            self.insert_contract(
+            self.insert_contract_add_operations(
                 contract_element,
                 contract,
-                &block_info,
+                block_info,
                 apply,
                 transaction,
                 &mut drive_operations,
             )?;
         }
-        let fees = calculate_fee(None, Some(drive_operations), &block_info.epoch)?;
-        Ok(fees)
+        Ok(drive_operations)
     }
 }
 

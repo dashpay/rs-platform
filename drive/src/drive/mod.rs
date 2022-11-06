@@ -73,6 +73,8 @@ pub mod identity;
 pub mod initialization;
 /// Object size info module
 pub mod object_size_info;
+/// Operation module
+pub mod operation;
 /// Query module
 pub mod query;
 

@@ -146,7 +146,7 @@ impl Drive {
             DocumentSize(element_size as u32)
         };
 
-        self.update_document_for_contract_operations(
+        self.update_document_for_contract_apply_and_add_to_operations(
             DocumentAndContractInfo {
                 document_info,
                 contract,
@@ -163,7 +163,7 @@ impl Drive {
     }
 
     /// Updates a document.
-    pub(crate) fn update_document_for_contract_operations(
+    pub(crate) fn update_document_for_contract_apply_and_add_to_operations(
         &self,
         document_and_contract_info: DocumentAndContractInfo,
         block_info: &BlockInfo,
@@ -171,6 +171,23 @@ impl Drive {
         transaction: TransactionArg,
         drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<(), Error> {
+        let batch_operations = self.update_document_for_contract_operations(
+            document_and_contract_info,
+            block_info,
+            apply,
+            transaction,
+        )?;
+        self.apply_batch_drive_operations(apply, transaction, batch_operations, drive_operations)
+    }
+
+    /// Gathers operations for updating a document.
+    pub(crate) fn update_document_for_contract_operations(
+        &self,
+        document_and_contract_info: DocumentAndContractInfo,
+        block_info: &BlockInfo,
+        apply: bool,
+        transaction: TransactionArg,
+    ) -> Result<Vec<DriveOperation>, Error> {
         let mut batch_operations: Vec<DriveOperation> = vec![];
 
         if !document_and_contract_info.document_type.documents_mutable {
@@ -184,15 +201,13 @@ impl Drive {
             .is_document_and_serialization()
         {
             // todo: right now let's say the worst case scenario for an update is that all the data must be added again
-            self.add_document_for_contract_operations(
+            return self.add_document_for_contract_operations(
                 document_and_contract_info,
                 false,
                 block_info,
                 apply,
                 transaction,
-                &mut batch_operations,
-            )?;
-            return Ok(());
+            );
         }
 
         let contract = document_and_contract_info.contract;
@@ -516,7 +531,7 @@ impl Drive {
                 }
             }
         }
-        self.apply_batch_drive_operations(apply, transaction, batch_operations, drive_operations)
+        Ok(batch_operations)
     }
 }
 

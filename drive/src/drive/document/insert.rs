@@ -400,7 +400,7 @@ impl Drive {
         transaction: TransactionArg,
     ) -> Result<FeeResult, Error> {
         let mut drive_operations: Vec<DriveOperation> = vec![];
-        self.add_document_for_contract_operations(
+        self.add_document_for_contract_apply_and_add_to_operations(
             document_and_contract_info,
             override_document,
             &block_info,
@@ -413,7 +413,7 @@ impl Drive {
     }
 
     /// Performs the operations to add a document to a contract.
-    pub(crate) fn add_document_for_contract_operations(
+    pub(crate) fn add_document_for_contract_apply_and_add_to_operations(
         &self,
         document_and_contract_info: DocumentAndContractInfo,
         override_document: bool,
@@ -422,6 +422,25 @@ impl Drive {
         transaction: TransactionArg,
         drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<(), Error> {
+        let batch_operations = self.add_document_for_contract_operations(
+            document_and_contract_info,
+            override_document,
+            block_info,
+            apply,
+            transaction,
+        )?;
+        self.apply_batch_drive_operations(apply, transaction, batch_operations, drive_operations)
+    }
+
+    /// Gathers the operations to add a document to a contract.
+    pub(crate) fn add_document_for_contract_operations(
+        &self,
+        document_and_contract_info: DocumentAndContractInfo,
+        override_document: bool,
+        block_info: &BlockInfo,
+        apply: bool,
+        transaction: TransactionArg,
+    ) -> Result<Vec<DriveOperation>, Error> {
         let mut batch_operations: Vec<DriveOperation> = vec![];
         // second we need to construct the path for documents on the contract
         // the path is
@@ -460,14 +479,14 @@ impl Drive {
                 &mut batch_operations,
             )?
         {
-            self.update_document_for_contract_operations(
+            let update_operations = self.update_document_for_contract_operations(
                 document_and_contract_info,
                 &block_info,
                 apply,
                 transaction,
-                &mut batch_operations,
             )?;
-            return Ok(());
+            batch_operations.extend(update_operations);
+            return Ok(batch_operations);
         } else {
             // if we have override_document set that means we already checked if it exists
             self.add_document_to_primary_storage(
@@ -732,7 +751,7 @@ impl Drive {
                 }
             }
         }
-        self.apply_batch_drive_operations(apply, transaction, batch_operations, drive_operations)
+        Ok(batch_operations)
     }
 }
 
@@ -1026,7 +1045,7 @@ mod tests {
             .expect("expected a root hash calculation to succeed");
 
         drive
-            .add_document_for_contract_operations(
+            .add_document_for_contract_apply_and_add_to_operations(
                 DocumentAndContractInfo {
                     document_info: document_info.clone(),
                     contract: &contract,
@@ -1050,7 +1069,7 @@ mod tests {
         assert_eq!(root_hash, root_hash_after_fee);
 
         drive
-            .add_document_for_contract_operations(
+            .add_document_for_contract_apply_and_add_to_operations(
                 DocumentAndContractInfo {
                     document_info,
                     contract: &contract,
