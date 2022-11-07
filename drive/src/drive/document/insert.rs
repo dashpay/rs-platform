@@ -32,7 +32,9 @@
 //! This module implements functions in Drive relevant to inserting documents.
 //!
 
-use grovedb::reference_path::ReferencePathType::{AbsolutePathReference, SiblingReference};
+use grovedb::reference_path::ReferencePathType::{
+    AbsolutePathReference, SiblingReference, UpstreamRootHeightReference,
+};
 use grovedb::{Element, TransactionArg};
 use std::collections::HashSet;
 use std::option::Option::None;
@@ -45,7 +47,7 @@ use crate::drive::document::{
     contract_documents_keeping_history_primary_key_path_for_document_id,
     contract_documents_keeping_history_primary_key_path_for_document_id_size,
     contract_documents_keeping_history_storage_time_reference_path_size,
-    contract_documents_primary_key_path,
+    contract_documents_primary_key_path, make_document_reference,
 };
 use crate::drive::flags::StorageFlags;
 use crate::drive::object_size_info::DocumentInfo::{
@@ -629,28 +631,6 @@ impl Drive {
                 // Iteration 2. the index path is now something like Contracts/ContractID/Documents(1)/$ownerId/<ownerId>/toUserId/<ToUserId>/accountReference/<accountReference>
             }
 
-            fn make_document_reference(
-                primary_key_path: [&[u8]; 5],
-                document: &Document,
-                document_type: &DocumentType,
-                storage_flags: Option<&StorageFlags>,
-            ) -> Element {
-                // we need to construct the reference to the original document
-                let mut reference_path = primary_key_path
-                    .iter()
-                    .map(|x| x.to_vec())
-                    .collect::<Vec<Vec<u8>>>();
-                reference_path.push(Vec::from(document.id));
-                if document_type.documents_keep_history {
-                    reference_path.push(vec![0]);
-                }
-                Element::Reference(
-                    AbsolutePathReference(reference_path),
-                    Some(2),
-                    StorageFlags::map_to_some_element_flags(storage_flags),
-                )
-            }
-
             // unique indexes will be stored under key "0"
             // non unique indices should have a tree at key "0" that has all elements based off of primary key
             if !index.unique || any_fields_null {
@@ -672,7 +652,6 @@ impl Drive {
                     DocumentRefAndSerialization((document, _, storage_flags))
                     | DocumentRefWithoutSerialization((document, storage_flags)) => {
                         let document_reference = make_document_reference(
-                            primary_key_path,
                             document,
                             document_and_contract_info.document_type,
                             *storage_flags,
@@ -681,7 +660,6 @@ impl Drive {
                     }
                     DocumentWithoutSerialization((document, storage_flags)) => {
                         let document_reference = make_document_reference(
-                            primary_key_path,
                             document,
                             document_and_contract_info.document_type,
                             storage_flags.as_ref(),
@@ -706,7 +684,6 @@ impl Drive {
                     DocumentRefAndSerialization((document, _, storage_flags))
                     | DocumentRefWithoutSerialization((document, storage_flags)) => {
                         let document_reference = make_document_reference(
-                            primary_key_path,
                             document,
                             document_and_contract_info.document_type,
                             *storage_flags,
@@ -715,7 +692,6 @@ impl Drive {
                     }
                     DocumentWithoutSerialization((document, storage_flags)) => {
                         let document_reference = make_document_reference(
-                            primary_key_path,
                             document,
                             document_and_contract_info.document_type,
                             storage_flags.as_ref(),

@@ -1015,7 +1015,7 @@ impl Drive {
             return Err(Error::Drive(DriveError::BatchIsEmpty()));
         }
         if self.config.batching_enabled {
-            //println!("batch {:#?}", ops);
+            // println!("batch {:#?}", ops);
             if self.config.batching_consistency_verification {
                 let consistency_results =
                     GroveDbOp::verify_consistency_of_operations(&ops.operations);
@@ -1056,8 +1056,15 @@ impl Drive {
                                     new_storage_flags,
                                     cost.added_bytes,
                                 ).map_err(|_| GroveError::JustInTimeElementFlagsClientError("drive could not combine storage flags (new flags were bigger)"))?;
-                            *new_flags = combined_storage_flags.to_element_flags();
-                            Ok(true)
+                            let combined_flags = combined_storage_flags.to_element_flags();
+                            // it's possible they got bigger in the same epoch
+                            if combined_flags == *new_flags {
+                                // they are the same there was no update
+                                Ok(false)
+                            } else {
+                                *new_flags = combined_flags;
+                                Ok(true)
+                            }
                         }
                         OperationStorageTransitionType::OperationUpdateSmallerSize => {
                             let combined_storage_flags =
@@ -1066,8 +1073,15 @@ impl Drive {
                                     new_storage_flags,
                                     &cost.removed_bytes,
                                 ).map_err(|_| GroveError::JustInTimeElementFlagsClientError("drive could not combine storage flags (new flags were smaller)"))?;
-                            *new_flags = combined_storage_flags.to_element_flags();
-                            Ok(true)
+                            let combined_flags = combined_storage_flags.to_element_flags();
+                            // it's possible they got bigger in the same epoch
+                            if combined_flags == *new_flags {
+                                // they are the same there was no update
+                                Ok(false)
+                            } else {
+                                *new_flags = combined_flags;
+                                Ok(true)
+                            }
                         }
                         _ => Ok(false),
                     }
