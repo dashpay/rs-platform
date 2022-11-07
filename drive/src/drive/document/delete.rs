@@ -117,8 +117,16 @@ impl Drive {
 
         if !document_type.documents_mutable {
             return Err(Error::Drive(DriveError::UpdatingReadOnlyImmutableDocument(
-                "documents for this contract are not mutable",
+                "this document type is not mutable and can not be deleted",
             )));
+        }
+
+        if document_type.documents_keep_history {
+            return Err(Error::Drive(
+                DriveError::InvalidDeletionOfDocumentThatKeepsHistory(
+                    "this document type keeps history and therefore can not be deleted",
+                ),
+            ));
         }
 
         // first we need to construct the path for documents on the contract
@@ -939,11 +947,9 @@ mod tests {
             )
             .expect("expected to insert a document successfully");
 
+        let added_bytes = fee_result.storage_fee / STORAGE_DISK_USAGE_CREDIT_PER_BYTE;
         // We added 1756 bytes
-        assert_eq!(
-            fee_result.storage_fee / STORAGE_DISK_USAGE_CREDIT_PER_BYTE,
-            1756
-        );
+        assert_eq!(added_bytes, 1756);
 
         let document_id = bs58::decode("AM47xnyLfTAC9f61ZQPGfMK5Datk2FeYZwgYvcAnzqFY")
             .into_vec()
@@ -962,10 +968,13 @@ mod tests {
             )
             .expect("expected to be able to delete the document");
 
-        assert!(fee_result
+        let removed_bytes = fee_result
             .removed_from_identities
             .get(&random_owner_id)
-            .is_some());
+            .unwrap()
+            .get(0)
+            .unwrap();
+        assert_eq!(added_bytes, *removed_bytes as u64);
     }
 
     #[test]

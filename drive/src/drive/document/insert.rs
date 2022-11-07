@@ -467,6 +467,7 @@ impl Drive {
                 transaction,
                 &mut batch_operations,
             )?;
+            drive_operations.extend(batch_operations);
             return Ok(());
         } else {
             // if we have override_document set that means we already checked if it exists

@@ -26,6 +26,10 @@ pub enum DriveError {
     UpdatingReadOnlyImmutableDocument(&'static str),
 
     /// Error
+    #[error("invalid deletion of document that keeps history error: {0}")]
+    InvalidDeletionOfDocumentThatKeepsHistory(&'static str),
+
+    /// Error
     #[error("deleting document that does not exist error: {0}")]
     DeletingDocumentThatDoesNotExist(&'static str),
     /// Error

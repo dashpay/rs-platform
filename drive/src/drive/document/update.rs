@@ -539,6 +539,8 @@ mod tests {
     use crate::drive::object_size_info::DocumentAndContractInfo;
     use crate::drive::object_size_info::DocumentInfo::DocumentRefAndSerialization;
     use crate::drive::{defaults, Drive};
+    use crate::fee::default_costs::STORAGE_DISK_USAGE_CREDIT_PER_BYTE;
+    use crate::fee_pools::epochs::Epoch;
     use crate::query::DriveQuery;
 
     #[test]
@@ -1187,6 +1189,275 @@ mod tests {
             .expect("expected to update a document with history successfully");
     }
 
+    fn test_fees_for_update_document(using_history: bool, using_transaction: bool) {
+        let config = DriveConfig {
+            batching_enabled: true,
+            batching_consistency_verification: true,
+            has_raw_enabled: true,
+            default_genesis_time: Some(0),
+            encoding: DriveEncoding::DriveCbor,
+        };
+        let tmp_dir = TempDir::new().unwrap();
+
+        let drive: Drive =
+            Drive::open(&tmp_dir, Some(config)).expect("expected to open Drive successfully");
+
+        let transaction = if using_transaction {
+            Some(drive.grove.start_transaction())
+        } else {
+            None
+        };
+
+        drive
+            .create_initial_state_structure(transaction.as_ref())
+            .expect("expected to create root tree successfully");
+
+        let path = if using_history {
+            "tests/supporting_files/contract/family/family-contract-with-history-only-message-index.json"
+        } else {
+            "tests/supporting_files/contract/family/family-contract-only-message-index.json"
+        };
+
+        // setup code
+        let contract = setup_contract(&drive, path, None, transaction.as_ref());
+
+        let id = [1u8; 32].to_vec();
+        let owner_id = [2u8; 32].to_vec();
+        let person_0_original = Person {
+            id: id.clone(),
+            owner_id: owner_id.clone(),
+            first_name: "Samuel".to_string(),
+            middle_name: "Abraham".to_string(),
+            last_name: "Westrich".to_string(),
+            message: Some("My apples are safe".to_string()),
+            age: 33,
+        };
+
+        let person_0_updated = Person {
+            id: id.clone(),
+            owner_id: owner_id.clone(),
+            first_name: "Samuel".to_string(),
+            middle_name: "Abraham".to_string(),
+            last_name: "Westrich2".to_string(),
+            message: Some("My apples are safe".to_string()),
+            age: 35,
+        };
+
+        let original_fees = apply_person(
+            &drive,
+            &contract,
+            BlockInfo::default(),
+            &person_0_original,
+            transaction.as_ref(),
+        );
+        let original_bytes = original_fees.storage_fee / STORAGE_DISK_USAGE_CREDIT_PER_BYTE;
+        let expected_added_bytes = if using_history { 1393 } else { 1049 };
+        assert_eq!(original_bytes, expected_added_bytes);
+
+        if !using_history {
+            // let's delete it, just to make sure everything is working.
+            // we can delete items that use history though
+            let deletion_fees = delete_person(
+                &drive,
+                &contract,
+                BlockInfo::default(),
+                &person_0_original,
+                transaction.as_ref(),
+            );
+            let removed_bytes = deletion_fees
+                .removed_from_identities
+                .get(owner_id.as_slice())
+                .unwrap()
+                .get(0)
+                .unwrap();
+            assert_eq!(original_bytes, *removed_bytes as u64);
+            // let's re-add it again
+            let original_fees = apply_person(
+                &drive,
+                &contract,
+                BlockInfo::default(),
+                &person_0_original,
+                transaction.as_ref(),
+            );
+            let original_bytes = original_fees.storage_fee / STORAGE_DISK_USAGE_CREDIT_PER_BYTE;
+            assert_eq!(original_bytes, 1049);
+        }
+
+        // now let's update it 1 second later
+        let update_fees = apply_person(
+            &drive,
+            &contract,
+            BlockInfo::default_with_time(1000),
+            &person_0_updated,
+            transaction.as_ref(),
+        );
+        // we both add and remove bytes
+        // this is because trees are added because of indexes, and also removed
+        let added_bytes = update_fees.storage_fee / STORAGE_DISK_USAGE_CREDIT_PER_BYTE;
+
+        let expected_added_bytes = if using_history { 363 } else { 1 };
+        assert_eq!(added_bytes, expected_added_bytes);
+    }
+
+    fn test_fees_for_update_document_on_index(using_history: bool, using_transaction: bool) {
+        let config = DriveConfig {
+            batching_enabled: true,
+            batching_consistency_verification: true,
+            has_raw_enabled: true,
+            default_genesis_time: Some(0),
+            encoding: DriveEncoding::DriveCbor,
+        };
+        let tmp_dir = TempDir::new().unwrap();
+
+        let drive: Drive =
+            Drive::open(&tmp_dir, Some(config)).expect("expected to open Drive successfully");
+
+        let transaction = if using_transaction {
+            Some(drive.grove.start_transaction())
+        } else {
+            None
+        };
+
+        drive
+            .create_initial_state_structure(transaction.as_ref())
+            .expect("expected to create root tree successfully");
+
+        let path = if using_history {
+            "tests/supporting_files/contract/family/family-contract-with-history-only-message-index.json"
+        } else {
+            "tests/supporting_files/contract/family/family-contract-only-message-index.json"
+        };
+
+        // setup code
+        let contract = setup_contract(&drive, path, None, transaction.as_ref());
+
+        let id = [1u8; 32].to_vec();
+        let owner_id = [2u8; 32].to_vec();
+        let person_0_original = Person {
+            id: id.clone(),
+            owner_id: owner_id.clone(),
+            first_name: "Samuel".to_string(),
+            middle_name: "Abraham".to_string(),
+            last_name: "Westrich".to_string(),
+            message: Some("My apples are safe".to_string()),
+            age: 33,
+        };
+
+        let person_0_updated = Person {
+            id: id.clone(),
+            owner_id: owner_id.clone(),
+            first_name: "Samuel".to_string(),
+            middle_name: "Abraham".to_string(),
+            last_name: "Westrich".to_string(),
+            message: Some("My apples are safer".to_string()),
+            age: 35,
+        };
+
+        let original_fees = apply_person(
+            &drive,
+            &contract,
+            BlockInfo::default(),
+            &person_0_original,
+            transaction.as_ref(),
+        );
+        let original_bytes = original_fees.storage_fee / STORAGE_DISK_USAGE_CREDIT_PER_BYTE;
+        let expected_added_bytes = if using_history { 1393 } else { 1049 };
+        assert_eq!(original_bytes, expected_added_bytes);
+        if !using_history {
+            // let's delete it, just to make sure everything is working.
+            let deletion_fees = delete_person(
+                &drive,
+                &contract,
+                BlockInfo::default(),
+                &person_0_original,
+                transaction.as_ref(),
+            );
+            let removed_bytes = deletion_fees
+                .removed_from_identities
+                .get(owner_id.as_slice())
+                .unwrap()
+                .get(0)
+                .unwrap();
+            assert_eq!(original_bytes, *removed_bytes as u64);
+            // let's re-add it again
+            let original_fees = apply_person(
+                &drive,
+                &contract,
+                BlockInfo::default(),
+                &person_0_original,
+                transaction.as_ref(),
+            );
+            let original_bytes = original_fees.storage_fee / STORAGE_DISK_USAGE_CREDIT_PER_BYTE;
+            assert_eq!(original_bytes, 1049);
+        }
+        // now let's update it
+
+        let update_fees = apply_person(
+            &drive,
+            &contract,
+            BlockInfo::default(),
+            &person_0_updated,
+            transaction.as_ref(),
+        );
+        // we both add and remove bytes
+        // this is because trees are added because of indexes, and also removed
+        let added_bytes = update_fees.storage_fee / STORAGE_DISK_USAGE_CREDIT_PER_BYTE;
+        let removed_bytes = update_fees
+            .removed_from_identities
+            .get(owner_id.as_slice())
+            .unwrap()
+            .get(0)
+            .unwrap();
+
+        //todo: this is wrong
+        let expected_added_bytes = if using_history { 601 } else { 599 };
+        assert_eq!(added_bytes, expected_added_bytes);
+
+        let expected_removed_bytes = if using_history { 641 } else { 639 };
+
+        assert_eq!(*removed_bytes, expected_removed_bytes);
+    }
+
+    #[test]
+    fn test_fees_for_update_document_no_history_using_transaction() {
+        test_fees_for_update_document(false, true)
+    }
+
+    #[test]
+    fn test_fees_for_update_document_no_history_no_transaction() {
+        test_fees_for_update_document(false, false)
+    }
+
+    #[test]
+    fn test_fees_for_update_document_with_history_using_transaction() {
+        test_fees_for_update_document(true, true)
+    }
+
+    #[test]
+    fn test_fees_for_update_document_with_history_no_transaction() {
+        test_fees_for_update_document(true, false)
+    }
+
+    #[test]
+    fn test_fees_for_update_document_on_index_no_history_using_transaction() {
+        test_fees_for_update_document_on_index(false, true)
+    }
+
+    #[test]
+    fn test_fees_for_update_document_on_index_no_history_no_transaction() {
+        test_fees_for_update_document_on_index(false, false)
+    }
+
+    #[test]
+    fn test_fees_for_update_document_on_index_with_history_using_transaction() {
+        test_fees_for_update_document_on_index(true, true)
+    }
+
+    #[test]
+    fn test_fees_for_update_document_on_index_with_history_no_transaction() {
+        test_fees_for_update_document_on_index(true, false)
+    }
+
     #[derive(Serialize, Deserialize)]
     #[serde(rename_all = "camelCase")]
     struct Person {
@@ -1207,7 +1478,7 @@ mod tests {
         block_info: BlockInfo,
         person: &Person,
         transaction: TransactionArg,
-    ) {
+    ) -> FeeResult {
         let value = serde_json::to_value(person).expect("serialized person");
         let document_cbor = value_to_cbor(value, Some(defaults::PROTOCOL_VERSION));
         let document = Document::from_cbor(document_cbor.as_slice(), None, None)
@@ -1216,7 +1487,14 @@ mod tests {
             .document_type_for_name("person")
             .expect("expected to get document type");
 
-        let storage_flags = Some(StorageFlags::SingleEpoch(0));
+        let storage_flags = Some(StorageFlags::SingleEpochOwned(
+            0,
+            person
+                .owner_id
+                .clone()
+                .try_into()
+                .expect("expected to get owner_id"),
+        ));
 
         drive
             .add_document_for_contract(
@@ -1235,7 +1513,44 @@ mod tests {
                 true,
                 transaction,
             )
-            .expect("expected to add document");
+            .expect("expected to add document")
+    }
+
+    fn delete_person(
+        drive: &Drive,
+        contract: &Contract,
+        block_info: BlockInfo,
+        person: &Person,
+        transaction: TransactionArg,
+    ) -> FeeResult {
+        let value = serde_json::to_value(person).expect("serialized person");
+        let document_cbor = value_to_cbor(value, Some(defaults::PROTOCOL_VERSION));
+        let document = Document::from_cbor(document_cbor.as_slice(), None, None)
+            .expect("document should be properly deserialized");
+        let document_type = contract
+            .document_type_for_name("person")
+            .expect("expected to get document type");
+
+        let storage_flags = Some(StorageFlags::SingleEpochOwned(
+            0,
+            person
+                .owner_id
+                .clone()
+                .try_into()
+                .expect("expected to get owner_id"),
+        ));
+
+        drive
+            .delete_document_for_contract(
+                person.id.as_slice(),
+                &contract,
+                "person",
+                Some(person.owner_id.as_slice()),
+                block_info,
+                true,
+                transaction,
+            )
+            .expect("expected to remove person")
     }
 
     fn test_update_complex_person(
