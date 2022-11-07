@@ -1251,7 +1251,137 @@ mod tests {
             transaction.as_ref(),
         );
         let original_bytes = original_fees.storage_fee / STORAGE_DISK_USAGE_CREDIT_PER_BYTE;
-        let expected_added_bytes = if using_history { 1393 } else { 1049 };
+        let expected_added_bytes = if using_history {
+            //Explanation for 1350
+
+            //todo
+            1350
+        } else {
+            //Explanation for 1049
+
+            // Document Storage
+
+            //// Item
+            // = 410 Bytes
+
+            // Explanation for 410 storage_written_bytes
+
+            // Key -> 65 bytes
+            // 32 bytes for the key prefix
+            // 32 bytes for the unique id
+            // 1 byte for key_size (required space for 64)
+
+            // Value -> 278
+            //   1 for the flag option with flags
+            //   1 for the flags size
+            //   35 for flags 32 + 1 + 2
+            //   1 for the enum type
+            //   1 for item
+            //   173 for item serialized bytes
+            // 32 for node hash
+            // 32 for value hash
+            // 2 byte for the value_size (required space for above 128)
+
+            // Parent Hook -> 67
+            // Key Bytes 32
+            // Hash Size 32
+            // Key Length 1
+            // Child Heights 2
+
+            // Total 65 + 278 + 67 = 410
+
+            //// Tree 1 / <Person Contract> / 1 / person / message
+            // Key: My apples are safe
+            // = 177 Bytes
+
+            // Explanation for 177 storage_written_bytes
+
+            // Key -> 51 bytes
+            // 32 bytes for the key prefix
+            // 18 bytes for the key "My apples are safe" 18 characters
+            // 1 byte for key_size (required space for 50)
+
+            // Value -> 73
+            //   1 for the flag option with flags
+            //   1 for the flags size
+            //   35 for flags
+            //   1 for the enum type
+            //   1 for empty tree value
+            // 32 for node hash
+            // 0 for value hash
+            // 2 byte for the value_size (required space for 73 + up to 256 for child key)
+
+            // Parent Hook -> 53
+            // Key Bytes 18
+            // Hash Size 32
+            // Key Length 1
+            // Child Heights 2
+
+            // Total 51 + 73 + 53 = 177
+
+            //// Tree 1 / <Person Contract> / 1 / person / message / My apples are safe
+            // Key: 0
+            // = 143 Bytes
+
+            // Explanation for 143 storage_written_bytes
+
+            // Key -> 34 bytes
+            // 32 bytes for the key prefix
+            // 1 bytes for the key "My apples are safe" 18 characters
+            // 1 byte for key_size (required space for 33)
+
+            // Value -> 73
+            //   1 for the flag option with flags
+            //   1 for the flags size
+            //   35 for flags
+            //   1 for the enum type
+            //   1 for empty tree value
+            // 32 for node hash
+            // 0 for value hash
+            // 2 byte for the value_size (required space for 73 + up to 256 for child key)
+
+            // Parent Hook -> 36
+            // Key Bytes 1
+            // Hash Size 32
+            // Key Length 1
+            // Child Heights 2
+
+            // Total 34 + 73 + 36 = 143
+
+            //// Ref 1 / <Person Contract> / 1 / person / message / My apples are safe
+            // Reference to Serialized Item
+            // = 319 Bytes
+
+            // Explanation for 276 storage_written_bytes
+
+            // Key -> 65 bytes
+            // 32 bytes for the key prefix
+            // 32 bytes for the unique id
+            // 1 byte for key_size (required space for 64)
+
+            // Value -> 144
+            //   1 for the flag option with flags
+            //   1 for the flags size
+            //   35 for flags 32 + 1 + 2
+            //   1 for the element type as reference
+            //   1 for reference type as upstream root reference
+            //   1 for reference root height
+            //   36 for the reference path bytes ( 1 + 1 + 32 + 1 + 1)
+            //   2 for the max reference hop
+            // 32 for node hash
+            // 32 for value hash
+            // 2 byte for the value_size (required space for above 128)
+
+            // Parent Hook -> 67
+            // Key Bytes 32
+            // Hash Size 32
+            // Key Length 1
+            // Child Heights 2
+
+            // Total 65 + 144 + 67 = 276
+
+            1006
+        };
         assert_eq!(original_bytes, expected_added_bytes);
 
         if !using_history {
@@ -1280,7 +1410,7 @@ mod tests {
                 transaction.as_ref(),
             );
             let original_bytes = original_fees.storage_fee / STORAGE_DISK_USAGE_CREDIT_PER_BYTE;
-            assert_eq!(original_bytes, 1049);
+            assert_eq!(original_bytes, expected_added_bytes);
         }
 
         // now let's update it 1 second later
@@ -1361,7 +1491,7 @@ mod tests {
             transaction.as_ref(),
         );
         let original_bytes = original_fees.storage_fee / STORAGE_DISK_USAGE_CREDIT_PER_BYTE;
-        let expected_added_bytes = if using_history { 1393 } else { 1049 };
+        let expected_added_bytes = if using_history { 1350 } else { 1006 };
         assert_eq!(original_bytes, expected_added_bytes);
         if !using_history {
             // let's delete it, just to make sure everything is working.
@@ -1388,7 +1518,7 @@ mod tests {
                 transaction.as_ref(),
             );
             let original_bytes = original_fees.storage_fee / STORAGE_DISK_USAGE_CREDIT_PER_BYTE;
-            assert_eq!(original_bytes, 1049);
+            assert_eq!(original_bytes, expected_added_bytes);
         }
         // now let's update it
 
@@ -1409,11 +1539,11 @@ mod tests {
             .get(0)
             .unwrap();
 
-        //todo: this is wrong
+        // We added one byte, and since it is an index, and keys are doubled it's 2 extra bytes
         let expected_added_bytes = if using_history { 601 } else { 599 };
         assert_eq!(added_bytes, expected_added_bytes);
 
-        let expected_removed_bytes = if using_history { 641 } else { 639 };
+        let expected_removed_bytes = if using_history { 598 } else { 596 };
 
         assert_eq!(*removed_bytes, expected_removed_bytes);
     }
@@ -1486,7 +1616,6 @@ mod tests {
         let document_type = contract
             .document_type_for_name("person")
             .expect("expected to get document type");
-
         let storage_flags = Some(StorageFlags::SingleEpochOwned(
             0,
             person

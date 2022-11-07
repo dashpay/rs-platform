@@ -949,7 +949,7 @@ mod tests {
 
         let added_bytes = fee_result.storage_fee / STORAGE_DISK_USAGE_CREDIT_PER_BYTE;
         // We added 1756 bytes
-        assert_eq!(added_bytes, 1756);
+        assert_eq!(added_bytes, 1668);
 
         let document_id = bs58::decode("AM47xnyLfTAC9f61ZQPGfMK5Datk2FeYZwgYvcAnzqFY")
             .into_vec()
