@@ -237,7 +237,7 @@ class GroveDB {
 /**
  * @typedef Element
  * @property {"item"|"reference"|"tree"} type - element type. Can be "item", "reference" or "tree"
- * @property {Buffer|Buffer[]} value - element value
+ * @property {Buffer|Buffer[]} [value] - element value
  */
 
 /**
@@ -333,6 +333,23 @@ class GroveDB {
  * @property {"rangeAfterToInclusive"} type
  * @property {Buffer} after
  * @property {Buffer} to
+ */
+
+/**
+ * @typedef BlockInfo
+ * @property {number} height
+ * @property {number} epoch
+ * @property {number} timeMs
+ */
+
+/**
+ * @typedef FeeResult
+ * @property {number} processingFee
+ * @property {number} storageFee
+ * @property {{
+ *   identifier: Uint8Array,
+ *   epochsToBytes: Object<string, number>
+ * }[]} removedFromIdentities
  */
 
 module.exports = GroveDB;

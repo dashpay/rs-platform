@@ -57,15 +57,9 @@ pub fn js_object_to_element<'a, C: Context<'a>>(
                 storage_flags.to_some_element_flags(),
             ))
         }
-        "tree" => {
-            let js_buffer: Handle<JsBuffer> = js_object.get(cx, "value")?;
-            let tree_vec = js_buffer_to_vec_u8(js_buffer, cx);
-
-            Ok(Element::new_tree_with_flags(
-                Some(tree_vec),
-                storage_flags.to_some_element_flags(),
-            ))
-        }
+        "tree" => Ok(Element::empty_tree_with_flags(
+            storage_flags.to_some_element_flags(),
+        )),
         _ => cx.throw_error(format!("Unexpected element type {}", element_type)),
     }
 }
@@ -394,7 +388,7 @@ pub fn js_object_to_block_info<'a, C: Context<'a>>(
 ) -> NeonResult<BlockInfo> {
     let js_height: Handle<JsNumber> = js_object.get(cx, "height")?;
     let js_epoch: Handle<JsNumber> = js_object.get(cx, "epoch")?;
-    let js_time: Handle<JsNumber> = js_object.get(cx, "time")?;
+    let js_time: Handle<JsNumber> = js_object.get(cx, "timeMs")?;
 
     let epoch = Epoch::new(js_epoch.value(cx) as u16);
 

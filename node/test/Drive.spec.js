@@ -9,6 +9,10 @@ const getDataContractFixture = require('@dashevo/dpp/lib/test/fixtures/getDataCo
 const getDocumentsFixture = require('@dashevo/dpp/lib/test/fixtures/getDocumentsFixture');
 const getIdentityFixture = require('@dashevo/dpp/lib/test/fixtures/getIdentityFixture');
 
+const {
+  expectFeeResult,
+} = require('./utils');
+
 const Drive = require('../Drive');
 
 const TEST_DATA_PATH = './test_data';
@@ -17,7 +21,7 @@ describe('Drive', () => {
   let drive;
   let dataContract;
   let identity;
-  let blockTime;
+  let blockInfo;
   let documents;
   let initialRootHash;
 
@@ -26,7 +30,13 @@ describe('Drive', () => {
 
     dataContract = getDataContractFixture();
     identity = getIdentityFixture();
-    blockTime = new Date();
+
+    blockInfo = {
+      height: 1,
+      epoch: 1,
+      timeMs: new Date().getTime(),
+    };
+
     documents = getDocumentsFixture(dataContract);
     initialRootHash = await drive.getGroveDB().getRootHash();
   });
@@ -54,19 +64,15 @@ describe('Drive', () => {
     });
 
     it('should create contract if not exists', async () => {
-      const result = await drive.applyContract(dataContract, blockTime);
+      const result = await drive.applyContract(dataContract, blockInfo);
 
-      blockTime.setSeconds(blockTime.getSeconds() + 10);
-
-      expect(result).to.have.lengthOf(2);
-      expect(result[0]).to.be.greaterThan(0);
-      expect(result[1]).to.be.greaterThan(0);
+      expectFeeResult(result);
 
       expect(await drive.getGroveDB().getRootHash()).to.not.deep.equals(initialRootHash);
     });
 
     it('should update existing contract', async () => {
-      await drive.applyContract(dataContract, blockTime);
+      await drive.applyContract(dataContract, blockInfo);
 
       dataContract.setDocumentSchema('newDocumentType', {
         type: 'object',
@@ -78,23 +84,17 @@ describe('Drive', () => {
         additionalProperties: false,
       });
 
-      blockTime.setSeconds(blockTime.getSeconds() + 10);
+      const result = await drive.applyContract(dataContract, blockInfo);
 
-      const result = await drive.applyContract(dataContract, blockTime);
-
-      expect(result).to.have.lengthOf(2);
-      expect(result[0]).to.be.greaterThan(0);
-      expect(result[1]).to.be.greaterThan(0);
+      expectFeeResult(result);
 
       expect(await drive.getGroveDB().getRootHash()).to.not.deep.equals(initialRootHash);
     });
 
     it('should not create contract with dry run flag', async () => {
-      const result = await drive.applyContract(dataContract, blockTime, false, true);
+      const result = await drive.applyContract(dataContract, blockInfo, false, true);
 
-      expect(result).to.have.lengthOf(2);
-      // expect(result[0]).to.be.greaterThan(0);
-      // expect(result[1]).to.be.greaterThan(0);
+      expectFeeResult(result);
 
       expect(await drive.getGroveDB().getRootHash()).to.deep.equals(initialRootHash);
     });
@@ -104,7 +104,7 @@ describe('Drive', () => {
     beforeEach(async () => {
       await drive.createInitialStateStructure();
 
-      await drive.applyContract(dataContract, blockTime);
+      await drive.applyContract(dataContract, blockInfo);
 
       initialRootHash = await drive.getGroveDB().getRootHash();
     });
@@ -113,11 +113,9 @@ describe('Drive', () => {
       it('should create a document', async () => {
         const documentWithoutIndices = documents[0];
 
-        const result = await drive.createDocument(documentWithoutIndices, blockTime);
+        const result = await drive.createDocument(documentWithoutIndices, blockInfo);
 
-        expect(result).to.have.lengthOf(2);
-        expect(result[0]).to.be.greaterThan(0);
-        expect(result[1]).to.be.greaterThan(0);
+        expectFeeResult(result);
 
         expect(await drive.getGroveDB().getRootHash()).to.not.deep.equals(initialRootHash);
       });
@@ -127,11 +125,9 @@ describe('Drive', () => {
       it('should create a document', async () => {
         const documentWithIndices = documents[3];
 
-        const result = await drive.createDocument(documentWithIndices, blockTime);
+        const result = await drive.createDocument(documentWithIndices, blockInfo);
 
-        expect(result).to.have.lengthOf(2);
-        expect(result[0]).to.be.greaterThan(0);
-        expect(result[1]).to.be.greaterThan(0);
+        expectFeeResult(result);
 
         expect(await drive.getGroveDB().getRootHash()).to.not.deep.equals(initialRootHash);
       });
@@ -140,11 +136,9 @@ describe('Drive', () => {
     it('should not create a document with dry run flag', async () => {
       const documentWithoutIndices = documents[0];
 
-      const result = await drive.createDocument(documentWithoutIndices, blockTime, false, true);
+      const result = await drive.createDocument(documentWithoutIndices, blockInfo, false, true);
 
-      expect(result).to.have.lengthOf(2);
-      // expect(result[0]).to.be.greaterThan(0);
-      // expect(result[1]).to.be.greaterThan(0);
+      expectFeeResult(result);
 
       expect(await drive.getGroveDB().getRootHash()).to.deep.equals(initialRootHash);
     });
@@ -154,7 +148,7 @@ describe('Drive', () => {
     beforeEach(async () => {
       await drive.createInitialStateStructure();
 
-      await drive.applyContract(dataContract, blockTime);
+      await drive.applyContract(dataContract, blockInfo);
 
       initialRootHash = await drive.getGroveDB().getRootHash();
     });
@@ -164,16 +158,14 @@ describe('Drive', () => {
         // Create a document
         const documentWithoutIndices = documents[0];
 
-        await drive.createDocument(documentWithoutIndices, blockTime);
+        await drive.createDocument(documentWithoutIndices, blockInfo);
 
         // Update the document
-        documentWithoutIndices.set('name', 'Bob');
+        documentWithoutIndices.set('name', 'Boooooooooooob');
 
-        const result = await drive.updateDocument(documentWithoutIndices, blockTime);
+        const result = await drive.updateDocument(documentWithoutIndices, blockInfo);
 
-        expect(result).to.have.lengthOf(2);
-        expect(result[0]).to.be.greaterThan(0);
-        expect(result[1]).to.be.greaterThan(0);
+        expectFeeResult(result);
 
         expect(await drive.getGroveDB().getRootHash()).to.not.deep.equals(initialRootHash);
       });
@@ -184,16 +176,14 @@ describe('Drive', () => {
         // Create a document
         const documentWithIndices = documents[3];
 
-        await drive.createDocument(documentWithIndices, blockTime);
+        await drive.createDocument(documentWithIndices, blockInfo);
 
         // Update the document
         documentWithIndices.set('firstName', 'Bob');
 
-        const result = await drive.updateDocument(documentWithIndices, blockTime);
+        const result = await drive.updateDocument(documentWithIndices, blockInfo);
 
-        expect(result).to.have.lengthOf(2);
-        expect(result[0]).to.be.greaterThan(0);
-        expect(result[1]).to.be.greaterThan(0);
+        expectFeeResult(result);
 
         expect(await drive.getGroveDB().getRootHash()).to.not.deep.equals(initialRootHash);
       });
@@ -202,13 +192,17 @@ describe('Drive', () => {
     it('should not update a document with dry run flag', async () => {
       const documentWithoutIndices = documents[0];
 
-      documentWithoutIndices.set('name', 'Bob');
+      documentWithoutIndices.set('name', 'Boooooooooooooooooooooob');
 
-      const result = await drive.updateDocument(documentWithoutIndices, blockTime, false, true);
+      const result = await drive.updateDocument(documentWithoutIndices, blockInfo, false, true);
 
-      expect(result).to.have.lengthOf(2);
-      // expect(result[0]).to.be.greaterThan(0);
-      // expect(result[1]).to.be.greaterThan(0);
+      expect(result).to.have.property('processingFee');
+      expect(result).to.have.property('storageFee');
+      expect(result).to.have.property('removedFromIdentities');
+
+      // TODO: Processing fee doesn't work for v0.23
+      expect(result.processingFee).to.be.equals(0);
+      expect(result.storageFee).to.be.greaterThan(0, 'storage fee must be higher than 0');
 
       expect(await drive.getGroveDB().getRootHash()).to.deep.equals(initialRootHash);
     });
@@ -218,7 +212,7 @@ describe('Drive', () => {
     beforeEach(async () => {
       await drive.createInitialStateStructure();
 
-      await drive.applyContract(dataContract, blockTime);
+      await drive.applyContract(dataContract, blockInfo);
 
       initialRootHash = await drive.getGroveDB().getRootHash();
     });
@@ -228,7 +222,7 @@ describe('Drive', () => {
         // Create a document
         const documentWithoutIndices = documents[3];
 
-        await drive.createDocument(documentWithoutIndices, blockTime);
+        await drive.createDocument(documentWithoutIndices, blockInfo);
 
         initialRootHash = await drive.getGroveDB().getRootHash();
 
@@ -236,11 +230,15 @@ describe('Drive', () => {
           dataContract,
           documentWithoutIndices.getType(),
           documentWithoutIndices.getId(),
+          blockInfo,
         );
 
-        expect(result).to.have.lengthOf(2);
-        expect(result[0]).to.be.greaterThan(0);
-        expect(result[1]).to.be.greaterThan(0);
+        expect(result).to.have.property('processingFee');
+        expect(result).to.have.property('storageFee');
+        expect(result).to.have.property('removedFromIdentities');
+
+        expect(result.processingFee).to.be.greaterThan(0, 'processing fee must be higher than 0');
+        expect(result.storageFee).to.be.equal(0, 'storage fee must be equal to 0');
 
         expect(await drive.getGroveDB().getRootHash()).to.not.deep.equals(initialRootHash);
       });
@@ -251,7 +249,7 @@ describe('Drive', () => {
         // Create a document
         const documentWithIndices = documents[3];
 
-        await drive.createDocument(documentWithIndices, blockTime);
+        await drive.createDocument(documentWithIndices, blockInfo);
 
         initialRootHash = await drive.getGroveDB().getRootHash();
 
@@ -259,11 +257,15 @@ describe('Drive', () => {
           dataContract,
           documentWithIndices.getType(),
           documentWithIndices.getId(),
+          blockInfo,
         );
 
-        expect(result).to.have.lengthOf(2);
-        expect(result[0]).to.be.greaterThan(0);
-        expect(result[1]).to.be.greaterThan(0);
+        expect(result).to.have.property('processingFee');
+        expect(result).to.have.property('storageFee');
+        expect(result).to.have.property('removedFromIdentities');
+
+        expect(result.processingFee).to.be.greaterThan(0, 'processing fee must be higher than 0');
+        expect(result.storageFee).to.be.equal(0, 'storage fee must be equal to 0');
 
         expect(await drive.getGroveDB().getRootHash()).to.not.deep.equals(initialRootHash);
       });
@@ -273,7 +275,7 @@ describe('Drive', () => {
       // Create a document
       const documentWithoutIndices = documents[3];
 
-      await drive.createDocument(documentWithoutIndices, blockTime);
+      await drive.createDocument(documentWithoutIndices, blockInfo);
 
       initialRootHash = await drive.getGroveDB().getRootHash();
 
@@ -281,13 +283,17 @@ describe('Drive', () => {
         dataContract,
         documentWithoutIndices.getType(),
         documentWithoutIndices.getId(),
+        blockInfo,
         false,
         true,
       );
 
-      expect(result).to.have.lengthOf(2);
-      // expect(result[0]).to.be.greaterThan(0);
-      // expect(result[1]).to.be.greaterThan(0);
+      expect(result).to.have.property('processingFee');
+      expect(result).to.have.property('storageFee');
+      expect(result).to.have.property('removedFromIdentities');
+
+      expect(result.processingFee).to.be.greaterThan(0, 'processing fee must be higher than 0');
+      expect(result.storageFee).to.be.equal(0, 'storage fee must be equal to 0');
 
       expect(await drive.getGroveDB().getRootHash()).to.deep.equals(initialRootHash);
     });
@@ -297,17 +303,17 @@ describe('Drive', () => {
     beforeEach(async () => {
       await drive.createInitialStateStructure();
 
-      await drive.applyContract(dataContract, blockTime);
+      await drive.applyContract(dataContract, blockInfo);
     });
 
     it('should query existing documents', async () => {
       // Create documents
       await Promise.all(
-        documents.map((document) => drive.createDocument(document, blockTime)),
+        documents.map((document) => drive.createDocument(document, blockInfo)),
       );
 
       // eslint-disable-next-line no-unused-vars
-      const [fetchedDocuments, processingCost] = await drive.queryDocuments(dataContract, 'indexedDocument', {
+      const [fetchedDocuments, processingCost] = await drive.queryDocuments(dataContract, 'indexedDocument', blockInfo, {
         where: [['lastName', '==', 'Kennedy']],
       });
 
@@ -315,17 +321,17 @@ describe('Drive', () => {
       expect(fetchedDocuments[0]).to.be.an.instanceOf(Document);
       expect(fetchedDocuments[0].toObject()).to.deep.equal(documents[4].toObject());
 
-      // expect(processingCost).to.be.greaterThan(0);
+      expect(processingCost).to.be.greaterThan(0);
     });
 
     it('should query existing documents again', async () => {
       // Create documents
       await Promise.all(
-        documents.map((document) => drive.createDocument(document, blockTime)),
+        documents.map((document) => drive.createDocument(document, blockInfo)),
       );
 
       // eslint-disable-next-line no-unused-vars
-      const [fetchedDocuments, processingCost] = await drive.queryDocuments(dataContract, 'indexedDocument', {
+      const [fetchedDocuments, processingCost] = await drive.queryDocuments(dataContract, 'indexedDocument', blockInfo, {
         where: [['lastName', '==', 'Kennedy']],
       });
 
@@ -333,17 +339,17 @@ describe('Drive', () => {
       expect(fetchedDocuments[0]).to.be.an.instanceOf(Document);
       expect(fetchedDocuments[0].toObject()).to.deep.equal(documents[4].toObject());
 
-      // expect(processingCost).to.be.greaterThan(0);
+      expect(processingCost).to.be.greaterThan(0);
     });
 
     it('should return empty array if documents are not exist', async () => {
       // eslint-disable-next-line no-unused-vars
-      const [fetchedDocuments, processingCost] = await drive.queryDocuments(dataContract, 'indexedDocument', {
+      const [fetchedDocuments, processingCost] = await drive.queryDocuments(dataContract, 'indexedDocument', blockInfo, {
         where: [['lastName', '==', 'Kennedy']],
       });
 
       expect(fetchedDocuments).to.have.lengthOf(0);
-      // expect(processingCost).to.be.greaterThan(0);
+      expect(processingCost).to.be.greaterThan(0);
     });
   });
 
@@ -351,13 +357,13 @@ describe('Drive', () => {
     beforeEach(async () => {
       await drive.createInitialStateStructure();
 
-      await drive.applyContract(dataContract, blockTime);
+      await drive.applyContract(dataContract, blockInfo);
     });
 
     it('should query existing documents', async () => {
       // Create documents
       await Promise.all(
-        documents.map((document) => drive.createDocument(document, blockTime)),
+        documents.map((document) => drive.createDocument(document, blockInfo)),
       );
 
       const result = await drive.proveDocumentsQuery(dataContract, 'indexedDocument', {
@@ -371,7 +377,8 @@ describe('Drive', () => {
       expect(proofs).to.be.an.instanceOf(Buffer);
       expect(proofs.length).to.be.greaterThan(0);
 
-      expect(processingCost).to.be.greaterThan(0);
+      // TODO: We do not calculating processing costs for poofs yet
+      expect(processingCost).to.equal(0);
     });
   });
 
@@ -383,13 +390,9 @@ describe('Drive', () => {
     });
 
     it('should create identity if not exists', async () => {
-      const result = await drive.insertIdentity(identity);
+      const result = await drive.insertIdentity(identity, blockInfo);
 
-      blockTime.setSeconds(blockTime.getSeconds() + 10);
-
-      expect(result).to.have.lengthOf(2);
-      expect(result[0]).to.be.greaterThan(0);
-      expect(result[1]).to.be.greaterThan(0);
+      expectFeeResult(result);
 
       expect(await drive.getGroveDB().getRootHash()).to.not.deep.equals(initialRootHash);
     });

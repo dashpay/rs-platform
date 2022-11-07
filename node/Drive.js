@@ -89,17 +89,17 @@ class Drive {
 
   /**
    * @param {DataContract} dataContract
-   * @param {Date} blockTime
+   * @param {BlockInfo} blockInfo
    * @param {boolean} [useTransaction=false]
    * @param {boolean} [dryRun=false]
    *
-   * @returns {Promise<[number, number]>}
+   * @returns {Promise<FeeResult>}
    */
-  async applyContract(dataContract, blockTime, useTransaction = false, dryRun = false) {
+  async applyContract(dataContract, blockInfo, useTransaction = false, dryRun = false) {
     return driveApplyContractAsync.call(
       this.drive,
       dataContract.toBuffer(),
-      blockTime,
+      blockInfo,
       !dryRun,
       useTransaction,
     );
@@ -107,13 +107,13 @@ class Drive {
 
   /**
    * @param {Document} document
-   * @param {Date} blockTime
+   * @param {BlockInfo} blockInfo
    * @param {boolean} [useTransaction=false]
    * @param {boolean} [dryRun=false]
    *
-   * @returns {Promise<[number, number]>}
+   * @returns {Promise<FeeResult>}
    */
-  async createDocument(document, blockTime, useTransaction = false, dryRun = false) {
+  async createDocument(document, blockInfo, useTransaction = false, dryRun = false) {
     return driveCreateDocumentAsync.call(
       this.drive,
       document.toBuffer(),
@@ -121,7 +121,7 @@ class Drive {
       document.getType(),
       document.getOwnerId().toBuffer(),
       true,
-      blockTime,
+      blockInfo,
       !dryRun,
       useTransaction,
     );
@@ -129,20 +129,20 @@ class Drive {
 
   /**
    * @param {Document} document
-   * @param {Date} blockTime
+   * @param {BlockInfo} blockInfo
    * @param {boolean} [useTransaction=false]
    * @param {boolean} [dryRun=false]
    *
-   * @returns {Promise<[number, number]>}
+   * @returns {Promise<FeeResult>}
    */
-  async updateDocument(document, blockTime, useTransaction = false, dryRun = false) {
+  async updateDocument(document, blockInfo, useTransaction = false, dryRun = false) {
     return driveUpdateDocumentAsync.call(
       this.drive,
       document.toBuffer(),
       document.getDataContract().toBuffer(),
       document.getType(),
       document.getOwnerId().toBuffer(),
-      blockTime,
+      blockInfo,
       !dryRun,
       useTransaction,
     );
@@ -152,15 +152,17 @@ class Drive {
    * @param {DataContract} dataContract
    * @param {string} documentType
    * @param {Identifier} documentId
+   * @param {BlockInfo} blockInfo
    * @param {boolean} [useTransaction=false]
    * @param {boolean} [dryRun=false]
    *
-   * @returns {Promise<[number, number]>}
+   * @returns {Promise<FeeResult>}
    */
   async deleteDocument(
     dataContract,
     documentType,
     documentId,
+    blockInfo,
     useTransaction = false,
     dryRun = false,
   ) {
@@ -169,6 +171,7 @@ class Drive {
       documentId.toBuffer(),
       dataContract.toBuffer(),
       documentType,
+      blockInfo,
       !dryRun,
       useTransaction,
     );
@@ -178,6 +181,7 @@ class Drive {
    *
    * @param {DataContract} dataContract
    * @param {string} documentType
+   * @param {BlockInfo} blockInfo
    * @param [query]
    * @param [query.where]
    * @param [query.limit]
@@ -188,7 +192,7 @@ class Drive {
    *
    * @returns {Promise<[Document[], number]>}
    */
-  async queryDocuments(dataContract, documentType, query = {}, useTransaction = false) {
+  async queryDocuments(dataContract, documentType, blockInfo, query = {}, useTransaction = false) {
     const encodedQuery = await cbor.encodeAsync(query);
 
     const [encodedDocuments, , processingFee] = await driveQueryDocumentsAsync.call(
@@ -196,6 +200,7 @@ class Drive {
       encodedQuery,
       dataContract.id.toBuffer(),
       documentType,
+      blockInfo,
       useTransaction,
     );
 
@@ -242,22 +247,24 @@ class Drive {
 
   /**
    * @param {Identity} identity
+   * @param {BlockInfo} blockInfo
    * @param {boolean} [useTransaction=false]
    * @param {boolean} [dryRun=false]
    *
-   * @returns {Promise<[number, number]>}
+   * @returns {Promise<FeeResult>}
    */
-  async insertIdentity(identity, useTransaction = false, dryRun = false) {
+  async insertIdentity(identity, blockInfo, useTransaction = false, dryRun = false) {
     return driveInsertIdentityAsync.call(
       this.drive,
       identity.toBuffer(),
+      blockInfo,
       !dryRun,
       useTransaction,
     );
   }
 
   /**
-   * Fetch latest index of the withdrawal transaction in a queue
+   * Fetch the latest index of the withdrawal transaction in a queue
    *
    * @param {boolean} [useTransaction=false]
    *
