@@ -746,6 +746,7 @@ mod tests {
     use crate::drive::object_size_info::DocumentAndContractInfo;
     use crate::drive::object_size_info::DocumentInfo::DocumentRefAndSerialization;
     use crate::drive::Drive;
+    use crate::fee::default_costs::STORAGE_DISK_USAGE_CREDIT_PER_BYTE;
     use crate::fee::op::DriveOperation;
 
     #[test]
@@ -868,9 +869,8 @@ mod tests {
             .expect("expected to override a document successfully");
     }
 
-    #[ignore]
     #[test]
-    fn test_add_dashpay_fee_for_documents() {
+    fn test_add_dashpay_contact_request_with_fee() {
         let tmp_dir = TempDir::new().unwrap();
         let drive: Drive = Drive::open(tmp_dir, None).expect("expected to open Drive successfully");
 
@@ -882,7 +882,7 @@ mod tests {
 
         let contract = setup_contract(
             &drive,
-            "tests/supporting_files/contract/dashpay/dashpay-contract-all-mutable.json",
+            "tests/supporting_files/contract/dashpay/dashpay-contract.json",
             None,
             Some(&db_transaction),
         );
@@ -912,8 +912,57 @@ mod tests {
             )
             .expect("expected to insert a document successfully");
 
-        assert_eq!(1, storage_fee);
-        assert_eq!(1, processing_fee);
+        let added_bytes = storage_fee / STORAGE_DISK_USAGE_CREDIT_PER_BYTE;
+        assert_eq!(3211, added_bytes);
+        assert_eq!(2804600, processing_fee);
+    }
+
+    #[test]
+    fn test_add_dashpay_profile_with_fee() {
+        let tmp_dir = TempDir::new().unwrap();
+        let drive: Drive = Drive::open(tmp_dir, None).expect("expected to open Drive successfully");
+
+        let db_transaction = drive.grove.start_transaction();
+
+        drive
+            .create_initial_state_structure(Some(&db_transaction))
+            .expect("expected to create root tree successfully");
+
+        let contract = setup_contract(
+            &drive,
+            "tests/supporting_files/contract/dashpay/dashpay-contract.json",
+            None,
+            Some(&db_transaction),
+        );
+
+        let dashpay_cr_serialized_document = json_document_to_cbor(
+            "tests/supporting_files/contract/dashpay/profile0.json",
+            Some(1),
+        );
+
+        let random_owner_id = rand::thread_rng().gen::<[u8; 32]>();
+
+        let FeeResult {
+            storage_fee,
+            processing_fee,
+            removed_from_identities,
+        } = drive
+            .add_serialized_document_for_contract(
+                &dashpay_cr_serialized_document,
+                &contract,
+                "profile",
+                Some(&random_owner_id),
+                false,
+                BlockInfo::default(),
+                true,
+                StorageFlags::optional_default_as_ref(),
+                Some(&db_transaction),
+            )
+            .expect("expected to insert a document successfully");
+
+        let added_bytes = storage_fee / STORAGE_DISK_USAGE_CREDIT_PER_BYTE;
+        assert_eq!(1414, added_bytes);
+        assert_eq!(1862400, processing_fee);
     }
 
     #[ignore]
@@ -972,7 +1021,6 @@ mod tests {
         assert_eq!(fees, actual_fees);
     }
 
-    #[ignore]
     #[test]
     fn test_add_dashpay_fee_for_documents_detail() {
         let tmp_dir = TempDir::new().unwrap();
@@ -1064,7 +1112,7 @@ mod tests {
     }
 
     #[test]
-    fn test_add_dpns_documents() {
+    fn test_add_dpns_document_with_fee() {
         let tmp_dir = TempDir::new().unwrap();
         let drive: Drive = Drive::open(tmp_dir, None).expect("expected to open Drive successfully");
 
@@ -1091,7 +1139,7 @@ mod tests {
             None,
             Some(&random_owner_id),
         )
-        .expect("expected to deserialize the document");
+            .expect("expected to deserialize the document");
 
         let document_type = contract
             .document_type_for_name("domain")
@@ -1099,7 +1147,11 @@ mod tests {
 
         let storage_flags = Some(StorageFlags::SingleEpoch(0));
 
-        drive
+        let FeeResult {
+            storage_fee,
+            processing_fee,
+            removed_from_identities,
+        } = drive
             .add_document_for_contract(
                 DocumentAndContractInfo {
                     document_info: DocumentRefAndSerialization((
@@ -1117,6 +1169,10 @@ mod tests {
                 Some(&db_transaction),
             )
             .expect("expected to insert a document successfully");
+
+        let added_bytes = storage_fee / STORAGE_DISK_USAGE_CREDIT_PER_BYTE;
+        assert_eq!(1966, added_bytes);
+        assert_eq!(2538000, processing_fee);
 
         drive
             .grove
