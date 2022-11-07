@@ -424,6 +424,16 @@ impl DriveOperation {
     }
 
     /// Filters the groveDB ops from a list of operations and puts them in a `GroveDbOpBatch`.
+    pub fn combine_cost_operations(operations: &Vec<DriveOperation>) -> OperationCost {
+        let mut cost = OperationCost::default();
+        operations.iter().for_each(|op| match op {
+            CalculatedCostOperation(operationCost) => cost += operationCost.clone(),
+            _ => {}
+        });
+        cost
+    }
+
+    /// Filters the groveDB ops from a list of operations and puts them in a `GroveDbOpBatch`.
     pub fn grovedb_operations_batch(insert_operations: &Vec<DriveOperation>) -> GroveDbOpBatch {
         let operations = insert_operations
             .iter()

@@ -24,6 +24,7 @@ pub mod fee;
 pub mod fee_pools;
 /// Query module
 pub mod query;
+
 /// DPP module
 pub use dpp;
 /// GroveDB module
