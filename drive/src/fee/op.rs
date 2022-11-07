@@ -47,7 +47,8 @@ use crate::fee::default_costs::{
 };
 use crate::fee::op::DriveOperation::{
     CalculatedCostOperation, ContractFetch, CostCalculationDeleteOperation,
-    CostCalculationInsertOperation, CostCalculationQueryOperation, GroveOperation,
+    CostCalculationInsertOperation, CostCalculationQueryOperation, FunctionOperation,
+    GroveOperation,
 };
 use crate::fee_pools::epochs::Epoch;
 
@@ -400,6 +401,7 @@ impl DriveOperation {
             GroveOperation(_) => Err(Error::Drive(DriveError::CorruptedCodeExecution(
                 "grove operations must be executed, not directly transformed to costs",
             ))),
+            FunctionOperation(function_op) => Ok(function_op.cost()),
             CostCalculationInsertOperation(worst_case_insert_operation) => {
                 Ok(worst_case_insert_operation.cost())
             }

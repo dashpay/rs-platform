@@ -236,7 +236,7 @@ impl DocumentFieldType {
     ) -> Result<Option<Value>, ContractError> {
         return match self {
             DocumentFieldType::String(_, _) => {
-                let bytes = Self::read_varint_value(buf)?;
+                let bytes = read_varint_value(buf)?;
                 if let Some(bytes) = bytes {
                     let string = String::from_utf8(bytes).map_err(|_| {
                         ContractError::CorruptedSerialization(
@@ -291,7 +291,7 @@ impl DocumentFieldType {
                 }
             }
             DocumentFieldType::ByteArray(_, _) => {
-                let bytes = Self::read_varint_value(buf)?;
+                let bytes = read_varint_value(buf)?;
                 Ok(bytes.map(Value::Bytes))
             }
 
@@ -710,7 +710,7 @@ impl DocumentFieldType {
                     .try_into()
                     .map_err(|_| ContractError::ValueWrongType("expected integer value"))?;
 
-                encode_signed_integer(value_as_i64)
+                encode_i64(value_as_i64)
             }
             DocumentFieldType::Number => {
                 let value_as_f64 = if value.is_integer() {
@@ -840,7 +840,7 @@ fn get_field_type_matching_error() -> ContractError {
     ContractError::ValueWrongType("document field type doesn't match document value")
 }
 
-pub fn encode_unsigned_integer(val: u64) -> Result<Vec<u8>, ContractError> {
+pub fn encode_u64(val: u64) -> Result<Vec<u8>, ContractError> {
     // Positive integers are represented in binary with the signed bit set to 0
     // Negative integers are represented in 2's complement form
 
@@ -865,7 +865,32 @@ pub fn encode_unsigned_integer(val: u64) -> Result<Vec<u8>, ContractError> {
     Ok(wtr)
 }
 
-pub fn encode_signed_integer(val: i64) -> Result<Vec<u8>, ContractError> {
+pub fn encode_u16(val: u16) -> Result<Vec<u8>, ContractError> {
+    // Positive integers are represented in binary with the signed bit set to 0
+    // Negative integers are represented in 2's complement form
+
+    // Encode the integer in big endian form
+    // This ensures that most significant bits are compared first
+    // a bigger positive number would be greater than a smaller one
+    // and a bigger negative number would be greater than a smaller one
+    // maintains sort order for each domain
+    let mut wtr = vec![];
+    wtr.write_u16::<BigEndian>(val).unwrap();
+
+    // Flip the sign bit
+    // to deal with interaction between the domains
+    // 2's complement values have the sign bit set to 1
+    // this makes them greater than the positive domain in terms of sort order
+    // to fix this, we just flip the sign bit
+    // so positive integers have the high bit and negative integers have the low bit
+    // the relative order of elements in each domain is still maintained, as the
+    // change was uniform across all elements
+    wtr[0] ^= 0b1000_0000;
+
+    Ok(wtr)
+}
+
+pub fn encode_i64(val: i64) -> Result<Vec<u8>, ContractError> {
     // Positive integers are represented in binary with the signed bit set to 0
     // Negative integers are represented in 2's complement form
 

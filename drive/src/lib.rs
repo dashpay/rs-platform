@@ -24,6 +24,8 @@ pub mod fee;
 pub mod fee_pools;
 /// Query module
 pub mod query;
+/// Identity module
+pub mod identity;
 
 /// DPP module
 pub use dpp;

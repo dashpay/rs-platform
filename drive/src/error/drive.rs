@@ -103,4 +103,8 @@ pub enum DriveError {
     /// Error
     #[error("batch is empty")]
     BatchIsEmpty(),
+
+    /// Error
+    #[error("corrupted element type error: {0}")]
+    CorruptedElementType(&'static str),
 }

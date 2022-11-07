@@ -43,6 +43,7 @@ use object_size_info::DocumentInfo::DocumentSize;
 use crate::contract::Contract;
 use crate::drive::batch::GroveDbOpBatch;
 use crate::drive::config::DriveConfig;
+use crate::drive::identity::IdentityRootStructure;
 use crate::error::Error;
 use crate::fee::op::DriveOperation;
 use crate::fee::op::DriveOperation::GroveOperation;
@@ -117,6 +118,10 @@ pub enum RootTree {
     Misc = 5,
     /// Asset Unlock Transactions
     WithdrawalTransactions = 6,
+    /// Key Hashes
+    KeyHashes = 7,
+    /// Masternode Key Hashes
+    MasternodeKeyHashes = 8,
 }
 
 /// Storage cost
@@ -144,12 +149,29 @@ impl From<RootTree> for &'static [u8; 1] {
             RootTree::Pools => &[4],
             RootTree::Misc => &[5],
             RootTree::WithdrawalTransactions => &[6],
+            RootTree::KeyHashes => &[7],
+            RootTree::MasternodeKeyHashes => &[8],
         }
     }
 }
 
+/// Returns the path to the identities
+pub(crate) fn identity_tree_path() -> [&'static [u8]; 1] {
+    [Into::<&[u8; 1]>::into(RootTree::Identities)]
+}
+
+/// Returns the path to the key hashes.
+pub(crate) fn key_hashes_tree_path() -> [&'static [u8]; 1] {
+    [Into::<&[u8; 1]>::into(RootTree::KeyHashes)]
+}
+
+/// Returns the path to the masternode key hashes.
+pub(crate) fn masternode_key_hashes_tree_path() -> [&'static [u8]; 1] {
+    [Into::<&[u8; 1]>::into(RootTree::MasternodeKeyHashes)]
+}
+
 /// Returns the path to a contract's document types.
-fn contract_documents_path(contract_id: &[u8]) -> [&[u8]; 3] {
+pub(crate) fn contract_documents_path(contract_id: &[u8]) -> [&[u8]; 3] {
     [
         Into::<&[u8; 1]>::into(RootTree::ContractDocuments),
         contract_id,
