@@ -31,15 +31,15 @@ dashcore = { git="https://github.com/dashevo/rust-dashcore", features=["no-std",
 
 [dependencies.grovedb]
 git = "https://github.com/dashevo/grovedb"
-branch = "feat/finalCosts"
+branch = "fix/worstCaseCosts"
 
 [dependencies.storage]
 git = "https://github.com/dashevo/grovedb"
-branch = "feat/finalCosts"
+branch = "fix/worstCaseCosts"
 
 [dependencies.costs]
 git = "https://github.com/dashevo/grovedb"
-branch = "feat/finalCosts"
+branch = "fix/worstCaseCosts"
 
 [dev-dependencies]
 criterion = "0.3.5"

@@ -965,6 +965,54 @@ mod tests {
         assert_eq!(1862400, processing_fee);
     }
 
+    #[test]
+    fn test_add_dashpay_profile_worst_case_cost_fee() {
+        let tmp_dir = TempDir::new().unwrap();
+        let drive: Drive = Drive::open(tmp_dir, None).expect("expected to open Drive successfully");
+
+        let db_transaction = drive.grove.start_transaction();
+
+        drive
+            .create_initial_state_structure(Some(&db_transaction))
+            .expect("expected to create root tree successfully");
+
+        let contract = setup_contract(
+            &drive,
+            "tests/supporting_files/contract/dashpay/dashpay-contract.json",
+            None,
+            Some(&db_transaction),
+        );
+
+        let dashpay_cr_serialized_document = json_document_to_cbor(
+            "tests/supporting_files/contract/dashpay/profile0.json",
+            Some(1),
+        );
+
+        let random_owner_id = rand::thread_rng().gen::<[u8; 32]>();
+
+        let FeeResult {
+            storage_fee,
+            processing_fee,
+            removed_from_identities,
+        } = drive
+            .add_serialized_document_for_contract(
+                &dashpay_cr_serialized_document,
+                &contract,
+                "profile",
+                Some(&random_owner_id),
+                false,
+                BlockInfo::default(),
+                false,
+                StorageFlags::optional_default_as_ref(),
+                Some(&db_transaction),
+            )
+            .expect("expected to insert a document successfully");
+
+        let added_bytes = storage_fee / STORAGE_DISK_USAGE_CREDIT_PER_BYTE;
+        assert_eq!(1414, added_bytes);
+        assert_eq!(191877800, processing_fee);
+    }
+
     #[ignore]
     #[test]
     fn test_unknown_state_cost_dashpay_fee_for_add_documents() {

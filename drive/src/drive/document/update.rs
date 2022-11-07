@@ -540,6 +540,7 @@ mod tests {
     use grovedb::TransactionArg;
     use std::option::Option::None;
 
+    use dpp::data_contract::DataContract;
     use rand::Rng;
     use serde::{Deserialize, Serialize};
     use serde_json::json;
@@ -1262,6 +1263,7 @@ mod tests {
             &contract,
             BlockInfo::default(),
             &person_0_original,
+            true,
             transaction.as_ref(),
         );
         let original_bytes = original_fees.storage_fee / STORAGE_DISK_USAGE_CREDIT_PER_BYTE;
@@ -1421,6 +1423,7 @@ mod tests {
                 &contract,
                 BlockInfo::default(),
                 &person_0_original,
+                true,
                 transaction.as_ref(),
             );
             let original_bytes = original_fees.storage_fee / STORAGE_DISK_USAGE_CREDIT_PER_BYTE;
@@ -1433,6 +1436,7 @@ mod tests {
             &contract,
             BlockInfo::default_with_time(1000),
             &person_0_updated,
+            true,
             transaction.as_ref(),
         );
         // we both add and remove bytes
@@ -1502,6 +1506,7 @@ mod tests {
             &contract,
             BlockInfo::default(),
             &person_0_original,
+            true,
             transaction.as_ref(),
         );
         let original_bytes = original_fees.storage_fee / STORAGE_DISK_USAGE_CREDIT_PER_BYTE;
@@ -1529,6 +1534,7 @@ mod tests {
                 &contract,
                 BlockInfo::default(),
                 &person_0_original,
+                true,
                 transaction.as_ref(),
             );
             let original_bytes = original_fees.storage_fee / STORAGE_DISK_USAGE_CREDIT_PER_BYTE;
@@ -1541,6 +1547,7 @@ mod tests {
             &contract,
             BlockInfo::default(),
             &person_0_updated,
+            true,
             transaction.as_ref(),
         );
         // we both add and remove bytes
@@ -1602,6 +1609,239 @@ mod tests {
         test_fees_for_update_document_on_index(true, false)
     }
 
+    fn test_worst_case_fees_for_update_document(using_history: bool, using_transaction: bool) {
+        let config = DriveConfig {
+            batching_enabled: true,
+            batching_consistency_verification: true,
+            has_raw_enabled: true,
+            default_genesis_time: Some(0),
+            encoding: DriveEncoding::DriveCbor,
+        };
+        let tmp_dir = TempDir::new().unwrap();
+
+        let drive: Drive =
+            Drive::open(&tmp_dir, Some(config)).expect("expected to open Drive successfully");
+
+        let transaction = if using_transaction {
+            Some(drive.grove.start_transaction())
+        } else {
+            None
+        };
+
+        drive
+            .create_initial_state_structure(transaction.as_ref())
+            .expect("expected to create root tree successfully");
+
+        let path = if using_history {
+            "tests/supporting_files/contract/family/family-contract-with-history-only-message-index.json"
+        } else {
+            "tests/supporting_files/contract/family/family-contract-only-message-index.json"
+        };
+
+        // setup code
+        let contract = setup_contract(&drive, path, None, transaction.as_ref());
+
+        let id = [1u8; 32].to_vec();
+        let owner_id = [2u8; 32].to_vec();
+        let person_0_original = Person {
+            id: id.clone(),
+            owner_id: owner_id.clone(),
+            first_name: "Samuel".to_string(),
+            middle_name: "Abraham".to_string(),
+            last_name: "Westrich".to_string(),
+            message: Some("My apples are safe".to_string()),
+            age: 33,
+        };
+
+        let person_0_updated = Person {
+            id: id.clone(),
+            owner_id: owner_id.clone(),
+            first_name: "Samuel".to_string(),
+            middle_name: "Abraham".to_string(),
+            last_name: "Westrich2".to_string(),
+            message: Some("My apples are safe".to_string()),
+            age: 35,
+        };
+
+        let original_fees = apply_person(
+            &drive,
+            &contract,
+            BlockInfo::default(),
+            &person_0_original,
+            false,
+            transaction.as_ref(),
+        );
+        let original_bytes = original_fees.storage_fee / STORAGE_DISK_USAGE_CREDIT_PER_BYTE;
+        let expected_added_bytes = if using_history {
+            //Explanation for 1350
+
+            //todo
+            1350
+        } else {
+            //Explanation for 1049
+
+            // Document Storage
+
+            //// Item
+            // = 410 Bytes
+
+            // Explanation for 410 storage_written_bytes
+
+            // Key -> 65 bytes
+            // 32 bytes for the key prefix
+            // 32 bytes for the unique id
+            // 1 byte for key_size (required space for 64)
+
+            // Value -> 278
+            //   1 for the flag option with flags
+            //   1 for the flags size
+            //   35 for flags 32 + 1 + 2
+            //   1 for the enum type
+            //   1 for item
+            //   173 for item serialized bytes
+            // 32 for node hash
+            // 32 for value hash
+            // 2 byte for the value_size (required space for above 128)
+
+            // Parent Hook -> 67
+            // Key Bytes 32
+            // Hash Size 32
+            // Key Length 1
+            // Child Heights 2
+
+            // Total 65 + 278 + 67 = 410
+
+            //// Tree 1 / <Person Contract> / 1 / person / message
+            // Key: My apples are safe
+            // = 177 Bytes
+
+            // Explanation for 177 storage_written_bytes
+
+            // Key -> 51 bytes
+            // 32 bytes for the key prefix
+            // 18 bytes for the key "My apples are safe" 18 characters
+            // 1 byte for key_size (required space for 50)
+
+            // Value -> 73
+            //   1 for the flag option with flags
+            //   1 for the flags size
+            //   35 for flags
+            //   1 for the enum type
+            //   1 for empty tree value
+            // 32 for node hash
+            // 0 for value hash
+            // 2 byte for the value_size (required space for 73 + up to 256 for child key)
+
+            // Parent Hook -> 53
+            // Key Bytes 18
+            // Hash Size 32
+            // Key Length 1
+            // Child Heights 2
+
+            // Total 51 + 73 + 53 = 177
+
+            //// Tree 1 / <Person Contract> / 1 / person / message / My apples are safe
+            // Key: 0
+            // = 143 Bytes
+
+            // Explanation for 143 storage_written_bytes
+
+            // Key -> 34 bytes
+            // 32 bytes for the key prefix
+            // 1 bytes for the key "My apples are safe" 18 characters
+            // 1 byte for key_size (required space for 33)
+
+            // Value -> 73
+            //   1 for the flag option with flags
+            //   1 for the flags size
+            //   35 for flags
+            //   1 for the enum type
+            //   1 for empty tree value
+            // 32 for node hash
+            // 0 for value hash
+            // 2 byte for the value_size (required space for 73 + up to 256 for child key)
+
+            // Parent Hook -> 36
+            // Key Bytes 1
+            // Hash Size 32
+            // Key Length 1
+            // Child Heights 2
+
+            // Total 34 + 73 + 36 = 143
+
+            //// Ref 1 / <Person Contract> / 1 / person / message / My apples are safe
+            // Reference to Serialized Item
+            // = 319 Bytes
+
+            // Explanation for 276 storage_written_bytes
+
+            // Key -> 65 bytes
+            // 32 bytes for the key prefix
+            // 32 bytes for the unique id
+            // 1 byte for key_size (required space for 64)
+
+            // Value -> 144
+            //   1 for the flag option with flags
+            //   1 for the flags size
+            //   35 for flags 32 + 1 + 2
+            //   1 for the element type as reference
+            //   1 for reference type as upstream root reference
+            //   1 for reference root height
+            //   36 for the reference path bytes ( 1 + 1 + 32 + 1 + 1)
+            //   2 for the max reference hop
+            // 32 for node hash
+            // 32 for value hash
+            // 2 byte for the value_size (required space for above 128)
+
+            // Parent Hook -> 67
+            // Key Bytes 32
+            // Hash Size 32
+            // Key Length 1
+            // Child Heights 2
+
+            // Total 65 + 144 + 67 = 276
+
+            1006
+        };
+        assert_eq!(original_bytes, expected_added_bytes);
+
+        // now let's update it 1 second later
+        let update_fees = apply_person(
+            &drive,
+            &contract,
+            BlockInfo::default_with_time(1000),
+            &person_0_updated,
+            false,
+            transaction.as_ref(),
+        );
+        // we both add and remove bytes
+        // this is because trees are added because of indexes, and also removed
+        let added_bytes = update_fees.storage_fee / STORAGE_DISK_USAGE_CREDIT_PER_BYTE;
+
+        let expected_added_bytes = if using_history { 1351 } else { 1007 };
+        assert_eq!(added_bytes, expected_added_bytes);
+    }
+
+    #[test]
+    fn test_worst_case_fees_for_update_document_no_history_using_transaction() {
+        test_worst_case_fees_for_update_document(false, true)
+    }
+
+    #[test]
+    fn test_worst_case_fees_for_update_document_no_history_no_transaction() {
+        test_worst_case_fees_for_update_document(false, false)
+    }
+
+    #[test]
+    fn test_worst_case_fees_for_update_document_with_history_using_transaction() {
+        test_worst_case_fees_for_update_document(true, true)
+    }
+
+    #[test]
+    fn test_worst_case_fees_for_update_document_with_history_no_transaction() {
+        test_worst_case_fees_for_update_document(true, false)
+    }
+
     #[derive(Serialize, Deserialize)]
     #[serde(rename_all = "camelCase")]
     struct Person {
@@ -1621,6 +1861,7 @@ mod tests {
         contract: &Contract,
         block_info: BlockInfo,
         person: &Person,
+        apply: bool,
         transaction: TransactionArg,
     ) -> FeeResult {
         let value = serde_json::to_value(person).expect("serialized person");
@@ -1653,7 +1894,7 @@ mod tests {
                 },
                 true,
                 block_info,
-                true,
+                apply,
                 transaction,
             )
             .expect("expected to add document")
@@ -1778,6 +2019,7 @@ mod tests {
             &contract,
             BlockInfo::default(),
             &person_0_original,
+            true,
             transaction.as_ref(),
         );
         apply_person(
@@ -1785,6 +2027,7 @@ mod tests {
             &contract,
             BlockInfo::default(),
             &person_1_original,
+            true,
             transaction.as_ref(),
         );
         apply_person(
@@ -1792,6 +2035,7 @@ mod tests {
             &contract,
             BlockInfo::default_with_time(100),
             &person_0_updated,
+            true,
             transaction.as_ref(),
         );
         apply_person(
@@ -1799,6 +2043,7 @@ mod tests {
             &contract,
             BlockInfo::default_with_time(100),
             &person_1_updated,
+            true,
             transaction.as_ref(),
         );
     }
