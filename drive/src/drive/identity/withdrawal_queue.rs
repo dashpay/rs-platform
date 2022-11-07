@@ -38,10 +38,11 @@ use dashcore::blockdata::transaction::special_transaction::asset_unlock::unquali
 use dpp::identity::convert_credits_to_satoshi;
 use dpp::identity::state_transition::identity_credit_withdrawal_transition::apply_identity_credit_withdrawal_transition_factory::WITHDRAWAL_DATA_CONTRACT_ID_BYTES;
 use dpp::prelude::Document;
+use dpp::util::hash;
 use dpp::util::json_value::JsonValueExt;
 use grovedb::query_result_type::QueryResultType::QueryKeyElementPairResultType;
 use grovedb::{Element, PathQuery, Query, QueryItem, SizedQuery, TransactionArg};
-use serde_json::json;
+use serde_json::{json, Value as JsonValue, Number};
 
 use crate::common;
 use crate::drive::batch::GroveDbOpBatch;
@@ -150,7 +151,7 @@ impl Drive {
 
         let mut withdrawals: Vec<(Vec<u8>, Vec<u8>)> = vec![];
 
-        for document in documents {
+        for mut document in documents {
             let output_script = document.data.get_bytes("outputScript").map_err(|_| {
                 Error::Drive(DriveError::CorruptedCodeExecution(
                     "Can't get outputScript from withdrawal document",
@@ -205,6 +206,22 @@ impl Drive {
                 })?;
 
             withdrawals.push((transaction_idex.to_be_bytes().to_vec(), transaction_buffer));
+
+            let transacton_id = hash::hash(transaction_buffer);
+
+            document.data.insert(
+                "transactionId".to_string(),
+                JsonValue::Array(
+                    transacton_id
+                        .into_iter()
+                        .map(|byte| JsonValue::Number(Number::from(byte)))
+                        .collect(),
+                ),
+            );
+
+            document
+                .data
+                .insert("status".to_string(), JsonValue::Number(Number::from(1)));
         }
 
         let mut batch = GroveDbOpBatch::new();
