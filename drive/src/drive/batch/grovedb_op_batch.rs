@@ -1,6 +1,6 @@
 // MIT LICENSE
 //
-// Copyright (c) 2021 Dash Core Group
+// Copyright (c) 2022 Dash Core Group
 //
 // Permission is hereby granted, free of charge, to any
 // person obtaining a copy of this software and associated

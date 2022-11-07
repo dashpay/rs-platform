@@ -64,7 +64,7 @@ impl Drive {
         transaction: TransactionArg,
     ) -> Result<FeeResult, Error> {
         let mut drive_operations: Vec<DriveOperation> = vec![];
-        self.delete_document_for_contract_operations(
+        self.delete_document_for_contract_apply_and_add_to_operations(
             document_id,
             contract,
             document_type_name,
@@ -102,7 +102,7 @@ impl Drive {
     }
 
     /// Deletes a document.
-    pub fn delete_document_for_contract_operations(
+    pub fn delete_document_for_contract_apply_and_add_to_operations(
         &self,
         document_id: &[u8],
         contract: &Contract,
@@ -112,6 +112,27 @@ impl Drive {
         transaction: TransactionArg,
         drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<(), Error> {
+        let batch_operations = self.delete_document_for_contract_operations(
+            document_id,
+            contract,
+            document_type_name,
+            owner_id,
+            apply,
+            transaction,
+        )?;
+        self.apply_batch_drive_operations(apply, transaction, batch_operations, drive_operations)
+    }
+
+    /// Prepares the operations for deleting a document.
+    pub(crate) fn delete_document_for_contract_operations(
+        &self,
+        document_id: &[u8],
+        contract: &Contract,
+        document_type_name: &str,
+        owner_id: Option<&[u8]>,
+        apply: bool,
+        transaction: TransactionArg,
+    ) -> Result<Vec<DriveOperation>, Error> {
         let mut batch_operations: Vec<DriveOperation> = vec![];
         let document_type = contract.document_type_for_name(document_type_name)?;
 
@@ -254,7 +275,7 @@ impl Drive {
                 )?;
             }
         }
-        self.apply_batch_drive_operations(apply, transaction, batch_operations, drive_operations)
+        Ok(batch_operations)
     }
 }
 
