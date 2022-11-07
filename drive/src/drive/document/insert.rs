@@ -1139,7 +1139,7 @@ mod tests {
             None,
             Some(&random_owner_id),
         )
-            .expect("expected to deserialize the document");
+        .expect("expected to deserialize the document");
 
         let document_type = contract
             .document_type_for_name("domain")
