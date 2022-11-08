@@ -113,6 +113,7 @@ pub enum IdentityRootStructure {
     IdentityTreeRevision = 0,
     IdentityTreeBalance = 1, // the balance being at 1 means it will be at the top of the tree
     IdentityTreeKeys = 2,
+    IdentityTreeNegativeCredit = 3,
 }
 
 impl From<IdentityRootStructure> for u8 {

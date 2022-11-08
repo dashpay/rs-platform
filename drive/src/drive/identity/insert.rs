@@ -24,26 +24,6 @@ use grovedb::{Element, ElementFlags, TransactionArg};
 use sha2::{Digest, Sha256};
 
 impl Drive {
-    pub(crate) fn set_identity_balance(
-        &self,
-        identity_id: [u8; 32],
-        balance: u64,
-        element_flags: Option<ElementFlags>,
-        drive_operations: &mut Vec<DriveOperation>,
-    ) -> Result<(), Error> {
-        let identity_path = identity_path(identity_id.as_slice());
-        let new_balance_bytes = balance.to_be_bytes().to_vec();
-
-        self.batch_insert(
-            PathFixedSizeKeyElement((
-                identity_path,
-                Into::<&[u8; 1]>::into(IdentityRootStructure::IdentityTreeBalance),
-                Element::new_item_with_flags(new_balance_bytes, element_flags),
-            )),
-            drive_operations,
-        )
-    }
-
     fn set_revision(
         &self,
         identity_id: [u8; 32],

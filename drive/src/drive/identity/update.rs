@@ -1,5 +1,5 @@
 use crate::drive::defaults::CONTRACT_MAX_SERIALIZED_SIZE;
-use crate::drive::identity::{balance_from_bytes, identity_path};
+use crate::drive::identity::{balance_from_bytes, identity_path, IdentityRootStructure};
 use crate::drive::object_size_info::KeyValueInfo::KeyRefRequest;
 use crate::drive::Drive;
 use crate::error::drive::DriveError;
@@ -7,15 +7,52 @@ use crate::error::identity::IdentityError;
 use crate::error::Error;
 use crate::fee::op::DriveOperation;
 use grovedb::Element::Item;
-use grovedb::TransactionArg;
+use grovedb::{Element, ElementFlags, TransactionArg};
 
 impl Drive {
+    /// We can set an identities balance
+    fn set_identity_balance_operation(
+        &self,
+        identity_id: [u8; 32],
+        balance: u64,
+        element_flags: Option<ElementFlags>,
+    ) -> DriveOperation {
+        let identity_path = identity_path(identity_id.as_slice())
+            .into_iter()
+            .map(Vec::from)
+            .collect();
+        let new_balance_bytes = balance.to_be_bytes().to_vec();
+        DriveOperation::for_path_key_element(
+            identity_path,
+            Into::<&[u8; 1]>::into(IdentityRootStructure::IdentityTreeBalance).to_vec(),
+            Element::new_item_with_flags(new_balance_bytes, element_flags),
+        )
+    }
+
+    /// We can set an identities negative credit balance
+    fn set_identity_negative_credit_operation(
+        &self,
+        identity_id: [u8; 32],
+        negative_credit: u64,
+        element_flags: Option<ElementFlags>,
+    ) -> DriveOperation {
+        let identity_path = identity_path(identity_id.as_slice())
+            .into_iter()
+            .map(Vec::from)
+            .collect();
+        let new_negative_credit_bytes = negative_credit.to_be_bytes().to_vec();
+        DriveOperation::for_path_key_element(
+            identity_path,
+            Into::<&[u8; 1]>::into(IdentityRootStructure::IdentityTreeBalance).to_vec(),
+            Element::new_item_with_flags(new_negative_credit_bytes, element_flags),
+        )
+    }
+
     /// Balances are stored in the identity under key 0
     pub fn add_to_identity_balance(
         &self,
         identity_id: [u8; 32],
-        added_balance: i64,
-        error_if_absent: bool,
+        added_balance: u64,
         apply: bool,
         transaction: TransactionArg,
         drive_operations: &mut Vec<DriveOperation>,
@@ -34,33 +71,94 @@ impl Drive {
             transaction,
             drive_operations,
         )?;
-        if error_if_absent && identity_balance_element.is_none() {
+        if let Some(identity_balance_element) = identity_balance_element {
+            if let Item(identity_balance_element, element_flags) = identity_balance_element {
+                let balance = balance_from_bytes(identity_balance_element.as_slice())?;
+                balance.checked_add(added_balance).ok_or(Error::Identity(
+                    IdentityError::BalanceOverflow("identity overflow error"),
+                ))?;
+                drive_operations.push(self.set_identity_balance_operation(
+                    identity_id,
+                    new_balance,
+                    element_flags,
+                ));
+                Ok(())
+            } else {
+                Err(Error::Drive(DriveError::CorruptedElementType(
+                    "identity balance was present but was not identified as an item",
+                )))
+            }
+        } else {
             Err(Error::Identity(IdentityError::IdentityNotFound(
                 "identity not found while trying to modify an identity balance",
             )))
-        } else if identity_balance_element.is_none() {
-            Ok(())
-        } else if let Item(identity_balance_element, element_flags) =
-            identity_balance_element.unwrap()
-        {
-            let balance = balance_from_bytes(identity_balance_element.as_slice())?;
-            let new_balance = if added_balance > 0 {
-                balance
-                    .checked_add(added_balance as u64)
-                    .ok_or(Error::Identity(IdentityError::BalanceOverflow(
-                        "identity overflow error",
-                    )))?
-            } else {
-                (balance as i64)
-                    .checked_add(added_balance)
-                    .ok_or(Error::Identity(IdentityError::BalanceOverflow(
-                        "identity overflow error",
-                    )))? as u64
-            };
-            self.set_identity_balance(identity_id, new_balance, element_flags, drive_operations)
+        }
+    }
+
+    /// Balances are stored in the identity under key 0
+    pub fn remove_from_identity_balance(
+        &self,
+        identity_id: [u8; 32],
+        required_removed_balance: u64,
+        total_desired_removed_balance: u64,
+        apply: bool,
+        transaction: TransactionArg,
+        drive_operations: &mut Vec<DriveOperation>,
+    ) -> Result<(), Error> {
+        //todo ref sizes?
+        let query_state_less_max_value_size = if apply {
+            None
         } else {
-            Err(Error::Drive(DriveError::CorruptedElementType(
-                "identity balance was present but was not identified as an item",
+            Some((CONTRACT_MAX_SERIALIZED_SIZE, vec![0]))
+        };
+
+        let identity_balance_element = self.grove_get(
+            identity_path(identity_id.as_slice()),
+            KeyRefRequest(&[0]),
+            query_state_less_max_value_size,
+            transaction,
+            drive_operations,
+        )?;
+
+        if let Some(identity_balance_element) = identity_balance_element {
+            if let Item(identity_balance_element, element_flags) = identity_balance_element {
+                let balance = balance_from_bytes(identity_balance_element.as_slice())?;
+                let (new_balance, negative_credit_amount) = if total_desired_removed_balance
+                    > balance
+                {
+                    // we do not have enough balance
+                    // there is a part we absolutely need to pay for
+                    if required_removed_balance > balance {
+                        return Err(Error::Identity(IdentityError::IdentityInsufficientBalance(
+                            "identity does not have the required balance",
+                        )));
+                    }
+                    (0, Some(total_desired_removed_balance - balance))
+                } else {
+                    // we have enough balance
+                    (balance - total_desired_removed_balance, None)
+                };
+                drive_operations.push(self.set_identity_balance_operation(
+                    identity_id,
+                    new_balance,
+                    element_flags.clone(),
+                ));
+                if let Some(negative_credit_amount) = negative_credit_amount {
+                    drive_operations.push(self.set_identity_negative_credit_operation(
+                        identity_id,
+                        negative_credit_amount,
+                        element_flags,
+                    ));
+                }
+                Ok(())
+            } else {
+                Err(Error::Drive(DriveError::CorruptedElementType(
+                    "identity balance was present but was not identified as an item",
+                )))
+            }
+        } else {
+            Err(Error::Identity(IdentityError::IdentityNotFound(
+                "identity not found while trying to modify an identity balance",
             )))
         }
     }

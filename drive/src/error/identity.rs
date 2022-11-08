@@ -27,6 +27,9 @@ pub enum IdentityError {
     #[error("identity already exists error: {0}")]
     IdentityAlreadyExists(&'static str),
 
+    #[error("identity insufficient balance error: {0}")]
+    IdentityInsufficientBalance(&'static str),
+
     #[error("balance overflow: {0}")]
     BalanceOverflow(&'static str),
 }
