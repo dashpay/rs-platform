@@ -170,7 +170,7 @@ impl Drive {
                 ))
             })?;
 
-            let state_transition_size = 1; // TODO: find out how to get this
+            let state_transition_size = 184;
 
             let latest_withdrawal_index =
                 self.fetch_latest_withdrawal_transaction_index(transaction)?;
@@ -191,7 +191,7 @@ impl Drive {
                 base_payload: AssetUnlockBasePayload {
                     version: 1,
                     index: transaction_idex,
-                    fee: (state_transition_size * core_fee_per_byte) as u32,
+                    fee: (state_transition_size * core_fee_per_byte * 1000) as u32,
                 },
             };
 
@@ -205,23 +205,38 @@ impl Drive {
                     ))
                 })?;
 
-            withdrawals.push((transaction_idex.to_be_bytes().to_vec(), transaction_buffer));
+            withdrawals.push((
+                transaction_idex.to_be_bytes().to_vec(),
+                transaction_buffer.clone(),
+            ));
 
             let transacton_id = hash::hash(transaction_buffer);
 
-            document.data.insert(
-                "transactionId".to_string(),
-                JsonValue::Array(
-                    transacton_id
-                        .into_iter()
-                        .map(|byte| JsonValue::Number(Number::from(byte)))
-                        .collect(),
-                ),
-            );
+            document
+                .data
+                .insert(
+                    "transactionId".to_string(),
+                    JsonValue::Array(
+                        transacton_id
+                            .into_iter()
+                            .map(|byte| JsonValue::Number(Number::from(byte)))
+                            .collect(),
+                    ),
+                )
+                .map_err(|_| {
+                    Error::Drive(DriveError::CorruptedCodeExecution(
+                        "Can't update document field: transactionId",
+                    ))
+                })?;
 
             document
                 .data
-                .insert("status".to_string(), JsonValue::Number(Number::from(1)));
+                .insert("status".to_string(), JsonValue::Number(Number::from(1)))
+                .map_err(|_| {
+                    Error::Drive(DriveError::CorruptedCodeExecution(
+                        "Can't update document field: status",
+                    ))
+                })?;
         }
 
         let mut batch = GroveDbOpBatch::new();
