@@ -539,11 +539,18 @@ impl Drive {
 mod tests {
     use grovedb::TransactionArg;
     use std::option::Option::None;
+    use std::sync::Arc;
 
-    use dpp::data_contract::DataContract;
+    use dpp::data_contract::validation::data_contract_validator::DataContractValidator;
+    use dpp::data_contract::DataContractFactory;
+    use dpp::document::document_factory::DocumentFactory;
+    use dpp::document::document_validator::DocumentValidator;
+    use dpp::mocks;
+    use dpp::prelude::DataContract;
+    use dpp::version::{ProtocolVersionValidator, COMPATIBILITY_MAP, LATEST_VERSION};
     use rand::Rng;
     use serde::{Deserialize, Serialize};
-    use serde_json::json;
+    use serde_json::{json, Value};
     use tempfile::TempDir;
 
     use super::*;
@@ -2126,5 +2133,132 @@ mod tests {
     #[test]
     fn test_update_complex_person_no_history_with_transaction_no_batches_and_get_raw() {
         test_update_complex_person(false, true, false, false)
+    }
+
+    #[test]
+    fn test_update_document_without_apply_should_calculate_storage_fees() {
+        let tmp_dir = TempDir::new().unwrap();
+
+        let drive: Drive =
+            Drive::open(&tmp_dir, None).expect("expected to open Drive successfully");
+
+        drive
+            .create_initial_state_structure(None)
+            .expect("expected to create root tree successfully");
+
+        let block_info = BlockInfo::default();
+        let owner_id = dpp::identifier::Identifier::new([2u8; 32]);
+
+        let documents = json!({
+            "niceDocument": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "$createdAt"
+                ],
+                "additionalProperties": false
+            }
+        });
+
+        let protocol_version_validator = ProtocolVersionValidator::new(
+            LATEST_VERSION,
+            LATEST_VERSION,
+            COMPATIBILITY_MAP.clone(),
+        );
+
+        let data_contract_validator =
+            DataContractValidator::new(Arc::new(protocol_version_validator));
+        let factory = DataContractFactory::new(1, data_contract_validator);
+
+        let contract = factory
+            .create(owner_id.clone(), documents)
+            .expect("data in fixture should be correct");
+
+        let contract_cbor = contract.to_cbor().expect("should encode contract to cbor");
+
+        // TODO: Create method doesn't initiate document_types. It must be fixed
+        let contract = DataContract::from_cbor(contract_cbor.clone())
+            .expect("should create decode contract from cbor");
+
+        drive
+            .apply_contract(
+                &contract,
+                contract_cbor.clone(),
+                block_info.clone(),
+                true,
+                StorageFlags::optional_default_as_ref(),
+                None,
+            )
+            .expect("should apply contract");
+
+        let protocol_version_validator = Arc::new(ProtocolVersionValidator::new(
+            LATEST_VERSION,
+            LATEST_VERSION,
+            COMPATIBILITY_MAP.clone(),
+        ));
+
+        let document_validator = DocumentValidator::new(protocol_version_validator);
+
+        let document_factory = DocumentFactory::new(
+            1,
+            document_validator,
+            mocks::FetchAndValidateDataContract {},
+        );
+
+        let document_type = "niceDocument".to_string();
+
+        let mut document = document_factory
+            .create(
+                contract.clone(),
+                owner_id.clone(),
+                document_type.clone(),
+                json!({ "name": "Ivan" }),
+            )
+            .expect("should create a document");
+
+        let document_cbor = document.to_cbor().expect("should encode to cbor");
+
+        let storage_flags = StorageFlags::SingleEpochOwned(0, owner_id.to_buffer());
+
+        let create_fees = drive
+            .add_serialized_document_for_contract(
+                &document_cbor,
+                &contract,
+                &document_type,
+                Some(&owner_id.to_buffer()),
+                false,
+                block_info.clone(),
+                true,
+                Some(&storage_flags),
+                None,
+            )
+            .expect("should create document");
+
+        assert_ne!(create_fees.storage_fee, 0);
+
+        document
+            .set_value("name", Value::String("Ivaaaaaaaaaan!".to_string()))
+            .expect("should change name");
+
+        let document_cbor = document.to_cbor().expect("should encode to cbor");
+
+        let update_fees = drive
+            .update_document_for_contract_cbor(
+                &document_cbor,
+                &contract_cbor,
+                &document_type,
+                Some(&owner_id.to_buffer()),
+                block_info,
+                false,
+                Some(&storage_flags),
+                None,
+            )
+            .expect("should update document");
+
+        assert_ne!(update_fees.storage_fee, 0);
     }
 }

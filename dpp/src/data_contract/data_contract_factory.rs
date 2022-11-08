@@ -5,6 +5,7 @@ use serde_json::{json, Number, Value as JsonValue};
 
 use data_contract::state_transition::property_names as st_prop;
 
+use crate::data_contract::extra::{get_definitions, get_document_types, get_mutability};
 use crate::{
     data_contract::{self, generate_data_contract_id},
     decode_protocol_entity_factory::DecodeProtocolEntity,

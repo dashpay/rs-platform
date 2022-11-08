@@ -192,6 +192,9 @@ describe('Drive', () => {
     it('should not update a document with dry run flag', async () => {
       const documentWithoutIndices = documents[0];
 
+      // TODO: It should work without document creation
+      // await drive.createDocument(documentWithoutIndices, blockInfo);
+
       documentWithoutIndices.set('name', 'Boooooooooooooooooooooob');
 
       const result = await drive.updateDocument(documentWithoutIndices, blockInfo, false, true);
@@ -373,7 +376,6 @@ describe('Drive', () => {
       expect(result).to.have.lengthOf(2);
 
       const [proofs, processingCost] = result;
-
       expect(proofs).to.be.an.instanceOf(Buffer);
       expect(proofs.length).to.be.greaterThan(0);
 
