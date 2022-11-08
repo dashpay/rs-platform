@@ -236,7 +236,7 @@ impl DocumentFieldType {
     ) -> Result<Option<Value>, ContractError> {
         return match self {
             DocumentFieldType::String(_, _) => {
-                let bytes = read_varint_value(buf)?;
+                let bytes = Self::read_varint_value(buf)?;
                 if let Some(bytes) = bytes {
                     let string = String::from_utf8(bytes).map_err(|_| {
                         ContractError::CorruptedSerialization(
@@ -291,7 +291,7 @@ impl DocumentFieldType {
                 }
             }
             DocumentFieldType::ByteArray(_, _) => {
-                let bytes = read_varint_value(buf)?;
+                let bytes = Self::read_varint_value(buf)?;
                 Ok(bytes.map(Value::Bytes))
             }
 

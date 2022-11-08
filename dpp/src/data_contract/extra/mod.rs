@@ -8,10 +8,7 @@ use mutability::{
 };
 pub use {
     array_field::ArrayFieldType,
-    document_field::{
-        encode_float, encode_i64, encode_u64, DocumentField,
-        DocumentFieldType,
-    },
+    document_field::{encode_float, encode_i64, encode_u64, DocumentField, DocumentFieldType},
     document_type::DocumentType,
     drive_api::{DriveContractExt, DriveEncoding},
     errors::{ContractError, StructureError},

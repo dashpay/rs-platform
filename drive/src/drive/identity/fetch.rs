@@ -1,13 +1,13 @@
-use grovedb::{Element, PathQuery, SizedQuery, TransactionArg};
-use grovedb::query_result_type::QueryResultType::QueryElementResultType;
-use crate::drive::{Drive, RootTree};
 use crate::drive::flags::StorageFlags;
 use crate::drive::identity::IDENTITY_KEY;
+use crate::drive::{Drive, RootTree};
 use crate::error::drive::DriveError;
-use crate::error::Error;
 use crate::error::identity::IdentityError;
+use crate::error::Error;
 use crate::identity::Identity;
 use crate::query::{Query, QueryItem};
+use grovedb::query_result_type::QueryResultType::QueryElementResultType;
+use grovedb::{Element, PathQuery, SizedQuery, TransactionArg};
 
 impl Drive {
     /// Given an identity, fetches the identity with its flags from storage.

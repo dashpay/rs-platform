@@ -67,4 +67,4 @@ pub const STORAGE_FLAGS_SIZE: u32 = 2;
 pub const CONTRACT_MAX_SERIALIZED_SIZE: u16 = 16384;
 // TODO: Insert correct value here
 /// Max element size
-pub const MAX_ELEMENT_SIZE: u32 = 5000;
+pub const MAX_ELEMENT_SIZE: u16 = 5000;

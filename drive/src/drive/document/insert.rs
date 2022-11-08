@@ -32,9 +32,7 @@
 //! This module implements functions in Drive relevant to inserting documents.
 //!
 
-use grovedb::reference_path::ReferencePathType::{
-    AbsolutePathReference, SiblingReference, UpstreamRootHeightReference,
-};
+use grovedb::reference_path::ReferencePathType::SiblingReference;
 use grovedb::{Element, TransactionArg};
 use std::collections::HashSet;
 use std::option::Option::None;
@@ -66,11 +64,9 @@ use crate::error::drive::DriveError;
 use crate::error::Error;
 use crate::fee::op::DriveOperation;
 use crate::fee::{calculate_fee, FeeResult};
-use dpp::data_contract::extra::DocumentType;
 
 use crate::common::encode::encode_unsigned_integer;
 use crate::drive::block_info::BlockInfo;
-use dpp::data_contract::extra::encode_float;
 use dpp::data_contract::extra::DriveContractExt;
 
 impl Drive {

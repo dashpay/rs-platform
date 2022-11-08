@@ -43,7 +43,6 @@ use object_size_info::DocumentInfo::DocumentSize;
 use crate::contract::Contract;
 use crate::drive::batch::GroveDbOpBatch;
 use crate::drive::config::DriveConfig;
-use crate::drive::identity::IdentityRootStructure;
 use crate::error::Error;
 use crate::fee::op::DriveOperation;
 use crate::fee::op::DriveOperation::GroveOperation;

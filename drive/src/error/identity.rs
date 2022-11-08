@@ -24,7 +24,6 @@ pub enum IdentityError {
     #[error("identity serialization error: {0}")]
     IdentitySerialization(&'static str),
 
-
     #[error("identity already exists error: {0}")]
     IdentityAlreadyExists(&'static str),
 

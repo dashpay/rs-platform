@@ -1,3 +1,4 @@
+use crate::drive::defaults::CONTRACT_MAX_SERIALIZED_SIZE;
 use crate::drive::identity::{balance_from_bytes, identity_path};
 use crate::drive::object_size_info::KeyValueInfo::KeyRefRequest;
 use crate::drive::Drive;
@@ -7,7 +8,6 @@ use crate::error::Error;
 use crate::fee::op::DriveOperation;
 use grovedb::Element::Item;
 use grovedb::TransactionArg;
-use crate::drive::defaults::{CONTRACT_MAX_SERIALIZED_SIZE, SOME_TREE_SIZE};
 
 impl Drive {
     /// Balances are stored in the identity under key 0
@@ -20,7 +20,6 @@ impl Drive {
         transaction: TransactionArg,
         drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<(), Error> {
-
         //todo ref sizes?
         let query_state_less_max_value_size = if apply {
             None
@@ -92,7 +91,7 @@ mod tests {
         let identity = Identity::from_cbor(identity_bytes.as_slice())
             .expect("expected to deserialize an identity");
 
-        let storage_flags = StorageFlags { epoch: 0 };
+        let storage_flags = StorageFlags::SingleEpoch(0);
 
         drive
             .insert_identity(

@@ -5,7 +5,7 @@ use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
-use std::io::{BufRead, BufReader, Read};
+use std::io::{BufReader, Read};
 
 use crate::common::{bytes_for_system_value_from_tree_map, read_varint_value};
 use crate::drive::Drive;

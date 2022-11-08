@@ -22,10 +22,10 @@ pub mod error;
 pub mod fee;
 /// Fee pools module
 pub mod fee_pools;
-/// Query module
-pub mod query;
 /// Identity module
 pub mod identity;
+/// Query module
+pub mod query;
 
 /// DPP module
 pub use dpp;

@@ -39,7 +39,6 @@ use std::sync::Arc;
 
 use crate::common::encode::encode_unsigned_integer;
 use costs::CostContext;
-use dpp::data_contract::extra::encode_float;
 use dpp::data_contract::extra::DriveContractExt;
 use grovedb::reference_path::ReferencePathType::SiblingReference;
 use grovedb::{Element, TransactionArg};
@@ -218,7 +217,7 @@ impl Drive {
         block_info: &BlockInfo,
         apply: bool,
         transaction: TransactionArg,
-    ) -> Result<(Vec<DriveOperation>), Error> {
+    ) -> Result<Vec<DriveOperation>, Error> {
         let mut batch_operations: Vec<DriveOperation> = vec![];
         let storage_flags =
             StorageFlags::from_some_element_flags_ref(contract_element.get_flags())?;
@@ -350,7 +349,7 @@ impl Drive {
         block_info: &BlockInfo,
         apply: bool,
         transaction: TransactionArg,
-    ) -> Result<(Vec<DriveOperation>), Error> {
+    ) -> Result<Vec<DriveOperation>, Error> {
         let mut batch_operations: Vec<DriveOperation> = vec![];
         if original_contract.readonly() {
             return Err(Error::Drive(DriveError::UpdatingReadOnlyImmutableContract(

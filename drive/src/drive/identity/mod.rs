@@ -36,9 +36,13 @@ use crate::drive::RootTree;
 use crate::error::drive::DriveError;
 use crate::error::Error;
 
-pub mod insert;
-pub mod update;
 pub mod fetch;
+pub mod insert;
+pub mod key;
+pub mod update;
+pub mod withdrawal_queue;
+
+pub(crate) const IDENTITY_KEY: [u8; 1] = [0];
 
 pub(crate) fn identity_path(identity_id: &[u8]) -> [&[u8]; 2] {
     [Into::<&[u8; 1]>::into(RootTree::Identities), identity_id]
@@ -59,10 +63,8 @@ pub(crate) fn identity_key_tree_path(identity_id: &[u8]) -> [&[u8]; 3] {
     ]
 }
 
-pub(crate) fn identity_key_location_vec(identity_id: &[u8], encoded_key_id: &[u8]) -> Vec<Vec<u8>> {
+pub(crate) fn identity_key_location_within_identity_vec(encoded_key_id: &[u8]) -> Vec<Vec<u8>> {
     vec![
-        Into::<&[u8; 1]>::into(RootTree::Identities).to_vec(),
-        identity_id.to_vec(),
         Into::<&[u8; 1]>::into(IdentityRootStructure::IdentityTreeKeys).to_vec(),
         encoded_key_id.to_vec(),
     ]
