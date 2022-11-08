@@ -59,7 +59,7 @@ pub trait StateRepositoryLike: Send + Sync {
     /// Remove Document
     async fn remove_document(
         &self,
-        contract_id: &DataContract,
+        data_contract: &DataContract,
         data_contract_type: &str,
         document_id: &Identifier,
         execution_context: &StateTransitionExecutionContext,
@@ -146,5 +146,15 @@ pub trait StateRepositoryLike: Send + Sync {
         &self,
         identity: &Identity,
         execution_context: &StateTransitionExecutionContext,
+    ) -> AnyResult<()>;
+
+    // Get latest (in a queue) withdrawal transaction index
+    async fn fetch_latest_withdrawal_transaction_index(&self) -> AnyResult<u64>;
+
+    // Enqueue withdrawal transaction
+    async fn enqueue_withdrawal_transaction(
+        &self,
+        index: u64,
+        transaction_bytes: Vec<u8>,
     ) -> AnyResult<()>;
 }
