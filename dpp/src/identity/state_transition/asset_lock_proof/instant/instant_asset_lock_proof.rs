@@ -67,6 +67,7 @@ impl Default for InstantAssetLockProof {
                 lock_time: 0,
                 input: vec![],
                 output: vec![],
+                special_transaction_payload: None,
             },
             output_index: 0,
         }

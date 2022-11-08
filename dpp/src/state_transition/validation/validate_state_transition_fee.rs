@@ -39,7 +39,7 @@ where
         let mut result = SimpleValidationResult::default();
 
         let execution_context = state_transition.get_execution_context();
-        let balance: i64 = match state_transition {
+        let balance = match state_transition {
             StateTransition::IdentityCreate(st) => {
                 let output = self
                     .asset_lock_transition_output_fetcher
@@ -51,7 +51,7 @@ where
                             st.get_asset_lock_proof()
                         )
                     })?;
-                convert_satoshi_to_credits(output.value) as i64
+                convert_satoshi_to_credits(output.value)
             }
             StateTransition::IdentityTopUp(st) => {
                 let output = self
@@ -64,7 +64,7 @@ where
                             st.get_asset_lock_proof()
                         )
                     })?;
-                let balance = convert_satoshi_to_credits(output.value) as i64;
+                let balance = convert_satoshi_to_credits(output.value);
                 let identity_id = st.get_owner_id();
                 let identity: Identity = self
                     .state_repository
@@ -74,7 +74,7 @@ where
                 if execution_context.is_dry_run() {
                     return Ok(result);
                 }
-                balance + identity.get_balance() as i64
+                balance + identity.get_balance()
             }
             StateTransition::DataContractCreate(st) => {
                 let balance = self.get_identity_owner_balance(st).await?;
@@ -115,7 +115,8 @@ where
         }
 
         let fee = state_transition.calculate_fee();
-        if balance < fee {
+        // ? make sure Fee cannot be negative and refunds are handled differently
+        if (balance as i64) < fee {
             result.add_error(FeeError::BalanceIsNotEnoughError { balance, fee })
         }
 
@@ -125,7 +126,7 @@ where
     async fn get_identity_owner_balance(
         &self,
         st: &impl StateTransitionIdentitySigned,
-    ) -> Result<i64, ProtocolError> {
+    ) -> Result<u64, ProtocolError> {
         let identity_id = st.get_owner_id();
         let identity: Identity = self
             .state_repository
@@ -133,7 +134,7 @@ where
             .await?
             .with_context(|| format!("identity with ID {}' doesn't exist", identity_id))?;
 
-        Ok(identity.get_balance() as i64)
+        Ok(identity.get_balance())
     }
 }
 
