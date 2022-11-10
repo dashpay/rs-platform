@@ -134,19 +134,28 @@ pub fn element_to_js_object<'a, C: Context<'a>>(
     let js_type_string = cx.string(element_to_string(&element));
     js_object.set(cx, "type", js_type_string)?;
 
-    let js_value: Handle<JsValue> = match element {
+    let maybe_js_value: Option<Handle<JsValue>> = match element {
         Element::Item(item, _) => {
             let js_buffer = JsBuffer::external(cx, item);
-            js_buffer.upcast()
+            Some(js_buffer.upcast())
         }
-        Element::Reference(reference, _, _) => reference_to_dictionary(reference, cx)?,
-        Element::Tree(tree, _) => {
-            let js_buffer = JsBuffer::external(cx, tree.expect("tree path should present"));
-            js_buffer.upcast()
+        Element::Reference(reference, _, _) => {
+            let reference = reference_to_dictionary(reference, cx)?;
+
+            Some(reference)
         }
+        Element::Tree(Some(tree), _) => {
+            let js_buffer = JsBuffer::external(cx, tree);
+
+            Some(js_buffer.upcast())
+        }
+        Element::Tree(None, _) => None,
     };
 
-    js_object.set(cx, "value", js_value)?;
+    if let Some(js_value) = maybe_js_value {
+        js_object.set(cx, "value", js_value)?;
+    }
+
     NeonResult::Ok(js_object.upcast())
 }
 
