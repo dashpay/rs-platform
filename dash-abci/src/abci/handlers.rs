@@ -113,7 +113,7 @@ impl TenderdashAbci for Platform {
 
         let block_execution_context = BlockExecutionContext {
             block_info,
-            epoch_info,
+            epoch_info: epoch_info.clone(),
         };
 
         self.block_execution_context
@@ -127,6 +127,7 @@ impl TenderdashAbci for Platform {
             )?;
 
         let response = BlockBeginResponse {
+            epoch_info,
             unsigned_withdrawal_transactions: unsigned_withdrawal_transaction_bytes,
         };
 
@@ -158,12 +159,9 @@ impl TenderdashAbci for Platform {
             transaction,
         )?;
 
-        Ok(
-            BlockEndResponse::from_epoch_info_and_process_block_fees_result(
-                &block_execution_context.epoch_info,
-                &process_block_fees_result,
-            ),
-        )
+        Ok(BlockEndResponse::from_process_block_fees_result(
+            &process_block_fees_result,
+        ))
     }
 }
 
@@ -284,6 +282,36 @@ mod tests {
                             .as_str(),
                         );
 
+                    // Set previous block time
+                    previous_block_time_ms = Some(block_time_ms);
+
+                    // Should calculate correct current epochs
+                    let (epoch_index, epoch_change) = if day > epoch_1_start_day {
+                        (1, false)
+                    } else if day == epoch_1_start_day {
+                        if block_num < epoch_1_start_block {
+                            (0, false)
+                        } else if block_num == epoch_1_start_block {
+                            (1, true)
+                        } else {
+                            (1, false)
+                        }
+                    } else if day == 0 && block_num == 0 {
+                        (0, true)
+                    } else {
+                        (0, false)
+                    };
+
+                    assert_eq!(
+                        block_begin_response.epoch_info.current_epoch_index,
+                        epoch_index
+                    );
+
+                    assert_eq!(
+                        block_begin_response.epoch_info.is_epoch_change,
+                        epoch_change
+                    );
+
                     if day == 0 && block_num == 0 {
                         let unsigned_withdrawal_hexes = block_begin_response
                             .unsigned_withdrawal_transactions
@@ -332,30 +360,6 @@ mod tests {
                             )
                             .as_str(),
                         );
-
-                    // Set previous block time
-                    previous_block_time_ms = Some(block_time_ms);
-
-                    // Should calculate correct current epochs
-                    let (epoch_index, epoch_change) = if day > epoch_1_start_day {
-                        (1, false)
-                    } else if day == epoch_1_start_day {
-                        if block_num < epoch_1_start_block {
-                            (0, false)
-                        } else if block_num == epoch_1_start_block {
-                            (1, true)
-                        } else {
-                            (1, false)
-                        }
-                    } else if day == 0 && block_num == 0 {
-                        (0, true)
-                    } else {
-                        (0, false)
-                    };
-
-                    assert_eq!(block_end_response.current_epoch_index, epoch_index);
-
-                    assert_eq!(block_end_response.is_epoch_change, epoch_change);
 
                     // Should pay to all proposers for epoch 0, when epochs 1 started
                     if epoch_index != 0 && epoch_change {
@@ -448,28 +452,11 @@ mod tests {
                         validator_set_quorum_hash: Default::default(),
                     };
 
-                    platform
+                    let block_begin_response = platform
                         .block_begin(block_begin_request, Some(&transaction))
                         .expect(
                             format!(
                                 "should begin process block #{} for day #{}",
-                                block_height, day
-                            )
-                            .as_str(),
-                        );
-
-                    let block_end_request = BlockEndRequest {
-                        fees: FeesAggregate {
-                            processing_fees: 1600,
-                            storage_fees: storage_fees_per_block,
-                        },
-                    };
-
-                    let block_end_response = platform
-                        .block_end(block_end_request, Some(&transaction))
-                        .expect(
-                            format!(
-                                "should end process block #{} for day #{}",
                                 block_height, day
                             )
                             .as_str(),
@@ -491,9 +478,32 @@ mod tests {
                         (0, false)
                     };
 
-                    assert_eq!(block_end_response.current_epoch_index, epoch_index);
+                    assert_eq!(
+                        block_begin_response.epoch_info.current_epoch_index,
+                        epoch_index
+                    );
 
-                    assert_eq!(block_end_response.is_epoch_change, epoch_change);
+                    assert_eq!(
+                        block_begin_response.epoch_info.is_epoch_change,
+                        epoch_change
+                    );
+
+                    let block_end_request = BlockEndRequest {
+                        fees: FeesAggregate {
+                            processing_fees: 1600,
+                            storage_fees: storage_fees_per_block,
+                        },
+                    };
+
+                    let block_end_response = platform
+                        .block_end(block_end_request, Some(&transaction))
+                        .expect(
+                            format!(
+                                "should end process block #{} for day #{}",
+                                block_height, day
+                            )
+                            .as_str(),
+                        );
 
                     // Should pay to all proposers for epoch 0, when epochs 1 started
                     if epoch_index != 0 && epoch_change {

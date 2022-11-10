@@ -453,6 +453,11 @@ describe('Drive', () => {
         const response = await drive.getAbci().blockBegin(request);
 
         expect(response.unsignedWithdrawalTransactions).to.be.empty();
+        expect(response.epochInfo).to.deep.equal({
+          currentEpochIndex: 0,
+          isEpochChange: true,
+          previousEpochIndex: null,
+        });
       });
 
       it('should process a block with previous block time', async () => {
@@ -474,6 +479,11 @@ describe('Drive', () => {
         });
 
         expect(response.unsignedWithdrawalTransactions).to.be.empty();
+        expect(response.epochInfo).to.deep.equal({
+          currentEpochIndex: 0,
+          isEpochChange: false,
+          previousEpochIndex: null,
+        });
       });
     });
 
@@ -498,8 +508,6 @@ describe('Drive', () => {
 
         const response = await drive.getAbci().blockEnd(request);
 
-        expect(response).to.have.property('currentEpochIndex');
-        expect(response).to.have.property('isEpochChange');
         expect(response).to.have.property('proposersPaidCount');
         expect(response).to.have.property('paidEpochIndex');
       });
