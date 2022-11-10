@@ -394,6 +394,14 @@ class Drive {
 /**
  * @typedef BlockBeginResponse
  * @property {Buffer[]} unsignedWithdrawalTransactions
+ * @property {EpochInfo} epochInfo
+ */
+
+/**
+ * @typedef EpochInfo
+ * @property {number} currentEpochIndex
+ * @property {boolean} isEpochChange
+ * @property {number} [previousEpochIndex] - Available only on epoch change
  */
 
 /**
@@ -409,8 +417,6 @@ class Drive {
 
 /**
  * @typedef BlockEndResponse
- * @property {number} currentEpochIndex
- * @property {boolean} isEpochChange
  * @property {number} [proposersPaidCount]
  * @property {number} [paidEpochIndex]
  */
