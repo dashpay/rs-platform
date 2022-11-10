@@ -33,27 +33,6 @@ pub struct Identity {
     pub metadata: Option<Metadata>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-struct IdentityForBuffer {
-    // TODO the struct probably should be made from references
-    id: Identifier,
-    public_keys: Vec<IdentityPublicKey>,
-    balance: u64,
-    revision: Revision,
-}
-
-impl From<&Identity> for IdentityForBuffer {
-    fn from(i: &Identity) -> Self {
-        IdentityForBuffer {
-            id: i.id.clone(),
-            public_keys: i.public_keys.clone(),
-            balance: i.balance,
-            revision: i.revision,
-        }
-    }
-}
-
 impl Identity {
     /// Get Identity protocol version
     pub fn get_protocol_version(&self) -> u32 {
@@ -249,8 +228,6 @@ impl Identity {
     }
 
     pub fn from_raw_object(mut raw_object: JsonValue) -> Result<Identity, ProtocolError> {
-        // // TODO identifier_default_deserializer: default deserializer should be changed to bytes
-        // // Identifiers fields should be replaced with the string format to deserialize Identity
         raw_object.replace_identifier_paths(IDENTIFIER_FIELDS_RAW_OBJECT, ReplaceWith::Base58)?;
 
         let identity: Identity = serde_json::from_value(raw_object)?;
@@ -259,17 +236,11 @@ impl Identity {
     }
 
     pub fn from_raw_identity(raw_object: JsonValue) -> Result<Identity, ProtocolError> {
-        // // TODO identifier_default_deserializer: default deserializer should be changed to bytes
-        // // Identifiers fields should be replaced with the string format to deserialize Identity
-        // raw_object.replace_identifier_paths(IDENTIFIER_FIELDS_RAW_OBJECT, ReplaceWith::Base58)?;
-        // println!("{:?}",raw_object.get("publicKeys").unwrap().as_object().unwrap());
-
         let pks = raw_object.get("publicKeys").unwrap().as_array().unwrap();
 
         for pk in pks {
-            let _pkd: IdentityPublicKey = serde_json::from_value(pk.clone()).map_err(|_e| {
-                ProtocolError::Generic(format!("Can't parse publick key: {}", pk.to_string()))
-            })?;
+            let _pkd: IdentityPublicKey = serde_json::from_value(pk.clone())
+                .map_err(|_e| ProtocolError::Generic(format!("Can't parse public key: {}", pk)))?;
         }
 
         let identity: Identity = serde_json::from_value(raw_object)?;

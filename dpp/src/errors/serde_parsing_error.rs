@@ -27,7 +27,7 @@ impl From<serde_json::Error> for SerdeParsingError {
             "Parsing error at line {}, column {}: {}",
             err.line(),
             err.column(),
-            err.to_string()
+            err
         );
         Self::new(message)
     }

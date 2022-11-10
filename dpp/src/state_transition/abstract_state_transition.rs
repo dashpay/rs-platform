@@ -219,8 +219,6 @@ pub trait StateTransitionConvert: Serialize {
 }
 
 pub mod state_transition_helpers {
-    use itertools::Itertools;
-
     use super::*;
 
     pub fn to_json<'a>(
