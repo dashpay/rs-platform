@@ -58,10 +58,9 @@ where
         }
 
         if let Some(mut identity) = maybe_identity {
-            // increase balance with max of `u64` causes the the integer overflow
             if !is_dry_run {
                 identity.increase_balance(credits_amount);
-            }
+            };
 
             self.state_repository
                 .update_identity(&identity, state_transition.get_execution_context())
