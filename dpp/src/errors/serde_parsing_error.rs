@@ -23,7 +23,12 @@ impl SerdeParsingError {
 
 impl From<serde_json::Error> for SerdeParsingError {
     fn from(err: Error) -> Self {
-        let message = format!("Parsing error at line {}, column {}: {}", err.line(), err.column(), err.to_string());
+        let message = format!(
+            "Parsing error at line {}, column {}: {}",
+            err.line(),
+            err.column(),
+            err
+        );
         Self::new(message)
     }
 }

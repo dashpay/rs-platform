@@ -45,8 +45,8 @@ mod validate_identity_credit_withdrawal_transition_state_factory {
         state_repository
             .expect_fetch_identity::<Identity>()
             .times(1)
-            .withf(|id| *id == Identifier::default())
-            .returning(|_| anyhow::Ok(None));
+            .withf(|id, _| *id == Identifier::default())
+            .returning(|_, _| anyhow::Ok(None));
 
         let (state_transition, validator) = setup_test(state_repository, None);
 
@@ -69,11 +69,11 @@ mod validate_identity_credit_withdrawal_transition_state_factory {
         state_repository
             .expect_fetch_identity::<Identity>()
             .times(1)
-            .withf(|id| *id == Identifier::default())
-            .returning(|_| {
+            .withf(|id, _| *id == Identifier::default())
+            .returning(|_, _| {
                 let mut identity = Identity::default();
 
-                identity = identity.set_balance(10);
+                identity.set_balance(10);
 
                 anyhow::Ok(Some(identity))
             });
@@ -99,8 +99,8 @@ mod validate_identity_credit_withdrawal_transition_state_factory {
         state_repository
             .expect_fetch_identity::<Identity>()
             .times(1)
-            .withf(|id| *id == Identifier::default())
-            .returning(|_| Err(Error::msg("Some error")));
+            .withf(|id, _| *id == Identifier::default())
+            .returning(|_, _| Err(Error::msg("Some error")));
 
         let (state_transition, validator) = setup_test(state_repository, Some(5));
 
@@ -121,11 +121,11 @@ mod validate_identity_credit_withdrawal_transition_state_factory {
         state_repository
             .expect_fetch_identity::<Identity>()
             .times(1)
-            .withf(|id| *id == Identifier::default())
-            .returning(|_| {
+            .withf(|id, _| *id == Identifier::default())
+            .returning(|_, _| {
                 let mut identity = Identity::default();
 
-                identity = identity.set_balance(10);
+                identity.set_balance(10);
 
                 anyhow::Ok(Some(identity))
             });
