@@ -2146,6 +2146,8 @@ mod tests {
             .create_initial_state_structure(None)
             .expect("expected to create root tree successfully");
 
+        // Create a contract
+
         let block_info = BlockInfo::default();
         let owner_id = dpp::identifier::Identifier::new([2u8; 32]);
 
@@ -2195,6 +2197,8 @@ mod tests {
             )
             .expect("should apply contract");
 
+        // Create a document factory
+
         let protocol_version_validator = Arc::new(ProtocolVersionValidator::new(
             LATEST_VERSION,
             LATEST_VERSION,
@@ -2208,6 +2212,8 @@ mod tests {
             document_validator,
             mocks::FetchAndValidateDataContract {},
         );
+
+        // Create a document
 
         let document_type = "niceDocument".to_string();
 
@@ -2240,11 +2246,15 @@ mod tests {
 
         assert_ne!(create_fees.storage_fee, 0);
 
+        // Update the document in a second
+
         document
             .set_value("name", Value::String("Ivaaaaaaaaaan!".to_string()))
             .expect("should change name");
 
         let document_cbor = document.to_cbor().expect("should encode to cbor");
+
+        let block_info = BlockInfo::default_with_time(10000);
 
         let update_fees = drive
             .update_document_for_contract_cbor(
