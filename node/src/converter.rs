@@ -25,41 +25,39 @@ pub fn js_object_to_element<'a, C: Context<'a>>(
 
     let element_type: String = js_element_type.value(cx);
 
-    let js_element_epoch: Handle<JsNumber> = js_object.get(cx, "epoch")?;
+    let js_element_epoch: Option<Handle<JsNumber>> = js_object.get_opt(cx, "epoch")?;
 
-    let js_maybe_owner_id: Option<Handle<JsBuffer>> = js_object.get_opt(cx, "ownerId")?;
+    let element_flags = if let Some(js_epoch) = js_element_epoch {
+        let epoch = u16::try_from(js_epoch.value(cx) as i64)
+            .or_else(|_| cx.throw_range_error("`epochs` must fit in u16"))?;
 
-    let epoch = u16::try_from(js_element_epoch.value(cx) as i64)
-        .or_else(|_| cx.throw_range_error("`epochs` must fit in u16"))?;
+        let js_maybe_owner_id: Option<Handle<JsBuffer>> = js_object.get_opt(cx, "ownerId")?;
 
-    let maybe_owner_id = js_maybe_owner_id
-        .map(|js_buffer| js_buffer_to_hash(js_buffer, cx))
-        .transpose()?;
+        let maybe_owner_id = js_maybe_owner_id
+            .map(|js_buffer| js_buffer_to_hash(js_buffer, cx))
+            .transpose()?;
 
-    let storage_flags = StorageFlags::new_single_epoch(epoch, maybe_owner_id);
+        let storage_flags = StorageFlags::new_single_epoch(epoch, maybe_owner_id);
+
+        storage_flags.to_some_element_flags()
+    } else {
+        None
+    };
 
     match element_type.as_str() {
         "item" => {
             let js_buffer: Handle<JsBuffer> = js_object.get(cx, "value")?;
             let item = js_buffer_to_vec_u8(js_buffer, cx);
 
-            Ok(Element::new_item_with_flags(
-                item,
-                storage_flags.to_some_element_flags(),
-            ))
+            Ok(Element::new_item_with_flags(item, element_flags))
         }
         "reference" => {
             let js_object: Handle<JsObject> = js_object.get(cx, "value")?;
             let reference = js_object_to_reference(js_object, cx)?;
 
-            Ok(Element::new_reference_with_flags(
-                reference,
-                storage_flags.to_some_element_flags(),
-            ))
+            Ok(Element::new_reference_with_flags(reference, element_flags))
         }
-        "tree" => Ok(Element::empty_tree_with_flags(
-            storage_flags.to_some_element_flags(),
-        )),
+        "tree" => Ok(Element::empty_tree_with_flags(element_flags)),
         _ => cx.throw_error(format!("Unexpected element type {}", element_type)),
     }
 }
@@ -156,7 +154,7 @@ pub fn element_to_js_object<'a, C: Context<'a>>(
         js_object.set(cx, "value", js_value)?;
     }
 
-    NeonResult::Ok(js_object.upcast())
+    Ok(js_object.upcast())
 }
 
 pub fn nested_vecs_to_js<'a, C: Context<'a>>(
