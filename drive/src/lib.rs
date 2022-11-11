@@ -22,6 +22,8 @@ pub mod error;
 pub mod fee;
 /// Fee pools module
 pub mod fee_pools;
+/// Identity module
+pub mod identity;
 /// Query module
 pub mod query;
 

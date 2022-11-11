@@ -33,11 +33,8 @@
 use crate::drive::flags::StorageFlags::{
     MultiEpoch, MultiEpochOwned, SingleEpoch, SingleEpochOwned,
 };
-use costs::storage_cost::removal::StorageRemovedBytes::{
-    BasicStorageRemoval, SectionedStorageRemoval,
-};
+use costs::storage_cost::removal::StorageRemovedBytes::SectionedStorageRemoval;
 use costs::storage_cost::removal::{StorageRemovalPerEpochByIdentifier, StorageRemovedBytes};
-use dashcore::anyhow;
 use grovedb::ElementFlags;
 use integer_encoding::VarInt;
 use intmap::IntMap;
