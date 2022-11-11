@@ -32,7 +32,6 @@
 
 use std::cell::RefCell;
 use std::path::Path;
-use std::sync::Arc;
 
 use grovedb::{GroveDb, Transaction, TransactionArg};
 use moka::sync::Cache;
@@ -51,6 +50,8 @@ use crate::fee::op::DriveOperation::GroveOperation;
 pub mod batch;
 /// Block info module
 pub mod block_info;
+/// Drive Cache
+pub mod cache;
 /// Config module
 pub mod config;
 /// Contract module
@@ -77,17 +78,10 @@ pub mod object_size_info;
 pub mod query;
 
 use crate::drive::block_info::BlockInfo;
+use crate::drive::cache::DriveCache;
 use crate::fee::FeeResult;
 use crate::fee_pools::epochs::Epoch;
 use dpp::data_contract::extra::DriveContractExt;
-
-/// Drive cache struct
-pub struct DriveCache {
-    /// Cached contracts
-    pub cached_contracts: Cache<[u8; 32], Arc<Contract>>,
-    /// Genesis time in ms
-    pub genesis_time_ms: Option<u64>,
-}
 
 /// Drive struct
 pub struct Drive {

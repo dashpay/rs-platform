@@ -32,14 +32,14 @@
 //! This module defines functions pertinent to Contracts stored in Drive.
 //!
 
+use std::borrow::Borrow;
 use std::cell::RefMut;
 use std::collections::HashSet;
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
 use crate::common::encode::encode_unsigned_integer;
-use costs::CostContext;
-use dpp::data_contract::extra::encode_float;
+use costs::{cost_return_on_error_no_add, CostContext, CostResult, CostsExt, OperationCost};
 use dpp::data_contract::extra::DriveContractExt;
 use grovedb::reference_path::ReferencePathType::SiblingReference;
 use grovedb::{Element, TransactionArg};
@@ -47,6 +47,7 @@ use grovedb::{Element, TransactionArg};
 use crate::contract::Contract;
 use crate::drive::batch::GroveDbOpBatch;
 use crate::drive::block_info::BlockInfo;
+use crate::drive::cache::ContractFetchInfo;
 use crate::drive::defaults::CONTRACT_MAX_SERIALIZED_SIZE;
 use crate::drive::flags::StorageFlags;
 use crate::drive::object_size_info::DriveKeyInfo::{KeyRef, KeySize};
@@ -59,8 +60,9 @@ use crate::drive::{contract_documents_path, defaults, Drive, DriveCache, RootTre
 use crate::error::drive::DriveError;
 use crate::error::Error;
 use crate::fee::op::DriveOperation;
-use crate::fee::op::DriveOperation::{CalculatedCostOperation, ContractFetch};
+use crate::fee::op::DriveOperation::{CalculatedCostOperation, PreCalculatedFeeResult};
 use crate::fee::{calculate_fee, FeeResult};
+use crate::fee_pools::epochs::Epoch;
 
 /// Takes a contract ID and returns the contract's root path.
 pub(crate) fn contract_root_path(contract_id: &[u8]) -> [&[u8]; 2] {
@@ -218,7 +220,7 @@ impl Drive {
         block_info: &BlockInfo,
         apply: bool,
         transaction: TransactionArg,
-    ) -> Result<(Vec<DriveOperation>), Error> {
+    ) -> Result<Vec<DriveOperation>, Error> {
         let mut batch_operations: Vec<DriveOperation> = vec![];
         let storage_flags =
             StorageFlags::from_some_element_flags_ref(contract_element.get_flags())?;
@@ -350,7 +352,7 @@ impl Drive {
         block_info: &BlockInfo,
         apply: bool,
         transaction: TransactionArg,
-    ) -> Result<(Vec<DriveOperation>), Error> {
+    ) -> Result<Vec<DriveOperation>, Error> {
         let mut batch_operations: Vec<DriveOperation> = vec![];
         if original_contract.readonly() {
             return Err(Error::Drive(DriveError::UpdatingReadOnlyImmutableContract(
@@ -510,67 +512,158 @@ impl Drive {
         )
     }
 
-    /// Returns the contract with the given ID.
-    pub fn get_contract(
+    // /// Returns the contract with the given ID.
+    // pub fn get_contract(
+    //     &self,
+    //     contract_id: [u8; 32],
+    //     epoch: Option<&Epoch>,
+    //     transaction: TransactionArg,
+    //     drive_operations: &mut Vec<DriveOperation>,
+    // ) -> Result<Option<Arc<Contract>>, Error> {
+    //     self.get_contract_with_fetch_info(contract_id, epoch, transaction, drive_operations)
+    //         .map(|o| o.as_ref().map(|c| Arc::new(c.contract)))
+    // }
+
+    /// Returns the contract with fetch info with the given ID.
+    pub fn get_contract_with_fetch_info(
         &self,
         contract_id: [u8; 32],
+        epoch: Option<&Epoch>,
         transaction: TransactionArg,
         drive_operations: &mut Vec<DriveOperation>,
-    ) -> Result<Option<Arc<Contract>>, Error> {
-        // We always charge for a contract fetch in order to remove non determinism issues
-        drive_operations.push(ContractFetch);
+    ) -> Result<Option<Arc<ContractFetchInfo>>, Error> {
         let cache = self.cache.borrow_mut();
         match cache.cached_contracts.get(&contract_id) {
-            None => self
-                .fetch_contract(contract_id, transaction, cache)
-                .map(|(c, _)| c),
-            Some(contract) => {
-                let contract_ref = Arc::clone(&contract);
-                Ok(Some(contract_ref))
+            None => {
+                let mut cost = OperationCost::default();
+                //todo: there is a cost here that isn't returned on error
+                // we should investigate if this could be a problem
+                let mut result = self
+                    .fetch_contract(contract_id, epoch, transaction, cache)
+                    .unwrap_add_cost(&mut cost)?;
+
+                // we only need to pay if epoch is set
+                if epoch.is_some() {
+                    if let Some(contract_fetch_info) = &result {
+                        let fee = contract_fetch_info.fee.as_ref().ok_or(
+                            Error::Drive(DriveError::CorruptedCodeExecution(
+                                "should be impossible to not have fee on something just fetched with an epoch",
+                            ))
+                        )?;
+                        drive_operations.push(PreCalculatedFeeResult(fee.clone()));
+                    } else {
+                        drive_operations.push(CalculatedCostOperation(cost));
+                    }
+                }
+                Ok(result)
+            }
+            Some(contract_fetch_info) => {
+                // we only need to pay if epoch is set
+                if let Some(epoch) = epoch {
+                    let fee = if let Some(known_fee) = &contract_fetch_info.fee {
+                        known_fee.clone()
+                    } else {
+                        // we need to calculate new fee
+                        let op = vec![CalculatedCostOperation(contract_fetch_info.cost.clone())];
+                        let fee = calculate_fee(None, Some(op), epoch)?;
+
+                        let updated_contract_fetch_info = Arc::new(ContractFetchInfo {
+                            contract: (&contract_fetch_info.contract).clone(),
+                            storage_flags: (&contract_fetch_info.storage_flags).clone(),
+                            cost: (&contract_fetch_info.cost).clone(),
+                            fee: Some(fee.clone()),
+                        });
+
+                        // we override the cache for the contract as the fee is now calculated
+                        cache
+                            .cached_contracts
+                            .insert(contract_id, updated_contract_fetch_info);
+
+                        fee
+                    };
+                    drive_operations.push(PreCalculatedFeeResult(fee));
+                }
+                Ok(Some(contract_fetch_info))
             }
         }
     }
 
-    /// Returns the contract with the given ID if it's in cache.
-    pub fn get_cached_contract(
+    /// Returns the contract fetch info with the given ID if it's in cache.
+    pub fn get_cached_contract_with_fetch_info(
         &self,
         contract_id: [u8; 32],
-    ) -> Result<Option<Arc<Contract>>, Error> {
+    ) -> Result<Option<Arc<ContractFetchInfo>>, Error> {
         match self.cache.borrow().cached_contracts.get(&contract_id) {
             None => Ok(None),
-            Some(contract) => {
-                let contract_ref = Arc::clone(&contract);
-                Ok(Some(contract_ref))
+            Some(contract_fetch_info) => {
+                let contract_fetch_info_ref = Arc::clone(&contract_fetch_info);
+                Ok(Some(contract_fetch_info_ref))
             }
         }
     }
+
+    // /// Returns the contract with the given ID if it's in cache.
+    // pub fn get_cached_contract(
+    //     &self,
+    //     contract_id: [u8; 32],
+    // ) -> Result<Option<Contract>, Error> {
+    //     match self.cache.borrow().cached_contracts.get(&contract_id) {
+    //         None => Ok(None),
+    //         Some(contract) => {
+    //             let contract_ref = Arc::clone(&contract);
+    //             Ok(Some(contract_ref.contract))
+    //         }
+    //     }
+    // }
 
     /// Returns the contract with the given ID from storage and also inserts it in cache.
     pub fn fetch_contract(
         &self,
         contract_id: [u8; 32],
+        epoch: Option<&Epoch>,
         transaction: TransactionArg,
         drive_cache: RefMut<DriveCache>,
-    ) -> Result<(Option<Arc<Contract>>, Option<StorageFlags>), Error> {
-        let CostContext { value, cost: _ } =
+    ) -> CostResult<Option<Arc<ContractFetchInfo>>, Error> {
+        let CostContext { value, cost } =
             self.grove
                 .get(contract_root_path(&contract_id), &[0], transaction);
-        let stored_element = value.map_err(Error::GroveDB)?;
+        let stored_element = cost_return_on_error_no_add!(&cost, value.map_err(Error::GroveDB));
         if let Element::Item(stored_contract_bytes, element_flag) = stored_element {
-            let contract = Arc::new(<Contract as DriveContractExt>::from_cbor(
-                &stored_contract_bytes,
-                None,
-            )?);
+            let contract = cost_return_on_error_no_add!(
+                &cost,
+                <Contract as DriveContractExt>::from_cbor(&stored_contract_bytes, None,)
+                    .map_err(Error::Contract)
+            );
+            let drive_operation = CalculatedCostOperation(cost.clone());
+            let fee = if let Some(epoch) = epoch {
+                Some(cost_return_on_error_no_add!(
+                    &cost,
+                    calculate_fee(None, Some(vec![drive_operation]), epoch)
+                ))
+            } else {
+                None
+            };
+
+            let storage_flags = cost_return_on_error_no_add!(
+                &cost,
+                StorageFlags::from_some_element_flags_ref(&element_flag)
+            );
+            let contract_fetch_info = Arc::new(ContractFetchInfo {
+                contract,
+                storage_flags,
+                cost: cost.clone(),
+                fee,
+            });
             drive_cache
                 .deref()
                 .cached_contracts
-                .insert(contract_id, Arc::clone(&contract));
-            let flags = StorageFlags::from_some_element_flags_ref(&element_flag)?;
-            Ok((Some(Arc::clone(&contract)), flags))
+                .insert(contract_id, Arc::clone(&contract_fetch_info));
+            Ok(Some(Arc::clone(&contract_fetch_info))).wrap_with_cost(cost)
         } else {
             Err(Error::Drive(DriveError::CorruptedContractPath(
                 "contract path did not refer to a contract element",
             )))
+            .wrap_with_cost(cost)
         }
     }
 

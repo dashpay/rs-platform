@@ -46,9 +46,10 @@ use crate::fee::default_costs::{
     STORAGE_PROCESSING_CREDIT_PER_BYTE, STORAGE_SEEK_COST,
 };
 use crate::fee::op::DriveOperation::{
-    CalculatedCostOperation, ContractFetch, CostCalculationDeleteOperation,
-    CostCalculationInsertOperation, CostCalculationQueryOperation, GroveOperation,
+    CalculatedCostOperation, CostCalculationDeleteOperation, CostCalculationInsertOperation,
+    CostCalculationQueryOperation, GroveOperation,
 };
+use crate::fee::FeeResult;
 use crate::fee_pools::epochs::Epoch;
 
 /// Base ops
@@ -373,8 +374,8 @@ pub enum DriveOperation {
     GroveOperation(GroveDbOp),
     /// Calculated cost operation
     CalculatedCostOperation(OperationCost),
-    /// Contract fetch
-    ContractFetch,
+    /// Pre Calculated Fee Result
+    PreCalculatedFeeResult(FeeResult),
     /// Cost calculation insert operation
     CostCalculationInsertOperation(SizesOfInsertOperation),
     /// Cost calculation delete operation

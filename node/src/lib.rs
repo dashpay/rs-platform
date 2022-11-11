@@ -11,6 +11,7 @@ use neon::prelude::*;
 use rs_drive::dpp::identity::Identity;
 use rs_drive::drive::batch::GroveDbOpBatch;
 use rs_drive::drive::flags::StorageFlags;
+use rs_drive::fee_pools::epochs::Epoch;
 use rs_drive::grovedb::{PathQuery, Transaction, TransactionArg};
 
 const READONLY_MSG: &str =
@@ -576,7 +577,7 @@ impl DriveWrapper {
         let js_query_cbor = cx.argument::<JsBuffer>(0)?;
         let js_contract_id = cx.argument::<JsBuffer>(1)?;
         let js_document_type_name = cx.argument::<JsString>(2)?;
-        let js_block_info = cx.argument::<JsObject>(3)?;
+        let js_epoch_info = cx.argument::<JsNumber>(3)?;
         // TODO We need dry run for validation
         let js_using_transaction = cx.argument::<JsBoolean>(4)?;
         let js_callback = cx.argument::<JsFunction>(5)?.root(&mut cx);
@@ -588,7 +589,7 @@ impl DriveWrapper {
         let query_cbor = converter::js_buffer_to_vec_u8(js_query_cbor, &mut cx);
         let contract_id = converter::js_buffer_to_vec_u8(js_contract_id, &mut cx);
         let document_type_name = js_document_type_name.value(&mut cx);
-        let block_info = converter::js_object_to_block_info(js_block_info, &mut cx)?;
+        let epoch_info = Epoch::new(js_epoch_info.value(&mut cx) as u16);
         let using_transaction = js_using_transaction.value(&mut cx);
 
         drive
@@ -597,7 +598,7 @@ impl DriveWrapper {
                     &query_cbor,
                     <[u8; 32]>::try_from(contract_id).unwrap(),
                     document_type_name.as_str(),
-                    Some(block_info),
+                    Some(&epoch_info),
                     using_transaction.then_some(transaction).flatten(),
                 );
 
@@ -654,6 +655,7 @@ impl DriveWrapper {
                     &query_cbor,
                     <[u8; 32]>::try_from(contract_id).unwrap(),
                     document_type_name.as_str(),
+                    None,
                     None,
                     using_transaction.then_some(transaction).flatten(),
                 );
