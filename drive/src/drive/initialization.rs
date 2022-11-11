@@ -54,6 +54,8 @@ impl Drive {
 
         batch.add_insert_empty_tree(vec![], vec![RootTree::Pools as u8]);
 
+        batch.add_insert_empty_tree(vec![], vec![RootTree::Misc as u8]);
+
         add_initial_withdrawal_state_structure_operations(&mut batch);
 
         // initialize the pools with epochs
