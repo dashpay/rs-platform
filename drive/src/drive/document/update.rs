@@ -134,17 +134,8 @@ impl Drive {
 
         let document_type = contract.document_type_for_name(document_type_name)?;
 
-        let document_info = if apply {
-            DocumentRefAndSerialization((document, serialized_document, storage_flags))
-        } else {
-            let element_size = Element::Item(
-                serialized_document.to_vec(),
-                StorageFlags::map_to_some_element_flags(storage_flags),
-            )
-            .serialized_size();
-
-            DocumentSize(element_size as u32)
-        };
+        let document_info =
+            DocumentRefAndSerialization((document, serialized_document, storage_flags));
 
         self.update_document_for_contract_apply_and_add_to_operations(
             DocumentAndContractInfo {
