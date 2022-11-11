@@ -316,7 +316,7 @@ describe('Drive', () => {
       );
 
       // eslint-disable-next-line no-unused-vars
-      const [fetchedDocuments, processingCost] = await drive.queryDocuments(dataContract, 'indexedDocument', blockInfo, {
+      const [fetchedDocuments, processingCost] = await drive.queryDocuments(dataContract, 'indexedDocument', undefined, {
         where: [['lastName', '==', 'Kennedy']],
       });
 
@@ -324,7 +324,8 @@ describe('Drive', () => {
       expect(fetchedDocuments[0]).to.be.an.instanceOf(Document);
       expect(fetchedDocuments[0].toObject()).to.deep.equal(documents[4].toObject());
 
-      expect(processingCost).to.be.greaterThan(0);
+      // costs are not calculating without block info
+      expect(processingCost).to.be.equal(0);
     });
 
     it('should query existing documents again', async () => {
