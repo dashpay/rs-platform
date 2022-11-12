@@ -192,9 +192,6 @@ describe('Drive', () => {
     it('should not update a document with dry run flag', async () => {
       const documentWithoutIndices = documents[0];
 
-      // TODO: It should work without document creation
-      // await drive.createDocument(documentWithoutIndices, blockInfo);
-
       documentWithoutIndices.set('name', 'Boooooooooooooooooooooob');
 
       const result = await drive.updateDocument(documentWithoutIndices, blockInfo, false, true);
@@ -203,8 +200,7 @@ describe('Drive', () => {
       expect(result).to.have.property('storageFee');
       expect(result).to.have.property('removedFromIdentities');
 
-      // TODO: Processing fee doesn't work for v0.23
-      expect(result.processingFee).to.be.equals(0);
+      expect(result.processingFee).to.be.greaterThan(0);
       expect(result.storageFee).to.be.greaterThan(0, 'storage fee must be higher than 0');
 
       expect(await drive.getGroveDB().getRootHash()).to.deep.equals(initialRootHash);
@@ -335,7 +331,7 @@ describe('Drive', () => {
       );
 
       // eslint-disable-next-line no-unused-vars
-      const [fetchedDocuments, processingCost] = await drive.queryDocuments(dataContract, 'indexedDocument', blockInfo, {
+      const [fetchedDocuments, processingCost] = await drive.queryDocuments(dataContract, 'indexedDocument', blockInfo.epoch, {
         where: [['lastName', '==', 'Kennedy']],
       });
 
@@ -348,7 +344,7 @@ describe('Drive', () => {
 
     it('should return empty array if documents are not exist', async () => {
       // eslint-disable-next-line no-unused-vars
-      const [fetchedDocuments, processingCost] = await drive.queryDocuments(dataContract, 'indexedDocument', blockInfo, {
+      const [fetchedDocuments, processingCost] = await drive.queryDocuments(dataContract, 'indexedDocument', blockInfo.epoch, {
         where: [['lastName', '==', 'Kennedy']],
       });
 
