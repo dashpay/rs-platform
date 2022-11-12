@@ -37,6 +37,7 @@ use std::io::{self, BufRead};
 use std::option::Option::None;
 use std::sync::Arc;
 
+use dpp::data_contract::DataContractFactory;
 use rand::seq::SliceRandom;
 use rand::{Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
@@ -58,6 +59,12 @@ use rs_drive::error::{query::QueryError, Error};
 use rs_drive::query::DriveQuery;
 
 use dpp::data_contract::extra::DriveContractExt;
+use dpp::data_contract::validation::data_contract_validator::DataContractValidator;
+use dpp::document::document_factory::DocumentFactory;
+use dpp::document::document_validator::DocumentValidator;
+use dpp::mocks;
+use dpp::prelude::DataContract;
+use dpp::version::{ProtocolVersionValidator, COMPATIBILITY_MAP, LATEST_VERSION};
 use rs_drive::drive::block_info::BlockInfo;
 
 #[derive(Serialize, Deserialize)]
@@ -3872,6 +3879,126 @@ fn test_dpns_query_start_after_with_null_id_desc() {
         .expect("we should be able to a proof");
     assert_eq!(root_hash, proof_root_hash);
     assert_eq!(results, proof_results);
+}
+
+#[test]
+fn test_query_a_b_c_d_e_contract() {
+    let tmp_dir = TempDir::new().unwrap();
+
+    let drive: Drive = Drive::open(&tmp_dir, None).expect("expected to open Drive successfully");
+
+    drive
+        .create_initial_state_structure(None)
+        .expect("expected to create root tree successfully");
+
+    // Create a contract
+
+    let block_info = BlockInfo::default();
+    let owner_id = dpp::identifier::Identifier::new([2u8; 32]);
+
+    let documents = json!({
+      "testDocument": {
+        "type": "object",
+        "properties": {
+          "a": {
+            "type": "integer"
+          },
+          "b": {
+            "type": "integer"
+          },
+          "c": {
+            "type": "integer"
+          },
+          "d": {
+            "type": "integer"
+          },
+          "e": {
+            "type": "integer"
+          }
+        },
+        "additionalProperties": false,
+        "indices": [
+          {
+            "name": "abcde",
+            "properties": [
+              {
+                "a": "asc"
+              },
+              {
+                "b": "asc"
+              },
+              {
+                "c": "asc"
+              },
+              {
+                "d": "asc"
+              },
+              {
+                "e": "asc"
+              }
+            ]
+          },
+        ]
+      }
+    });
+
+    let protocol_version_validator =
+        ProtocolVersionValidator::new(LATEST_VERSION, LATEST_VERSION, COMPATIBILITY_MAP.clone());
+
+    let data_contract_validator = DataContractValidator::new(Arc::new(protocol_version_validator));
+    let factory = DataContractFactory::new(1, data_contract_validator);
+
+    let contract = factory
+        .create(owner_id, documents)
+        .expect("data in fixture should be correct");
+
+    let contract_cbor = contract.to_cbor().expect("should encode contract to cbor");
+
+    // TODO: Create method doesn't initiate document_types. It must be fixed
+    let contract = DataContract::from_cbor(contract_cbor.clone())
+        .expect("should create decode contract from cbor");
+
+    drive
+        .apply_contract(
+            &contract,
+            contract_cbor,
+            block_info,
+            true,
+            StorageFlags::optional_default_as_ref(),
+            None,
+        )
+        .expect("should apply contract");
+
+    // Perform query
+
+    let document_type = "testDocument".to_string();
+
+    let query_json = json!({
+        "where": [
+            ["a","==",1],
+            ["b","==",2],
+            ["c","==",3],
+            ["d","in",[1,2]]],
+        "orderBy":[
+            ["d","desc"],
+            ["e","asc"]
+        ]
+    });
+
+    let query_cbor = common::value_to_cbor(query_json, None);
+
+    drive
+        .query_documents_from_contract(
+            &contract,
+            contract
+                .document_types()
+                .get(&document_type)
+                .expect("should have this document type"),
+            &query_cbor,
+            None,
+            None,
+        )
+        .expect("should perform query");
 }
 
 #[test]
