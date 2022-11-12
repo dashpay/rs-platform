@@ -47,7 +47,6 @@ use grovedb::{Element, TransactionArg};
 use crate::contract::Contract;
 use crate::drive::batch::GroveDbOpBatch;
 use crate::drive::block_info::BlockInfo;
-use crate::drive::cache::ContractFetchInfo;
 use crate::drive::defaults::CONTRACT_MAX_SERIALIZED_SIZE;
 use crate::drive::flags::StorageFlags;
 use crate::drive::object_size_info::DriveKeyInfo::{KeyRef, KeySize};
@@ -99,6 +98,20 @@ pub(crate) fn contract_keeping_history_storage_time_reference_path(
 /// Namely it inserts an empty tree at the contract's root path.
 pub fn add_init_contracts_structure_operations(batch: &mut GroveDbOpBatch) {
     batch.add_insert_empty_tree(vec![], vec![RootTree::ContractDocuments as u8]);
+}
+
+/// Contract and fetch information
+pub struct ContractFetchInfo {
+    /// The contract
+    pub contract: Contract,
+    /// The contract's potential storage flags
+    pub storage_flags: Option<StorageFlags>,
+    /// These are the operations that are used to fetch a contract
+    /// This is only used on epoch change
+    pub(crate) cost: OperationCost,
+    /// The fee is updated every epoch based on operation costs
+    /// Except if protocol version has changed in which case all the cache is cleared
+    pub fee: Option<FeeResult>,
 }
 
 impl Drive {
