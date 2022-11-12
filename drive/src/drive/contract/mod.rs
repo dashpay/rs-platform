@@ -512,18 +512,6 @@ impl Drive {
         )
     }
 
-    // /// Returns the contract with the given ID.
-    // pub fn get_contract(
-    //     &self,
-    //     contract_id: [u8; 32],
-    //     epoch: Option<&Epoch>,
-    //     transaction: TransactionArg,
-    //     drive_operations: &mut Vec<DriveOperation>,
-    // ) -> Result<Option<Arc<Contract>>, Error> {
-    //     self.get_contract_with_fetch_info(contract_id, epoch, transaction, drive_operations)
-    //         .map(|o| o.as_ref().map(|c| Arc::new(c.contract)))
-    // }
-
     /// Returns the contract with fetch info with the given ID.
     pub fn get_contract_with_fetch_info(
         &self,
@@ -601,20 +589,6 @@ impl Drive {
             }
         }
     }
-
-    // /// Returns the contract with the given ID if it's in cache.
-    // pub fn get_cached_contract(
-    //     &self,
-    //     contract_id: [u8; 32],
-    // ) -> Result<Option<Contract>, Error> {
-    //     match self.cache.borrow().cached_contracts.get(&contract_id) {
-    //         None => Ok(None),
-    //         Some(contract) => {
-    //             let contract_ref = Arc::clone(&contract);
-    //             Ok(Some(contract_ref.contract))
-    //         }
-    //     }
-    // }
 
     /// Returns the contract with the given ID from storage and also inserts it in cache.
     pub fn fetch_contract(
