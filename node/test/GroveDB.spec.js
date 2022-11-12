@@ -1143,7 +1143,7 @@ describe('GroveDB', () => {
       await groveDb.insert(
         itemTreePath,
         eKey,
-        { type: 'tree', epoch: 0 },
+        { type: 'tree' },
       );
 
       await groveDb.insert(
@@ -1152,10 +1152,12 @@ describe('GroveDB', () => {
         { type: 'item', epoch: 0, value: eaValue },
       );
 
+      const ownerId = Buffer.alloc(32).fill('c');
+
       await groveDb.insert(
         ePath,
         Buffer.from('ebKey'),
-        { type: 'item', epoch: 0, value: ebValue },
+        { type: 'item', epoch: 0, ownerId, value: ebValue },
       );
     });
 
@@ -1193,7 +1195,7 @@ describe('GroveDB', () => {
       expect(result).to.exist();
 
       expect(result).to.be.instanceOf(Buffer);
-      expect(result).to.have.lengthOf(380);
+      expect(result).to.have.lengthOf(376);
     });
   });
 
