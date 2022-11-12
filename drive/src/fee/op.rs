@@ -31,11 +31,15 @@
 //!
 
 use crate::drive::batch::GroveDbOpBatch;
-use costs::storage_cost::removal::StorageRemovedBytes::NoStorageRemoval;
+use costs::storage_cost::removal::Identifier;
+use costs::storage_cost::removal::StorageRemovedBytes::{
+    BasicStorageRemoval, NoStorageRemoval, SectionedStorageRemoval,
+};
 use costs::storage_cost::StorageCost;
 use costs::OperationCost;
 use enum_map::Enum;
 use grovedb::{batch::GroveDbOp, Element, PathQuery};
+use std::collections::BTreeMap;
 
 use crate::drive::flags::StorageFlags;
 use crate::error::drive::DriveError;
@@ -45,7 +49,10 @@ use crate::fee::default_costs::{
     STORAGE_DISK_USAGE_CREDIT_PER_BYTE, STORAGE_LOAD_CREDIT_PER_BYTE,
     STORAGE_PROCESSING_CREDIT_PER_BYTE, STORAGE_SEEK_COST,
 };
-use crate::fee::op::DriveOperation::{CalculatedCostOperation, CostCalculationDeleteOperation, CostCalculationInsertOperation, CostCalculationQueryOperation, GroveOperation, PreCalculatedFeeResult};
+use crate::fee::op::DriveOperation::{
+    CalculatedCostOperation, CostCalculationDeleteOperation, CostCalculationInsertOperation,
+    CostCalculationQueryOperation, GroveOperation, PreCalculatedFeeResult,
+};
 use crate::fee::{calculate_fee, FeeResult};
 use crate::fee_pools::epochs::Epoch;
 
@@ -389,15 +396,33 @@ impl DriveOperation {
     ) -> Result<Vec<FeeResult>, Error> {
         drive_operation
             .into_iter()
-            .map(|operation| 
-            match operation {
-                PreCalculatedFeeResult(f) => { f}
-                _ => operation.operation_cost().map(|c| 
-                FeeResult {
-                    storage_fee: c.storage_cost(epoch),
-                    processing_fee: c.ephemeral_cost(epoch),
-                    removed_from_identities: c.storage_cost.removed_bytes,
-                })
+            .map(|operation| match operation {
+                PreCalculatedFeeResult(f) => Ok(f),
+                _ => {
+                    let cost = operation.operation_cost()?;
+                    let storage_fee = cost.storage_cost(epoch)?;
+                    let processing_fee = cost.ephemeral_cost(epoch)?;
+                    let (removed_bytes_from_identities, removed_bytes_from_system) =
+                        match cost.storage_cost.removed_bytes {
+                            NoStorageRemoval => (BTreeMap::default(), 0),
+                            BasicStorageRemoval(amount) => {
+                                // this is not always considered an error
+                                (BTreeMap::default(), amount)
+                            }
+                            SectionedStorageRemoval(mut s) => {
+                                let system_amount = s
+                                    .remove(&Identifier::default())
+                                    .map_or(0, |a| a.values().sum());
+                                (s, system_amount)
+                            }
+                        };
+                    Ok(FeeResult {
+                        storage_fee,
+                        processing_fee,
+                        removed_bytes_from_identities,
+                        removed_bytes_from_system,
+                    })
+                }
             })
             .collect()
     }
@@ -419,8 +444,8 @@ impl DriveOperation {
             }
             CalculatedCostOperation(c) => Ok(c),
             PreCalculatedFeeResult(_) => Err(Error::Drive(DriveError::CorruptedCodeExecution(
-                                                                 "pre calculated fees should be requested by operation costs",
-                                                             ))),
+                "pre calculated fees should be requested by operation costs",
+            ))),
         }
     }
 

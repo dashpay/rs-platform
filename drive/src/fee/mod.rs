@@ -57,7 +57,9 @@ pub struct FeeResult {
     /// Processing fee
     pub processing_fee: u64,
     /// Removed bytes from identities
-    pub removed_from_identities: BTreeMap<Identifier, IntMap<u32>>,
+    pub removed_bytes_from_identities: BTreeMap<Identifier, IntMap<u32>>,
+    /// Removed bytes not needing to be refunded to identities
+    pub removed_bytes_from_system: u32,
 }
 
 /// Calculates fees for the given operations. Returns the storage and processing costs.
@@ -66,14 +68,14 @@ pub fn calculate_fee(
     drive_operations: Option<Vec<DriveOperation>>,
     epoch: &Epoch,
 ) -> Result<FeeResult, Error> {
-    let mut fee_result = FeeResult::default();
+    let mut aggregate_fee_result = FeeResult::default();
     if let Some(base_operations) = base_operations {
         for (base_op, count) in base_operations.iter() {
             match base_op.cost().checked_mul(*count) {
                 None => return Err(Error::Fee(FeeError::Overflow("overflow error"))),
-                Some(cost) => match processing_cost.checked_add(cost) {
+                Some(cost) => match aggregate_fee_result.processing_fee.checked_add(cost) {
                     None => return Err(Error::Fee(FeeError::Overflow("overflow error"))),
-                    Some(value) => processing_cost = value,
+                    Some(value) => aggregate_fee_result.processing_fee = value,
                 },
             }
         }
@@ -81,55 +83,76 @@ pub fn calculate_fee(
 
     if let Some(drive_operations) = drive_operations {
         // println!("{:#?}", drive_operations);
-        for drive_operation in DriveOperation::consume_to_fees(drive_operations)? {
-            match processing_cost.checked_add(drive_operation.ephemeral_cost(epoch)?) {
-                None => return Err(Error::Fee(FeeError::Overflow("overflow error"))),
-                Some(value) => processing_cost = value,
-            }
-
-            match storage_cost.checked_add(drive_operation.storage_cost(epoch)?) {
-                None => return Err(Error::Fee(FeeError::Overflow("overflow error"))),
-                Some(value) => storage_cost = value,
-            }
-
-            storage_removed_bytes += drive_operation.storage_cost.removed_bytes;
+        for drive_fee_result in DriveOperation::consume_to_fees(drive_operations, epoch)? {
+            aggregate_fee_result.checked_add_assign(drive_fee_result)?;
         }
     }
 
-    let removed_from_identities = match storage_removed_bytes {
-        NoStorageRemoval => BTreeMap::default(),
-        BasicStorageRemoval(_) => {
-            // this is not always considered an error
-            BTreeMap::default()
-        }
-        SectionedStorageRemoval(s) => s,
-    };
+    // let (removed_bytes_from_identities, removed_bytes_from_system) = match storage_removed_bytes {
+    //     NoStorageRemoval => (BTreeMap::default(), 0),
+    //     BasicStorageRemoval( amount ) => {
+    //         // this is not always considered an error
+    //         (BTreeMap::default(), amount)
+    //     }
+    //     SectionedStorageRemoval(s) => {
+    //         s.remove()
+    //         s
+    //     },
+    // };
+    //
+    // let fee_result = FeeResult {
+    //     storage_fee: storage_cost,
+    //     processing_fee: processing_cost,
+    //     removed_bytes_from_identities,
+    //     removed_bytes_from_system,
+    // };
 
-    let fee_result = FeeResult {
-        storage_fee: storage_cost,
-        processing_fee: processing_cost,
-        removed_from_identities,
-    };
-
-    Ok(fee_result)
+    Ok(aggregate_fee_result)
 }
 
 impl FeeResult {
-    fn checked_add(&self, rhs: Self) -> Result<Self, Error> {
-        let storage_fee = self.storage_fee.checked_add(rhs.storage_fee).ok_or(Error::Fee(FeeError::Overflow("storage fee overflow error")))?;
-        let processing_fee = self.processing_fee.checked_add(rhs.processing_fee).ok_or(Error::Fee(FeeError::Overflow("processing fee overflow error")))?;
-        Ok(FeeResult {
-            storage_fee,
-            processing_fee,
-            removed_from_identities: Default::default()
-        })
-    }
-}
-
-impl AddAssign for FeeResult{
-    fn add_assign(&mut self, rhs: Self) {
-        self.storage_fee += rhs.storage_fee;
-        self.processing_fee += rhs.processing_fee;
-        self.removed_from_identities
+    fn checked_add_assign(&mut self, rhs: Self) -> Result<(), Error> {
+        self.storage_fee = self
+            .storage_fee
+            .checked_add(rhs.storage_fee)
+            .ok_or(Error::Fee(FeeError::Overflow("storage fee overflow error")))?;
+        self.processing_fee =
+            self.processing_fee
+                .checked_add(rhs.processing_fee)
+                .ok_or(Error::Fee(FeeError::Overflow(
+                    "processing fee overflow error",
+                )))?;
+        for (identifier, mut int_map_b) in rhs.removed_bytes_from_identities.into_iter() {
+            let to_insert_int_map = if let Some(sint_map_a) =
+                self.removed_bytes_from_identities.remove(&identifier)
+            {
+                // other has an int_map with the same identifier
+                let intersection = sint_map_a
+                    .into_iter()
+                    .map(|(k, v)| {
+                        let combined = if let Some(value_b) = int_map_b.remove(k) {
+                            v.checked_add(value_b)
+                                .ok_or(Error::Fee(FeeError::Overflow("storage fee overflow error")))
+                        } else {
+                            Ok(v)
+                        };
+                        combined.map(|c| (k, c))
+                    })
+                    .collect::<Result<IntMap<u32>, Error>>()?;
+                intersection.into_iter().chain(int_map_b).collect()
+            } else {
+                int_map_b
+            };
+            // reinsert the now combined intmap
+            self.removed_bytes_from_identities
+                .insert(identifier, to_insert_int_map);
+        }
+        self.removed_bytes_from_system = self
+            .removed_bytes_from_system
+            .checked_add(rhs.removed_bytes_from_system)
+            .ok_or(Error::Fee(FeeError::Overflow(
+                "removed_bytes_from_system overflow error",
+            )))?;
+        Ok(())
     }
 }

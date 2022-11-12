@@ -1409,7 +1409,7 @@ mod tests {
                 transaction.as_ref(),
             );
             let removed_bytes = deletion_fees
-                .removed_from_identities
+                .removed_bytes_from_identities
                 .get(owner_id.as_slice())
                 .unwrap()
                 .get(0)
@@ -1520,7 +1520,7 @@ mod tests {
                 transaction.as_ref(),
             );
             let removed_bytes = deletion_fees
-                .removed_from_identities
+                .removed_bytes_from_identities
                 .get(owner_id.as_slice())
                 .unwrap()
                 .get(0)
@@ -1552,7 +1552,7 @@ mod tests {
         // this is because trees are added because of indexes, and also removed
         let added_bytes = update_fees.storage_fee / STORAGE_DISK_USAGE_CREDIT_PER_BYTE;
         let removed_bytes = update_fees
-            .removed_from_identities
+            .removed_bytes_from_identities
             .get(owner_id.as_slice())
             .unwrap()
             .get(0)

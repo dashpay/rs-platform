@@ -897,7 +897,8 @@ mod tests {
         let FeeResult {
             storage_fee,
             processing_fee,
-            removed_from_identities,
+            removed_bytes_from_identities,
+            removed_bytes_from_system,
         } = drive
             .add_serialized_document_for_contract(
                 &dashpay_cr_serialized_document,
@@ -945,7 +946,8 @@ mod tests {
         let FeeResult {
             storage_fee,
             processing_fee,
-            removed_from_identities,
+            removed_bytes_from_identities,
+            removed_bytes_from_system,
         } = drive
             .add_serialized_document_for_contract(
                 &dashpay_cr_serialized_document,
@@ -993,7 +995,8 @@ mod tests {
         let FeeResult {
             storage_fee,
             processing_fee,
-            removed_from_identities,
+            removed_bytes_from_identities,
+            removed_bytes_from_system,
         } = drive
             .add_serialized_document_for_contract(
                 &dashpay_cr_serialized_document,
@@ -1198,7 +1201,8 @@ mod tests {
         let FeeResult {
             storage_fee,
             processing_fee,
-            removed_from_identities,
+            removed_bytes_from_identities,
+            removed_bytes_from_system,
         } = drive
             .add_document_for_contract(
                 DocumentAndContractInfo {

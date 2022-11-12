@@ -990,7 +990,7 @@ mod tests {
             .expect("expected to be able to delete the document");
 
         let removed_bytes = fee_result
-            .removed_from_identities
+            .removed_bytes_from_identities
             .get(&random_owner_id)
             .unwrap()
             .get(0)
