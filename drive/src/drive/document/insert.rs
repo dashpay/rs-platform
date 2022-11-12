@@ -417,7 +417,7 @@ impl Drive {
                 contract_id_sized,
                 Some(&block_info.epoch),
                 transaction,
-                &mut vec![],
+                &mut drive_operations,
             )?
             .ok_or(Error::Document(DocumentError::ContractNotFound()))?;
 

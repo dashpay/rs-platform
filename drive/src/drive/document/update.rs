@@ -58,6 +58,7 @@ use crate::fee::op::DriveOperation;
 use crate::fee::{calculate_fee, FeeResult};
 
 use crate::drive::block_info::BlockInfo;
+use crate::error::document::DocumentError;
 use dpp::data_contract::extra::DriveContractExt;
 
 impl Drive {
@@ -88,6 +89,59 @@ impl Drive {
             storage_flags,
             transaction,
         )
+    }
+
+    /// Updates a serialized document given a contract id and returns the associated fee.
+    pub fn update_document_for_contract_id(
+        &self,
+        serialized_document: &[u8],
+        contract_id: &[u8],
+        document_type: &str,
+        owner_id: Option<&[u8]>,
+        block_info: BlockInfo,
+        apply: bool,
+        storage_flags: Option<&StorageFlags>,
+        transaction: TransactionArg,
+    ) -> Result<FeeResult, Error> {
+        let mut drive_operations: Vec<DriveOperation> = vec![];
+
+        let contract_id_sized = <[u8; 32]>::try_from(contract_id)
+            .map_err(|_| Error::Document(DocumentError::InvalidContractIdSize()))?;
+
+        let contract_fetch_info = self
+            .get_contract_with_fetch_info(
+                contract_id_sized,
+                Some(&block_info.epoch),
+                transaction,
+                &mut drive_operations,
+            )?
+            .ok_or(Error::Document(DocumentError::ContractNotFound()))?;
+
+        let contract = &contract_fetch_info.contract;
+
+        let document = Document::from_cbor(serialized_document, None, owner_id)?;
+
+        let document_info =
+            DocumentRefAndSerialization((&document, serialized_document, storage_flags));
+
+        let document_type = contract.document_type_for_name(document_type)?;
+
+        self.update_document_for_contract_apply_and_add_to_operations(
+            DocumentAndContractInfo {
+                document_info,
+                contract,
+                document_type,
+                owner_id,
+            },
+            &block_info,
+            apply,
+            transaction,
+            &mut drive_operations,
+        )?;
+
+        let fees = calculate_fee(None, Some(drive_operations), &block_info.epoch)?;
+
+        Ok(fees)
     }
 
     /// Updates a serialized document and returns the associated fee.

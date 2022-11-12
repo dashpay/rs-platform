@@ -226,7 +226,7 @@ describe('Drive', () => {
         initialRootHash = await drive.getGroveDB().getRootHash();
 
         const result = await drive.deleteDocument(
-          dataContract,
+          dataContract.getId(),
           documentWithoutIndices.getType(),
           documentWithoutIndices.getId(),
           blockInfo,
@@ -253,7 +253,7 @@ describe('Drive', () => {
         initialRootHash = await drive.getGroveDB().getRootHash();
 
         const result = await drive.deleteDocument(
-          dataContract,
+          dataContract.getId(),
           documentWithIndices.getType(),
           documentWithIndices.getId(),
           blockInfo,
@@ -279,7 +279,7 @@ describe('Drive', () => {
       initialRootHash = await drive.getGroveDB().getRootHash();
 
       const result = await drive.deleteDocument(
-        dataContract,
+        dataContract.getId(),
         documentWithoutIndices.getType(),
         documentWithoutIndices.getId(),
         blockInfo,
