@@ -1157,7 +1157,12 @@ describe('GroveDB', () => {
       await groveDb.insert(
         ePath,
         Buffer.from('ebKey'),
-        { type: 'item', epoch: 0, ownerId, value: ebValue },
+        {
+          type: 'item',
+          epoch: 0,
+          ownerId,
+          value: ebValue,
+        },
       );
     });
 

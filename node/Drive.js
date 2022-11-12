@@ -181,7 +181,7 @@ class Drive {
    *
    * @param {DataContract} dataContract
    * @param {string} documentType
-   * @param {BlockInfo} [blockInfo]
+   * @param {number} [epochIndex]
    * @param [query]
    * @param [query.where]
    * @param [query.limit]
@@ -192,7 +192,13 @@ class Drive {
    *
    * @returns {Promise<[Document[], number]>}
    */
-  async queryDocuments(dataContract, documentType, blockInfo = undefined, query = {}, useTransaction = false) {
+  async queryDocuments(
+    dataContract,
+    documentType,
+    epochIndex = undefined,
+    query = {},
+    useTransaction = false,
+  ) {
     const encodedQuery = await cbor.encodeAsync(query);
 
     const [encodedDocuments, , processingFee] = await driveQueryDocumentsAsync.call(
@@ -200,7 +206,7 @@ class Drive {
       encodedQuery,
       dataContract.id.toBuffer(),
       documentType,
-      blockInfo,
+      epochIndex,
       useTransaction,
     );
 

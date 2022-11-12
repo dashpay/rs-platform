@@ -578,7 +578,7 @@ impl DriveWrapper {
         let js_query_cbor = cx.argument::<JsBuffer>(0)?;
         let js_contract_id = cx.argument::<JsBuffer>(1)?;
         let js_document_type_name = cx.argument::<JsString>(2)?;
-        let js_epoch_info = cx.argument::<JsNumber>(3)?;
+        let js_maybe_epoch_index = cx.argument::<JsValue>(3)?;
         // TODO We need dry run for validation
         let js_using_transaction = cx.argument::<JsBoolean>(4)?;
         let js_callback = cx.argument::<JsFunction>(5)?.root(&mut cx);
@@ -590,7 +590,20 @@ impl DriveWrapper {
         let query_cbor = converter::js_buffer_to_vec_u8(js_query_cbor, &mut cx);
         let contract_id = converter::js_buffer_to_vec_u8(js_contract_id, &mut cx);
         let document_type_name = js_document_type_name.value(&mut cx);
-        let epoch_info = Epoch::new(js_epoch_info.value(&mut cx) as u16);
+
+        let maybe_epoch: Option<Epoch> = if !js_maybe_epoch_index.is_a::<JsUndefined, _>(&mut cx) {
+            let js_epoch_index = js_maybe_epoch_index.downcast_or_throw::<JsNumber, _>(&mut cx)?;
+
+            let epoch_index = u16::try_from(js_epoch_index.value(&mut cx) as i64)
+                .or_else(|_| cx.throw_range_error("`epochs` must fit in u16"))?;
+
+            let epoch = Epoch::new(epoch_index);
+
+            Some(epoch)
+        } else {
+            None
+        };
+
         let using_transaction = js_using_transaction.value(&mut cx);
 
         drive
@@ -599,7 +612,7 @@ impl DriveWrapper {
                     &query_cbor,
                     <[u8; 32]>::try_from(contract_id).unwrap(),
                     document_type_name.as_str(),
-                    Some(&epoch_info),
+                    maybe_epoch.as_ref(),
                     using_transaction.then_some(transaction).flatten(),
                 );
 
