@@ -37,6 +37,7 @@ use costs::storage_cost::removal::{Identifier, StorageRemovedBytes};
 use enum_map::EnumMap;
 use intmap::IntMap;
 use std::collections::BTreeMap;
+use std::ops::AddAssign;
 
 use crate::error::fee::FeeError;
 use crate::error::Error;
@@ -49,7 +50,7 @@ pub mod default_costs;
 pub mod op;
 
 /// Fee Result
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Default)]
 pub struct FeeResult {
     /// Storage fee
     pub storage_fee: u64,
@@ -65,9 +66,7 @@ pub fn calculate_fee(
     drive_operations: Option<Vec<DriveOperation>>,
     epoch: &Epoch,
 ) -> Result<FeeResult, Error> {
-    let mut storage_cost = 0u64;
-    let mut processing_cost = 0u64;
-    let mut storage_removed_bytes: StorageRemovedBytes = NoStorageRemoval;
+    let mut fee_result = FeeResult::default();
     if let Some(base_operations) = base_operations {
         for (base_op, count) in base_operations.iter() {
             match base_op.cost().checked_mul(*count) {
@@ -82,7 +81,7 @@ pub fn calculate_fee(
 
     if let Some(drive_operations) = drive_operations {
         // println!("{:#?}", drive_operations);
-        for drive_operation in DriveOperation::consume_to_costs(drive_operations)? {
+        for drive_operation in DriveOperation::consume_to_fees(drive_operations)? {
             match processing_cost.checked_add(drive_operation.ephemeral_cost(epoch)?) {
                 None => return Err(Error::Fee(FeeError::Overflow("overflow error"))),
                 Some(value) => processing_cost = value,
@@ -113,4 +112,24 @@ pub fn calculate_fee(
     };
 
     Ok(fee_result)
+}
+
+impl FeeResult {
+    fn checked_add(&self, rhs: Self) -> Result<Self, Error> {
+        let storage_fee = self.storage_fee.checked_add(rhs.storage_fee).ok_or(Error::Fee(FeeError::Overflow("storage fee overflow error")))?;
+        let processing_fee = self.processing_fee.checked_add(rhs.processing_fee).ok_or(Error::Fee(FeeError::Overflow("processing fee overflow error")))?;
+        Ok(FeeResult {
+            storage_fee,
+            processing_fee,
+            removed_from_identities: Default::default()
+        })
+    }
+}
+
+impl AddAssign for FeeResult{
+    fn add_assign(&mut self, rhs: Self) {
+        self.storage_fee += rhs.storage_fee;
+        self.processing_fee += rhs.processing_fee;
+        self.removed_from_identities
+    }
 }

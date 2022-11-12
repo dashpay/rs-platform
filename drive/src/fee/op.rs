@@ -45,11 +45,8 @@ use crate::fee::default_costs::{
     STORAGE_DISK_USAGE_CREDIT_PER_BYTE, STORAGE_LOAD_CREDIT_PER_BYTE,
     STORAGE_PROCESSING_CREDIT_PER_BYTE, STORAGE_SEEK_COST,
 };
-use crate::fee::op::DriveOperation::{
-    CalculatedCostOperation, CostCalculationDeleteOperation, CostCalculationInsertOperation,
-    CostCalculationQueryOperation, GroveOperation,
-};
-use crate::fee::FeeResult;
+use crate::fee::op::DriveOperation::{CalculatedCostOperation, CostCalculationDeleteOperation, CostCalculationInsertOperation, CostCalculationQueryOperation, GroveOperation, PreCalculatedFeeResult};
+use crate::fee::{calculate_fee, FeeResult};
 use crate::fee_pools::epochs::Epoch;
 
 /// Base ops
@@ -386,12 +383,22 @@ pub enum DriveOperation {
 
 impl DriveOperation {
     /// Returns a list of the costs of the Drive operations.
-    pub fn consume_to_costs(
+    pub fn consume_to_fees(
         drive_operation: Vec<DriveOperation>,
-    ) -> Result<Vec<OperationCost>, Error> {
+        epoch: &Epoch,
+    ) -> Result<Vec<FeeResult>, Error> {
         drive_operation
             .into_iter()
-            .map(|operation| operation.operation_cost())
+            .map(|operation| 
+            match operation {
+                PreCalculatedFeeResult(f) => { f}
+                _ => operation.operation_cost().map(|c| 
+                FeeResult {
+                    storage_fee: c.storage_cost(epoch),
+                    processing_fee: c.ephemeral_cost(epoch),
+                    removed_from_identities: c.storage_cost.removed_bytes,
+                })
+            })
             .collect()
     }
 
@@ -411,16 +418,9 @@ impl DriveOperation {
                 Ok(worst_case_delete_operation.cost())
             }
             CalculatedCostOperation(c) => Ok(c),
-            ContractFetch => Ok(OperationCost {
-                seek_count: 0,
-                storage_cost: StorageCost {
-                    added_bytes: 0,
-                    replaced_bytes: 0,
-                    removed_bytes: NoStorageRemoval,
-                },
-                storage_loaded_bytes: 0,
-                hash_node_calls: 0,
-            }),
+            PreCalculatedFeeResult(_) => Err(Error::Drive(DriveError::CorruptedCodeExecution(
+                                                                 "pre calculated fees should be requested by operation costs",
+                                                             ))),
         }
     }
 
