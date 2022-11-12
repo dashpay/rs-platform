@@ -1307,7 +1307,8 @@ impl<'a> DriveQuery<'a> {
         let query_result = drive.grove_get_path_query(&path_query, transaction, drive_operations);
         match query_result {
             Err(GroveDB(GroveError::PathKeyNotFound(_)))
-            | Err(GroveDB(GroveError::PathNotFound(_))) => Ok((Vec::new(), 0)),
+            | Err(GroveDB(GroveError::PathNotFound(_)))
+            | Err(GroveDB(GroveError::PathParentLayerNotFound(_))) => Ok((Vec::new(), 0)),
             _ => {
                 let (data, skipped) = query_result?;
                 {
