@@ -88,25 +88,6 @@ pub fn calculate_fee(
         }
     }
 
-    // let (removed_bytes_from_identities, removed_bytes_from_system) = match storage_removed_bytes {
-    //     NoStorageRemoval => (BTreeMap::default(), 0),
-    //     BasicStorageRemoval( amount ) => {
-    //         // this is not always considered an error
-    //         (BTreeMap::default(), amount)
-    //     }
-    //     SectionedStorageRemoval(s) => {
-    //         s.remove()
-    //         s
-    //     },
-    // };
-    //
-    // let fee_result = FeeResult {
-    //     storage_fee: storage_cost,
-    //     processing_fee: processing_cost,
-    //     removed_bytes_from_identities,
-    //     removed_bytes_from_system,
-    // };
-
     Ok(aggregate_fee_result)
 }
 
