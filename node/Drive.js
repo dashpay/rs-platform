@@ -117,7 +117,7 @@ class Drive {
     return driveCreateDocumentAsync.call(
       this.drive,
       document.toBuffer(),
-      document.getDataContract().toBuffer(),
+      document.getDataContractId().toBuffer(),
       document.getType(),
       document.getOwnerId().toBuffer(),
       true,

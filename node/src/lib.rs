@@ -316,9 +316,9 @@ impl DriveWrapper {
         Ok(cx.undefined())
     }
 
-    fn js_add_document_for_contract_cbor(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+    fn js_create_document(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         let js_document_cbor = cx.argument::<JsBuffer>(0)?;
-        let js_contract_cbor = cx.argument::<JsBuffer>(1)?;
+        let js_contract_id = cx.argument::<JsBuffer>(1)?;
         let js_document_type_name = cx.argument::<JsString>(2)?;
         let js_owner_id = cx.argument::<JsBuffer>(3)?;
         let js_override_document = cx.argument::<JsBoolean>(4)?;
@@ -332,7 +332,7 @@ impl DriveWrapper {
             .downcast_or_throw::<JsBox<DriveWrapper>, _>(&mut cx)?;
 
         let document_cbor = converter::js_buffer_to_vec_u8(js_document_cbor, &mut cx);
-        let contract_cbor = converter::js_buffer_to_vec_u8(js_contract_cbor, &mut cx);
+        let contract_id = converter::js_buffer_to_vec_u8(js_contract_id, &mut cx);
         let document_type_name = js_document_type_name.value(&mut cx);
         let owner_id = converter::js_buffer_to_vec_u8(js_owner_id, &mut cx);
         let override_document = js_override_document.value(&mut cx);
@@ -342,19 +342,17 @@ impl DriveWrapper {
 
         drive
             .send_to_drive_thread(move |platform: &Platform, transaction, channel| {
-                let result = platform
-                    .drive
-                    .add_serialized_document_for_serialized_contract(
-                        &document_cbor,
-                        &contract_cbor,
-                        &document_type_name,
-                        Some(&owner_id),
-                        override_document,
-                        block_info,
-                        apply,
-                        StorageFlags::optional_default_as_ref(),
-                        using_transaction.then_some(transaction).flatten(),
-                    );
+                let result = platform.drive.add_serialized_document_for_contract_id(
+                    &document_cbor,
+                    &contract_id,
+                    &document_type_name,
+                    Some(&owner_id),
+                    override_document,
+                    block_info,
+                    apply,
+                    StorageFlags::optional_default_as_ref(),
+                    using_transaction.then_some(transaction).flatten(),
+                );
 
                 channel.send(move |mut task_context| {
                     let callback = js_callback.into_inner(&mut task_context);
@@ -1705,10 +1703,7 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
         DriveWrapper::js_create_initial_state_structure,
     )?;
     cx.export_function("driveApplyContract", DriveWrapper::js_apply_contract)?;
-    cx.export_function(
-        "driveCreateDocument",
-        DriveWrapper::js_add_document_for_contract_cbor,
-    )?;
+    cx.export_function("driveCreateDocument", DriveWrapper::js_create_document)?;
     cx.export_function(
         "driveUpdateDocument",
         DriveWrapper::js_update_document_for_contract_cbor,
