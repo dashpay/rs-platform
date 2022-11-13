@@ -45,6 +45,7 @@ use crate::drive::object_size_info::DriveKeyInfo;
 use crate::drive::object_size_info::DriveKeyInfo::Key;
 use crate::drive::object_size_info::KeyValueInfo::KeyRefRequest;
 use crate::drive::Drive;
+use crate::error::document::DocumentError;
 use crate::error::drive::DriveError;
 use crate::error::Error;
 use crate::fee::op::DriveOperation;
@@ -99,6 +100,49 @@ impl Drive {
             apply,
             transaction,
         )
+    }
+
+    /// Deletes a document and returns the associated fee.
+    /// The contract CBOR is given instead of the contract itself.
+    pub fn delete_document_for_contract_id(
+        &self,
+        document_id: &[u8],
+        contract_id: &[u8],
+        document_type_name: &str,
+        owner_id: Option<&[u8]>,
+        block_info: BlockInfo,
+        apply: bool,
+        transaction: TransactionArg,
+    ) -> Result<FeeResult, Error> {
+        let mut drive_operations: Vec<DriveOperation> = vec![];
+
+        let contract_id_sized = <[u8; 32]>::try_from(contract_id)
+            .map_err(|_| Error::Document(DocumentError::InvalidContractIdSize()))?;
+
+        let contract_fetch_info = self
+            .get_contract_with_fetch_info(
+                contract_id_sized,
+                Some(&block_info.epoch),
+                transaction,
+                &mut drive_operations,
+            )?
+            .ok_or(Error::Document(DocumentError::ContractNotFound()))?;
+
+        let contract = &contract_fetch_info.contract;
+
+        self.delete_document_for_contract_apply_and_add_to_operations(
+            document_id,
+            contract,
+            document_type_name,
+            owner_id,
+            apply,
+            transaction,
+            &mut drive_operations,
+        )?;
+
+        let fees = calculate_fee(None, Some(drive_operations), &block_info.epoch)?;
+
+        Ok(fees)
     }
 
     /// Deletes a document.

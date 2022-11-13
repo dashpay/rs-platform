@@ -117,7 +117,7 @@ class Drive {
     return driveCreateDocumentAsync.call(
       this.drive,
       document.toBuffer(),
-      document.getDataContract().toBuffer(),
+      document.getDataContractId().toBuffer(),
       document.getType(),
       document.getOwnerId().toBuffer(),
       true,
@@ -139,7 +139,7 @@ class Drive {
     return driveUpdateDocumentAsync.call(
       this.drive,
       document.toBuffer(),
-      document.getDataContract().toBuffer(),
+      document.getDataContractId().toBuffer(),
       document.getType(),
       document.getOwnerId().toBuffer(),
       blockInfo,
@@ -149,7 +149,7 @@ class Drive {
   }
 
   /**
-   * @param {DataContract} dataContract
+   * @param {Buffer|Identifier} dataContractId
    * @param {string} documentType
    * @param {Identifier} documentId
    * @param {BlockInfo} blockInfo
@@ -159,7 +159,7 @@ class Drive {
    * @returns {Promise<FeeResult>}
    */
   async deleteDocument(
-    dataContract,
+    dataContractId,
     documentType,
     documentId,
     blockInfo,
@@ -169,7 +169,7 @@ class Drive {
     return driveDeleteDocumentAsync.call(
       this.drive,
       documentId.toBuffer(),
-      dataContract.toBuffer(),
+      dataContractId,
       documentType,
       blockInfo,
       !dryRun,

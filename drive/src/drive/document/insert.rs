@@ -39,7 +39,6 @@ use grovedb::{Element, TransactionArg};
 use std::collections::HashSet;
 use std::option::Option::None;
 
-use crate::contract::document::Document;
 use crate::contract::Contract;
 use crate::drive::defaults::{DEFAULT_HASH_SIZE, STORAGE_FLAGS_SIZE};
 use crate::drive::document::{
@@ -69,7 +68,10 @@ use crate::fee::{calculate_fee, FeeResult};
 use dpp::data_contract::extra::DocumentType;
 
 use crate::common::encode::encode_unsigned_integer;
+use crate::contract::document::Document;
 use crate::drive::block_info::BlockInfo;
+use crate::error::document::DocumentError;
+use crate::fee_pools::epochs::Epoch;
 use dpp::data_contract::extra::encode_float;
 use dpp::data_contract::extra::DriveContractExt;
 
@@ -390,6 +392,61 @@ impl Drive {
             apply,
             transaction,
         )
+    }
+
+    /// Deserializes a document and adds it to a contract by id.
+    pub fn add_serialized_document_for_contract_id(
+        &self,
+        serialized_document: &[u8],
+        contract_id: &[u8],
+        document_type_name: &str,
+        owner_id: Option<&[u8]>,
+        override_document: bool,
+        block_info: BlockInfo,
+        apply: bool,
+        storage_flags: Option<&StorageFlags>,
+        transaction: TransactionArg,
+    ) -> Result<FeeResult, Error> {
+        let mut drive_operations: Vec<DriveOperation> = vec![];
+
+        let contract_id_sized = <[u8; 32]>::try_from(contract_id)
+            .map_err(|_| Error::Document(DocumentError::InvalidContractIdSize()))?;
+
+        let contract_fetch_info = self
+            .get_contract_with_fetch_info(
+                contract_id_sized,
+                Some(&block_info.epoch),
+                transaction,
+                &mut drive_operations,
+            )?
+            .ok_or(Error::Document(DocumentError::ContractNotFound()))?;
+
+        let contract = &contract_fetch_info.contract;
+
+        let document = Document::from_cbor(serialized_document, None, owner_id)?;
+
+        let document_info =
+            DocumentRefAndSerialization((&document, serialized_document, storage_flags));
+
+        let document_type = contract.document_type_for_name(document_type_name)?;
+
+        self.add_document_for_contract_apply_and_add_to_operations(
+            DocumentAndContractInfo {
+                document_info,
+                contract,
+                document_type,
+                owner_id,
+            },
+            override_document,
+            &block_info,
+            apply,
+            transaction,
+            &mut drive_operations,
+        )?;
+
+        let fees = calculate_fee(None, Some(drive_operations), &block_info.epoch)?;
+
+        Ok(fees)
     }
 
     /// Adds a document to a contract.
