@@ -352,7 +352,7 @@ impl Drive {
             StorageFlags::map_to_some_element_flags(storage_flags),
         );
 
-        let original_contract = self
+        let original_contract_fetch_info = self
             .get_contract_with_fetch_info_and_add_to_operations(
                 contract_id,
                 Some(&block_info.epoch),
@@ -366,7 +366,7 @@ impl Drive {
         self.update_contract_element(
             contract_element,
             &contract,
-            &original_contract.contract,
+            &original_contract_fetch_info.contract,
             &block_info,
             apply,
             transaction,
