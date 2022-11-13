@@ -68,7 +68,7 @@ impl Drive {
         serialized_document: &[u8],
         contract_cbor: &[u8],
         document_type: &str,
-        owner_id: Option<&[u8]>,
+        owner_id: Option<[u8; 32]>,
         block_info: BlockInfo,
         apply: bool,
         storage_flags: Option<&StorageFlags>,
@@ -95,9 +95,9 @@ impl Drive {
     pub fn update_document_for_contract_id(
         &self,
         serialized_document: &[u8],
-        contract_id: &[u8],
+        contract_id: [u8; 32],
         document_type: &str,
-        owner_id: Option<&[u8]>,
+        owner_id: Option<[u8; 32]>,
         block_info: BlockInfo,
         apply: bool,
         storage_flags: Option<&StorageFlags>,
@@ -105,12 +105,9 @@ impl Drive {
     ) -> Result<FeeResult, Error> {
         let mut drive_operations: Vec<DriveOperation> = vec![];
 
-        let contract_id_sized = <[u8; 32]>::try_from(contract_id)
-            .map_err(|_| Error::Document(DocumentError::InvalidContractIdSize()))?;
-
         let contract_fetch_info = self
             .get_contract_with_fetch_info(
-                contract_id_sized,
+                contract_id,
                 Some(&block_info.epoch),
                 transaction,
                 &mut drive_operations,
@@ -150,7 +147,7 @@ impl Drive {
         serialized_document: &[u8],
         contract: &Contract,
         document_type: &str,
-        owner_id: Option<&[u8]>,
+        owner_id: Option<[u8; 32]>,
         block_info: BlockInfo,
         apply: bool,
         storage_flags: Option<&StorageFlags>,
@@ -178,7 +175,7 @@ impl Drive {
         serialized_document: &[u8],
         contract: &Contract,
         document_type_name: &str,
-        owner_id: Option<&[u8]>,
+        owner_id: Option<[u8; 32]>,
         block_info: BlockInfo,
         apply: bool,
         storage_flags: Option<&StorageFlags>,
@@ -953,7 +950,7 @@ mod tests {
 
         drive
             .delete_document_for_contract(
-                &alice_profile.id,
+                alice_profile.id,
                 &contract,
                 "profile",
                 None,
@@ -1116,13 +1113,16 @@ mod tests {
 
         let document_id = bs58::decode("DLRWw2eRbLAW5zDU2c7wwsSFQypTSZPhFYzpY48tnaXN")
             .into_vec()
-            .expect("should decode base58");
+            .expect("should decode")
+            .as_slice()
+            .try_into()
+            .expect("this be 32 bytes");
 
         // Delete document
 
         drive
             .delete_document_for_contract_cbor(
-                document_id.as_slice(),
+                document_id,
                 &contract,
                 "indexedDocument",
                 None,
@@ -1162,7 +1162,7 @@ mod tests {
                 &dashpay_cr_serialized_document,
                 &contract,
                 "contactRequest",
-                Some(&random_owner_id),
+                Some(random_owner_id),
                 false,
                 BlockInfo::default(),
                 true,
@@ -1176,7 +1176,7 @@ mod tests {
                 &dashpay_cr_serialized_document,
                 &contract,
                 "contactRequest",
-                Some(&random_owner_id),
+                Some(random_owner_id),
                 BlockInfo::default(),
                 true,
                 StorageFlags::optional_default_as_ref(),
@@ -1189,7 +1189,7 @@ mod tests {
                 &dashpay_cr_serialized_document,
                 &contract,
                 "contactRequest",
-                Some(&random_owner_id),
+                Some(random_owner_id),
                 true,
                 BlockInfo::default(),
                 true,
@@ -1233,7 +1233,7 @@ mod tests {
                 &dashpay_profile_serialized_document,
                 &contract,
                 "profile",
-                Some(&random_owner_id),
+                Some(random_owner_id),
                 false,
                 BlockInfo::default(),
                 true,
@@ -1247,7 +1247,7 @@ mod tests {
                 &dashpay_profile_updated_public_message_serialized_document,
                 &contract,
                 "profile",
-                Some(&random_owner_id),
+                Some(random_owner_id),
                 BlockInfo::default(),
                 true,
                 StorageFlags::optional_default_as_ref(),
@@ -1288,11 +1288,11 @@ mod tests {
         // setup code
         let contract = setup_contract(&drive, path, None, transaction.as_ref());
 
-        let id = [1u8; 32].to_vec();
-        let owner_id = [2u8; 32].to_vec();
+        let id = [1u8; 32];
+        let owner_id = [2u8; 32];
         let person_0_original = Person {
-            id: id.clone(),
-            owner_id: owner_id.clone(),
+            id,
+            owner_id,
             first_name: "Samuel".to_string(),
             middle_name: "Abraham".to_string(),
             last_name: "Westrich".to_string(),
@@ -1301,8 +1301,8 @@ mod tests {
         };
 
         let person_0_updated = Person {
-            id: id.clone(),
-            owner_id: owner_id.clone(),
+            id,
+            owner_id,
             first_name: "Samuel".to_string(),
             middle_name: "Abraham".to_string(),
             last_name: "Westrich2".to_string(),
@@ -1531,11 +1531,11 @@ mod tests {
         // setup code
         let contract = setup_contract(&drive, path, None, transaction.as_ref());
 
-        let id = [1u8; 32].to_vec();
-        let owner_id = [2u8; 32].to_vec();
+        let id = [1u8; 32];
+        let owner_id = [2u8; 32];
         let person_0_original = Person {
-            id: id.clone(),
-            owner_id: owner_id.clone(),
+            id,
+            owner_id,
             first_name: "Samuel".to_string(),
             middle_name: "Abraham".to_string(),
             last_name: "Westrich".to_string(),
@@ -1544,8 +1544,8 @@ mod tests {
         };
 
         let person_0_updated = Person {
-            id: id.clone(),
-            owner_id: owner_id.clone(),
+            id,
+            owner_id,
             first_name: "Samuel".to_string(),
             middle_name: "Abraham".to_string(),
             last_name: "Westrich".to_string(),
@@ -1693,11 +1693,11 @@ mod tests {
         // setup code
         let contract = setup_contract(&drive, path, None, transaction.as_ref());
 
-        let id = [1u8; 32].to_vec();
-        let owner_id = [2u8; 32].to_vec();
+        let id = [1u8; 32];
+        let owner_id = [2u8; 32];
         let person_0_original = Person {
-            id: id.clone(),
-            owner_id: owner_id.clone(),
+            id,
+            owner_id,
             first_name: "Samuel".to_string(),
             middle_name: "Abraham".to_string(),
             last_name: "Westrich".to_string(),
@@ -1898,9 +1898,9 @@ mod tests {
     #[serde(rename_all = "camelCase")]
     struct Person {
         #[serde(rename = "$id")]
-        id: Vec<u8>,
+        id: [u8; 32],
         #[serde(rename = "$ownerId")]
-        owner_id: Vec<u8>,
+        owner_id: [u8; 32],
         first_name: String,
         middle_name: String,
         last_name: String,
@@ -1978,10 +1978,10 @@ mod tests {
 
         drive
             .delete_document_for_contract(
-                person.id.as_slice(),
+                person.id,
                 &contract,
                 "person",
-                Some(person.owner_id.as_slice()),
+                Some(person.owner_id),
                 block_info,
                 true,
                 transaction,
@@ -2027,8 +2027,8 @@ mod tests {
         let contract = setup_contract(&drive, path, None, transaction.as_ref());
 
         let person_0_original = Person {
-            id: [0u8; 32].to_vec(),
-            owner_id: [0u8; 32].to_vec(),
+            id: [0u8; 32],
+            owner_id: [0u8; 32],
             first_name: "Samuel".to_string(),
             middle_name: "Abraham".to_string(),
             last_name: "Westrich".to_string(),
@@ -2037,8 +2037,8 @@ mod tests {
         };
 
         let person_0_updated = Person {
-            id: [0u8; 32].to_vec(),
-            owner_id: [0u8; 32].to_vec(),
+            id: [0u8; 32],
+            owner_id: [0u8; 32],
             first_name: "Samuel".to_string(),
             middle_name: "Abraham".to_string(),
             last_name: "Westrich".to_string(),
@@ -2047,8 +2047,8 @@ mod tests {
         };
 
         let person_1_original = Person {
-            id: [1u8; 32].to_vec(),
-            owner_id: [1u8; 32].to_vec(),
+            id: [1u8; 32],
+            owner_id: [1u8; 32],
             first_name: "Wisdom".to_string(),
             middle_name: "Madabuchukwu".to_string(),
             last_name: "Ogwu".to_string(),
@@ -2057,8 +2057,8 @@ mod tests {
         };
 
         let person_1_updated = Person {
-            id: [1u8; 32].to_vec(),
-            owner_id: [1u8; 32].to_vec(),
+            id: [1u8; 32],
+            owner_id: [1u8; 32],
             first_name: "Wisdom".to_string(),
             middle_name: "Madabuchukwu".to_string(),
             last_name: "Ogwu".to_string(),
@@ -2280,7 +2280,7 @@ mod tests {
                 &document_cbor,
                 &contract,
                 &document_type,
-                Some(&owner_id.to_buffer()),
+                Some(owner_id.to_buffer()),
                 false,
                 block_info.clone(),
                 true,
@@ -2306,7 +2306,7 @@ mod tests {
                 &document_cbor,
                 &contract_cbor,
                 &document_type,
-                Some(&owner_id.to_buffer()),
+                Some(owner_id.to_buffer()),
                 block_info,
                 false,
                 Some(&storage_flags),

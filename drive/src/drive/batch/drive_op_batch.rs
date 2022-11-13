@@ -129,7 +129,7 @@ pub enum DocumentOperationType<'a> {
         /// The name of the document type
         document_type_name: &'a str,
         /// The owner id, if none is specified will try to recover from serialized document
-        owner_id: Option<&'a [u8]>,
+        owner_id: Option<[u8; 32]>,
         /// Should we override the document if one already exists?
         override_document: bool,
         /// Add storage flags (like epoch, owner id, etc)
@@ -144,7 +144,7 @@ pub enum DocumentOperationType<'a> {
         /// The name of the document type
         document_type_name: &'a str,
         /// The owner id, if none is specified will try to recover from serialized document
-        owner_id: Option<&'a [u8]>,
+        owner_id: Option<[u8; 32]>,
         /// Should we override the document if one already exists?
         override_document: bool,
         /// Add storage flags (like epoch, owner id, etc)
@@ -160,25 +160,25 @@ pub enum DocumentOperationType<'a> {
     /// Deletes a document and returns the associated fee.
     DeleteDocumentForContract {
         /// The document id
-        document_id: &'a [u8],
+        document_id: [u8; 32],
         /// The contract
         contract: &'a Contract,
         /// The name of the document type
         document_type_name: &'a str,
         /// The owner id, if none is specified will try to recover from serialized document
-        owner_id: Option<&'a [u8]>,
+        owner_id: Option<[u8; 32]>,
     },
     /// Deletes a document and returns the associated fee.
     /// The contract CBOR is given instead of the contract itself.
     DeleteDocumentForContractCbor {
         /// The document id
-        document_id: &'a [u8],
+        document_id: [u8; 32],
         /// The serialized contract
         contract_cbor: &'a [u8],
         /// The name of the document type
         document_type_name: &'a str,
         /// The owner id, if none is specified will try to recover from serialized document
-        owner_id: Option<&'a [u8]>,
+        owner_id: Option<[u8; 32]>,
     },
     /// Updates a serialized document given a contract CBOR and returns the associated fee.
     UpdateDocumentForContractCbor {
@@ -189,7 +189,7 @@ pub enum DocumentOperationType<'a> {
         /// The name of the document type
         document_type_name: &'a str,
         /// The owner id, if none is specified will try to recover from serialized document
-        owner_id: Option<&'a [u8]>,
+        owner_id: Option<[u8; 32]>,
         /// Add storage flags (like epoch, owner id, etc)
         storage_flags: Option<&'a StorageFlags>,
     },
@@ -202,7 +202,7 @@ pub enum DocumentOperationType<'a> {
         /// The name of the document type
         document_type_name: &'a str,
         /// The owner id, if none is specified will try to recover from serialized document
-        owner_id: Option<&'a [u8]>,
+        owner_id: Option<[u8; 32]>,
         /// Add storage flags (like epoch, owner id, etc)
         storage_flags: Option<&'a StorageFlags>,
     },
@@ -217,7 +217,7 @@ pub enum DocumentOperationType<'a> {
         /// The name of the document type
         document_type_name: &'a str,
         /// The owner id, if none is specified will try to recover from serialized document
-        owner_id: Option<&'a [u8]>,
+        owner_id: Option<[u8; 32]>,
         /// Add storage flags (like epoch, owner id, etc)
         storage_flags: Option<&'a StorageFlags>,
     },
@@ -574,7 +574,7 @@ mod tests {
             serialized_document: dashpay_cr_serialized_document.as_slice(),
             contract: &contract,
             document_type_name: "contactRequest",
-            owner_id: Some(&random_owner_id),
+            owner_id: Some(random_owner_id),
             override_document: false,
             storage_flags: StorageFlags::optional_default_as_ref(),
         }));

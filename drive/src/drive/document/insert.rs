@@ -330,7 +330,7 @@ impl Drive {
         serialized_document: &[u8],
         serialized_contract: &[u8],
         document_type_name: &str,
-        owner_id: Option<&[u8]>,
+        owner_id: Option<[u8; 32]>,
         override_document: bool,
         block_info: BlockInfo,
         apply: bool,
@@ -366,7 +366,7 @@ impl Drive {
         serialized_document: &[u8],
         contract: &Contract,
         document_type_name: &str,
-        owner_id: Option<&[u8]>,
+        owner_id: Option<[u8; 32]>,
         override_document: bool,
         block_info: BlockInfo,
         apply: bool,
@@ -398,9 +398,9 @@ impl Drive {
     pub fn add_serialized_document_for_contract_id(
         &self,
         serialized_document: &[u8],
-        contract_id: &[u8],
+        contract_id: [u8; 32],
         document_type_name: &str,
-        owner_id: Option<&[u8]>,
+        owner_id: Option<[u8; 32]>,
         override_document: bool,
         block_info: BlockInfo,
         apply: bool,
@@ -409,12 +409,9 @@ impl Drive {
     ) -> Result<FeeResult, Error> {
         let mut drive_operations: Vec<DriveOperation> = vec![];
 
-        let contract_id_sized = <[u8; 32]>::try_from(contract_id)
-            .map_err(|_| Error::Document(DocumentError::InvalidContractIdSize()))?;
-
         let contract_fetch_info = self
             .get_contract_with_fetch_info(
-                contract_id_sized,
+                contract_id,
                 Some(&block_info.epoch),
                 transaction,
                 &mut drive_operations,
@@ -821,7 +818,7 @@ mod tests {
                 &dashpay_cr_serialized_document,
                 &dashpay_cbor,
                 "contactRequest",
-                Some(&random_owner_id),
+                Some(random_owner_id),
                 false,
                 BlockInfo::default(),
                 true,
@@ -835,7 +832,7 @@ mod tests {
                 &dashpay_cr_serialized_document,
                 &dashpay_cbor,
                 "contactRequest",
-                Some(&random_owner_id),
+                Some(random_owner_id),
                 false,
                 BlockInfo::default(),
                 true,
@@ -849,7 +846,7 @@ mod tests {
                 &dashpay_cr_serialized_document,
                 &dashpay_cbor,
                 "contactRequest",
-                Some(&random_owner_id),
+                Some(random_owner_id),
                 true,
                 BlockInfo::default(),
                 true,
@@ -888,7 +885,7 @@ mod tests {
                 &dashpay_cr_serialized_document,
                 &contract,
                 "contactRequest",
-                Some(&random_owner_id),
+                Some(random_owner_id),
                 false,
                 BlockInfo::default(),
                 true,
@@ -902,7 +899,7 @@ mod tests {
                 &dashpay_cr_serialized_document,
                 &contract,
                 "contactRequest",
-                Some(&random_owner_id),
+                Some(random_owner_id),
                 false,
                 BlockInfo::default(),
                 true,
@@ -916,7 +913,7 @@ mod tests {
                 &dashpay_cr_serialized_document,
                 &contract,
                 "contactRequest",
-                Some(&random_owner_id),
+                Some(random_owner_id),
                 true,
                 BlockInfo::default(),
                 true,
@@ -961,7 +958,7 @@ mod tests {
                 &dashpay_cr_serialized_document,
                 &contract,
                 "contactRequest",
-                Some(&random_owner_id),
+                Some(random_owner_id),
                 false,
                 BlockInfo::default(),
                 true,
@@ -1010,7 +1007,7 @@ mod tests {
                 &dashpay_cr_serialized_document,
                 &contract,
                 "profile",
-                Some(&random_owner_id),
+                Some(random_owner_id),
                 false,
                 BlockInfo::default(),
                 true,
@@ -1059,7 +1056,7 @@ mod tests {
                 &dashpay_cr_serialized_document,
                 &contract,
                 "profile",
-                Some(&random_owner_id),
+                Some(random_owner_id),
                 false,
                 BlockInfo::default(),
                 false,
@@ -1103,7 +1100,7 @@ mod tests {
                 &dashpay_cr_serialized_document,
                 &contract,
                 "contactRequest",
-                Some(&random_owner_id),
+                Some(random_owner_id),
                 false,
                 BlockInfo::default(),
                 false,
@@ -1117,7 +1114,7 @@ mod tests {
                 &dashpay_cr_serialized_document,
                 &contract,
                 "contactRequest",
-                Some(&random_owner_id),
+                Some(random_owner_id),
                 false,
                 BlockInfo::default(),
                 true,
@@ -1153,7 +1150,7 @@ mod tests {
         );
 
         let owner_id = rand::thread_rng().gen::<[u8; 32]>();
-        let document = Document::from_cbor(&dashpay_cr_serialized_document, None, Some(&owner_id))
+        let document = Document::from_cbor(&dashpay_cr_serialized_document, None, Some(owner_id))
             .expect("expected to deserialize document successfully");
 
         let storage_flags = Some(StorageFlags::SingleEpoch(0));
@@ -1182,7 +1179,7 @@ mod tests {
                     document_info: document_info.clone(),
                     contract: &contract,
                     document_type,
-                    owner_id: Some(&owner_id),
+                    owner_id: Some(owner_id),
                 },
                 false,
                 &BlockInfo::default(),
@@ -1206,7 +1203,7 @@ mod tests {
                     document_info,
                     contract: &contract,
                     document_type,
-                    owner_id: Some(&owner_id),
+                    owner_id: Some(owner_id),
                 },
                 false,
                 &BlockInfo::default(),
@@ -1245,7 +1242,7 @@ mod tests {
         let document = Document::from_cbor(
             &dpns_domain_serialized_document,
             None,
-            Some(&random_owner_id),
+            Some(random_owner_id),
         )
         .expect("expected to deserialize the document");
 
@@ -1315,7 +1312,7 @@ mod tests {
                 &dashpay_cr_serialized_document_0,
                 &dashpay_cbor,
                 "contactRequest",
-                Some(&random_owner_id),
+                Some(random_owner_id),
                 false,
                 BlockInfo::default(),
                 true,
@@ -1328,7 +1325,7 @@ mod tests {
                 &dashpay_cr_serialized_document_1,
                 &dashpay_cbor,
                 "contactRequest",
-                Some(&random_owner_id),
+                Some(random_owner_id),
                 false,
                 BlockInfo::default(),
                 true,
@@ -1341,7 +1338,7 @@ mod tests {
                 &dashpay_cr_serialized_document_2,
                 &dashpay_cbor,
                 "contactRequest",
-                Some(&random_owner_id),
+                Some(random_owner_id),
                 false,
                 BlockInfo::default(),
                 true,
@@ -1371,7 +1368,7 @@ mod tests {
                 &dashpay_cr_serialized_document_0,
                 &dashpay_cbor,
                 "contactRequest",
-                Some(&random_owner_id),
+                Some(random_owner_id),
                 false,
                 BlockInfo::default(),
                 true,
@@ -1384,7 +1381,7 @@ mod tests {
                 &dashpay_cr_serialized_document_0_dup,
                 &dashpay_cbor,
                 "contactRequest",
-                Some(&random_owner_id),
+                Some(random_owner_id),
                 false,
                 BlockInfo::default(),
                 true,

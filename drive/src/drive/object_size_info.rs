@@ -421,7 +421,7 @@ pub struct DocumentAndContractInfo<'a> {
     /// Document type
     pub document_type: &'a DocumentType,
     /// Owner ID
-    pub owner_id: Option<&'a [u8]>,
+    pub owner_id: Option<[u8; 32]>,
 }
 
 /// Document info
@@ -467,7 +467,7 @@ impl<'a> DocumentInfo<'a> {
         &self,
         key_path: &str,
         document_type: &DocumentType,
-        owner_id: Option<&[u8]>,
+        owner_id: Option<[u8; 32]>,
     ) -> Result<Option<DriveKeyInfo>, Error> {
         match self {
             DocumentInfo::DocumentRefAndSerialization((document, _, _))
