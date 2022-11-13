@@ -34,7 +34,7 @@ pub fn js_object_to_element<'a, C: Context<'a>>(
         let js_maybe_owner_id: Option<Handle<JsBuffer>> = js_object.get_opt(cx, "ownerId")?;
 
         let maybe_owner_id = js_maybe_owner_id
-            .map(|js_buffer| js_buffer_to_hash(js_buffer, cx))
+            .map(|js_buffer| js_buffer_to_identifier(js_buffer, cx))
             .transpose()?;
 
         let storage_flags = StorageFlags::new_single_epoch(epoch, maybe_owner_id);
@@ -223,7 +223,7 @@ pub fn reference_to_dictionary<'a, C: Context<'a>>(
     Ok(js_object.upcast())
 }
 
-pub fn js_buffer_to_hash<'a, C: Context<'a>>(
+pub fn js_buffer_to_identifier<'a, C: Context<'a>>(
     js_buffer: Handle<JsBuffer>,
     cx: &mut C,
 ) -> NeonResult<[u8; 32]> {

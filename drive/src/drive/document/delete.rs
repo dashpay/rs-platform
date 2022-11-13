@@ -56,10 +56,10 @@ impl Drive {
     /// Deletes a document and returns the associated fee.
     pub fn delete_document_for_contract(
         &self,
-        document_id: &[u8],
+        document_id: [u8; 32],
         contract: &Contract,
         document_type_name: &str,
-        owner_id: Option<&[u8]>,
+        owner_id: Option<[u8; 32]>,
         block_info: BlockInfo,
         apply: bool,
         transaction: TransactionArg,
@@ -82,10 +82,10 @@ impl Drive {
     /// The contract CBOR is given instead of the contract itself.
     pub fn delete_document_for_contract_cbor(
         &self,
-        document_id: &[u8],
+        document_id: [u8; 32],
         contract_cbor: &[u8],
         document_type_name: &str,
-        owner_id: Option<&[u8]>,
+        owner_id: Option<[u8; 32]>,
         block_info: BlockInfo,
         apply: bool,
         transaction: TransactionArg,
@@ -106,22 +106,19 @@ impl Drive {
     /// The contract CBOR is given instead of the contract itself.
     pub fn delete_document_for_contract_id(
         &self,
-        document_id: &[u8],
-        contract_id: &[u8],
+        document_id: [u8; 32],
+        contract_id: [u8; 32],
         document_type_name: &str,
-        owner_id: Option<&[u8]>,
+        owner_id: Option<[u8; 32]>,
         block_info: BlockInfo,
         apply: bool,
         transaction: TransactionArg,
     ) -> Result<FeeResult, Error> {
         let mut drive_operations: Vec<DriveOperation> = vec![];
 
-        let contract_id_sized = <[u8; 32]>::try_from(contract_id)
-            .map_err(|_| Error::Document(DocumentError::InvalidContractIdSize()))?;
-
         let contract_fetch_info = self
             .get_contract_with_fetch_info(
-                contract_id_sized,
+                contract_id,
                 Some(&block_info.epoch),
                 transaction,
                 &mut drive_operations,
@@ -148,10 +145,10 @@ impl Drive {
     /// Deletes a document.
     pub fn delete_document_for_contract_apply_and_add_to_operations(
         &self,
-        document_id: &[u8],
+        document_id: [u8; 32],
         contract: &Contract,
         document_type_name: &str,
-        owner_id: Option<&[u8]>,
+        owner_id: Option<[u8; 32]>,
         apply: bool,
         transaction: TransactionArg,
         drive_operations: &mut Vec<DriveOperation>,
@@ -170,10 +167,10 @@ impl Drive {
     /// Prepares the operations for deleting a document.
     pub(crate) fn delete_document_for_contract_operations(
         &self,
-        document_id: &[u8],
+        document_id: [u8; 32],
         contract: &Contract,
         document_type_name: &str,
-        owner_id: Option<&[u8]>,
+        owner_id: Option<[u8; 32]>,
         apply: bool,
         transaction: TransactionArg,
     ) -> Result<Vec<DriveOperation>, Error> {
@@ -212,7 +209,7 @@ impl Drive {
         // next we need to get the document from storage
         let document_element: Option<Element> = self.grove_get_direct(
             contract_documents_primary_key_path,
-            KeyRefRequest(document_id),
+            KeyRefRequest(document_id.as_slice()),
             query_stateless_max_value_size,
             transaction,
             &mut batch_operations,
@@ -239,7 +236,7 @@ impl Drive {
         // third we need to delete the document for it's primary key
         self.batch_delete(
             contract_documents_primary_key_path,
-            document_id,
+            document_id.as_slice(),
             true,
             true, // not a tree, irrelevant
             transaction,
@@ -301,7 +298,7 @@ impl Drive {
                 // here we should return an error if the element already exists
                 self.batch_delete_up_tree_while_empty(
                     index_path,
-                    document_id,
+                    document_id.as_slice(),
                     Some(CONTRACT_DOCUMENTS_PATH_HEIGHT),
                     apply,
                     transaction,
@@ -369,7 +366,7 @@ mod tests {
         let random_owner_id = rand::thread_rng().gen::<[u8; 32]>();
 
         let document =
-            Document::from_cbor(&person_serialized_document, None, Some(&random_owner_id))
+            Document::from_cbor(&person_serialized_document, None, Some(random_owner_id))
                 .expect("expected to deserialize the document");
 
         let document_type = contract
@@ -414,14 +411,17 @@ mod tests {
         assert_eq!(results_on_transaction.len(), 1);
         let document_id = bs58::decode("AYjYxDqLy2hvGQADqE6FAkBnQEpJSzNd3CRw1tpS6vZ7")
             .into_vec()
-            .expect("this should decode");
+            .expect("should decode")
+            .as_slice()
+            .try_into()
+            .expect("this be 32 bytes");
 
         drive
             .delete_document_for_contract(
-                &document_id,
+                document_id,
                 &contract,
                 "person",
-                Some(&random_owner_id),
+                Some(random_owner_id),
                 BlockInfo::default(),
                 true,
                 None,
@@ -461,7 +461,7 @@ mod tests {
         let random_owner_id = rand::thread_rng().gen::<[u8; 32]>();
 
         let document =
-            Document::from_cbor(&person_serialized_document, None, Some(&random_owner_id))
+            Document::from_cbor(&person_serialized_document, None, Some(random_owner_id))
                 .expect("expected to deserialize the document");
 
         let document_type = contract
@@ -514,14 +514,17 @@ mod tests {
         assert_eq!(results_on_transaction.len(), 1);
         let document_id = bs58::decode("AYjYxDqLy2hvGQADqE6FAkBnQEpJSzNd3CRw1tpS6vZ7")
             .into_vec()
-            .expect("this should decode");
+            .expect("should decode")
+            .as_slice()
+            .try_into()
+            .expect("this be 32 bytes");
 
         drive
             .delete_document_for_contract(
-                &document_id,
+                document_id,
                 &contract,
                 "person",
-                Some(&random_owner_id),
+                Some(random_owner_id),
                 BlockInfo::default(),
                 true,
                 Some(&db_transaction),
@@ -569,7 +572,7 @@ mod tests {
         let random_owner_id = rand::thread_rng().gen::<[u8; 32]>();
 
         let document =
-            Document::from_cbor(&person_serialized_document, None, Some(&random_owner_id))
+            Document::from_cbor(&person_serialized_document, None, Some(random_owner_id))
                 .expect("expected to deserialize the document");
 
         let document_type = contract
@@ -605,7 +608,7 @@ mod tests {
         let random_owner_id = rand::thread_rng().gen::<[u8; 32]>();
 
         let document =
-            Document::from_cbor(&person_serialized_document, None, Some(&random_owner_id))
+            Document::from_cbor(&person_serialized_document, None, Some(random_owner_id))
                 .expect("expected to deserialize the document");
 
         let document_type = contract
@@ -651,16 +654,19 @@ mod tests {
 
         let document_id = bs58::decode("8wjx2TC1vj2grssQvdwWnksNLwpi4xKraYy1TbProgd4")
             .into_vec()
-            .expect("this should decode");
+            .expect("should decode")
+            .as_slice()
+            .try_into()
+            .expect("this be 32 bytes");
 
         let db_transaction = drive.grove.start_transaction();
 
         drive
             .delete_document_for_contract(
-                &document_id,
+                document_id,
                 &contract,
                 "person",
-                Some(&random_owner_id),
+                Some(random_owner_id),
                 BlockInfo::default(),
                 true,
                 Some(&db_transaction),
@@ -685,16 +691,19 @@ mod tests {
 
         let document_id = bs58::decode("AYjYxDqLy2hvGQADqE6FAkBnQEpJSzNd3CRw1tpS6vZ7")
             .into_vec()
-            .expect("this should decode");
+            .expect("should decode")
+            .as_slice()
+            .try_into()
+            .expect("this be 32 bytes");
 
         let db_transaction = drive.grove.start_transaction();
 
         drive
             .delete_document_for_contract(
-                &document_id,
+                document_id,
                 &contract,
                 "person",
-                Some(&random_owner_id),
+                Some(random_owner_id),
                 BlockInfo::default(),
                 true,
                 Some(&db_transaction),
@@ -744,7 +753,7 @@ mod tests {
         let random_owner_id = rand::thread_rng().gen::<[u8; 32]>();
 
         let document =
-            Document::from_cbor(&person_serialized_document, None, Some(&random_owner_id))
+            Document::from_cbor(&person_serialized_document, None, Some(random_owner_id))
                 .expect("expected to deserialize the document");
 
         let document_type = contract
@@ -780,7 +789,7 @@ mod tests {
         let random_owner_id = rand::thread_rng().gen::<[u8; 32]>();
 
         let document =
-            Document::from_cbor(&person_serialized_document, None, Some(&random_owner_id))
+            Document::from_cbor(&person_serialized_document, None, Some(random_owner_id))
                 .expect("expected to deserialize the document");
 
         let document_type = contract
@@ -826,16 +835,19 @@ mod tests {
 
         let document_id = bs58::decode("BZjYxDqLy2hvGQADqE6FAkBnQEpJSzNd3CRw1tpS6vZ7")
             .into_vec()
-            .expect("this should decode");
+            .expect("should decode")
+            .as_slice()
+            .try_into()
+            .expect("this be 32 bytes");
 
         let db_transaction = drive.grove.start_transaction();
 
         drive
             .delete_document_for_contract(
-                &document_id,
+                document_id,
                 &contract,
                 "person",
-                Some(&random_owner_id),
+                Some(random_owner_id),
                 BlockInfo::default(),
                 true,
                 Some(&db_transaction),
@@ -853,7 +865,7 @@ mod tests {
         let db_transaction = drive.grove.start_transaction();
 
         let document =
-            Document::from_cbor(&person_serialized_document, None, Some(&random_owner_id))
+            Document::from_cbor(&person_serialized_document, None, Some(random_owner_id))
                 .expect("expected to deserialize the document");
 
         let storage_flags = Some(StorageFlags::SingleEpoch(0));
@@ -889,10 +901,10 @@ mod tests {
 
         drive
             .delete_document_for_contract(
-                &document_id,
+                document_id,
                 &contract,
                 "person",
-                Some(&random_owner_id),
+                Some(random_owner_id),
                 BlockInfo::default(),
                 true,
                 Some(&db_transaction),
@@ -901,14 +913,17 @@ mod tests {
 
         let document_id = bs58::decode("AYjYxDqLy2hvGQADqE6FAkBnQEpJSzNd3CRw1tpS6vZ7")
             .into_vec()
-            .expect("this should decode");
+            .expect("should decode")
+            .as_slice()
+            .try_into()
+            .expect("this be 32 bytes");
 
         drive
             .delete_document_for_contract(
-                &document_id,
+                document_id,
                 &contract,
                 "person",
-                Some(&random_owner_id),
+                Some(random_owner_id),
                 BlockInfo::default(),
                 true,
                 Some(&db_transaction),
@@ -947,7 +962,7 @@ mod tests {
                 &dashpay_profile_serialized_document,
                 &dashpay_cbor,
                 "profile",
-                Some(&random_owner_id),
+                Some(random_owner_id),
                 false,
                 BlockInfo::default(),
                 true,
@@ -958,14 +973,17 @@ mod tests {
 
         let document_id = bs58::decode("AM47xnyLfTAC9f61ZQPGfMK5Datk2FeYZwgYvcAnzqFY")
             .into_vec()
-            .expect("this should decode");
+            .expect("should decode")
+            .as_slice()
+            .try_into()
+            .expect("this be 32 bytes");
 
         drive
             .delete_document_for_contract_cbor(
-                &document_id,
+                document_id,
                 &dashpay_cbor,
                 "profile",
-                Some(&random_owner_id),
+                Some(random_owner_id),
                 BlockInfo::default(),
                 true,
                 None,
@@ -1003,7 +1021,7 @@ mod tests {
                 &dashpay_profile_serialized_document,
                 &contract,
                 "profile",
-                Some(&random_owner_id),
+                Some(random_owner_id),
                 false,
                 BlockInfo::default(),
                 true,
@@ -1018,15 +1036,18 @@ mod tests {
 
         let document_id = bs58::decode("AM47xnyLfTAC9f61ZQPGfMK5Datk2FeYZwgYvcAnzqFY")
             .into_vec()
-            .expect("this should decode");
+            .expect("should decode")
+            .as_slice()
+            .try_into()
+            .expect("this be 32 bytes");
 
         // Let's delete the document at the third epoch
         let fee_result = drive
             .delete_document_for_contract(
-                &document_id,
+                document_id,
                 &contract,
                 "profile",
-                Some(&random_owner_id),
+                Some(random_owner_id),
                 BlockInfo::default_with_epoch(Epoch::new(3)),
                 true,
                 Some(&db_transaction),
@@ -1136,10 +1157,10 @@ mod tests {
 
         drive
             .delete_document_for_contract(
-                &documents.get(0).unwrap().id,
+                documents.get(0).unwrap().id,
                 &contract,
                 "niceDocument",
-                Some(&documents.get(0).unwrap().owner_id),
+                Some(documents.get(0).unwrap().owner_id),
                 BlockInfo::default(),
                 true,
                 Some(&db_transaction),

@@ -2270,7 +2270,8 @@ fn test_family_with_nulls_query() {
             .delete_document_for_contract(
                 base64::decode(ids.get(i).unwrap())
                     .expect("expected to decode from base64")
-                    .as_slice(),
+                    .try_into()
+                    .expect("expected to get 32 bytes"),
                 &contract,
                 "person",
                 None,

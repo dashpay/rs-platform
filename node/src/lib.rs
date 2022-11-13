@@ -332,9 +332,9 @@ impl DriveWrapper {
             .downcast_or_throw::<JsBox<DriveWrapper>, _>(&mut cx)?;
 
         let document_cbor = converter::js_buffer_to_vec_u8(js_document_cbor, &mut cx);
-        let contract_id = converter::js_buffer_to_vec_u8(js_contract_id, &mut cx);
+        let contract_id = converter::js_buffer_to_identifier(js_contract_id, &mut cx)?;
         let document_type_name = js_document_type_name.value(&mut cx);
-        let owner_id = converter::js_buffer_to_vec_u8(js_owner_id, &mut cx);
+        let owner_id = converter::js_buffer_to_identifier(js_owner_id, &mut cx)?;
         let override_document = js_override_document.value(&mut cx);
         let block_info = converter::js_object_to_block_info(js_block_info, &mut cx)?;
         let apply = js_apply.value(&mut cx);
@@ -344,9 +344,9 @@ impl DriveWrapper {
             .send_to_drive_thread(move |platform: &Platform, transaction, channel| {
                 let result = platform.drive.add_serialized_document_for_contract_id(
                     &document_cbor,
-                    &contract_id,
+                    contract_id,
                     &document_type_name,
-                    Some(&owner_id),
+                    Some(owner_id),
                     override_document,
                     block_info,
                     apply,
@@ -396,9 +396,9 @@ impl DriveWrapper {
             .downcast_or_throw::<JsBox<DriveWrapper>, _>(&mut cx)?;
 
         let document_cbor = converter::js_buffer_to_vec_u8(js_document_cbor, &mut cx);
-        let contract_id = converter::js_buffer_to_vec_u8(js_contract_id, &mut cx);
+        let contract_id = converter::js_buffer_to_identifier(js_contract_id, &mut cx)?;
         let document_type_name = js_document_type_name.value(&mut cx);
-        let owner_id = converter::js_buffer_to_vec_u8(js_owner_id, &mut cx);
+        let owner_id = converter::js_buffer_to_identifier(js_owner_id, &mut cx)?;
         let block_info = converter::js_object_to_block_info(js_block_info, &mut cx)?;
         let apply = js_apply.value(&mut cx);
         let using_transaction = js_using_transaction.value(&mut cx);
@@ -407,9 +407,9 @@ impl DriveWrapper {
             .send_to_drive_thread(move |platform: &Platform, transaction, channel| {
                 let result = platform.drive.update_document_for_contract_id(
                     &document_cbor,
-                    &contract_id,
+                    contract_id,
                     &document_type_name,
-                    Some(&owner_id),
+                    Some(owner_id),
                     block_info,
                     apply,
                     StorageFlags::optional_default_as_ref(),
@@ -456,8 +456,8 @@ impl DriveWrapper {
             .this()
             .downcast_or_throw::<JsBox<DriveWrapper>, _>(&mut cx)?;
 
-        let document_id = converter::js_buffer_to_vec_u8(js_document_id, &mut cx);
-        let contract_id = converter::js_buffer_to_vec_u8(js_contract_id, &mut cx);
+        let document_id = converter::js_buffer_to_identifier(js_document_id, &mut cx)?;
+        let contract_id = converter::js_buffer_to_identifier(js_contract_id, &mut cx)?;
         let document_type_name = js_document_type_name.value(&mut cx);
         let block_info = converter::js_object_to_block_info(js_block_info, &mut cx)?;
         let apply = js_apply.value(&mut cx);
@@ -477,8 +477,8 @@ impl DriveWrapper {
                     });
                 } else {
                     let result = platform.drive.delete_document_for_contract_id(
-                        &document_id,
-                        &contract_id,
+                        document_id,
+                        contract_id,
                         &document_type_name,
                         None,
                         block_info,

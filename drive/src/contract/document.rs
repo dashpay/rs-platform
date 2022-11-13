@@ -186,8 +186,8 @@ impl Document {
     /// If Document and Owner IDs are provided, they are used, otherwise they are created.
     pub fn from_cbor(
         document_cbor: &[u8],
-        document_id: Option<&[u8]>,
-        owner_id: Option<&[u8]>,
+        document_id: Option<[u8; 32]>,
+        owner_id: Option<[u8; 32]>,
     ) -> Result<Self, Error> {
         let (version, read_document_cbor) = document_cbor.split_at(4);
         if !Drive::check_protocol_version_bytes(version) {
@@ -218,15 +218,7 @@ impl Document {
                 }
                 owner_id.as_slice().try_into()
             }
-            Some(owner_id) => {
-                // we need to start by verifying that the owner_id is a 256 bit number (32 bytes)
-                if owner_id.len() != 32 {
-                    return Err(Error::Contract(ContractError::FieldRequirementUnmet(
-                        "invalid owner id",
-                    )));
-                }
-                owner_id.try_into()
-            }
+            Some(owner_id) => Ok(owner_id),
         }
         .expect("conversion to 32bytes shouldn't fail");
 
@@ -248,12 +240,7 @@ impl Document {
             }
             Some(document_id) => {
                 // we need to start by verifying that the document_id is a 256 bit number (32 bytes)
-                if document_id.len() != 32 {
-                    return Err(Error::Contract(ContractError::FieldRequirementUnmet(
-                        "invalid document id",
-                    )));
-                }
-                document_id.try_into()
+                Ok(document_id)
             }
         }
         .expect("document_id must be 32 bytes");
@@ -326,7 +313,7 @@ impl Document {
         &'a self,
         key_path: &str,
         document_type: &DocumentType,
-        owner_id: Option<&[u8]>,
+        owner_id: Option<[u8; 32]>,
     ) -> Result<Option<Vec<u8>>, Error> {
         // returns the owner id if the key path is $ownerId and an owner id is given
         if key_path == "$ownerId" && owner_id.is_some() {
@@ -394,7 +381,7 @@ impl Document {
         key: &str,
         document_type_name: &str,
         contract: &Contract,
-        owner_id: Option<&[u8]>,
+        owner_id: Option<[u8; 32]>,
     ) -> Result<Option<Vec<u8>>, Error> {
         let document_type = contract.document_types().get(document_type_name).ok_or({
             Error::Contract(ContractError::DocumentTypeNotFound(
