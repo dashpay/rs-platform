@@ -18,8 +18,8 @@ fn element_to_string(element: &Element) -> &'static str {
 }
 
 pub fn js_object_to_element<'a, C: Context<'a>>(
-    js_object: Handle<JsObject>,
     cx: &mut C,
+    js_object: Handle<JsObject>,
 ) -> NeonResult<Element> {
     let js_element_type: Handle<JsString> = js_object.get(cx, "type")?;
 
@@ -34,7 +34,7 @@ pub fn js_object_to_element<'a, C: Context<'a>>(
         let js_maybe_owner_id: Option<Handle<JsBuffer>> = js_object.get_opt(cx, "ownerId")?;
 
         let maybe_owner_id = js_maybe_owner_id
-            .map(|js_buffer| js_buffer_to_identifier(js_buffer, cx))
+            .map(|js_buffer| js_buffer_to_identifier(cx, js_buffer))
             .transpose()?;
 
         let storage_flags = StorageFlags::new_single_epoch(epoch, maybe_owner_id);
@@ -53,7 +53,7 @@ pub fn js_object_to_element<'a, C: Context<'a>>(
         }
         "reference" => {
             let js_object: Handle<JsObject> = js_object.get(cx, "value")?;
-            let reference = js_object_to_reference(js_object, cx)?;
+            let reference = js_object_to_reference(cx, js_object)?;
 
             Ok(Element::new_reference_with_flags(reference, element_flags))
         }
@@ -63,8 +63,8 @@ pub fn js_object_to_element<'a, C: Context<'a>>(
 }
 
 fn js_object_to_reference<'a, C: Context<'a>>(
-    js_object: Handle<JsObject>,
     cx: &mut C,
+    js_object: Handle<JsObject>,
 ) -> NeonResult<ReferencePathType> {
     let js_reference_type: Handle<JsString> = js_object.get(cx, "type")?;
     let reference_type: String = js_reference_type.value(cx);
@@ -125,8 +125,8 @@ fn js_object_to_reference<'a, C: Context<'a>>(
 }
 
 pub fn element_to_js_object<'a, C: Context<'a>>(
-    element: Element,
     cx: &mut C,
+    element: Element,
 ) -> NeonResult<Handle<'a, JsValue>> {
     let js_object = cx.empty_object();
     let js_type_string = cx.string(element_to_string(&element));
@@ -138,7 +138,7 @@ pub fn element_to_js_object<'a, C: Context<'a>>(
             Some(js_buffer.upcast())
         }
         Element::Reference(reference, _, _) => {
-            let reference = reference_to_dictionary(reference, cx)?;
+            let reference = reference_to_dictionary(cx, reference)?;
 
             Some(reference)
         }
@@ -158,8 +158,8 @@ pub fn element_to_js_object<'a, C: Context<'a>>(
 }
 
 pub fn nested_vecs_to_js<'a, C: Context<'a>>(
-    v: Vec<Vec<u8>>,
     cx: &mut C,
+    v: Vec<Vec<u8>>,
 ) -> NeonResult<Handle<'a, JsValue>> {
     let js_array: Handle<JsArray> = cx.empty_array();
 
@@ -173,15 +173,15 @@ pub fn nested_vecs_to_js<'a, C: Context<'a>>(
 }
 
 pub fn reference_to_dictionary<'a, C: Context<'a>>(
-    reference: ReferencePathType,
     cx: &mut C,
+    reference: ReferencePathType,
 ) -> NeonResult<Handle<'a, JsValue>> {
     let js_object: Handle<JsObject> = cx.empty_object();
 
     match reference {
         ReferencePathType::AbsolutePathReference(path) => {
             let js_type_name = cx.string("absolutePathReference");
-            let js_path = nested_vecs_to_js(path, cx)?;
+            let js_path = nested_vecs_to_js(cx, path)?;
 
             js_object.set(cx, "type", js_type_name)?;
             js_object.set(cx, "path", js_path)?;
@@ -189,7 +189,7 @@ pub fn reference_to_dictionary<'a, C: Context<'a>>(
         ReferencePathType::UpstreamRootHeightReference(relativity_index, path) => {
             let js_type_name = cx.string("upstreamRootHeightReference");
             let js_relativity_index = cx.number(relativity_index);
-            let js_path = nested_vecs_to_js(path, cx)?;
+            let js_path = nested_vecs_to_js(cx, path)?;
 
             js_object.set(cx, "type", js_type_name)?;
             js_object.set(cx, "relativityIndex", js_relativity_index)?;
@@ -198,7 +198,7 @@ pub fn reference_to_dictionary<'a, C: Context<'a>>(
         ReferencePathType::UpstreamFromElementHeightReference(relativity_index, path) => {
             let js_type_name = cx.string("upstreamFromElementHeightReference");
             let js_relativity_index = cx.number(relativity_index);
-            let js_path = nested_vecs_to_js(path, cx)?;
+            let js_path = nested_vecs_to_js(cx, path)?;
 
             js_object.set(cx, "type", js_type_name)?;
             js_object.set(cx, "relativityIndex", js_relativity_index)?;
@@ -224,8 +224,8 @@ pub fn reference_to_dictionary<'a, C: Context<'a>>(
 }
 
 pub fn js_buffer_to_identifier<'a, C: Context<'a>>(
-    js_buffer: Handle<JsBuffer>,
     cx: &mut C,
+    js_buffer: Handle<JsBuffer>,
 ) -> NeonResult<[u8; 32]> {
     // let guard = cx.lock();
 
@@ -409,8 +409,8 @@ pub fn js_object_to_block_info<'a, C: Context<'a>>(
 }
 
 pub fn fee_result_to_js_object<'a, C: Context<'a>>(
-    fee_result: FeeResult,
     cx: &mut C,
+    fee_result: FeeResult,
 ) -> NeonResult<Handle<'a, JsObject>> {
     // TODO: We can't go with f64 because we can lose costs
     let js_processing_fee = cx.number(fee_result.processing_fee as f64);
