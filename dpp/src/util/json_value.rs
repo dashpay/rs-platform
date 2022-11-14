@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, convert::TryInto};
 
-use anyhow::{anyhow, bail};
+use anyhow::{anyhow, bail, Context};
 use log::trace;
 use serde::de::DeserializeOwned;
 use serde_json::{Number, Value as JsonValue};
@@ -272,13 +272,8 @@ impl JsonValueExt for JsonValue {
             let mut to_replace = get_value_mut(raw_path, self);
             match to_replace {
                 Some(ref mut v) => {
-                    replace_identifier(v, with).map_err(|err| {
-                        anyhow!(
-                            "unable replace the {:?} with {:?}: '{}'",
-                            raw_path,
-                            with,
-                            err
-                        )
+                    replace_identifier(v, with).with_context(|| {
+                        format!("unable to replace the {raw_path:?} with {with:?}")
                     })?;
                 }
                 None => {
