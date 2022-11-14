@@ -697,43 +697,49 @@ impl Drive {
             self.grove
                 .get(contract_root_path(&contract_id), &[0], transaction);
 
-        let stored_element = cost_return_on_error_no_add!(&cost, value.map_err(Error::GroveDB));
-        if let Element::Item(stored_contract_bytes, element_flag) = stored_element {
-            let contract = cost_return_on_error_no_add!(
-                &cost,
-                <Contract as DriveContractExt>::from_cbor(&stored_contract_bytes, None,)
-                    .map_err(Error::Contract)
-            );
-            let drive_operation = CalculatedCostOperation(cost.clone());
-            let fee = if let Some(epoch) = epoch {
-                Some(cost_return_on_error_no_add!(
+        match value {
+            Ok(Element::Item(stored_contract_bytes, element_flag)) => {
+                let contract = cost_return_on_error_no_add!(
                     &cost,
-                    calculate_fee(None, Some(vec![drive_operation]), epoch)
-                ))
-            } else {
-                None
-            };
+                    <Contract as DriveContractExt>::from_cbor(&stored_contract_bytes, None,)
+                        .map_err(Error::Contract)
+                );
+                let drive_operation = CalculatedCostOperation(cost.clone());
+                let fee = if let Some(epoch) = epoch {
+                    Some(cost_return_on_error_no_add!(
+                        &cost,
+                        calculate_fee(None, Some(vec![drive_operation]), epoch)
+                    ))
+                } else {
+                    None
+                };
 
-            let storage_flags = cost_return_on_error_no_add!(
-                &cost,
-                StorageFlags::from_some_element_flags_ref(&element_flag)
-            );
-            let contract_fetch_info = Arc::new(ContractFetchInfo {
-                contract,
-                storage_flags,
-                cost: cost.clone(),
-                fee,
-            });
-            drive_cache
-                .deref()
-                .cached_contracts
-                .insert(contract_id, Arc::clone(&contract_fetch_info));
-            Ok(Some(Arc::clone(&contract_fetch_info))).wrap_with_cost(cost)
-        } else {
-            Err(Error::Drive(DriveError::CorruptedContractPath(
+                let storage_flags = cost_return_on_error_no_add!(
+                    &cost,
+                    StorageFlags::from_some_element_flags_ref(&element_flag)
+                );
+                let contract_fetch_info = Arc::new(ContractFetchInfo {
+                    contract,
+                    storage_flags,
+                    cost: cost.clone(),
+                    fee,
+                });
+                drive_cache
+                    .deref()
+                    .cached_contracts
+                    .insert(contract_id, Arc::clone(&contract_fetch_info));
+                Ok(Some(Arc::clone(&contract_fetch_info))).wrap_with_cost(cost)
+            }
+            Ok(_) => Err(Error::Drive(DriveError::CorruptedContractPath(
                 "contract path did not refer to a contract element",
             )))
-            .wrap_with_cost(cost)
+            .wrap_with_cost(cost),
+            Err(
+                grovedb::Error::PathKeyNotFound(_)
+                | grovedb::Error::PathParentLayerNotFound(_)
+                | grovedb::Error::PathNotFound(_),
+            ) => Ok(None).wrap_with_cost(cost),
+            Err(e) => Err(Error::GroveDB(e)).wrap_with_cost(cost),
         }
     }
 
@@ -1034,6 +1040,9 @@ mod tests {
         let tmp_dir = TempDir::new().unwrap();
         let drive: Drive = Drive::open(tmp_dir, None).expect("expected to open Drive successfully");
 
+        drive
+            .create_initial_state_structure(None)
+            .expect("expected to create state structure");
         let contract_id = rand::thread_rng().gen::<[u8; 32]>();
 
         let result = drive

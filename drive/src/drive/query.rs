@@ -59,7 +59,12 @@ impl Drive {
     ) -> Result<(Vec<Vec<u8>>, u16, u64), Error> {
         let mut drive_operations: Vec<DriveOperation> = vec![];
         let contract = self
-            .get_contract_with_fetch_info_and_add_to_operations(contract_id, epoch, transaction, &mut drive_operations)?
+            .get_contract_with_fetch_info_and_add_to_operations(
+                contract_id,
+                epoch,
+                transaction,
+                &mut drive_operations,
+            )?
             .ok_or(Error::Query(QueryError::ContractNotFound(
                 "contract not found",
             )))?;
@@ -166,7 +171,12 @@ impl Drive {
     ) -> Result<(Vec<u8>, u64), Error> {
         let mut drive_operations: Vec<DriveOperation> = vec![];
         let contract = self
-            .get_contract_with_fetch_info_and_add_to_operations(contract_id, epoch, transaction, &mut drive_operations)?
+            .get_contract_with_fetch_info_and_add_to_operations(
+                contract_id,
+                epoch,
+                transaction,
+                &mut drive_operations,
+            )?
             .ok_or(Error::Query(QueryError::ContractNotFound(
                 "contract not found",
             )))?;
