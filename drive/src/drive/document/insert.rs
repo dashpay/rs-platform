@@ -410,7 +410,7 @@ impl Drive {
         let mut drive_operations: Vec<DriveOperation> = vec![];
 
         let contract_fetch_info = self
-            .get_contract_with_fetch_info(
+            .get_contract_with_fetch_info_and_add_to_operations(
                 contract_id,
                 Some(&block_info.epoch),
                 transaction,

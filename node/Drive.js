@@ -10,7 +10,9 @@ const {
   driveOpen,
   driveClose,
   driveCreateInitialStateStructure,
-  driveApplyContract,
+  driveFetchContract,
+  driveCreateContract,
+  driveUpdateContract,
   driveCreateDocument,
   driveUpdateDocument,
   driveDeleteDocument,
@@ -37,7 +39,9 @@ const driveCloseAsync = appendStack(promisify(driveClose));
 const driveCreateInitialStateStructureAsync = appendStack(
   promisify(driveCreateInitialStateStructure),
 );
-const driveApplyContractAsync = appendStack(promisify(driveApplyContract));
+const driveFetchContractAsync = appendStack(promisify(driveFetchContract));
+const driveCreateContractAsync = appendStack(promisify(driveCreateContract));
+const driveUpdateContractAsync = appendStack(promisify(driveUpdateContract));
 const driveCreateDocumentAsync = appendStack(promisify(driveCreateDocument));
 const driveUpdateDocumentAsync = appendStack(promisify(driveUpdateDocument));
 const driveDeleteDocumentAsync = appendStack(promisify(driveDeleteDocument));
@@ -88,6 +92,22 @@ class Drive {
   }
 
   /**
+   * @param {Buffer|Identifier} id
+   * @param {number} epochIndex
+   * @param {boolean} [useTransaction=false]
+   *
+   * @returns {Promise<[DataContract, FeeResult]>}
+   */
+  async fetchContract(id, epochIndex = undefined, useTransaction = false) {
+    return driveFetchContractAsync.call(
+      this.drive,
+      Buffer.from(id),
+      epochIndex,
+      useTransaction,
+    );
+  }
+
+  /**
    * @param {DataContract} dataContract
    * @param {BlockInfo} blockInfo
    * @param {boolean} [useTransaction=false]
@@ -95,8 +115,26 @@ class Drive {
    *
    * @returns {Promise<FeeResult>}
    */
-  async applyContract(dataContract, blockInfo, useTransaction = false, dryRun = false) {
-    return driveApplyContractAsync.call(
+  async createContract(dataContract, blockInfo, useTransaction = false, dryRun = false) {
+    return driveCreateContractAsync.call(
+      this.drive,
+      dataContract.toBuffer(),
+      blockInfo,
+      !dryRun,
+      useTransaction,
+    );
+  }
+
+  /**
+   * @param {DataContract} dataContract
+   * @param {BlockInfo} blockInfo
+   * @param {boolean} [useTransaction=false]
+   * @param {boolean} [dryRun=false]
+   *
+   * @returns {Promise<FeeResult>}
+   */
+  async updateContract(dataContract, blockInfo, useTransaction = false, dryRun = false) {
+    return driveUpdateContractAsync.call(
       this.drive,
       dataContract.toBuffer(),
       blockInfo,

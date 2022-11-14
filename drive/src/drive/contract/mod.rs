@@ -41,6 +41,7 @@ use std::sync::Arc;
 use crate::common::encode::encode_unsigned_integer;
 use costs::{cost_return_on_error_no_add, CostContext, CostResult, CostsExt, OperationCost};
 use dpp::data_contract::extra::DriveContractExt;
+use dpp::prelude::DataContract;
 use grovedb::reference_path::ReferencePathType::SiblingReference;
 use grovedb::{Element, TransactionArg};
 
@@ -179,9 +180,40 @@ impl Drive {
         Ok(())
     }
 
+    /// Insert a contract CBOR.
+    pub fn insert_contract_cbor(
+        &self,
+        contract_cbor: Vec<u8>,
+        contract_id: Option<[u8; 32]>,
+        block_info: BlockInfo,
+        apply: bool,
+        storage_flags: Option<&StorageFlags>,
+        transaction: TransactionArg,
+    ) -> Result<FeeResult, Error> {
+        let mut drive_operations: Vec<DriveOperation> = vec![];
+
+        let contract = <Contract as DriveContractExt>::from_cbor(&contract_cbor, contract_id)?;
+
+        let contract_element = Element::Item(
+            contract_cbor,
+            StorageFlags::map_to_some_element_flags(storage_flags),
+        );
+
+        self.insert_contract_element(
+            contract_element,
+            &contract,
+            &block_info,
+            apply,
+            transaction,
+            &mut drive_operations,
+        )?;
+
+        calculate_fee(None, Some(drive_operations), &block_info.epoch)
+    }
+
     /// Adds a contract to storage using `add_contract_to_storage`
     /// and inserts the empty trees which will be necessary to later insert documents.
-    fn insert_contract(
+    pub fn insert_contract_element(
         &self,
         contract_element: Element,
         contract: &Contract,
@@ -190,13 +222,8 @@ impl Drive {
         transaction: TransactionArg,
         drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<(), Error> {
-        let batch_operations = self.insert_contract_operations(
-            contract_element,
-            contract,
-            block_info,
-            apply,
-            transaction,
-        )?;
+        let batch_operations =
+            self.insert_contract_operations(contract_element, contract, block_info, apply)?;
         self.apply_batch_drive_operations(apply, transaction, batch_operations, drive_operations)
     }
 
@@ -209,16 +236,10 @@ impl Drive {
         contract: &Contract,
         block_info: &BlockInfo,
         apply: bool,
-        transaction: TransactionArg,
         drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<(), Error> {
-        let batch_operations = self.insert_contract_operations(
-            contract_element,
-            contract,
-            block_info,
-            apply,
-            transaction,
-        )?;
+        let batch_operations =
+            self.insert_contract_operations(contract_element, contract, block_info, apply)?;
         drive_operations.extend(batch_operations);
         Ok(())
     }
@@ -232,7 +253,6 @@ impl Drive {
         contract: &Contract,
         block_info: &BlockInfo,
         apply: bool,
-        transaction: TransactionArg,
     ) -> Result<Vec<DriveOperation>, Error> {
         let mut batch_operations: Vec<DriveOperation> = vec![];
         let storage_flags =
@@ -248,7 +268,7 @@ impl Drive {
         self.add_contract_to_storage(
             contract_element,
             contract,
-            &block_info,
+            block_info,
             apply,
             &mut batch_operations,
         )?;
@@ -311,8 +331,53 @@ impl Drive {
         Ok(batch_operations)
     }
 
+    /// Insert a contract CBOR.
+    pub fn update_contract_cbor(
+        &self,
+        contract_cbor: Vec<u8>,
+        contract_id: Option<[u8; 32]>,
+        block_info: BlockInfo,
+        apply: bool,
+        storage_flags: Option<&StorageFlags>,
+        transaction: TransactionArg,
+    ) -> Result<FeeResult, Error> {
+        let mut drive_operations: Vec<DriveOperation> = vec![];
+
+        let contract = <Contract as DriveContractExt>::from_cbor(&contract_cbor, contract_id)?;
+
+        let contract_id = contract_id.unwrap_or_else(|| contract.id().as_bytes().clone());
+
+        let contract_element = Element::Item(
+            contract_cbor,
+            StorageFlags::map_to_some_element_flags(storage_flags),
+        );
+
+        let original_contract_fetch_info = self
+            .get_contract_with_fetch_info_and_add_to_operations(
+                contract_id,
+                Some(&block_info.epoch),
+                transaction,
+                &mut drive_operations,
+            )?
+            .ok_or(Error::Drive(DriveError::CorruptedCodeExecution(
+                "Contract should exists",
+            )))?;
+
+        self.update_contract_element(
+            contract_element,
+            &contract,
+            &original_contract_fetch_info.contract,
+            &block_info,
+            apply,
+            transaction,
+            &mut drive_operations,
+        )?;
+
+        calculate_fee(None, Some(drive_operations), &block_info.epoch)
+    }
+
     /// Updates a contract.
-    fn update_contract(
+    pub fn update_contract_element(
         &self,
         contract_element: Element,
         contract: &Contract,
@@ -525,8 +590,25 @@ impl Drive {
         )
     }
 
-    /// Returns the contract with fetch info with the given ID.
+    /// Returns the contract with fetch info and operations with the given ID.
     pub fn get_contract_with_fetch_info(
+        &self,
+        contract_id: [u8; 32],
+        epoch: Option<&Epoch>,
+        transaction: TransactionArg,
+    ) -> Result<Option<Arc<ContractFetchInfo>>, Error> {
+        let mut drive_operations: Vec<DriveOperation> = Vec::new();
+
+        self.get_contract_with_fetch_info_and_add_to_operations(
+            contract_id,
+            epoch,
+            transaction,
+            &mut drive_operations,
+        )
+    }
+
+    /// Returns the contract with fetch info and operations with the given ID.
+    pub(crate) fn get_contract_with_fetch_info_and_add_to_operations(
         &self,
         contract_id: [u8; 32],
         epoch: Option<&Epoch>,
@@ -539,7 +621,7 @@ impl Drive {
                 let mut cost = OperationCost::default();
                 //todo: there is a cost here that isn't returned on error
                 // we should investigate if this could be a problem
-                let mut result = self
+                let result = self
                     .fetch_contract(contract_id, epoch, transaction, cache)
                     .unwrap_add_cost(&mut cost)?;
 
@@ -614,43 +696,50 @@ impl Drive {
         let CostContext { value, cost } =
             self.grove
                 .get(contract_root_path(&contract_id), &[0], transaction);
-        let stored_element = cost_return_on_error_no_add!(&cost, value.map_err(Error::GroveDB));
-        if let Element::Item(stored_contract_bytes, element_flag) = stored_element {
-            let contract = cost_return_on_error_no_add!(
-                &cost,
-                <Contract as DriveContractExt>::from_cbor(&stored_contract_bytes, None,)
-                    .map_err(Error::Contract)
-            );
-            let drive_operation = CalculatedCostOperation(cost.clone());
-            let fee = if let Some(epoch) = epoch {
-                Some(cost_return_on_error_no_add!(
-                    &cost,
-                    calculate_fee(None, Some(vec![drive_operation]), epoch)
-                ))
-            } else {
-                None
-            };
 
-            let storage_flags = cost_return_on_error_no_add!(
-                &cost,
-                StorageFlags::from_some_element_flags_ref(&element_flag)
-            );
-            let contract_fetch_info = Arc::new(ContractFetchInfo {
-                contract,
-                storage_flags,
-                cost: cost.clone(),
-                fee,
-            });
-            drive_cache
-                .deref()
-                .cached_contracts
-                .insert(contract_id, Arc::clone(&contract_fetch_info));
-            Ok(Some(Arc::clone(&contract_fetch_info))).wrap_with_cost(cost)
-        } else {
-            Err(Error::Drive(DriveError::CorruptedContractPath(
+        match value {
+            Ok(Element::Item(stored_contract_bytes, element_flag)) => {
+                let contract = cost_return_on_error_no_add!(
+                    &cost,
+                    <Contract as DriveContractExt>::from_cbor(&stored_contract_bytes, None,)
+                        .map_err(Error::Contract)
+                );
+                let drive_operation = CalculatedCostOperation(cost.clone());
+                let fee = if let Some(epoch) = epoch {
+                    Some(cost_return_on_error_no_add!(
+                        &cost,
+                        calculate_fee(None, Some(vec![drive_operation]), epoch)
+                    ))
+                } else {
+                    None
+                };
+
+                let storage_flags = cost_return_on_error_no_add!(
+                    &cost,
+                    StorageFlags::from_some_element_flags_ref(&element_flag)
+                );
+                let contract_fetch_info = Arc::new(ContractFetchInfo {
+                    contract,
+                    storage_flags,
+                    cost: cost.clone(),
+                    fee,
+                });
+                drive_cache
+                    .deref()
+                    .cached_contracts
+                    .insert(contract_id, Arc::clone(&contract_fetch_info));
+                Ok(Some(Arc::clone(&contract_fetch_info))).wrap_with_cost(cost)
+            }
+            Ok(_) => Err(Error::Drive(DriveError::CorruptedContractPath(
                 "contract path did not refer to a contract element",
             )))
-            .wrap_with_cost(cost)
+            .wrap_with_cost(cost),
+            Err(
+                grovedb::Error::PathKeyNotFound(_)
+                | grovedb::Error::PathParentLayerNotFound(_)
+                | grovedb::Error::PathNotFound(_),
+            ) => Ok(None).wrap_with_cost(cost),
+            Err(e) => Err(Error::GroveDB(e)).wrap_with_cost(cost),
         }
     }
 
@@ -759,7 +848,6 @@ impl Drive {
                 contract,
                 block_info,
                 apply,
-                transaction,
                 &mut drive_operations,
             )?;
         }
@@ -945,5 +1033,22 @@ mod tests {
                 None,
             )
             .expect("expected to insert a document successfully");
+    }
+
+    #[test]
+    fn test_get_non_existent_contract() {
+        let tmp_dir = TempDir::new().unwrap();
+        let drive: Drive = Drive::open(tmp_dir, None).expect("expected to open Drive successfully");
+
+        drive
+            .create_initial_state_structure(None)
+            .expect("expected to create state structure");
+        let contract_id = rand::thread_rng().gen::<[u8; 32]>();
+
+        let result = drive
+            .get_contract_with_fetch_info(contract_id, None, None)
+            .expect("should get contract");
+
+        assert!(result.is_none());
     }
 }
