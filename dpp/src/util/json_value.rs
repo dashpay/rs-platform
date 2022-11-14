@@ -271,11 +271,14 @@ impl JsonValueExt for JsonValue {
         for raw_path in paths {
             let mut to_replace = get_value_mut(raw_path, self);
             match to_replace {
-                Some(ref mut v) => {
-                    replace_identifier(v, with).with_context(|| {
-                        format!("unable to replace the {raw_path:?} with {with:?}")
-                    })?;
-                }
+                Some(ref mut v) => replace_identifier(v, with).map_err(|err| {
+                    anyhow!(
+                        "unable replace the {:?} with {:?}: '{}'",
+                        raw_path,
+                        with,
+                        err
+                    )
+                })?,
                 None => {
                     trace!("path '{}' is not found, replacing to {:?} ", raw_path, with)
                 }
