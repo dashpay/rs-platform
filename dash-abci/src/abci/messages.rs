@@ -37,6 +37,7 @@ use crate::error::serialization::SerializationError;
 use crate::error::Error;
 use crate::execution::fee_pools::epoch::EpochInfo;
 use crate::execution::fee_pools::process_block_fees::ProcessedBlockFeesResult;
+use ciborium::value::Value;
 use serde::{Deserialize, Serialize};
 
 /// A struct for handling chain initialization requests
@@ -130,12 +131,27 @@ impl BlockEndResponse {
     }
 }
 
+/// A struct for handling finalize block responses
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AfterFinalizeBlockRequest {
+    /// List of updated contract ids
+    pub updated_data_contract_ids: Vec<[u8; 32]>,
+}
+
+/// A struct for handling finalize block responses
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AfterFinalizeBlockResponse {}
+
 impl<'a> Serializable<'a> for InitChainRequest {}
 impl<'a> Serializable<'a> for InitChainResponse {}
 impl<'a> Serializable<'a> for BlockBeginRequest {}
 impl<'a> Serializable<'a> for BlockBeginResponse {}
 impl<'a> Serializable<'a> for BlockEndRequest {}
 impl<'a> Serializable<'a> for BlockEndResponse {}
+impl<'a> Serializable<'a> for AfterFinalizeBlockRequest {}
+impl<'a> Serializable<'a> for AfterFinalizeBlockResponse {}
 
 /// A trait for serializing or deserializing ABCI messages
 pub trait Serializable<'a>: Serialize + Deserialize<'a> {

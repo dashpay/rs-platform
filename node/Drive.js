@@ -24,6 +24,7 @@ const {
   abciInitChain,
   abciBlockBegin,
   abciBlockEnd,
+  abciAfterFinalizeBlock,
 } = require('neon-load-or-build')({
   dir: pathJoin(__dirname, '..'),
 });
@@ -57,6 +58,7 @@ const driveInsertIdentityAsync = appendStack(promisify(driveInsertIdentity));
 const abciInitChainAsync = appendStack(promisify(abciInitChain));
 const abciBlockBeginAsync = appendStack(promisify(abciBlockBegin));
 const abciBlockEndAsync = appendStack(promisify(abciBlockEnd));
+const abciAfterFinalizeBlockAsync = appendStack(promisify(abciAfterFinalizeBlock));
 
 // Wrapper class for the boxed `Drive` for idiomatic JavaScript usage
 class Drive {
@@ -371,7 +373,7 @@ class Drive {
       },
 
       /**
-       * ABCI init chain
+       * ABCI block begin
        *
        * @param {BlockBeginRequest} request
        * @param {boolean} [useTransaction=false]
@@ -396,7 +398,7 @@ class Drive {
       },
 
       /**
-       * ABCI init chain
+       * ABCI block end
        *
        * @param {BlockEndRequest} request
        * @param {boolean} [useTransaction=false]
@@ -410,6 +412,29 @@ class Drive {
           drive,
           requestBytes,
           useTransaction,
+        );
+
+        return cbor.decode(responseBytes);
+      },
+
+      /**
+       * ABCI after finalize block
+       *
+       * @param {AfterFinalizeBlockRequest} request
+       *
+       * @returns {Promise<AfterFinalizeBlockResponse>}
+       */
+      async afterFinalizeBlock(request) {
+        const requestBytes = cbor.encode({
+          ...request,
+          // cborium doesn't eat Buffers
+          updatedDataContractIds: request.updatedDataContractIds
+            .map((identifier) => Array.from(identifier)),
+        });
+
+        const responseBytes = await abciAfterFinalizeBlockAsync.call(
+          drive,
+          requestBytes,
         );
 
         return cbor.decode(responseBytes);
@@ -463,6 +488,15 @@ class Drive {
  * @typedef BlockEndResponse
  * @property {number} [proposersPaidCount]
  * @property {number} [paidEpochIndex]
+ */
+
+/**
+ * @typedef AfterFinalizeBlockRequest
+ * @property {Identifier[]|Buffer[]} updatedDataContractIds
+ */
+
+/**
+ * @typedef AfterFinalizeBlockResponse
  */
 
 module.exports = Drive;

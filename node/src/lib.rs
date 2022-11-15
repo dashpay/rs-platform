@@ -4,7 +4,7 @@ use std::{option::Option::None, path::Path, sync::mpsc, thread};
 
 use dash_abci::abci::handlers::TenderdashAbci;
 use dash_abci::abci::messages::{
-    BlockBeginRequest, BlockEndRequest, InitChainRequest, Serializable,
+    AfterFinalizeBlockRequest, BlockBeginRequest, BlockEndRequest, InitChainRequest, Serializable,
 };
 use dash_abci::platform::Platform;
 use neon::prelude::*;
@@ -1720,6 +1720,47 @@ impl DriveWrapper {
         Ok(cx.undefined())
     }
 
+    fn js_abci_after_finalize_block(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+        let js_request = cx.argument::<JsBuffer>(0)?;
+        let js_callback = cx.argument::<JsFunction>(1)?.root(&mut cx);
+
+        let db = cx
+            .this()
+            .downcast_or_throw::<JsBox<DriveWrapper>, _>(&mut cx)?;
+
+        let request_bytes = converter::js_buffer_to_vec_u8(js_request, &mut cx);
+
+        db.send_to_drive_thread(move |platform: &Platform, transaction, channel| {
+            let result = AfterFinalizeBlockRequest::from_bytes(&request_bytes)
+                .and_then(|request| platform.after_finalize_block(request))
+                .and_then(|response| response.to_bytes());
+
+            channel.send(move |mut task_context| {
+                let callback = js_callback.into_inner(&mut task_context);
+                let this = task_context.undefined();
+
+                let callback_arguments: Vec<Handle<JsValue>> = match result {
+                    Ok(response_bytes) => {
+                        let value = JsBuffer::external(&mut task_context, response_bytes);
+
+                        vec![task_context.null().upcast(), value.upcast()]
+                    }
+
+                    // Convert the error to a JavaScript exception on failure
+                    Err(err) => vec![task_context.error(err.to_string())?.upcast()],
+                };
+
+                callback.call(&mut task_context, this, callback_arguments)?;
+
+                Ok(())
+            });
+        })
+        .or_else(|err| cx.throw_error(err.to_string()))?;
+
+        // The result is returned through the callback, not through direct return
+        Ok(cx.undefined())
+    }
+
     fn js_fetch_latest_withdrawal_transaction_index(
         mut cx: FunctionContext,
     ) -> JsResult<JsUndefined> {
@@ -1903,6 +1944,10 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("abciInitChain", DriveWrapper::js_abci_init_chain)?;
     cx.export_function("abciBlockBegin", DriveWrapper::js_abci_block_begin)?;
     cx.export_function("abciBlockEnd", DriveWrapper::js_abci_block_end)?;
+    cx.export_function(
+        "abciAfterFinalizeBlock",
+        DriveWrapper::js_abci_after_finalize_block,
+    )?;
 
     Ok(())
 }

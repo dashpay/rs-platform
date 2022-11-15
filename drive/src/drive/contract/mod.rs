@@ -622,19 +622,31 @@ impl Drive {
                 //todo: there is a cost here that isn't returned on error
                 // we should investigate if this could be a problem
                 let result = self
-                    .fetch_contract(contract_id, epoch, transaction, cache)
+                    .fetch_contract(contract_id, epoch, transaction)
                     .unwrap_add_cost(&mut cost)?;
 
                 // we only need to pay if epoch is set
                 if epoch.is_some() {
                     if let Some(contract_fetch_info) = &result {
-                        let fee = contract_fetch_info.fee.as_ref().ok_or(
-                            Error::Drive(DriveError::CorruptedCodeExecution(
-                                "should be impossible to not have fee on something just fetched with an epoch",
-                            ))
-                        )?;
-                        drive_operations.push(PreCalculatedFeeResult(fee.clone()));
-                    } else {
+                        // Do not cache contract fetched from database transaction
+                        // Transaction is used only for block candidates so we should
+                        // Prevent to overwrite committed state contracts with block candidate's contracts
+                        if result.is_some() && transaction.is_none() {
+                            cache
+                                .deref()
+                                .cached_contracts
+                                .insert(contract_id, Arc::clone(contract_fetch_info));
+                        }
+
+                        if epoch.is_some() {
+                            let fee = contract_fetch_info.fee.as_ref().ok_or(
+                                Error::Drive(DriveError::CorruptedCodeExecution(
+                                    "should be impossible to not have fee on something just fetched with an epoch",
+                                ))
+                            )?;
+                            drive_operations.push(PreCalculatedFeeResult(fee.clone()));
+                        }
+                    } else if epoch.is_some() {
                         drive_operations.push(CalculatedCostOperation(cost));
                     }
                 }
@@ -691,7 +703,6 @@ impl Drive {
         contract_id: [u8; 32],
         epoch: Option<&Epoch>,
         transaction: TransactionArg,
-        drive_cache: RefMut<DriveCache>,
     ) -> CostResult<Option<Arc<ContractFetchInfo>>, Error> {
         let CostContext { value, cost } =
             self.grove
@@ -724,10 +735,7 @@ impl Drive {
                     cost: cost.clone(),
                     fee,
                 });
-                drive_cache
-                    .deref()
-                    .cached_contracts
-                    .insert(contract_id, Arc::clone(&contract_fetch_info));
+
                 Ok(Some(Arc::clone(&contract_fetch_info))).wrap_with_cost(cost)
             }
             Ok(_) => Err(Error::Drive(DriveError::CorruptedContractPath(

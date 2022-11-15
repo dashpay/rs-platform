@@ -32,42 +32,53 @@
 //! This module defines the `TenderdashAbci` trait and implements it for type `Platform`.
 //!
 
+use rs_drive::contract::DataContract;
+use rs_drive::drive::contract::ContractFetchInfo;
+use rs_drive::fee_pools::epochs::Epoch;
+use std::borrow::Borrow;
 use std::ops::Deref;
 
 use crate::abci::messages::{
-    BlockBeginRequest, BlockBeginResponse, BlockEndRequest, BlockEndResponse, InitChainRequest,
-    InitChainResponse,
+    AfterFinalizeBlockRequest, AfterFinalizeBlockResponse, BlockBeginRequest, BlockBeginResponse,
+    BlockEndRequest, BlockEndResponse, InitChainRequest, InitChainResponse,
 };
 use crate::block::{BlockExecutionContext, BlockInfo};
 use crate::execution::fee_pools::epoch::EpochInfo;
 use rs_drive::grovedb::TransactionArg;
 
 use crate::error::execution::ExecutionError;
+use crate::error::serialization::SerializationError;
 use crate::error::Error;
 use crate::platform::Platform;
 
 /// A trait for handling the Tenderdash ABCI (Application Blockchain Interface).
 pub trait TenderdashAbci {
-    /// Send request to initialize the blockchain
+    /// Called with JS drive on init chain
     fn init_chain(
         &self,
         request: InitChainRequest,
         transaction: TransactionArg,
     ) -> Result<InitChainResponse, Error>;
 
-    /// Send request to begin a block
+    /// Called with JS Drive on block begin
     fn block_begin(
         &self,
         request: BlockBeginRequest,
         transaction: TransactionArg,
     ) -> Result<BlockBeginResponse, Error>;
 
-    /// Send request to end a block
+    /// Called with JS Drive on block end
     fn block_end(
         &self,
         request: BlockEndRequest,
         transaction: TransactionArg,
     ) -> Result<BlockEndResponse, Error>;
+
+    /// Called with JS Drive after the current block db transaction is committed
+    fn after_finalize_block(
+        &self,
+        request: AfterFinalizeBlockRequest,
+    ) -> Result<AfterFinalizeBlockResponse, Error>;
 }
 
 impl TenderdashAbci for Platform {
@@ -142,14 +153,11 @@ impl TenderdashAbci for Platform {
     ) -> Result<BlockEndResponse, Error> {
         // Retrieve block execution context
         let block_execution_context = self.block_execution_context.borrow();
-        let block_execution_context = match block_execution_context.deref() {
-            Some(block_execution_context) => block_execution_context,
-            None => {
-                return Err(Error::Execution(ExecutionError::CorruptedCodeExecution(
-                    "block execution context must be set in block begin handler",
-                )))
-            }
-        };
+        let block_execution_context = block_execution_context.as_ref().ok_or(Error::Execution(
+            ExecutionError::CorruptedCodeExecution(
+                "block execution context must be set in block begin handler",
+            ),
+        ))?;
 
         // Process fees
         let process_block_fees_result = self.process_block_fees(
@@ -162,6 +170,40 @@ impl TenderdashAbci for Platform {
         Ok(BlockEndResponse::from_process_block_fees_result(
             &process_block_fees_result,
         ))
+    }
+
+    fn after_finalize_block(
+        &self,
+        request: AfterFinalizeBlockRequest,
+    ) -> Result<AfterFinalizeBlockResponse, Error> {
+        let drive_cache = self.drive.cache.borrow_mut();
+
+        // Remove old version of an updated contract from the cache
+        for contract_id in &request.updated_data_contract_ids {
+            drive_cache.cached_contracts.invalidate(contract_id);
+        }
+
+        drop(drive_cache);
+
+        // Retrieve current epoch frm block execution context
+        let block_execution_context = self.block_execution_context.borrow();
+        let block_execution_context = block_execution_context.as_ref().ok_or(Error::Execution(
+            ExecutionError::CorruptedCodeExecution(
+                "block execution context must be set in block begin handler",
+            ),
+        ))?;
+
+        let epoch = Epoch::new(block_execution_context.epoch_info.current_epoch_index);
+        let maybe_epoch_ref = Some(&epoch);
+
+        // Update contracts in cache
+        // We use two separate loops because we need to borrow mut for both operations
+        for contract_id in request.updated_data_contract_ids {
+            self.drive
+                .get_contract_with_fetch_info(contract_id, maybe_epoch_ref, None)?;
+        }
+
+        Ok(AfterFinalizeBlockResponse {})
     }
 }
 
@@ -177,7 +219,8 @@ mod tests {
         use std::ops::Div;
 
         use crate::abci::messages::{
-            BlockBeginRequest, BlockEndRequest, FeesAggregate, InitChainRequest,
+            AfterFinalizeBlockRequest, BlockBeginRequest, BlockEndRequest, FeesAggregate,
+            InitChainRequest,
         };
         use crate::common::helpers::setup::setup_platform;
 
@@ -361,6 +404,20 @@ mod tests {
                             .as_str(),
                         );
 
+                    let after_finalize_block_request = AfterFinalizeBlockRequest {
+                        updated_data_contract_ids: Vec::new(),
+                    };
+
+                    platform
+                        .after_finalize_block(after_finalize_block_request)
+                        .expect(
+                            format!(
+                                "should begin process block #{} for day #{}",
+                                block_height, day
+                            )
+                            .as_str(),
+                        );
+
                     // Should pay to all proposers for epoch 0, when epochs 1 started
                     if epoch_index != 0 && epoch_change {
                         assert!(block_end_response.proposers_paid_count.is_some());
@@ -500,6 +557,20 @@ mod tests {
                         .expect(
                             format!(
                                 "should end process block #{} for day #{}",
+                                block_height, day
+                            )
+                            .as_str(),
+                        );
+
+                    let after_finalize_block_request = AfterFinalizeBlockRequest {
+                        updated_data_contract_ids: Vec::new(),
+                    };
+
+                    platform
+                        .after_finalize_block(after_finalize_block_request)
+                        .expect(
+                            format!(
+                                "should begin process block #{} for day #{}",
                                 block_height, day
                             )
                             .as_str(),
