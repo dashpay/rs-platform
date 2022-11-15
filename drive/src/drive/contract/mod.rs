@@ -631,7 +631,7 @@ impl Drive {
                         // Do not cache contract fetched from database transaction
                         // Transaction is used only for block candidates so we should
                         // Prevent to overwrite committed state contracts with block candidate's contracts
-                        if result.is_some() && transaction.is_none() {
+                        if transaction.is_none() {
                             cache
                                 .deref()
                                 .cached_contracts
