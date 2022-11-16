@@ -367,7 +367,6 @@ impl DriveWrapper {
                     None,
                     block_info,
                     apply,
-                    StorageFlags::optional_default_as_ref(),
                     using_transaction.then_some(transaction).flatten(),
                 );
 
@@ -421,7 +420,6 @@ impl DriveWrapper {
                     None,
                     block_info,
                     apply,
-                    StorageFlags::optional_default_as_ref(),
                     using_transaction.then_some(transaction).flatten(),
                 );
 
@@ -478,6 +476,9 @@ impl DriveWrapper {
 
         drive
             .send_to_drive_thread(move |platform: &Platform, transaction, channel| {
+                let storage_flags =
+                    StorageFlags::new_single_epoch(block_info.epoch.index, Some(owner_id));
+
                 let result = platform.drive.add_serialized_document_for_contract_id(
                     &document_cbor,
                     contract_id,
@@ -486,7 +487,7 @@ impl DriveWrapper {
                     override_document,
                     block_info,
                     apply,
-                    StorageFlags::optional_default_as_ref(),
+                    Some(storage_flags).as_ref(),
                     using_transaction.then_some(transaction).flatten(),
                 );
 
@@ -541,6 +542,9 @@ impl DriveWrapper {
 
         drive
             .send_to_drive_thread(move |platform: &Platform, transaction, channel| {
+                let storage_flags =
+                    StorageFlags::new_single_epoch(block_info.epoch.index, Some(owner_id));
+
                 let result = platform.drive.update_document_for_contract_id(
                     &document_cbor,
                     contract_id,
@@ -548,7 +552,7 @@ impl DriveWrapper {
                     Some(owner_id),
                     block_info,
                     apply,
-                    StorageFlags::optional_default_as_ref(),
+                    Some(storage_flags).as_ref(),
                     using_transaction.then_some(transaction).flatten(),
                 );
 
@@ -673,11 +677,16 @@ impl DriveWrapper {
 
         drive
             .send_to_drive_thread(move |platform: &Platform, transaction, channel| {
+                let storage_flags = StorageFlags::new_single_epoch(
+                    block_info.epoch.index,
+                    Some(identity.id.to_buffer()),
+                );
+
                 let result = platform.drive.insert_identity(
                     identity,
                     block_info,
                     apply,
-                    StorageFlags::optional_default_as_ref(),
+                    Some(storage_flags).as_ref(),
                     using_transaction.then_some(transaction).flatten(),
                 );
 

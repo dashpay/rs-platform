@@ -187,16 +187,20 @@ impl Drive {
         contract_id: Option<[u8; 32]>,
         block_info: BlockInfo,
         apply: bool,
-        storage_flags: Option<&StorageFlags>,
         transaction: TransactionArg,
     ) -> Result<FeeResult, Error> {
         let mut drive_operations: Vec<DriveOperation> = vec![];
 
         let contract = <Contract as DriveContractExt>::from_cbor(&contract_cbor, contract_id)?;
 
+        let storage_flags = StorageFlags::new_single_epoch(
+            block_info.epoch.index,
+            Some(contract.owner_id.to_buffer()),
+        );
+
         let contract_element = Element::Item(
             contract_cbor,
-            StorageFlags::map_to_some_element_flags(storage_flags),
+            StorageFlags::map_to_some_element_flags(Some(storage_flags).as_ref()),
         );
 
         self.insert_contract_element(
@@ -338,7 +342,6 @@ impl Drive {
         contract_id: Option<[u8; 32]>,
         block_info: BlockInfo,
         apply: bool,
-        storage_flags: Option<&StorageFlags>,
         transaction: TransactionArg,
     ) -> Result<FeeResult, Error> {
         let mut drive_operations: Vec<DriveOperation> = vec![];
@@ -347,9 +350,14 @@ impl Drive {
 
         let contract_id = contract_id.unwrap_or_else(|| contract.id().as_bytes().clone());
 
+        let storage_flags = StorageFlags::new_single_epoch(
+            block_info.epoch.index,
+            Some(contract.owner_id.to_buffer()),
+        );
+
         let contract_element = Element::Item(
             contract_cbor,
-            StorageFlags::map_to_some_element_flags(storage_flags),
+            StorageFlags::map_to_some_element_flags(Some(storage_flags).as_ref()),
         );
 
         let original_contract_fetch_info = self
