@@ -190,14 +190,18 @@ impl Drive {
 
         let contract = <Contract as DriveContractExt>::from_cbor(&contract_cbor, contract_id)?;
 
-        let storage_flags = StorageFlags::new_single_epoch(
-            block_info.epoch.index,
-            Some(contract.owner_id.to_buffer()),
-        );
+        let storage_flags = if contract.can_be_deleted() || !contract.readonly() {
+            Some(StorageFlags::new_single_epoch(
+                block_info.epoch.index,
+                Some(contract.owner_id.to_buffer()),
+            ))
+        } else {
+            None
+        };
 
         let contract_element = Element::Item(
             contract_cbor,
-            StorageFlags::map_to_some_element_flags(Some(storage_flags).as_ref()),
+            StorageFlags::map_to_some_element_flags(storage_flags.as_ref()),
         );
 
         self.insert_contract_element(
@@ -347,14 +351,15 @@ impl Drive {
 
         let contract_id = contract_id.unwrap_or_else(|| *contract.id().as_bytes());
 
-        let storage_flags = StorageFlags::new_single_epoch(
+        // Since we can update the contract by definition it already has storage flags
+        let storage_flags = Some(StorageFlags::new_single_epoch(
             block_info.epoch.index,
             Some(contract.owner_id.to_buffer()),
-        );
+        ));
 
         let contract_element = Element::Item(
             contract_cbor,
-            StorageFlags::map_to_some_element_flags(Some(storage_flags).as_ref()),
+            StorageFlags::map_to_some_element_flags(storage_flags.as_ref()),
         );
 
         let original_contract_fetch_info = self
@@ -365,8 +370,14 @@ impl Drive {
                 &mut drive_operations,
             )?
             .ok_or(Error::Drive(DriveError::CorruptedCodeExecution(
-                "Contract should exists",
+                "contract should exist",
             )))?;
+
+        if original_contract_fetch_info.contract.readonly() {
+            return Err(Error::Drive(DriveError::UpdatingReadOnlyImmutableContract(
+                "original contract is readonly",
+            )));
+        }
 
         self.update_contract_element(
             contract_element,
@@ -639,25 +650,23 @@ impl Drive {
                     .fetch_contract(contract_id, epoch, transaction)
                     .unwrap_add_cost(&mut cost)?;
 
-                // we only need to pay if epoch is set
-                if epoch.is_some() {
-                    if let Some(contract_fetch_info) = &result {
-                        // Store a contract in cache
-                        cache
-                            .cached_contracts
-                            .insert(Arc::clone(contract_fetch_info), transaction);
+                if let Some(contract_fetch_info) = &result {
+                    // Store a contract in cache
+                    cache
+                        .cached_contracts
+                        .insert(Arc::clone(contract_fetch_info), transaction);
 
-                        if epoch.is_some() {
-                            let fee = contract_fetch_info.fee.as_ref().ok_or(
-                                Error::Drive(DriveError::CorruptedCodeExecution(
-                                    "should be impossible to not have fee on something just fetched with an epoch",
-                                ))
-                            )?;
-                            drive_operations.push(PreCalculatedFeeResult(fee.clone()));
-                        }
-                    } else if epoch.is_some() {
-                        drive_operations.push(CalculatedCostOperation(cost));
+                    // we only need to pay if epoch is set
+                    if epoch.is_some() {
+                        let fee = contract_fetch_info.fee.as_ref().ok_or(
+                            Error::Drive(DriveError::CorruptedCodeExecution(
+                                "should be impossible to not have fee on something just fetched with an epoch",
+                            ))
+                        )?;
+                        drive_operations.push(PreCalculatedFeeResult(fee.clone()));
                     }
+                } else if epoch.is_some() {
+                    drive_operations.push(CalculatedCostOperation(cost));
                 }
                 Ok(result)
             }
