@@ -55,10 +55,11 @@ impl DriveWrapper {
         let drive_config = cx.argument::<JsObject>(1)?;
 
         let js_data_contracts_cache_size: Handle<JsNumber> =
-            drive_config.get(cx, "dataContractsCacheSize")?;
-        let data_contracts_cache_size =
-            u64::try_from(js_data_contracts_cache_size.value(cx) as i64)
-                .or_else(|_| cx.throw_range_error("`dataContractsCacheSize` must fit in u64"))?;
+            drive_config.get(cx, "dataContractsGlobalCacheSize")?;
+        let data_contracts_global_cache_size =
+            u64::try_from(js_data_contracts_cache_size.value(cx) as i64).or_else(|_| {
+                cx.throw_range_error("`dataContractsGlobalCacheSize` must fit in u64")
+            })?;
 
         let js_data_contracts_transactional_cache_size: Handle<JsNumber> =
             drive_config.get(cx, "dataContractsTransactionalCacheSize")?;
@@ -84,7 +85,7 @@ impl DriveWrapper {
             // Open a connection to groveDb, this will be moved to a separate thread
 
             let drive_config = DriveConfig {
-                data_contracts_general_cache_size: data_contracts_cache_size,
+                data_contracts_global_cache_size,
                 data_contracts_transactional_cache_size,
                 ..Default::default()
             };

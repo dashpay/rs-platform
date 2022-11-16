@@ -65,7 +65,7 @@ class Drive {
   /**
    * @param {string} dbPath
    * @param {Object} config
-   * @param {number} config.dataContractsCacheSize
+   * @param {number} config.dataContractsGlobalCacheSize
    * @param {number} config.dataContractsTransactionalCacheSize
    */
   constructor(dbPath, config) {

@@ -161,7 +161,7 @@ impl Drive {
             Ok(grove) => {
                 let config = config.unwrap_or_default();
                 let genesis_time_ms = config.default_genesis_time;
-                let data_contracts_general_cache_size = config.data_contracts_general_cache_size;
+                let data_contracts_global_cache_size = config.data_contracts_global_cache_size;
                 let data_contracts_transactional_cache_size =
                     config.data_contracts_transactional_cache_size;
 
@@ -170,7 +170,7 @@ impl Drive {
                     config,
                     cache: RefCell::new(DriveCache {
                         cached_contracts: DataContractCache::new(
-                            data_contracts_general_cache_size,
+                            data_contracts_global_cache_size,
                             data_contracts_transactional_cache_size,
                         ),
                         genesis_time_ms,

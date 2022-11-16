@@ -27,7 +27,7 @@ describe('Drive', () => {
 
   beforeEach(async () => {
     drive = new Drive(TEST_DATA_PATH, {
-      dataContractsCacheSize: 500,
+      dataContractsGlobalCacheSize: 500,
       dataContractsTransactionalCacheSize: 500,
     });
 

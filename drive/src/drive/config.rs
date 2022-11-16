@@ -67,8 +67,8 @@ pub struct DriveConfig {
     /// Encoding
     pub encoding: DriveEncoding,
 
-    /// Maximum number of contracts in general cache
-    pub data_contracts_general_cache_size: u64,
+    /// Maximum number of contracts in global cache
+    pub data_contracts_global_cache_size: u64,
 
     /// Maximum number of contracts in block candidate cache
     pub data_contracts_transactional_cache_size: u64,
@@ -83,7 +83,7 @@ impl Default for DriveConfig {
             has_raw_enabled: DEFAULT_GROVE_HAS_RAW_ENABLED,
             default_genesis_time: None,
             encoding: DriveCbor,
-            data_contracts_general_cache_size: DEFAULT_DATA_CONTRACTS_CACHE_SIZE,
+            data_contracts_global_cache_size: DEFAULT_DATA_CONTRACTS_CACHE_SIZE,
             data_contracts_transactional_cache_size: DEFAULT_DATA_CONTRACTS_CACHE_SIZE,
         }
     }
