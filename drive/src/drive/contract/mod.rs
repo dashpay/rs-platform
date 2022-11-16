@@ -378,6 +378,13 @@ impl Drive {
             &mut drive_operations,
         )?;
 
+        // Update Data Contracts cache with the new contract
+        let mut drive_cache = self.cache.borrow_mut();
+
+        drive_cache
+            .cached_contracts
+            .insert(original_contract_fetch_info, transaction);
+
         calculate_fee(None, Some(drive_operations), &block_info.epoch)
     }
 
