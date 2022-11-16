@@ -31,7 +31,6 @@
 //!
 
 use crate::drive::config::DriveEncoding::DriveCbor;
-use DriveEncoding::DriveProtobuf;
 
 /// Boolean if GroveDB batching is enabled by default
 pub const DEFAULT_GROVE_BATCHING_ENABLED: bool = true;

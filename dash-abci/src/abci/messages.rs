@@ -37,7 +37,6 @@ use crate::error::serialization::SerializationError;
 use crate::error::Error;
 use crate::execution::fee_pools::epoch::EpochInfo;
 use crate::execution::fee_pools::process_block_fees::ProcessedBlockFeesResult;
-use ciborium::value::Value;
 use serde::{Deserialize, Serialize};
 
 /// A struct for handling chain initialization requests

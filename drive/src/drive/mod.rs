@@ -31,11 +31,9 @@
 //!
 
 use std::cell::RefCell;
-use std::collections::HashMap;
 use std::path::Path;
 
 use grovedb::{GroveDb, Transaction, TransactionArg};
-use moka::sync::Cache;
 
 use object_size_info::DocumentAndContractInfo;
 use object_size_info::DocumentInfo::DocumentSize;
@@ -79,7 +77,7 @@ pub mod object_size_info;
 pub mod query;
 
 use crate::drive::block_info::BlockInfo;
-use crate::drive::cache::{DataContractCache, DataContractTransactionalCache, DriveCache};
+use crate::drive::cache::{DataContractCache, DriveCache};
 use crate::fee::FeeResult;
 use crate::fee_pools::epochs::Epoch;
 use dpp::data_contract::extra::DriveContractExt;

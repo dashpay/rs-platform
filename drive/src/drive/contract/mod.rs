@@ -32,16 +32,12 @@
 //! This module defines functions pertinent to Contracts stored in Drive.
 //!
 
-use std::borrow::Borrow;
-use std::cell::RefMut;
 use std::collections::HashSet;
-use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
 use crate::common::encode::encode_unsigned_integer;
 use costs::{cost_return_on_error_no_add, CostContext, CostResult, CostsExt, OperationCost};
 use dpp::data_contract::extra::DriveContractExt;
-use dpp::prelude::DataContract;
 use grovedb::reference_path::ReferencePathType::SiblingReference;
 use grovedb::{Element, TransactionArg};
 
@@ -56,7 +52,7 @@ use crate::drive::object_size_info::PathKeyElementInfo::{
     PathFixedSizeKeyElement, PathKeyElementSize,
 };
 use crate::drive::object_size_info::PathKeyInfo::PathFixedSizeKeyRef;
-use crate::drive::{contract_documents_path, defaults, Drive, DriveCache, RootTree};
+use crate::drive::{contract_documents_path, defaults, Drive, RootTree};
 use crate::error::drive::DriveError;
 use crate::error::Error;
 use crate::fee::op::DriveOperation;
@@ -348,7 +344,7 @@ impl Drive {
 
         let contract = <Contract as DriveContractExt>::from_cbor(&contract_cbor, contract_id)?;
 
-        let contract_id = contract_id.unwrap_or_else(|| contract.id().as_bytes().clone());
+        let contract_id = contract_id.unwrap_or_else(|| *contract.id().as_bytes());
 
         let storage_flags = StorageFlags::new_single_epoch(
             block_info.epoch.index,
@@ -484,7 +480,7 @@ impl Drive {
         self.add_contract_to_storage(
             contract_element,
             contract,
-            &block_info,
+            block_info,
             apply,
             &mut batch_operations,
         )?;
@@ -668,9 +664,9 @@ impl Drive {
                         let fee = calculate_fee(None, Some(op), epoch)?;
 
                         let updated_contract_fetch_info = Arc::new(ContractFetchInfo {
-                            contract: (&contract_fetch_info.contract).clone(),
-                            storage_flags: (&contract_fetch_info.storage_flags).clone(),
-                            cost: (&contract_fetch_info.cost).clone(),
+                            contract: contract_fetch_info.contract.clone(),
+                            storage_flags: contract_fetch_info.storage_flags.clone(),
+                            cost: contract_fetch_info.cost.clone(),
                             fee: Some(fee.clone()),
                         });
 

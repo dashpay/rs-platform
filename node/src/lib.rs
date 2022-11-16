@@ -8,7 +8,6 @@ use dash_abci::abci::messages::{
 };
 use dash_abci::platform::Platform;
 use neon::prelude::*;
-use neon::types::buffer::TypedArray;
 use rs_drive::dpp::identity::Identity;
 use rs_drive::drive::batch::GroveDbOpBatch;
 use rs_drive::drive::config::DriveConfig;
@@ -1793,7 +1792,7 @@ impl DriveWrapper {
 
         let request_bytes = converter::js_buffer_to_vec_u8(js_request, &mut cx);
 
-        db.send_to_drive_thread(move |platform: &Platform, transaction, channel| {
+        db.send_to_drive_thread(move |platform: &Platform, _, channel| {
             let result = AfterFinalizeBlockRequest::from_bytes(&request_bytes)
                 .and_then(|request| platform.after_finalize_block(request))
                 .and_then(|response| response.to_bytes());
