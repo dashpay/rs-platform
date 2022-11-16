@@ -93,7 +93,9 @@ mod tests {
                     "should not be able to get start time on uninit epochs pool"
                 ),
                 Err(e) => match e {
-                    super::error::Error::GroveDB(grovedb::Error::PathNotFound(_)) => assert!(true),
+                    super::error::Error::GroveDB(grovedb::Error::PathParentLayerNotFound(_)) => {
+                        assert!(true)
+                    }
                     _ => assert!(false, "invalid error type"),
                 },
             }

@@ -85,7 +85,9 @@ mod tests {
                     "should not be able to get unpaid epoch if fee pools tree is not initialized"
                 ),
                 Err(e) => match e {
-                    error::Error::GroveDB(grovedb::Error::PathNotFound(_)) => assert!(true),
+                    error::Error::GroveDB(grovedb::Error::PathParentLayerNotFound(_)) => {
+                        assert!(true)
+                    }
                     _ => assert!(false, "invalid error type"),
                 },
             }

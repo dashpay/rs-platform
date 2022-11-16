@@ -621,7 +621,9 @@ impl Drive {
             self.grove.has_raw(path, key, transaction)
         } else {
             self.grove.get_raw(path, key, transaction).map(|r| match r {
-                Err(GroveError::PathKeyNotFound(_)) | Err(GroveError::PathNotFound(_)) => Ok(false),
+                Err(GroveError::PathKeyNotFound(_))
+                | Err(GroveError::PathNotFound(_))
+                | Err(GroveError::PathParentLayerNotFound(_)) => Ok(false),
                 Err(e) => Err(e),
                 Ok(_) => Ok(true),
             })

@@ -792,7 +792,7 @@ mod tests {
             ) {
                 Ok(_) => assert!(false, "expect tree not exists"),
                 Err(e) => match e {
-                    Error::GroveDB(grovedb::Error::PathNotFound(_)) => assert!(true),
+                    Error::GroveDB(grovedb::Error::PathParentLayerNotFound(_)) => assert!(true),
                     _ => assert!(false, "invalid error type"),
                 },
             }
@@ -904,7 +904,7 @@ mod tests {
             ) {
                 Ok(_) => assert!(false, "expect tree not exists"),
                 Err(e) => match e {
-                    Error::GroveDB(grovedb::Error::PathNotFound(_)) => assert!(true),
+                    Error::GroveDB(grovedb::Error::PathParentLayerNotFound(_)) => assert!(true),
                     _ => assert!(false, "invalid error type"),
                 },
             }

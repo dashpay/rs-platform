@@ -101,7 +101,10 @@ impl Platform {
                         // In case if we have a gap between current and previous epochs
                         // multiple future epochs could be created in the current batch
                         error::Error::GroveDB(grovedb::Error::PathNotFound(_))
-                        | error::Error::GroveDB(grovedb::Error::PathKeyNotFound(_)) => Ok(0u64),
+                        | error::Error::GroveDB(grovedb::Error::PathKeyNotFound(_))
+                        | error::Error::GroveDB(grovedb::Error::PathParentLayerNotFound(_)) => {
+                            Ok(0u64)
+                        }
                         _ => Err(e),
                     })?;
 
