@@ -26,7 +26,10 @@ describe('Drive', () => {
   let initialRootHash;
 
   beforeEach(async () => {
-    drive = new Drive(TEST_DATA_PATH);
+    drive = new Drive(TEST_DATA_PATH, {
+      dataContractsCacheSize: 500,
+      dataContractsTransactionalCacheSize: 500,
+    });
 
     dataContract = getDataContractFixture();
     identity = getIdentityFixture();

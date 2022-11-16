@@ -32,12 +32,6 @@
 //! This module defines the `TenderdashAbci` trait and implements it for type `Platform`.
 //!
 
-use rs_drive::contract::DataContract;
-use rs_drive::drive::contract::ContractFetchInfo;
-use rs_drive::fee_pools::epochs::Epoch;
-use std::borrow::Borrow;
-use std::ops::Deref;
-
 use crate::abci::messages::{
     AfterFinalizeBlockRequest, AfterFinalizeBlockResponse, BlockBeginRequest, BlockBeginResponse,
     BlockEndRequest, BlockEndResponse, InitChainRequest, InitChainResponse,
@@ -47,7 +41,6 @@ use crate::execution::fee_pools::epoch::EpochInfo;
 use rs_drive::grovedb::TransactionArg;
 
 use crate::error::execution::ExecutionError;
-use crate::error::serialization::SerializationError;
 use crate::error::Error;
 use crate::platform::Platform;
 
@@ -174,34 +167,11 @@ impl TenderdashAbci for Platform {
 
     fn after_finalize_block(
         &self,
-        request: AfterFinalizeBlockRequest,
+        _: AfterFinalizeBlockRequest,
     ) -> Result<AfterFinalizeBlockResponse, Error> {
-        let drive_cache = self.drive.cache.borrow_mut();
+        let mut drive_cache = self.drive.cache.borrow_mut();
 
-        // Remove old version of an updated contract from the cache
-        for contract_id in &request.updated_data_contract_ids {
-            drive_cache.cached_contracts.invalidate(contract_id);
-        }
-
-        drop(drive_cache);
-
-        // Retrieve current epoch frm block execution context
-        let block_execution_context = self.block_execution_context.borrow();
-        let block_execution_context = block_execution_context.as_ref().ok_or(Error::Execution(
-            ExecutionError::CorruptedCodeExecution(
-                "block execution context must be set in block begin handler",
-            ),
-        ))?;
-
-        let epoch = Epoch::new(block_execution_context.epoch_info.current_epoch_index);
-        let maybe_epoch_ref = Some(&epoch);
-
-        // Update contracts in cache
-        // We use two separate loops because we need to borrow mut for both operations
-        for contract_id in request.updated_data_contract_ids {
-            self.drive
-                .get_contract_with_fetch_info(contract_id, maybe_epoch_ref, None)?;
-        }
+        drive_cache.cached_contracts.clear_all_transactional_cache();
 
         Ok(AfterFinalizeBlockResponse {})
     }

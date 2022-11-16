@@ -18,7 +18,10 @@ describe('GroveDB', () => {
   let otherTreeKey;
 
   beforeEach(() => {
-    drive = new Drive(TEST_DATA_PATH);
+    drive = new Drive(TEST_DATA_PATH, {
+      dataContractsCacheSize: 500,
+      dataContractsTransactionalCacheSize: 500,
+    });
 
     groveDb = drive.getGroveDB();
 

@@ -623,10 +623,12 @@ impl Drive {
         transaction: TransactionArg,
         drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<Option<Arc<ContractFetchInfo>>, Error> {
-        let cache = self.cache.borrow_mut();
-        match cache.cached_contracts.get(&contract_id) {
+        let mut cache = self.cache.borrow_mut();
+
+        match cache.cached_contracts.get(contract_id, transaction) {
             None => {
                 let mut cost = OperationCost::default();
+
                 //todo: there is a cost here that isn't returned on error
                 // we should investigate if this could be a problem
                 let result = self
@@ -636,15 +638,10 @@ impl Drive {
                 // we only need to pay if epoch is set
                 if epoch.is_some() {
                     if let Some(contract_fetch_info) = &result {
-                        // Do not cache contract fetched from database transaction
-                        // Transaction is used only for block candidates so we should
-                        // Prevent to overwrite committed state contracts with block candidate's contracts
-                        if transaction.is_none() {
-                            cache
-                                .deref()
-                                .cached_contracts
-                                .insert(contract_id, Arc::clone(contract_fetch_info));
-                        }
+                        // Store a contract in cache
+                        cache
+                            .cached_contracts
+                            .insert(Arc::clone(contract_fetch_info), transaction);
 
                         if epoch.is_some() {
                             let fee = contract_fetch_info.fee.as_ref().ok_or(
@@ -680,7 +677,7 @@ impl Drive {
                         // we override the cache for the contract as the fee is now calculated
                         cache
                             .cached_contracts
-                            .insert(contract_id, updated_contract_fetch_info);
+                            .insert(updated_contract_fetch_info, transaction);
 
                         fee
                     };
@@ -695,14 +692,13 @@ impl Drive {
     pub fn get_cached_contract_with_fetch_info(
         &self,
         contract_id: [u8; 32],
-    ) -> Result<Option<Arc<ContractFetchInfo>>, Error> {
-        match self.cache.borrow().cached_contracts.get(&contract_id) {
-            None => Ok(None),
-            Some(contract_fetch_info) => {
-                let contract_fetch_info_ref = Arc::clone(&contract_fetch_info);
-                Ok(Some(contract_fetch_info_ref))
-            }
-        }
+        transaction: TransactionArg,
+    ) -> Option<Arc<ContractFetchInfo>> {
+        self.cache
+            .borrow()
+            .cached_contracts
+            .get(contract_id, transaction)
+            .map(|fetch_info| Arc::clone(&fetch_info))
     }
 
     /// Returns the contract with the given ID from storage and also inserts it in cache.

@@ -64,9 +64,12 @@ const abciAfterFinalizeBlockAsync = appendStack(promisify(abciAfterFinalizeBlock
 class Drive {
   /**
    * @param {string} dbPath
+   * @param {Object} config
+   * @param {number} config.dataContractsCacheSize
+   * @param {number} config.dataContractsTransactionalCacheSize
    */
-  constructor(dbPath) {
-    this.drive = driveOpen(dbPath);
+  constructor(dbPath, config) {
+    this.drive = driveOpen(dbPath, config);
     this.groveDB = new GroveDB(this.drive);
   }
 
@@ -442,6 +445,13 @@ class Drive {
     };
   }
 }
+
+/**
+ * @typedef BlockInfo
+ * @property {number} height
+ * @property {number} epoch
+ * @property {number} timeMs
+ */
 
 /**
  * @typedef InitChainRequest

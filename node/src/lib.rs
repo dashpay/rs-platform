@@ -11,6 +11,7 @@ use neon::prelude::*;
 use neon::types::buffer::TypedArray;
 use rs_drive::dpp::identity::Identity;
 use rs_drive::drive::batch::GroveDbOpBatch;
+use rs_drive::drive::config::DriveConfig;
 use rs_drive::drive::flags::StorageFlags;
 use rs_drive::fee_pools::epochs::Epoch;
 use rs_drive::grovedb::{PathQuery, Transaction, TransactionArg};
@@ -49,7 +50,22 @@ impl DriveWrapper {
     // 3. On a separate thread, read closures off the channel and execute with
     // access    to the connection.
     fn new(cx: &mut FunctionContext) -> NeonResult<Self> {
+        // Drive's configuration
         let path_string = cx.argument::<JsString>(0)?.value(cx);
+        let drive_config = cx.argument::<JsObject>(1)?;
+
+        let js_data_contracts_cache_size: Handle<JsNumber> =
+            drive_config.get(cx, "dataContractsCacheSize")?;
+        let data_contracts_cache_size =
+            u64::try_from(js_data_contracts_cache_size.value(cx) as i64)
+                .or_else(|_| cx.throw_range_error("`dataContractsCacheSize` must fit in u64"))?;
+
+        let js_data_contracts_transactional_cache_size: Handle<JsNumber> =
+            drive_config.get(cx, "dataContractsTransactionalCacheSize")?;
+        let data_contracts_transactional_cache_size =
+            u64::try_from(js_data_contracts_transactional_cache_size.value(cx) as i64).or_else(
+                |_| cx.throw_range_error("`dataContractsTransactionalCacheSize` must fit in u64"),
+            )?;
 
         // Channel for sending callbacks to execute on the Drive connection thread
         let (tx, rx) = mpsc::channel::<DriveMessage>();
@@ -66,8 +82,15 @@ impl DriveWrapper {
         thread::spawn(move || {
             let path = Path::new(&path_string);
             // Open a connection to groveDb, this will be moved to a separate thread
+
+            let drive_config = DriveConfig {
+                data_contracts_general_cache_size: data_contracts_cache_size,
+                data_contracts_transactional_cache_size,
+                ..Default::default()
+            };
+
             // TODO: think how to pass this error to JS
-            let platform: Platform = Platform::open(path, None).unwrap();
+            let platform: Platform = Platform::open(path, Some(drive_config)).unwrap();
 
             let mut transaction: Option<Transaction> = None;
 
@@ -100,22 +123,52 @@ impl DriveWrapper {
                         callback(&channel);
                     }
                     DriveMessage::CommitTransaction(callback) => {
-                        platform
-                            .drive
-                            .commit_transaction(transaction.take().unwrap())
-                            .unwrap();
-                        callback(&channel);
+                        if let Some(tx) = &transaction {
+                            // Merge and clear transactional cache
+
+                            let mut drive_cache = platform.drive.cache.borrow_mut();
+
+                            drive_cache.cached_contracts.merge_transactional_cache(tx);
+
+                            drive_cache.cached_contracts.clear_transactional_cache(tx);
+
+                            // Commit transaction
+
+                            platform
+                                .drive
+                                .commit_transaction(transaction.take().unwrap())
+                                .unwrap();
+
+                            callback(&channel);
+                        } else {
+                            panic!("transaction is not started");
+                        }
                     }
                     DriveMessage::RollbackTransaction(callback) => {
-                        platform
-                            .drive
-                            .rollback_transaction(&transaction.take().unwrap())
-                            .unwrap();
-                        callback(&channel);
+                        if let Some(tx) = &transaction {
+                            let mut drive_cache = platform.drive.cache.borrow_mut();
+
+                            drive_cache.cached_contracts.clear_transactional_cache(tx);
+
+                            platform.drive.rollback_transaction(tx).unwrap();
+
+                            callback(&channel);
+                        } else {
+                            panic!("transaction is not started");
+                        }
                     }
                     DriveMessage::AbortTransaction(callback) => {
-                        drop(transaction.take());
-                        callback(&channel);
+                        if let Some(tx) = &transaction {
+                            let mut drive_cache = platform.drive.cache.borrow_mut();
+
+                            drive_cache.cached_contracts.clear_transactional_cache(tx);
+
+                            drop(transaction.take());
+
+                            callback(&channel);
+                        } else {
+                            panic!("transaction is not started");
+                        }
                     }
                 }
             }

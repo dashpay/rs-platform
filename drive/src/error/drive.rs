@@ -54,7 +54,6 @@ pub enum DriveError {
     /// Error
     #[error("changing document type keeps history error: {0}")]
     ChangingDocumentTypeKeepsHistory(&'static str),
-
     /// Error
     #[error("corrupted contract path error: {0}")]
     CorruptedContractPath(&'static str),

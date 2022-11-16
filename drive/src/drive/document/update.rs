@@ -580,6 +580,7 @@ impl Drive {
 #[cfg(test)]
 mod tests {
     use grovedb::TransactionArg;
+    use std::default::Default;
     use std::option::Option::None;
     use std::sync::Arc;
 
@@ -1263,6 +1264,7 @@ mod tests {
             has_raw_enabled: true,
             default_genesis_time: Some(0),
             encoding: DriveEncoding::DriveCbor,
+            ..Default::default()
         };
         let tmp_dir = TempDir::new().unwrap();
 
@@ -1506,6 +1508,7 @@ mod tests {
             has_raw_enabled: true,
             default_genesis_time: Some(0),
             encoding: DriveEncoding::DriveCbor,
+            ..Default::default()
         };
         let tmp_dir = TempDir::new().unwrap();
 
@@ -1668,6 +1671,7 @@ mod tests {
             has_raw_enabled: true,
             default_genesis_time: Some(0),
             encoding: DriveEncoding::DriveCbor,
+            ..Default::default()
         };
         let tmp_dir = TempDir::new().unwrap();
 
@@ -2001,6 +2005,7 @@ mod tests {
             has_raw_enabled: using_has_raw,
             default_genesis_time: Some(0),
             encoding: DriveEncoding::DriveCbor,
+            ..Default::default()
         };
         let tmp_dir = TempDir::new().unwrap();
 
