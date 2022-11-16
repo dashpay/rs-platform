@@ -144,3 +144,71 @@ impl DataContractTransactionalCache {
         transaction_raw_pointer as TransactionPointerAddress
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use crate::common::helpers::setup::setup_drive;
+
+    mod get {
+        use super::*;
+
+        #[test]
+        fn test_get_from_global_cache_when_transaction_is_not_specified() {
+            let drive = setup_drive(None);
+            let transaction = drive.grove.start_transaction();
+
+            let mut data_contract_cache = DataContractCache::new(10, 10);
+
+            // Create global contract
+            let fetch_info_global = Arc::new(ContractFetchInfo::default());
+
+            let contract_id = fetch_info_global.contract.id().to_buffer();
+
+            data_contract_cache
+                .global_cache
+                .insert(contract_id, Arc::clone(&fetch_info_global));
+
+            // Create transactional contract with a new version
+            let mut fetch_info_transactional = ContractFetchInfo::default();
+
+            fetch_info_transactional.contract.increment_version();
+
+            let fetch_info_transactional = Arc::new(fetch_info_transactional);
+
+            data_contract_cache
+                .transactional_cache
+                .insert(&transaction, Arc::clone(&fetch_info_transactional));
+
+            let fetch_info_from_cache = data_contract_cache
+                .get(contract_id, None)
+                .expect("should be present");
+
+            assert_eq!(fetch_info_from_cache, fetch_info_global)
+        }
+
+        #[test]
+        fn test_get_from_global_cache_when_transaction_cache_does_not_have_contract() {
+            let drive = setup_drive(None);
+            let transaction = drive.grove.start_transaction();
+
+            let data_contract_cache = DataContractCache::new(10, 10);
+
+            // Create global contract
+            let fetch_info_global = Arc::new(ContractFetchInfo::default());
+
+            let contract_id = fetch_info_global.contract.id().to_buffer();
+
+            data_contract_cache
+                .global_cache
+                .insert(contract_id, Arc::clone(&fetch_info_global));
+
+            let fetch_info_from_cache = data_contract_cache
+                .get(contract_id, Some(&transaction))
+                .expect("should be present");
+
+            assert_eq!(fetch_info_from_cache, fetch_info_global)
+        }
+    }
+}

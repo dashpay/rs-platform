@@ -98,6 +98,7 @@ pub fn add_init_contracts_structure_operations(batch: &mut GroveDbOpBatch) {
 }
 
 /// Contract and fetch information
+#[derive(Default, PartialEq, Debug)]
 pub struct ContractFetchInfo {
     /// The contract
     pub contract: Contract,
