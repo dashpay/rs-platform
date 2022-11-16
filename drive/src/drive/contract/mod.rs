@@ -370,8 +370,14 @@ impl Drive {
                 &mut drive_operations,
             )?
             .ok_or(Error::Drive(DriveError::CorruptedCodeExecution(
-                "Contract should exists",
+                "contract should exist",
             )))?;
+
+        if original_contract_fetch_info.contract.readonly() {
+            return Err(Error::Drive(DriveError::UpdatingReadOnlyImmutableContract(
+                "original contract is readonly",
+            )));
+        }
 
         self.update_contract_element(
             contract_element,
