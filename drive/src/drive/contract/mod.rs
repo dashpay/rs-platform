@@ -1051,20 +1051,60 @@ mod tests {
             .expect("expected to insert a document successfully");
     }
 
-    #[test]
-    fn test_get_non_existent_contract() {
-        let tmp_dir = TempDir::new().unwrap();
-        let drive: Drive = Drive::open(tmp_dir, None).expect("expected to open Drive successfully");
+    mod get_contract_with_fetch_info_and_add_to_operations {
+        use super::*;
 
-        drive
-            .create_initial_state_structure(None)
-            .expect("expected to create state structure");
-        let contract_id = rand::thread_rng().gen::<[u8; 32]>();
+        #[test]
+        fn test_get_contract_from_global_and_transactional_cache() {
+            let (drive, mut contract, _) = setup_reference_contract();
 
-        let result = drive
-            .get_contract_with_fetch_info(contract_id, None, None)
-            .expect("should get contract");
+            let transaction = drive.grove.start_transaction();
 
-        assert!(result.is_none());
+            contract.increment_version();
+
+            let updated_contract_cbor = contract.to_buffer().expect("should serialize a contract");
+
+            drive
+                .update_contract_cbor(
+                    updated_contract_cbor,
+                    None,
+                    BlockInfo::default(),
+                    true,
+                    Some(&transaction),
+                )
+                .expect("should update contract");
+
+            let fetch_info_from_database = drive
+                .get_contract_with_fetch_info(contract.id().to_buffer(), None, None)
+                .expect("should get contract")
+                .expect("should be present");
+
+            assert_eq!(fetch_info_from_database.contract.version(), 1);
+
+            let fetch_info_from_cache = drive
+                .get_contract_with_fetch_info(contract.id().to_buffer(), None, Some(&transaction))
+                .expect("should get contract")
+                .expect("should be present");
+
+            assert_eq!(fetch_info_from_cache.contract.version(), 2);
+        }
+
+        #[test]
+        fn test_get_non_existent_contract() {
+            let tmp_dir = TempDir::new().unwrap();
+            let drive: Drive =
+                Drive::open(tmp_dir, None).expect("expected to open Drive successfully");
+
+            drive
+                .create_initial_state_structure(None)
+                .expect("expected to create state structure");
+            let contract_id = rand::thread_rng().gen::<[u8; 32]>();
+
+            let result = drive
+                .get_contract_with_fetch_info(contract_id, None, None)
+                .expect("should get contract");
+
+            assert!(result.is_none());
+        }
     }
 }
