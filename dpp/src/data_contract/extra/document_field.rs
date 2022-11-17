@@ -301,9 +301,8 @@ impl DocumentFieldType {
                     .filter_map(|(key, field)| {
                         let read_value = field.document_type.read_from(buf, field.required);
                         match read_value {
-                            Ok(read_value) => {
-                                read_value.map(|read_value| Ok((Value::Text(key.clone()), read_value)))
-                            }
+                            Ok(read_value) => read_value
+                                .map(|read_value| Ok((Value::Text(key.clone()), read_value))),
                             Err(e) => Some(Err(e)),
                         }
                     })
