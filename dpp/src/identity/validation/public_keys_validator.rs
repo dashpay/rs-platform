@@ -33,11 +33,29 @@ pub trait TPublicKeysValidator {
     ) -> Result<ValidationResult<()>, NonConsensusError>;
 }
 
-pub struct PublicKeysValidator {
+pub struct PublicKeysValidator<T: BlsValidator> {
     public_key_schema_validator: JsonSchemaValidator,
+    bls_validator: T,
 }
 
-impl TPublicKeysValidator for PublicKeysValidator {
+pub trait BlsValidator {
+    fn validate_public_key(&self, pk: &[u8]) -> Result<(), PublicKeyValidationError>;
+}
+
+#[derive(Default)]
+pub struct NativeBlsValidator;
+
+impl BlsValidator for NativeBlsValidator {
+    fn validate_public_key(&self, pk: &[u8]) -> Result<(), PublicKeyValidationError> {
+        match BlsPublicKey::from_bytes(pk) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(PublicKeyValidationError::new(e.to_string())),
+        }
+    }
+}
+
+
+impl<T: BlsValidator> TPublicKeysValidator for PublicKeysValidator<T> {
     fn validate_keys(
         &self,
         raw_public_keys: &[Value],
@@ -86,7 +104,7 @@ impl TPublicKeysValidator for PublicKeysValidator {
                         Err(e) => Some(PublicKeyValidationError::new(e.to_string())),
                     }
                 }
-                KeyType::BLS12_381 => match BlsPublicKey::from_bytes(&public_key.data) {
+                KeyType::BLS12_381 => match self.bls_validator.validate_public_key(&public_key.data) {
                     Ok(_) => None,
                     Err(e) => Some(PublicKeyValidationError::new(e.to_string())),
                 },
@@ -137,22 +155,24 @@ impl TPublicKeysValidator for PublicKeysValidator {
     }
 }
 
-impl PublicKeysValidator {
-    pub fn new() -> Result<Self, DashPlatformProtocolInitError> {
+impl<T: BlsValidator> PublicKeysValidator<T> {
+    pub fn new(bls_validator: T) -> Result<Self, DashPlatformProtocolInitError> {
         let public_key_schema_validator = JsonSchemaValidator::new(PUBLIC_KEY_SCHEMA.clone())?;
 
         let public_keys_validator = Self {
             public_key_schema_validator,
+            bls_validator
         };
 
         Ok(public_keys_validator)
     }
 
-    pub fn new_with_schema(schema: Value) -> Result<Self, DashPlatformProtocolInitError> {
+    pub fn new_with_schema(schema: Value, bls_validator: T) -> Result<Self, DashPlatformProtocolInitError> {
         let public_key_schema_validator = JsonSchemaValidator::new(schema)?;
 
         let public_keys_validator = Self {
             public_key_schema_validator,
+            bls_validator
         };
 
         Ok(public_keys_validator)
