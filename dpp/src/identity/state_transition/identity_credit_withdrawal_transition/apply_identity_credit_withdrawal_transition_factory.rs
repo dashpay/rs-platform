@@ -1,21 +1,11 @@
 use std::convert::TryInto;
 
 use anyhow::{anyhow, Result};
-use chrono::Utc;
-use dashcore::{
-    blockdata::transaction::special_transaction::asset_unlock::unqualified_asset_unlock::{
-        AssetUnlockBasePayload, AssetUnlockBaseTransactionInfo,
-    },
-    consensus::Encodable,
-    Script, TxOut,
-};
-use lazy_static::__Deref;
 use serde_json::{Map, Value as JsonValue};
 
 use crate::{
     data_contract::DataContract,
     document::Document,
-    identity::convert_credits_to_satoshi,
     prelude::{Identifier, Identity},
     state_repository::StateRepositoryLike,
     state_transition::StateTransitionConvert,
@@ -24,11 +14,11 @@ use crate::{
 
 use super::IdentityCreditWithdrawalTransition;
 
-const WITHDRAWAL_DATA_CONTRACT_ID_BYTES: [u8; 32] = [
+pub const WITHDRAWAL_DATA_CONTRACT_ID_BYTES: [u8; 32] = [
     54, 98, 187, 97, 225, 127, 174, 62, 162, 148, 207, 96, 49, 151, 251, 10, 171, 109, 81, 24, 11,
     216, 182, 16, 76, 73, 68, 166, 47, 226, 217, 127,
 ];
-const WITHDRAWAL_DATA_CONTRACT_OWNER_ID_BYTES: [u8; 32] = [
+pub const WITHDRAWAL_DATA_CONTRACT_OWNER_ID_BYTES: [u8; 32] = [
     170, 138, 235, 213, 173, 122, 202, 36, 243, 48, 61, 185, 146, 50, 146, 255, 194, 133, 221, 176,
     188, 82, 144, 69, 234, 198, 106, 35, 245, 167, 46, 192,
 ];
@@ -54,39 +44,6 @@ where
         &self,
         state_transition: &IdentityCreditWithdrawalTransition,
     ) -> Result<()> {
-        let latest_withdrawal_index = self
-            .state_repository
-            .fetch_latest_withdrawal_transaction_index()
-            .await?;
-
-        let output_script: Script = state_transition.output_script.deref().clone();
-
-        let tx_out = TxOut {
-            value: convert_credits_to_satoshi(state_transition.amount),
-            script_pubkey: output_script,
-        };
-
-        let withdrawal_transaction = AssetUnlockBaseTransactionInfo {
-            version: 1,
-            lock_time: 0,
-            output: vec![tx_out],
-            base_payload: AssetUnlockBasePayload {
-                version: 1,
-                index: latest_withdrawal_index + 1,
-                fee: state_transition.core_fee_per_byte, // TODO: redo fee calculation
-            },
-        };
-
-        let mut transaction_buffer: Vec<u8> = vec![];
-
-        withdrawal_transaction
-            .consensus_encode(&mut transaction_buffer)
-            .map_err(|e| anyhow!(e))?;
-
-        self.state_repository
-            .enqueue_withdrawal_transaction(latest_withdrawal_index, transaction_buffer)
-            .await?;
-
         let data_contract_id = Identifier::new(WITHDRAWAL_DATA_CONTRACT_ID_BYTES);
         let data_contract_owner_id = Identifier::new(WITHDRAWAL_DATA_CONTRACT_OWNER_ID_BYTES);
 

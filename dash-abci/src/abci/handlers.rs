@@ -150,6 +150,9 @@ impl TenderdashAbci for Platform {
             }
         };
 
+        self.drive
+            .prepare_and_enqueue_withdrawal_transactions(transaction)?;
+
         // Process fees
         let process_block_fees_result = self.process_block_fees(
             &block_execution_context.block_info,

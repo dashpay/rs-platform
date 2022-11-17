@@ -32,9 +32,19 @@
 
 use std::ops::RangeFull;
 
+use dashcore::consensus::Encodable;
+use dashcore::{Script, TxOut};
+use dashcore::blockdata::transaction::special_transaction::asset_unlock::unqualified_asset_unlock::{AssetUnlockBaseTransactionInfo, AssetUnlockBasePayload};
+use dpp::identity::convert_credits_to_satoshi;
+use dpp::identity::state_transition::identity_credit_withdrawal_transition::apply_identity_credit_withdrawal_transition_factory::WITHDRAWAL_DATA_CONTRACT_ID_BYTES;
+use dpp::prelude::Document;
+use dpp::util::hash;
+use dpp::util::json_value::JsonValueExt;
 use grovedb::query_result_type::QueryResultType::QueryKeyElementPairResultType;
 use grovedb::{Element, PathQuery, Query, QueryItem, SizedQuery, TransactionArg};
+use serde_json::{json, Value as JsonValue, Number};
 
+use crate::common;
 use crate::drive::batch::GroveDbOpBatch;
 use crate::drive::{Drive, RootTree};
 use crate::error::drive::DriveError;
@@ -45,6 +55,8 @@ use crate::fee::op::DriveOperation;
 pub const WITHDRAWAL_TRANSACTIONS_COUNTER_ID: [u8; 1] = [0];
 /// constant id for subtree containing transactions queue
 pub const WITHDRAWAL_TRANSACTIONS_QUEUE_ID: [u8; 1] = [1];
+
+const WITHDRAWAL_DOCUMENT_TYPE_NAME: &str = "withdrawal";
 
 type WithdrawalTransaction = (Vec<u8>, Vec<u8>);
 
@@ -101,6 +113,139 @@ impl Drive {
                 ),
             ))
         }
+    }
+
+    ///
+    pub fn prepare_and_enqueue_withdrawal_transactions(
+        &self,
+        transaction: TransactionArg,
+    ) -> Result<(), Error> {
+        let query_value = json!({
+            "where": [
+                ["status", "==", "0"],
+            ],
+            "orderBy": [
+                ["$createdAt", "desc"],
+            ]
+        });
+
+        let query_cbor = common::value_to_cbor(query_value, None);
+
+        let (documents, _, _) = self.query_documents(
+            &query_cbor,
+            WITHDRAWAL_DATA_CONTRACT_ID_BYTES,
+            WITHDRAWAL_DOCUMENT_TYPE_NAME,
+            transaction,
+        )?;
+
+        let documents = documents
+            .into_iter()
+            .map(|document_cbor| {
+                Document::from_cbor(document_cbor).map_err(|_| {
+                    Error::Drive(DriveError::CorruptedCodeExecution(
+                        "Can't create a document from cbor",
+                    ))
+                })
+            })
+            .collect::<Result<Vec<Document>, Error>>()?;
+
+        let mut withdrawals: Vec<(Vec<u8>, Vec<u8>)> = vec![];
+
+        for mut document in documents {
+            let output_script = document.data.get_bytes("outputScript").map_err(|_| {
+                Error::Drive(DriveError::CorruptedCodeExecution(
+                    "Can't get outputScript from withdrawal document",
+                ))
+            })?;
+
+            let amount = document.data.get_u64("amount").map_err(|_| {
+                Error::Drive(DriveError::CorruptedCodeExecution(
+                    "Can't get amount from withdrawal document",
+                ))
+            })?;
+
+            let core_fee_per_byte = document.data.get_u64("coreFeePerByte").map_err(|_| {
+                Error::Drive(DriveError::CorruptedCodeExecution(
+                    "Can't get coreFeePerByte from withdrawal document",
+                ))
+            })?;
+
+            let state_transition_size = 184;
+
+            let latest_withdrawal_index =
+                self.fetch_latest_withdrawal_transaction_index(transaction)?;
+
+            let output_script: Script = Script::from(output_script);
+
+            let tx_out = TxOut {
+                value: convert_credits_to_satoshi(amount),
+                script_pubkey: output_script,
+            };
+
+            let transaction_idex = latest_withdrawal_index + 1;
+
+            let withdrawal_transaction = AssetUnlockBaseTransactionInfo {
+                version: 1,
+                lock_time: 0,
+                output: vec![tx_out],
+                base_payload: AssetUnlockBasePayload {
+                    version: 1,
+                    index: transaction_idex,
+                    fee: (state_transition_size * core_fee_per_byte * 1000) as u32,
+                },
+            };
+
+            let mut transaction_buffer: Vec<u8> = vec![];
+
+            withdrawal_transaction
+                .consensus_encode(&mut transaction_buffer)
+                .map_err(|_| {
+                    Error::Drive(DriveError::CorruptedCodeExecution(
+                        "Can't consensus encode a withdrawal transaction",
+                    ))
+                })?;
+
+            withdrawals.push((
+                transaction_idex.to_be_bytes().to_vec(),
+                transaction_buffer.clone(),
+            ));
+
+            let transacton_id = hash::hash(transaction_buffer);
+
+            document
+                .data
+                .insert(
+                    "transactionId".to_string(),
+                    JsonValue::Array(
+                        transacton_id
+                            .into_iter()
+                            .map(|byte| JsonValue::Number(Number::from(byte)))
+                            .collect(),
+                    ),
+                )
+                .map_err(|_| {
+                    Error::Drive(DriveError::CorruptedCodeExecution(
+                        "Can't update document field: transactionId",
+                    ))
+                })?;
+
+            document
+                .data
+                .insert("status".to_string(), JsonValue::Number(Number::from(1)))
+                .map_err(|_| {
+                    Error::Drive(DriveError::CorruptedCodeExecution(
+                        "Can't update document field: status",
+                    ))
+                })?;
+        }
+
+        let mut batch = GroveDbOpBatch::new();
+
+        self.add_enqueue_withdrawal_transaction_operations(&mut batch, withdrawals);
+
+        self.grove_apply_batch(batch, true, transaction)?;
+
+        Ok(())
     }
 
     /// Add counter update operations to the batch
