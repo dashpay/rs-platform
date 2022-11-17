@@ -3,9 +3,8 @@
 use std::convert::TryInto;
 use std::{collections::HashMap, convert::TryFrom, hash::Hash};
 
-use anyhow::{anyhow, bail};
+use anyhow::bail;
 use ciborium::value::Value as CborValue;
-use dashcore::PublicKey;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Value as JsonValue;
