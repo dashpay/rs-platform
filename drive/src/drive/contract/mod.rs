@@ -390,11 +390,22 @@ impl Drive {
         )?;
 
         // Update Data Contracts cache with the new contract
+        let updated_contract_fetch_info = self
+            .fetch_contract_and_add_operations(
+                contract_id,
+                Some(&block_info.epoch),
+                transaction,
+                &mut drive_operations,
+            )?
+            .ok_or(Error::Drive(DriveError::CorruptedCodeExecution(
+                "contract should exist",
+            )))?;
+
         let mut drive_cache = self.cache.borrow_mut();
 
         drive_cache
             .cached_contracts
-            .insert(original_contract_fetch_info, transaction);
+            .insert(updated_contract_fetch_info, transaction);
 
         calculate_fee(None, Some(drive_operations), &block_info.epoch)
     }
@@ -642,33 +653,21 @@ impl Drive {
 
         match cache.cached_contracts.get(contract_id, transaction) {
             None => {
-                let mut cost = OperationCost::default();
+                let maybe_contract_fetch_info = self.fetch_contract_and_add_operations(
+                    contract_id,
+                    epoch,
+                    transaction,
+                    drive_operations,
+                )?;
 
-                //todo: there is a cost here that isn't returned on error
-                // we should investigate if this could be a problem
-                let result = self
-                    .fetch_contract(contract_id, epoch, transaction)
-                    .unwrap_add_cost(&mut cost)?;
-
-                if let Some(contract_fetch_info) = &result {
-                    // Store a contract in cache
+                // Store a contract in cache if present
+                if let Some(contract_fetch_info) = &maybe_contract_fetch_info {
                     cache
                         .cached_contracts
                         .insert(Arc::clone(contract_fetch_info), transaction);
+                };
 
-                    // we only need to pay if epoch is set
-                    if epoch.is_some() {
-                        let fee = contract_fetch_info.fee.as_ref().ok_or(
-                            Error::Drive(DriveError::CorruptedCodeExecution(
-                                "should be impossible to not have fee on something just fetched with an epoch",
-                            ))
-                        )?;
-                        drive_operations.push(PreCalculatedFeeResult(fee.clone()));
-                    }
-                } else if epoch.is_some() {
-                    drive_operations.push(CalculatedCostOperation(cost));
-                }
-                Ok(result)
+                Ok(maybe_contract_fetch_info)
             }
             Some(contract_fetch_info) => {
                 // we only need to pay if epoch is set
@@ -699,6 +698,40 @@ impl Drive {
                 Ok(Some(contract_fetch_info))
             }
         }
+    }
+
+    /// Fetch contract from database and add operations
+    fn fetch_contract_and_add_operations(
+        &self,
+        contract_id: [u8; 32],
+        epoch: Option<&Epoch>,
+        transaction: TransactionArg,
+        drive_operations: &mut Vec<DriveOperation>,
+    ) -> Result<Option<Arc<ContractFetchInfo>>, Error> {
+        let mut cost = OperationCost::default();
+
+        //todo: there is a cost here that isn't returned on error
+        // we should investigate if this could be a problem
+        let maybe_contract_fetch_info = self
+            .fetch_contract(contract_id, epoch, transaction)
+            .unwrap_add_cost(&mut cost)?;
+
+        if let Some(contract_fetch_info) = &maybe_contract_fetch_info {
+            // we only need to pay if epoch is set
+            if epoch.is_some() {
+                let fee = contract_fetch_info
+                    .fee
+                    .as_ref()
+                    .ok_or(Error::Drive(DriveError::CorruptedCodeExecution(
+                    "should be impossible to not have fee on something just fetched with an epoch",
+                )))?;
+                drive_operations.push(PreCalculatedFeeResult(fee.clone()));
+            }
+        } else if epoch.is_some() {
+            drive_operations.push(CalculatedCostOperation(cost));
+        }
+
+        Ok(maybe_contract_fetch_info)
     }
 
     /// Returns the contract fetch info with the given ID if it's in cache.
