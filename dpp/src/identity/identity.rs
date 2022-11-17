@@ -235,7 +235,7 @@ impl Identity {
         Ok(identity)
     }
 
-    pub fn from_raw_identity(raw_object: JsonValue) -> Result<Identity, ProtocolError> {
+    pub fn from_json_object(raw_object: JsonValue) -> Result<Identity, ProtocolError> {
         let pks = raw_object.get("publicKeys").unwrap().as_array().unwrap();
 
         for pk in pks {
