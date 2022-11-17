@@ -303,6 +303,81 @@ pub fn setup_family_tests_with_nulls(
     (drive, contract)
 }
 
+/// Inserts the test "family" contract and adds `count` documents containing randomly named people to it.
+pub fn setup_family_tests_only_first_name_index(
+    count: u32,
+    with_batching: bool,
+    seed: u64,
+) -> (Drive, Contract) {
+    let drive_config = if with_batching {
+        DriveConfig::default_with_batches()
+    } else {
+        DriveConfig::default_without_batches()
+    };
+
+    let drive = setup_drive(Some(drive_config));
+
+    let db_transaction = drive.grove.start_transaction();
+
+    // Create contracts tree
+    let mut batch = GroveDbOpBatch::new();
+
+    add_init_contracts_structure_operations(&mut batch);
+
+    drive
+        .grove_apply_batch(batch, false, Some(&db_transaction))
+        .expect("expected to create contracts tree successfully");
+
+    // setup code
+    let contract = common::setup_contract(
+        &drive,
+        "tests/supporting_files/contract/family/family-contract-only-first-name-index.json",
+        None,
+        Some(&db_transaction),
+    );
+
+    let people = Person::random_people(count, seed);
+    for person in people {
+        let value = serde_json::to_value(&person).expect("serialized person");
+        let document_cbor =
+            common::value_to_cbor(value, Some(rs_drive::drive::defaults::PROTOCOL_VERSION));
+        let document = Document::from_cbor(document_cbor.as_slice(), None, None)
+            .expect("document should be properly deserialized");
+
+        let document_type = contract
+            .document_type_for_name("person")
+            .expect("expected to get document type");
+
+        let storage_flags = Some(StorageFlags::SingleEpoch(0));
+
+        drive
+            .add_document_for_contract(
+                DocumentAndContractInfo {
+                    document_info: DocumentRefAndSerialization((
+                        &document,
+                        &document_cbor,
+                        storage_flags.as_ref(),
+                    )),
+                    contract: &contract,
+                    document_type,
+                    owner_id: None,
+                },
+                true,
+                BlockInfo::genesis(),
+                true,
+                Some(&db_transaction),
+            )
+            .expect("document should be inserted");
+    }
+    drive
+        .grove
+        .commit_transaction(db_transaction)
+        .unwrap()
+        .expect("transaction should be committed");
+
+    (drive, contract)
+}
+
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Records {
@@ -548,6 +623,46 @@ fn test_query_many() {
         .commit_transaction(db_transaction)
         .unwrap()
         .expect("transaction should be committed");
+}
+
+#[test]
+fn test_reference_proof_single_index() {
+    let (drive, contract) = setup_family_tests_only_first_name_index(1, true, 73509);
+
+    let db_transaction = drive.grove.start_transaction();
+
+    let root_hash = drive
+        .grove
+        .root_hash(Some(&db_transaction))
+        .unwrap()
+        .expect("there is always a root hash");
+
+    // A query getting all elements by firstName
+
+    let query_value = json!({
+        "where": [
+        ],
+        "limit": 100,
+        "orderBy": [
+            ["firstName", "asc"]
+        ]
+    });
+    let where_cbor = common::value_to_cbor(query_value, None);
+    let person_document_type = contract
+        .document_types()
+        .get("person")
+        .expect("contract should have a person document type");
+    let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &person_document_type)
+        .expect("query should be built");
+    let (results, _, _) = query
+        .execute_no_proof(&drive, None, Some(&db_transaction))
+        .expect("proof should be executed");
+
+    let (proof_root_hash, proof_results, _) = query
+        .execute_with_proof_only_get_elements(&drive, None, None)
+        .expect("we should be able to a proof");
+    assert_eq!(root_hash, proof_root_hash);
+    assert_eq!(results, proof_results);
 }
 
 #[test]
