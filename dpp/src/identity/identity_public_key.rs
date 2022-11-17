@@ -50,7 +50,7 @@ impl TryFrom<u8> for KeyType {
             1 => Ok(Self::BLS12_381),
             2 => Ok(Self::ECDSA_HASH160),
             3 => Ok(Self::BIP13_SCRIPT_HASH),
-            value => bail!("unrecognized security level: {}", value),
+            value => bail!("unrecognized key type: {}", value),
         }
     }
 }
@@ -316,16 +316,13 @@ impl IdentityPublicKey {
             return Err(ProtocolError::EmptyPublicKeyDataError);
         }
 
-        if self.key_type == KeyType::ECDSA_HASH160 || self.key_type == KeyType::BIP13_SCRIPT_HASH {
-            return Ok(self.data.clone());
-        }
-
-        match self.data.len() {
-            33 | 48 | 65 => Ok(ripemd160_sha256(&self.data)),
-            _ => Err(ProtocolError::ParsingError(format!(
-                "The length of the public key is invalid: {}. Allowed sizes: 33, 48 or 65 bytes",
-                self.data.len()
-            ))),
+        return match self.key_type {
+            KeyType::ECDSA_SECP256K1 | KeyType::BLS12_381 => {
+                Ok(ripemd160_sha256(&self.data))
+            }
+            KeyType::ECDSA_HASH160 | KeyType::BIP13_SCRIPT_HASH => {
+                Ok(self.data.clone())
+            }
         }
     }
 
