@@ -92,7 +92,7 @@ pub fn calculate_fee(
 }
 
 impl FeeResult {
-    fn checked_add_assign(&mut self, rhs: Self) -> Result<(), Error> {
+    pub fn checked_add_assign(&mut self, rhs: Self) -> Result<(), Error> {
         self.storage_fee = self
             .storage_fee
             .checked_add(rhs.storage_fee)
