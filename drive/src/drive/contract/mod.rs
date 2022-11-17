@@ -32,16 +32,12 @@
 //! This module defines functions pertinent to Contracts stored in Drive.
 //!
 
-use std::borrow::Borrow;
-use std::cell::RefMut;
 use std::collections::HashSet;
-use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
 use crate::common::encode::encode_unsigned_integer;
 use costs::{cost_return_on_error_no_add, CostContext, CostResult, CostsExt, OperationCost};
 use dpp::data_contract::extra::DriveContractExt;
-use dpp::prelude::DataContract;
 use grovedb::reference_path::ReferencePathType::SiblingReference;
 use grovedb::{Element, TransactionArg};
 
@@ -56,7 +52,7 @@ use crate::drive::object_size_info::PathKeyElementInfo::{
     PathFixedSizeKeyElement, PathKeyElementSize,
 };
 use crate::drive::object_size_info::PathKeyInfo::PathFixedSizeKeyRef;
-use crate::drive::{contract_documents_path, defaults, Drive, DriveCache, RootTree};
+use crate::drive::{contract_documents_path, defaults, Drive, RootTree};
 use crate::error::drive::DriveError;
 use crate::error::Error;
 use crate::fee::op::DriveOperation;
@@ -102,6 +98,7 @@ pub fn add_init_contracts_structure_operations(batch: &mut GroveDbOpBatch) {
 }
 
 /// Contract and fetch information
+#[derive(Default, PartialEq, Debug)]
 pub struct ContractFetchInfo {
     /// The contract
     pub contract: Contract,
@@ -187,16 +184,24 @@ impl Drive {
         contract_id: Option<[u8; 32]>,
         block_info: BlockInfo,
         apply: bool,
-        storage_flags: Option<&StorageFlags>,
         transaction: TransactionArg,
     ) -> Result<FeeResult, Error> {
         let mut drive_operations: Vec<DriveOperation> = vec![];
 
         let contract = <Contract as DriveContractExt>::from_cbor(&contract_cbor, contract_id)?;
 
+        let storage_flags = if contract.can_be_deleted() || !contract.readonly() {
+            Some(StorageFlags::new_single_epoch(
+                block_info.epoch.index,
+                Some(contract.owner_id.to_buffer()),
+            ))
+        } else {
+            None
+        };
+
         let contract_element = Element::Item(
             contract_cbor,
-            StorageFlags::map_to_some_element_flags(storage_flags),
+            StorageFlags::map_to_some_element_flags(storage_flags.as_ref()),
         );
 
         self.insert_contract_element(
@@ -338,18 +343,23 @@ impl Drive {
         contract_id: Option<[u8; 32]>,
         block_info: BlockInfo,
         apply: bool,
-        storage_flags: Option<&StorageFlags>,
         transaction: TransactionArg,
     ) -> Result<FeeResult, Error> {
         let mut drive_operations: Vec<DriveOperation> = vec![];
 
         let contract = <Contract as DriveContractExt>::from_cbor(&contract_cbor, contract_id)?;
 
-        let contract_id = contract_id.unwrap_or_else(|| contract.id().as_bytes().clone());
+        let contract_id = contract_id.unwrap_or_else(|| *contract.id().as_bytes());
+
+        // Since we can update the contract by definition it already has storage flags
+        let storage_flags = Some(StorageFlags::new_single_epoch(
+            block_info.epoch.index,
+            Some(contract.owner_id.to_buffer()),
+        ));
 
         let contract_element = Element::Item(
             contract_cbor,
-            StorageFlags::map_to_some_element_flags(storage_flags),
+            StorageFlags::map_to_some_element_flags(storage_flags.as_ref()),
         );
 
         let original_contract_fetch_info = self
@@ -360,8 +370,14 @@ impl Drive {
                 &mut drive_operations,
             )?
             .ok_or(Error::Drive(DriveError::CorruptedCodeExecution(
-                "Contract should exists",
+                "contract should exist",
             )))?;
+
+        if original_contract_fetch_info.contract.readonly() {
+            return Err(Error::Drive(DriveError::UpdatingReadOnlyImmutableContract(
+                "original contract is readonly",
+            )));
+        }
 
         self.update_contract_element(
             contract_element,
@@ -372,6 +388,24 @@ impl Drive {
             transaction,
             &mut drive_operations,
         )?;
+
+        // Update Data Contracts cache with the new contract
+        let updated_contract_fetch_info = self
+            .fetch_contract_and_add_operations(
+                contract_id,
+                Some(&block_info.epoch),
+                transaction,
+                &mut drive_operations,
+            )?
+            .ok_or(Error::Drive(DriveError::CorruptedCodeExecution(
+                "contract should exist",
+            )))?;
+
+        let mut drive_cache = self.cache.borrow_mut();
+
+        drive_cache
+            .cached_contracts
+            .insert(updated_contract_fetch_info, transaction);
 
         calculate_fee(None, Some(drive_operations), &block_info.epoch)
     }
@@ -476,7 +510,7 @@ impl Drive {
         self.add_contract_to_storage(
             contract_element,
             contract,
-            &block_info,
+            block_info,
             apply,
             &mut batch_operations,
         )?;
@@ -615,30 +649,25 @@ impl Drive {
         transaction: TransactionArg,
         drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<Option<Arc<ContractFetchInfo>>, Error> {
-        let cache = self.cache.borrow_mut();
-        match cache.cached_contracts.get(&contract_id) {
-            None => {
-                let mut cost = OperationCost::default();
-                //todo: there is a cost here that isn't returned on error
-                // we should investigate if this could be a problem
-                let result = self
-                    .fetch_contract(contract_id, epoch, transaction, cache)
-                    .unwrap_add_cost(&mut cost)?;
+        let mut cache = self.cache.borrow_mut();
 
-                // we only need to pay if epoch is set
-                if epoch.is_some() {
-                    if let Some(contract_fetch_info) = &result {
-                        let fee = contract_fetch_info.fee.as_ref().ok_or(
-                            Error::Drive(DriveError::CorruptedCodeExecution(
-                                "should be impossible to not have fee on something just fetched with an epoch",
-                            ))
-                        )?;
-                        drive_operations.push(PreCalculatedFeeResult(fee.clone()));
-                    } else {
-                        drive_operations.push(CalculatedCostOperation(cost));
-                    }
-                }
-                Ok(result)
+        match cache.cached_contracts.get(contract_id, transaction) {
+            None => {
+                let maybe_contract_fetch_info = self.fetch_contract_and_add_operations(
+                    contract_id,
+                    epoch,
+                    transaction,
+                    drive_operations,
+                )?;
+
+                // Store a contract in cache if present
+                if let Some(contract_fetch_info) = &maybe_contract_fetch_info {
+                    cache
+                        .cached_contracts
+                        .insert(Arc::clone(contract_fetch_info), transaction);
+                };
+
+                Ok(maybe_contract_fetch_info)
             }
             Some(contract_fetch_info) => {
                 // we only need to pay if epoch is set
@@ -651,16 +680,16 @@ impl Drive {
                         let fee = calculate_fee(None, Some(op), epoch)?;
 
                         let updated_contract_fetch_info = Arc::new(ContractFetchInfo {
-                            contract: (&contract_fetch_info.contract).clone(),
-                            storage_flags: (&contract_fetch_info.storage_flags).clone(),
-                            cost: (&contract_fetch_info.cost).clone(),
+                            contract: contract_fetch_info.contract.clone(),
+                            storage_flags: contract_fetch_info.storage_flags.clone(),
+                            cost: contract_fetch_info.cost.clone(),
                             fee: Some(fee.clone()),
                         });
 
                         // we override the cache for the contract as the fee is now calculated
                         cache
                             .cached_contracts
-                            .insert(contract_id, updated_contract_fetch_info);
+                            .insert(updated_contract_fetch_info, transaction);
 
                         fee
                     };
@@ -671,18 +700,51 @@ impl Drive {
         }
     }
 
+    /// Fetch contract from database and add operations
+    fn fetch_contract_and_add_operations(
+        &self,
+        contract_id: [u8; 32],
+        epoch: Option<&Epoch>,
+        transaction: TransactionArg,
+        drive_operations: &mut Vec<DriveOperation>,
+    ) -> Result<Option<Arc<ContractFetchInfo>>, Error> {
+        let mut cost = OperationCost::default();
+
+        //todo: there is a cost here that isn't returned on error
+        // we should investigate if this could be a problem
+        let maybe_contract_fetch_info = self
+            .fetch_contract(contract_id, epoch, transaction)
+            .unwrap_add_cost(&mut cost)?;
+
+        if let Some(contract_fetch_info) = &maybe_contract_fetch_info {
+            // we only need to pay if epoch is set
+            if epoch.is_some() {
+                let fee = contract_fetch_info
+                    .fee
+                    .as_ref()
+                    .ok_or(Error::Drive(DriveError::CorruptedCodeExecution(
+                    "should be impossible to not have fee on something just fetched with an epoch",
+                )))?;
+                drive_operations.push(PreCalculatedFeeResult(fee.clone()));
+            }
+        } else if epoch.is_some() {
+            drive_operations.push(CalculatedCostOperation(cost));
+        }
+
+        Ok(maybe_contract_fetch_info)
+    }
+
     /// Returns the contract fetch info with the given ID if it's in cache.
     pub fn get_cached_contract_with_fetch_info(
         &self,
         contract_id: [u8; 32],
-    ) -> Result<Option<Arc<ContractFetchInfo>>, Error> {
-        match self.cache.borrow().cached_contracts.get(&contract_id) {
-            None => Ok(None),
-            Some(contract_fetch_info) => {
-                let contract_fetch_info_ref = Arc::clone(&contract_fetch_info);
-                Ok(Some(contract_fetch_info_ref))
-            }
-        }
+        transaction: TransactionArg,
+    ) -> Option<Arc<ContractFetchInfo>> {
+        self.cache
+            .borrow()
+            .cached_contracts
+            .get(contract_id, transaction)
+            .map(|fetch_info| Arc::clone(&fetch_info))
     }
 
     /// Returns the contract with the given ID from storage and also inserts it in cache.
@@ -691,7 +753,6 @@ impl Drive {
         contract_id: [u8; 32],
         epoch: Option<&Epoch>,
         transaction: TransactionArg,
-        drive_cache: RefMut<DriveCache>,
     ) -> CostResult<Option<Arc<ContractFetchInfo>>, Error> {
         let CostContext { value, cost } =
             self.grove
@@ -724,10 +785,7 @@ impl Drive {
                     cost: cost.clone(),
                     fee,
                 });
-                drive_cache
-                    .deref()
-                    .cached_contracts
-                    .insert(contract_id, Arc::clone(&contract_fetch_info));
+
                 Ok(Some(Arc::clone(&contract_fetch_info))).wrap_with_cost(cost)
             }
             Ok(_) => Err(Error::Drive(DriveError::CorruptedContractPath(
@@ -1035,20 +1093,60 @@ mod tests {
             .expect("expected to insert a document successfully");
     }
 
-    #[test]
-    fn test_get_non_existent_contract() {
-        let tmp_dir = TempDir::new().unwrap();
-        let drive: Drive = Drive::open(tmp_dir, None).expect("expected to open Drive successfully");
+    mod get_contract_with_fetch_info_and_add_to_operations {
+        use super::*;
 
-        drive
-            .create_initial_state_structure(None)
-            .expect("expected to create state structure");
-        let contract_id = rand::thread_rng().gen::<[u8; 32]>();
+        #[test]
+        fn test_get_contract_from_global_and_transactional_cache() {
+            let (drive, mut contract, _) = setup_reference_contract();
 
-        let result = drive
-            .get_contract_with_fetch_info(contract_id, None, None)
-            .expect("should get contract");
+            let transaction = drive.grove.start_transaction();
 
-        assert!(result.is_none());
+            contract.increment_version();
+
+            let updated_contract_cbor = contract.to_buffer().expect("should serialize a contract");
+
+            drive
+                .update_contract_cbor(
+                    updated_contract_cbor,
+                    None,
+                    BlockInfo::default(),
+                    true,
+                    Some(&transaction),
+                )
+                .expect("should update contract");
+
+            let fetch_info_from_database = drive
+                .get_contract_with_fetch_info(contract.id().to_buffer(), None, None)
+                .expect("should get contract")
+                .expect("should be present");
+
+            assert_eq!(fetch_info_from_database.contract.version(), 1);
+
+            let fetch_info_from_cache = drive
+                .get_contract_with_fetch_info(contract.id().to_buffer(), None, Some(&transaction))
+                .expect("should get contract")
+                .expect("should be present");
+
+            assert_eq!(fetch_info_from_cache.contract.version(), 2);
+        }
+
+        #[test]
+        fn test_get_non_existent_contract() {
+            let tmp_dir = TempDir::new().unwrap();
+            let drive: Drive =
+                Drive::open(tmp_dir, None).expect("expected to open Drive successfully");
+
+            drive
+                .create_initial_state_structure(None)
+                .expect("expected to create state structure");
+            let contract_id = rand::thread_rng().gen::<[u8; 32]>();
+
+            let result = drive
+                .get_contract_with_fetch_info(contract_id, None, None)
+                .expect("should get contract");
+
+            assert!(result.is_none());
+        }
     }
 }

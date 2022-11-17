@@ -4,13 +4,13 @@ use std::{option::Option::None, path::Path, sync::mpsc, thread};
 
 use dash_abci::abci::handlers::TenderdashAbci;
 use dash_abci::abci::messages::{
-    BlockBeginRequest, BlockEndRequest, InitChainRequest, Serializable,
+    AfterFinalizeBlockRequest, BlockBeginRequest, BlockEndRequest, InitChainRequest, Serializable,
 };
 use dash_abci::platform::Platform;
 use neon::prelude::*;
-use neon::types::buffer::TypedArray;
 use rs_drive::dpp::identity::Identity;
 use rs_drive::drive::batch::GroveDbOpBatch;
+use rs_drive::drive::config::DriveConfig;
 use rs_drive::drive::flags::StorageFlags;
 use rs_drive::fee_pools::epochs::Epoch;
 use rs_drive::grovedb::{PathQuery, Transaction, TransactionArg};
@@ -49,7 +49,23 @@ impl DriveWrapper {
     // 3. On a separate thread, read closures off the channel and execute with
     // access    to the connection.
     fn new(cx: &mut FunctionContext) -> NeonResult<Self> {
+        // Drive's configuration
         let path_string = cx.argument::<JsString>(0)?.value(cx);
+        let drive_config = cx.argument::<JsObject>(1)?;
+
+        let js_data_contracts_cache_size: Handle<JsNumber> =
+            drive_config.get(cx, "dataContractsGlobalCacheSize")?;
+        let data_contracts_global_cache_size =
+            u64::try_from(js_data_contracts_cache_size.value(cx) as i64).or_else(|_| {
+                cx.throw_range_error("`dataContractsGlobalCacheSize` must fit in u64")
+            })?;
+
+        let js_data_contracts_transactional_cache_size: Handle<JsNumber> =
+            drive_config.get(cx, "dataContractsTransactionalCacheSize")?;
+        let data_contracts_transactional_cache_size =
+            u64::try_from(js_data_contracts_transactional_cache_size.value(cx) as i64).or_else(
+                |_| cx.throw_range_error("`dataContractsTransactionalCacheSize` must fit in u64"),
+            )?;
 
         // Channel for sending callbacks to execute on the Drive connection thread
         let (tx, rx) = mpsc::channel::<DriveMessage>();
@@ -66,8 +82,15 @@ impl DriveWrapper {
         thread::spawn(move || {
             let path = Path::new(&path_string);
             // Open a connection to groveDb, this will be moved to a separate thread
+
+            let drive_config = DriveConfig {
+                data_contracts_global_cache_size,
+                data_contracts_transactional_cache_size,
+                ..Default::default()
+            };
+
             // TODO: think how to pass this error to JS
-            let platform: Platform = Platform::open(path, None).unwrap();
+            let platform: Platform = Platform::open(path, Some(drive_config)).unwrap();
 
             let mut transaction: Option<Transaction> = None;
 
@@ -100,22 +123,52 @@ impl DriveWrapper {
                         callback(&channel);
                     }
                     DriveMessage::CommitTransaction(callback) => {
-                        platform
-                            .drive
-                            .commit_transaction(transaction.take().unwrap())
-                            .unwrap();
-                        callback(&channel);
+                        if let Some(tx) = &transaction {
+                            // Merge and clear transactional cache
+
+                            let mut drive_cache = platform.drive.cache.borrow_mut();
+
+                            drive_cache.cached_contracts.merge_transactional_cache(tx);
+
+                            drive_cache.cached_contracts.clear_transactional_cache(tx);
+
+                            // Commit transaction
+
+                            platform
+                                .drive
+                                .commit_transaction(transaction.take().unwrap())
+                                .unwrap();
+
+                            callback(&channel);
+                        } else {
+                            panic!("transaction is not started");
+                        }
                     }
                     DriveMessage::RollbackTransaction(callback) => {
-                        platform
-                            .drive
-                            .rollback_transaction(&transaction.take().unwrap())
-                            .unwrap();
-                        callback(&channel);
+                        if let Some(tx) = &transaction {
+                            let mut drive_cache = platform.drive.cache.borrow_mut();
+
+                            drive_cache.cached_contracts.clear_transactional_cache(tx);
+
+                            platform.drive.rollback_transaction(tx).unwrap();
+
+                            callback(&channel);
+                        } else {
+                            panic!("transaction is not started");
+                        }
                     }
                     DriveMessage::AbortTransaction(callback) => {
-                        drop(transaction.take());
-                        callback(&channel);
+                        if let Some(tx) = &transaction {
+                            let mut drive_cache = platform.drive.cache.borrow_mut();
+
+                            drive_cache.cached_contracts.clear_transactional_cache(tx);
+
+                            drop(transaction.take());
+
+                            callback(&channel);
+                        } else {
+                            panic!("transaction is not started");
+                        }
                     }
                 }
             }
@@ -367,7 +420,6 @@ impl DriveWrapper {
                     None,
                     block_info,
                     apply,
-                    StorageFlags::optional_default_as_ref(),
                     using_transaction.then_some(transaction).flatten(),
                 );
 
@@ -421,7 +473,6 @@ impl DriveWrapper {
                     None,
                     block_info,
                     apply,
-                    StorageFlags::optional_default_as_ref(),
                     using_transaction.then_some(transaction).flatten(),
                 );
 
@@ -478,6 +529,9 @@ impl DriveWrapper {
 
         drive
             .send_to_drive_thread(move |platform: &Platform, transaction, channel| {
+                let storage_flags =
+                    StorageFlags::new_single_epoch(block_info.epoch.index, Some(owner_id));
+
                 let result = platform.drive.add_serialized_document_for_contract_id(
                     &document_cbor,
                     contract_id,
@@ -486,7 +540,7 @@ impl DriveWrapper {
                     override_document,
                     block_info,
                     apply,
-                    StorageFlags::optional_default_as_ref(),
+                    Some(storage_flags).as_ref(),
                     using_transaction.then_some(transaction).flatten(),
                 );
 
@@ -541,6 +595,9 @@ impl DriveWrapper {
 
         drive
             .send_to_drive_thread(move |platform: &Platform, transaction, channel| {
+                let storage_flags =
+                    StorageFlags::new_single_epoch(block_info.epoch.index, Some(owner_id));
+
                 let result = platform.drive.update_document_for_contract_id(
                     &document_cbor,
                     contract_id,
@@ -548,7 +605,7 @@ impl DriveWrapper {
                     Some(owner_id),
                     block_info,
                     apply,
-                    StorageFlags::optional_default_as_ref(),
+                    Some(storage_flags).as_ref(),
                     using_transaction.then_some(transaction).flatten(),
                 );
 
@@ -673,11 +730,16 @@ impl DriveWrapper {
 
         drive
             .send_to_drive_thread(move |platform: &Platform, transaction, channel| {
+                let storage_flags = StorageFlags::new_single_epoch(
+                    block_info.epoch.index,
+                    Some(identity.id.to_buffer()),
+                );
+
                 let result = platform.drive.insert_identity(
                     identity,
                     block_info,
                     apply,
-                    StorageFlags::optional_default_as_ref(),
+                    Some(storage_flags).as_ref(),
                     using_transaction.then_some(transaction).flatten(),
                 );
 
@@ -1720,6 +1782,47 @@ impl DriveWrapper {
         Ok(cx.undefined())
     }
 
+    fn js_abci_after_finalize_block(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+        let js_request = cx.argument::<JsBuffer>(0)?;
+        let js_callback = cx.argument::<JsFunction>(1)?.root(&mut cx);
+
+        let db = cx
+            .this()
+            .downcast_or_throw::<JsBox<DriveWrapper>, _>(&mut cx)?;
+
+        let request_bytes = converter::js_buffer_to_vec_u8(js_request, &mut cx);
+
+        db.send_to_drive_thread(move |platform: &Platform, _, channel| {
+            let result = AfterFinalizeBlockRequest::from_bytes(&request_bytes)
+                .and_then(|request| platform.after_finalize_block(request))
+                .and_then(|response| response.to_bytes());
+
+            channel.send(move |mut task_context| {
+                let callback = js_callback.into_inner(&mut task_context);
+                let this = task_context.undefined();
+
+                let callback_arguments: Vec<Handle<JsValue>> = match result {
+                    Ok(response_bytes) => {
+                        let value = JsBuffer::external(&mut task_context, response_bytes);
+
+                        vec![task_context.null().upcast(), value.upcast()]
+                    }
+
+                    // Convert the error to a JavaScript exception on failure
+                    Err(err) => vec![task_context.error(err.to_string())?.upcast()],
+                };
+
+                callback.call(&mut task_context, this, callback_arguments)?;
+
+                Ok(())
+            });
+        })
+        .or_else(|err| cx.throw_error(err.to_string()))?;
+
+        // The result is returned through the callback, not through direct return
+        Ok(cx.undefined())
+    }
+
     fn js_fetch_latest_withdrawal_transaction_index(
         mut cx: FunctionContext,
     ) -> JsResult<JsUndefined> {
@@ -1903,6 +2006,10 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("abciInitChain", DriveWrapper::js_abci_init_chain)?;
     cx.export_function("abciBlockBegin", DriveWrapper::js_abci_block_begin)?;
     cx.export_function("abciBlockEnd", DriveWrapper::js_abci_block_end)?;
+    cx.export_function(
+        "abciAfterFinalizeBlock",
+        DriveWrapper::js_abci_after_finalize_block,
+    )?;
 
     Ok(())
 }

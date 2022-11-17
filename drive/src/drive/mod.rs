@@ -34,7 +34,6 @@ use std::cell::RefCell;
 use std::path::Path;
 
 use grovedb::{GroveDb, Transaction, TransactionArg};
-use moka::sync::Cache;
 
 use object_size_info::DocumentAndContractInfo;
 use object_size_info::DocumentInfo::DocumentSize;
@@ -78,10 +77,12 @@ pub mod object_size_info;
 pub mod query;
 
 use crate::drive::block_info::BlockInfo;
-use crate::drive::cache::DriveCache;
+use crate::drive::cache::{DataContractCache, DriveCache};
 use crate::fee::FeeResult;
 use crate::fee_pools::epochs::Epoch;
 use dpp::data_contract::extra::DriveContractExt;
+
+type TransactionPointerAddress = usize;
 
 /// Drive struct
 pub struct Drive {
@@ -157,12 +158,19 @@ impl Drive {
         match GroveDb::open(path) {
             Ok(grove) => {
                 let config = config.unwrap_or_default();
-                let genesis_time_ms = config.default_genesis_time.clone();
+                let genesis_time_ms = config.default_genesis_time;
+                let data_contracts_global_cache_size = config.data_contracts_global_cache_size;
+                let data_contracts_transactional_cache_size =
+                    config.data_contracts_transactional_cache_size;
+
                 Ok(Drive {
                     grove,
                     config,
                     cache: RefCell::new(DriveCache {
-                        cached_contracts: Cache::new(200),
+                        cached_contracts: DataContractCache::new(
+                            data_contracts_global_cache_size,
+                            data_contracts_transactional_cache_size,
+                        ),
                         genesis_time_ms,
                     }),
                 })

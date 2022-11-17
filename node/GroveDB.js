@@ -339,13 +339,6 @@ class GroveDB {
  */
 
 /**
- * @typedef BlockInfo
- * @property {number} height
- * @property {number} epoch
- * @property {number} timeMs
- */
-
-/**
  * @typedef FeeResult
  * @property {number} processingFee
  * @property {number} storageFee

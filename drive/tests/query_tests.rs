@@ -2321,8 +2321,8 @@ fn test_query_with_cached_contract() {
     let where_cbor = common::value_to_cbor(query_value, None);
 
     let contract_ref = drive
-        .get_cached_contract_with_fetch_info(contract.id.as_bytes().clone())
-        .expect("expected to be able to get no contract");
+        .get_cached_contract_with_fetch_info(contract.id.as_bytes().clone(), Some(&db_transaction));
+
     assert!(contract_ref.is_none());
 
     let (results, _, _) = drive
@@ -2350,9 +2350,9 @@ fn test_query_with_cached_contract() {
     assert_eq!(results, proof_results);
 
     let contract_ref = drive
-        .get_cached_contract_with_fetch_info(*contract.id.as_bytes())
-        .expect("expected to be able to get contract")
+        .get_cached_contract_with_fetch_info(*contract.id.as_bytes(), None)
         .expect("expected a reference counter to the contract");
+
     assert_eq!(Arc::strong_count(&contract_ref), 2);
 }
 

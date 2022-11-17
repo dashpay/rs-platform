@@ -26,7 +26,10 @@ describe('Drive', () => {
   let initialRootHash;
 
   beforeEach(async () => {
-    drive = new Drive(TEST_DATA_PATH);
+    drive = new Drive(TEST_DATA_PATH, {
+      dataContractsGlobalCacheSize: 500,
+      dataContractsTransactionalCacheSize: 500,
+    });
 
     dataContract = getDataContractFixture();
     identity = getIdentityFixture();
@@ -571,6 +574,41 @@ describe('Drive', () => {
 
         expect(response).to.have.property('proposersPaidCount');
         expect(response).to.have.property('paidEpochIndex');
+      });
+    });
+
+    describe('AfterFinalizeBlock', () => {
+      beforeEach(async function beforeEach() {
+        this.timeout(10000);
+
+        await drive.createInitialStateStructure();
+        await drive.createContract(dataContract, blockInfo);
+
+        await drive.getAbci().initChain({});
+        await drive.getAbci().blockBegin({
+          blockHeight: 1,
+          blockTimeMs: (new Date()).getTime(),
+          proposerProTxHash: Buffer.alloc(32, 1),
+          validatorSetQuorumHash: Buffer.alloc(32, 2),
+        });
+        await drive.getAbci().blockEnd({
+          fees: {
+            storageFees: 100,
+            processingFees: 100,
+          },
+        });
+      });
+
+      it('should process a block', async function it() {
+        this.timeout(10000);
+
+        const request = {
+          updatedDataContractIds: [dataContract.getId()],
+        };
+
+        const response = await drive.getAbci().afterFinalizeBlock(request);
+
+        expect(response).to.be.empty();
       });
     });
   });
