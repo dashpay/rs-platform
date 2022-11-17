@@ -666,6 +666,46 @@ fn test_reference_proof_single_index() {
 }
 
 #[test]
+fn test_non_existence_reference_proof_single_index() {
+    let (drive, contract) = setup_family_tests_only_first_name_index(0, true, 73509);
+
+    let db_transaction = drive.grove.start_transaction();
+
+    let root_hash = drive
+        .grove
+        .root_hash(Some(&db_transaction))
+        .unwrap()
+        .expect("there is always a root hash");
+
+    // A query getting all elements by firstName
+
+    let query_value = json!({
+        "where": [
+        ],
+        "limit": 100,
+        "orderBy": [
+            ["firstName", "asc"]
+        ]
+    });
+    let where_cbor = common::value_to_cbor(query_value, None);
+    let person_document_type = contract
+        .document_types()
+        .get("person")
+        .expect("contract should have a person document type");
+    let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &person_document_type)
+        .expect("query should be built");
+    let (results, _, _) = query
+        .execute_no_proof(&drive, None, Some(&db_transaction))
+        .expect("proof should be executed");
+
+    let (proof_root_hash, proof_results, _) = query
+        .execute_with_proof_only_get_elements(&drive, None, None)
+        .expect("we should be able to a proof");
+    assert_eq!(root_hash, proof_root_hash);
+    assert_eq!(results, proof_results);
+}
+
+#[test]
 fn test_family_basic_queries() {
     let (drive, contract) = setup_family_tests(10, true, 73509);
 
