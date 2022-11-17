@@ -316,10 +316,10 @@ impl IdentityPublicKey {
             return Err(ProtocolError::EmptyPublicKeyDataError);
         }
 
-        return match self.key_type {
+        match self.key_type {
             KeyType::ECDSA_SECP256K1 | KeyType::BLS12_381 => Ok(ripemd160_sha256(&self.data)),
             KeyType::ECDSA_HASH160 | KeyType::BIP13_SCRIPT_HASH => Ok(self.data.clone()),
-        };
+        }
     }
 
     pub fn as_ecdsa_array(&self) -> Result<[u8; 33], InvalidVectorSizeError> {
