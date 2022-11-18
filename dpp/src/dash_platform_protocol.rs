@@ -1,12 +1,12 @@
 use std::sync::Arc;
-use crate::BlsValidator;
+use crate::BlsModule;
 
 use crate::errors::DashPlatformProtocolInitError;
 use crate::identity::validation::{PublicKeysValidator};
 use crate::identity::IdentityFacade;
 use crate::version::{ProtocolVersionValidator, COMPATIBILITY_MAP, LATEST_VERSION};
 
-pub struct DashPlatformProtocol<SR, BLS: BlsValidator> {
+pub struct DashPlatformProtocol<SR, BLS: BlsModule> {
     /// Version of protocol
     pub protocol_version: u32,
     /// Public facing facades to interact with the library
@@ -17,7 +17,7 @@ pub struct DashPlatformProtocol<SR, BLS: BlsValidator> {
 
 /// DashPlatformProtocol is the main interface of the library used to perform validation
 /// and creating of different data structures
-impl<SR, BLS: BlsValidator> DashPlatformProtocol<SR, BLS> {
+impl<SR, BLS: BlsModule> DashPlatformProtocol<SR, BLS> {
     pub fn new(
         options: DPPOptions,
         state_repository: SR,

@@ -3,13 +3,13 @@ use std::sync::Arc;
 use crate::identity::validation::{IdentityValidator, PublicKeysValidator};
 use crate::validation::ValidationResult;
 use crate::version::ProtocolVersionValidator;
-use crate::{BlsValidator, DashPlatformProtocolInitError, NonConsensusError};
+use crate::{BlsModule, DashPlatformProtocolInitError, NonConsensusError};
 
-pub struct IdentityFacade<T: BlsValidator> {
+pub struct IdentityFacade<T: BlsModule> {
     identity_validator: IdentityValidator<PublicKeysValidator<T>>,
 }
 
-impl<T: BlsValidator> IdentityFacade<T> {
+impl<T: BlsModule> IdentityFacade<T> {
     pub fn new(
         protocol_version_validator: Arc<ProtocolVersionValidator>,
         public_keys_validator: Arc<PublicKeysValidator<T>>,

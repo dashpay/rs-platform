@@ -11,7 +11,7 @@ use crate::errors::consensus::basic::identity::{
 };
 use crate::identity::{IdentityPublicKey, KeyType, ALLOWED_SECURITY_LEVELS};
 use crate::validation::{JsonSchemaValidator, ValidationResult};
-use crate::{BlsValidator, DashPlatformProtocolInitError, NonConsensusError, PublicKeyValidationError};
+use crate::{BlsModule, DashPlatformProtocolInitError, NonConsensusError, PublicKeyValidationError};
 
 #[cfg(test)]
 use mockall::{automock, predicate::*};
@@ -33,13 +33,13 @@ pub trait TPublicKeysValidator {
     ) -> Result<ValidationResult<()>, NonConsensusError>;
 }
 
-pub struct PublicKeysValidator<T: BlsValidator> {
+pub struct PublicKeysValidator<T: BlsModule> {
     public_key_schema_validator: JsonSchemaValidator,
     bls_validator: T,
 }
 
 
-impl<T: BlsValidator> TPublicKeysValidator for PublicKeysValidator<T> {
+impl<T: BlsModule> TPublicKeysValidator for PublicKeysValidator<T> {
     fn validate_keys(
         &self,
         raw_public_keys: &[Value],
@@ -139,7 +139,7 @@ impl<T: BlsValidator> TPublicKeysValidator for PublicKeysValidator<T> {
     }
 }
 
-impl<T: BlsValidator> PublicKeysValidator<T> {
+impl<T: BlsModule> PublicKeysValidator<T> {
     pub fn new(bls_validator: T) -> Result<Self, DashPlatformProtocolInitError> {
         let public_key_schema_validator = JsonSchemaValidator::new(PUBLIC_KEY_SCHEMA.clone())?;
 

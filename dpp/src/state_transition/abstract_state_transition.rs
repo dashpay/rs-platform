@@ -10,15 +10,11 @@ use dashcore::signer;
 use serde::Serialize;
 use serde_json::Value as JsonValue;
 
-use crate::{
-    identity::KeyType,
-    prelude::ProtocolError,
-    util::{
-        hash,
-        json_value::{JsonValueExt, ReplaceWith},
-        serializer,
-    },
-};
+use crate::{BlsModule, identity::KeyType, prelude::ProtocolError, util::{
+    hash,
+    json_value::{JsonValueExt, ReplaceWith},
+    serializer,
+}};
 
 use super::{
     fee::calculate_state_transition_fee::calculate_state_transition_fee,
@@ -94,17 +90,18 @@ pub trait StateTransitionLike:
         Ok(())
     }
 
-    fn verify_by_public_key(
+    fn verify_by_public_key<T: BlsModule>(
         &self,
         public_key: &[u8],
         public_key_type: KeyType,
+        bls: &T,
     ) -> Result<(), ProtocolError> {
         match public_key_type {
             KeyType::ECDSA_SECP256K1 => self.verify_ecdsa_signature_by_public_key(public_key),
             KeyType::ECDSA_HASH160 => {
                 self.verify_ecdsa_hash_160_signature_by_public_key_hash(public_key)
             }
-            KeyType::BLS12_381 => self.verify_bls_signature_by_public_key(public_key),
+            KeyType::BLS12_381 => self.verify_bls_signature_by_public_key(public_key, bls),
             KeyType::BIP13_SCRIPT_HASH => {
                 Err(ProtocolError::InvalidIdentityPublicKeyTypeError { public_key_type })
             }
@@ -144,7 +141,7 @@ pub trait StateTransitionLike:
     }
 
     /// Verifies a BLS signature with the public key
-    fn verify_bls_signature_by_public_key(&self, public_key: &[u8]) -> Result<(), ProtocolError> {
+    fn verify_bls_signature_by_public_key<T: BlsModule>(&self, public_key: &[u8], bls: &T) -> Result<(), ProtocolError> {
         if self.get_signature().is_empty() {
             return Err(ProtocolError::StateTransitionIsNotIsSignedError {
                 state_transition: self.clone().into(),
@@ -152,14 +149,16 @@ pub trait StateTransitionLike:
         }
 
         let data = self.to_buffer(true)?;
-        let pk = BLSPublicKey::from_bytes(public_key).map_err(anyhow::Error::msg)?;
-        let signature = bls_signatures::Signature::from_bytes(self.get_signature())
-            .map_err(anyhow::Error::msg)?;
-        match verify_messages(&signature, &[&data], &[pk]) {
-            true => Ok(()),
-            // TODO change to specific error type
-            false => Err(anyhow!("Verification failed").into()),
-        }
+        // let pk = BLSPublicKey::from_bytes(public_key).map_err(anyhow::Error::msg)?;
+        // let signature = bls_signatures::Signature::from_bytes(self.get_signature())
+        //     .map_err(anyhow::Error::msg)?;
+        // match verify_messages(&signature, &[&data], &[pk]) {
+        //     true => Ok(()),
+        //     // TODO change to specific error type
+        //     false => Err(anyhow!("Verification failed").into()),
+        // };
+
+        bls.verify_signature(self.get_signature(), &data, public_key).map(|_| ())
     }
 
     /// returns true if state transition is a document state transition
