@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
-use crate::identity::validation::{BlsValidator, IdentityValidator, NativeBlsValidator, PublicKeysValidator};
+use crate::identity::validation::{IdentityValidator, PublicKeysValidator};
 use crate::validation::ValidationResult;
 use crate::version::ProtocolVersionValidator;
-use crate::{DashPlatformProtocolInitError, NonConsensusError};
+use crate::{BlsValidator, DashPlatformProtocolInitError, NonConsensusError};
 
 pub struct IdentityFacade<T: BlsValidator> {
     identity_validator: IdentityValidator<PublicKeysValidator<T>>,

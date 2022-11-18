@@ -2,9 +2,9 @@ use std::sync::Arc;
 
 use serde_json::Value;
 
-use crate::assert_consensus_errors;
+use crate::{assert_consensus_errors, NativeBlsValidator};
 use crate::errors::consensus::ConsensusError;
-use crate::identity::validation::{IdentityValidator, PublicKeysValidator, PUBLIC_KEY_SCHEMA, NativeBlsValidator};
+use crate::identity::validation::{IdentityValidator, PublicKeysValidator, PUBLIC_KEY_SCHEMA};
 use crate::version::ProtocolVersionValidator;
 
 fn setup_test() -> (Value, IdentityValidator<PublicKeysValidator<NativeBlsValidator>>) {

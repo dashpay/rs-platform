@@ -1,8 +1,4 @@
-use crate::{
-    dash_platform_protocol::DPPOptions, state_repository::MockStateRepositoryLike,
-    DashPlatformProtocol,
-};
-use crate::identity::validation::NativeBlsValidator;
+use crate::{dash_platform_protocol::DPPOptions, state_repository::MockStateRepositoryLike, DashPlatformProtocol, NativeBlsValidator};
 
 // TODO creation of DPP object for testing needs to be improved
 pub fn get_dpp() -> DashPlatformProtocol<MockStateRepositoryLike, NativeBlsValidator> {

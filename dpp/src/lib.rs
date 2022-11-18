@@ -39,6 +39,8 @@ pub mod mocks;
 
 #[cfg(test)]
 mod tests;
+mod bls_validator;
+pub use bls_validator::*;
 
 pub mod prelude {
     pub use crate::data_contract::DataContract;

@@ -11,7 +11,7 @@ use crate::errors::consensus::basic::identity::{
 };
 use crate::identity::{IdentityPublicKey, KeyType, ALLOWED_SECURITY_LEVELS};
 use crate::validation::{JsonSchemaValidator, ValidationResult};
-use crate::{DashPlatformProtocolInitError, NonConsensusError, PublicKeyValidationError};
+use crate::{BlsValidator, DashPlatformProtocolInitError, NonConsensusError, PublicKeyValidationError};
 
 #[cfg(test)]
 use mockall::{automock, predicate::*};
@@ -36,22 +36,6 @@ pub trait TPublicKeysValidator {
 pub struct PublicKeysValidator<T: BlsValidator> {
     public_key_schema_validator: JsonSchemaValidator,
     bls_validator: T,
-}
-
-pub trait BlsValidator {
-    fn validate_public_key(&self, pk: &[u8]) -> Result<(), PublicKeyValidationError>;
-}
-
-#[derive(Default)]
-pub struct NativeBlsValidator;
-
-impl BlsValidator for NativeBlsValidator {
-    fn validate_public_key(&self, pk: &[u8]) -> Result<(), PublicKeyValidationError> {
-        match BlsPublicKey::from_bytes(pk) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(PublicKeyValidationError::new(e.to_string())),
-        }
-    }
 }
 
 
