@@ -2457,12 +2457,19 @@ fn test_query_with_cached_contract() {
         .unwrap()
         .expect("there is always a root hash");
 
+    // Make sure the state is deterministic
     let expected_app_hash = vec![
         215, 91, 173, 219, 179, 145, 217, 218, 137, 212, 164, 79, 135, 107, 60, 107, 7, 66, 82, 49,
         27, 36, 192, 233, 23, 152, 140, 237, 49, 23, 122, 168,
     ];
 
     assert_eq!(root_hash.as_slice(), expected_app_hash);
+
+    // Make sure contract is not cached
+    let contract_ref =
+        drive.get_cached_contract_with_fetch_info(*contract.id.as_bytes(), Some(&db_transaction));
+
+    assert!(contract_ref.is_none());
 
     // A query getting all elements by firstName
 
@@ -2476,15 +2483,10 @@ fn test_query_with_cached_contract() {
     });
     let where_cbor = common::value_to_cbor(query_value, None);
 
-    let contract_ref = drive
-        .get_cached_contract_with_fetch_info(contract.id.as_bytes().clone(), Some(&db_transaction));
-
-    assert!(contract_ref.is_none());
-
     let (results, _, _) = drive
         .query_documents(
             where_cbor.as_slice(),
-            contract.id.as_bytes().clone(),
+            *contract.id.as_bytes(),
             "person",
             None,
             Some(&db_transaction),
@@ -2493,20 +2495,9 @@ fn test_query_with_cached_contract() {
 
     assert_eq!(results.len(), 10);
 
-    let person_document_type = contract
-        .document_types()
-        .get("person")
-        .expect("contract should have a person document type");
-    let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &person_document_type)
-        .expect("query should be built");
-    let (proof_root_hash, proof_results, _) = query
-        .execute_with_proof_only_get_elements(&drive, None, None)
-        .expect("we should be able to a proof");
-    assert_eq!(root_hash, proof_root_hash);
-    assert_eq!(results, proof_results);
-
+    // Cache was populated and there only two ref two the cached fetched info (here and cache)
     let contract_ref = drive
-        .get_cached_contract_with_fetch_info(*contract.id.as_bytes(), None)
+        .get_cached_contract_with_fetch_info(*contract.id.as_bytes(), Some(&db_transaction))
         .expect("expected a reference counter to the contract");
 
     assert_eq!(Arc::strong_count(&contract_ref), 2);

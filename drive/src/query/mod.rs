@@ -67,7 +67,6 @@ use crate::error::drive::DriveError;
 use crate::error::query::QueryError;
 use crate::error::structure::StructureError;
 use crate::error::Error;
-use crate::error::Error::GroveDB;
 use crate::fee::calculate_fee;
 use crate::fee::op::DriveOperation;
 use dpp::data_contract::extra::DocumentType;
@@ -540,7 +539,8 @@ impl<'a> DriveQuery<'a> {
                     )
                     .map_err(|e| match e {
                         Error::GroveDB(GroveError::PathKeyNotFound(_))
-                        | Error::GroveDB(GroveError::PathNotFound(_)) => {
+                        | Error::GroveDB(GroveError::PathNotFound(_))
+                        | Error::GroveDB(GroveError::PathParentLayerNotFound(_)) => {
                             let error_message = if self.start_at_included {
                                 "startAt document not found"
                             } else {
@@ -1306,9 +1306,9 @@ impl<'a> DriveQuery<'a> {
             self.construct_path_query_operations(drive, transaction, drive_operations)?;
         let query_result = drive.grove_get_path_query(&path_query, transaction, drive_operations);
         match query_result {
-            Err(GroveDB(GroveError::PathKeyNotFound(_)))
-            | Err(GroveDB(GroveError::PathNotFound(_)))
-            | Err(GroveDB(GroveError::PathParentLayerNotFound(_))) => Ok((Vec::new(), 0)),
+            Err(Error::GroveDB(GroveError::PathKeyNotFound(_)))
+            | Err(Error::GroveDB(GroveError::PathNotFound(_)))
+            | Err(Error::GroveDB(GroveError::PathParentLayerNotFound(_))) => Ok((Vec::new(), 0)),
             _ => {
                 let (data, skipped) = query_result?;
                 {

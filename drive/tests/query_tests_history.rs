@@ -257,8 +257,8 @@ fn test_query_historical() {
     assert_eq!(
         root_hash.as_slice(),
         vec![
-            230, 236, 88, 150, 111, 150, 60, 149, 247, 147, 196, 208, 248, 49, 68, 225, 141, 201,
-            251, 163, 138, 143, 223, 178, 244, 176, 103, 71, 146, 151, 51, 206
+            172, 91, 214, 52, 75, 82, 199, 59, 140, 214, 98, 176, 78, 117, 136, 4, 206, 173, 202,
+            110, 251, 122, 65, 84, 82, 170, 169, 167, 237, 225, 148, 4
         ]
     );
 
@@ -290,7 +290,7 @@ fn test_query_historical() {
         .document_types()
         .get("person")
         .expect("contract should have a person document type");
-    let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, &person_document_type)
+    let query = DriveQuery::from_cbor(where_cbor.as_slice(), &contract, person_document_type)
         .expect("query should be built");
     let (results, _, _) = query
         .execute_no_proof(&drive, None, Some(&db_transaction))
@@ -1536,8 +1536,8 @@ fn test_query_historical() {
     assert_eq!(
         root_hash.as_slice(),
         vec![
-            241, 184, 162, 238, 216, 246, 105, 87, 175, 234, 213, 27, 204, 105, 136, 216, 252, 202,
-            124, 135, 225, 215, 78, 235, 18, 4, 87, 142, 108, 143, 29, 53
+            24, 23, 196, 202, 192, 165, 122, 145, 140, 157, 74, 18, 23, 255, 138, 36, 203, 41, 67,
+            117, 241, 155, 227, 81, 16, 111, 146, 137, 157, 141, 1, 169
         ]
     );
 }
