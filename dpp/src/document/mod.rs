@@ -181,7 +181,10 @@ impl Document {
         Ok(hash(self.to_buffer()?))
     }
 
-    pub fn set_value(&mut self, path: &str, value: JsonValue) -> Result<(), ProtocolError> {
+    /// Set the value under given path.
+    /// The path supports syntax from `lodash` JS lib. Example: "root.people[0].name".
+    /// If parents are not present they will be automatically created
+    pub fn set(&mut self, path: &str, value: JsonValue) -> Result<(), ProtocolError> {
         Ok(self.data.insert_with_parents(path, value)?)
     }
 
@@ -191,6 +194,16 @@ impl Document {
             Ok(v) => Some(v),
             Err(_) => None,
         }
+    }
+
+    /// Get the Document's data
+    pub fn get_data(&self) -> &JsonValue {
+        &self.data
+    }
+
+    /// Set the Document's data
+    pub fn set_data(&mut self, data: JsonValue) {
+        self.data = data;
     }
 }
 
