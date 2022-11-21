@@ -26,6 +26,7 @@ use super::basic::identity::{
     IdentityInsufficientBalanceError, InvalidIdentityCreditWithdrawalTransitionCoreFeeError,
     InvalidIdentityCreditWithdrawalTransitionOutputScriptError,
 };
+use super::fee::FeeError;
 use super::signature::SignatureError;
 
 #[derive(Error, Debug)]
@@ -114,6 +115,9 @@ pub enum ConsensusError {
     #[error(transparent)]
     SignatureError(SignatureError),
 
+    #[error(transparent)]
+    FeeError(FeeError),
+
     #[cfg(test)]
     #[cfg_attr(test, error("{0}"))]
     TestConsensusError(TestConsensusError),
@@ -163,6 +167,7 @@ impl ConsensusError {
             ConsensusError::StateError(e) => e.get_code(),
             ConsensusError::BasicError(e) => e.get_code(),
             ConsensusError::SignatureError(e) => e.get_code(),
+            ConsensusError::FeeError(e) => e.get_code(),
 
             ConsensusError::IdentityAlreadyExistsError(_) => 4011,
 
@@ -309,5 +314,11 @@ impl From<IdentityInsufficientBalanceError> for ConsensusError {
 impl From<SignatureError> for ConsensusError {
     fn from(err: SignatureError) -> Self {
         Self::SignatureError(err)
+    }
+}
+
+impl From<FeeError> for ConsensusError {
+    fn from(err: FeeError) -> Self {
+        Self::FeeError(err)
     }
 }

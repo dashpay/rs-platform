@@ -6,9 +6,13 @@ use serde_json::{Map, Value as JsonValue};
 use crate::{
     data_contract::DataContract,
     document::Document,
+    identity::convert_credits_to_satoshi,
+    prelude::Identity,
     prelude::{Identifier, Identity},
     state_repository::StateRepositoryLike,
+    state_repository::StateRepositoryLike,
     state_transition::StateTransitionConvert,
+    state_transition::StateTransitionLike,
     util::{entropy_generator::generate, json_value::JsonValueExt},
 };
 
@@ -113,13 +117,16 @@ where
 
         let maybe_existing_identity: Option<Identity> = self
             .state_repository
-            .fetch_identity(&state_transition.identity_id)
+            .fetch_identity(
+                &state_transition.identity_id,
+                state_transition.get_execution_context(),
+            )
             .await?;
 
         let mut existing_identity =
             maybe_existing_identity.ok_or_else(|| anyhow!("Identity not found"))?;
 
-        existing_identity = existing_identity.reduce_balance(state_transition.amount);
+        existing_identity.reduce_balance(state_transition.amount);
 
         let updated_identity_revision = existing_identity.get_revision() + 1;
 
@@ -127,7 +134,7 @@ where
 
         // TODO: we need to be able to batch state repository operations
         self.state_repository
-            .update_identity(&existing_identity)
+            .update_identity(&existing_identity, state_transition.get_execution_context())
             .await
     }
 }

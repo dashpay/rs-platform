@@ -34,13 +34,12 @@ impl IdentityWasm {
     }
 
     #[wasm_bindgen(js_name=setPublicKeys)]
-    pub fn set_public_keys(mut self, pub_keys: Vec<JsValue>) -> Self {
+    pub fn set_public_keys(&mut self, pub_keys: Vec<JsValue>) {
         let keys: Vec<IdentityPublicKey> = pub_keys
             .into_iter()
             .map(|v| JsValue::into_serde(&v).expect("unable to convert pub keys"))
             .collect();
-        self.0 = self.0.set_public_keys(keys);
-        self
+        self.0.set_public_keys(keys);
     }
 
     #[wasm_bindgen(js_name=getPublicKeys)]
@@ -66,30 +65,24 @@ impl IdentityWasm {
     }
 
     #[wasm_bindgen(js_name=setBalance)]
-    pub fn set_balance(mut self, balance: u64) -> Self {
-        self.0 = self.0.set_balance(balance);
-        self
+    pub fn set_balance(&mut self, balance: u64) {
+        self.0.set_balance(balance);
     }
 
     #[wasm_bindgen(js_name=increaseBalance)]
-    pub fn increase_balance(mut self, amount: u64) -> Self {
-        self.0 = self.0.increase_balance(amount);
-        self
+    pub fn increase_balance(&mut self, amount: u64) {
+        self.0.increase_balance(amount);
     }
 
     #[wasm_bindgen(js_name=reduceBalance)]
-    pub fn reduce_balance(mut self, amount: u64) -> Self {
-        self.0 = self.0.reduce_balance(amount);
-        self
+    pub fn reduce_balance(&mut self, amount: u64) {
+        self.0.reduce_balance(amount);
     }
 
     #[wasm_bindgen(js_name=setAssetLockProof)]
-    pub fn set_asset_lock_proof(mut self, lock: JsValue) -> Self {
-        self.0 = self
-            .0
+    pub fn set_asset_lock_proof(&mut self, lock: JsValue) {
+        self.0
             .set_asset_lock_proof(JsValue::into_serde(&lock).unwrap());
-
-        self
     }
 
     #[wasm_bindgen(js_name=getAssetLockProof)]
@@ -101,9 +94,8 @@ impl IdentityWasm {
     }
 
     #[wasm_bindgen(js_name=setRevision)]
-    pub fn set_revision(mut self, revision: Revision) -> Self {
-        self.0 = self.0.set_revision(revision);
-        self
+    pub fn set_revision(&mut self, revision: Revision) {
+        self.0.set_revision(revision);
     }
 
     #[wasm_bindgen(js_name=getRevision)]
@@ -120,9 +112,8 @@ impl IdentityWasm {
     }
 
     #[wasm_bindgen(js_name=setMetadata)]
-    pub fn set_metadata(mut self, metadata: MetadataWasm) -> Self {
-        self.0 = self.0.set_metadata(metadata.into());
-        self
+    pub fn set_metadata(&mut self, metadata: MetadataWasm) {
+        self.0.set_metadata(metadata.into());
     }
 
     //? probably it should be a separate trait with blanket implementation
