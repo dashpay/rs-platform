@@ -56,16 +56,6 @@ pub struct Document {
 }
 
 impl Document {
-    pub fn from_json(
-        mut json_object: JsonValue,
-        data_contract: DataContract,
-    ) -> Result<Document, ProtocolError> {
-        json_object.replace_identifier_paths(IDENTIFIER_FIELDS, ReplaceWith::Bytes);
-        // now we need to get the all informations related to the
-
-        todo!()
-    }
-
     pub fn from_raw_document(
         mut raw_document: JsonValue,
         data_contract: DataContract,
