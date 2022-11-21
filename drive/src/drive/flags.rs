@@ -149,19 +149,14 @@ impl StorageFlags {
         let original_value = other_epoch_bytes.remove(epoch_with_adding_bytes);
         match original_value {
             None => other_epoch_bytes.insert(*epoch_with_adding_bytes, added_bytes),
-            Some(original_bytes) => other_epoch_bytes.insert(
-                *epoch_with_adding_bytes,
-                original_bytes + added_bytes,
-            ),
+            Some(original_bytes) => {
+                other_epoch_bytes.insert(*epoch_with_adding_bytes, original_bytes + added_bytes)
+            }
         };
 
         match owner_id {
             None => Ok(MultiEpoch(base_epoch, other_epoch_bytes)),
-            Some(owner_id) => Ok(MultiEpochOwned(
-                base_epoch,
-                other_epoch_bytes,
-                *owner_id,
-            )),
+            Some(owner_id) => Ok(MultiEpochOwned(base_epoch, other_epoch_bytes, *owner_id)),
         }
     }
 
@@ -215,11 +210,7 @@ impl StorageFlags {
 
         match owner_id {
             None => Ok(MultiEpoch(base_epoch, other_epoch_bytes)),
-            Some(owner_id) => Ok(MultiEpochOwned(
-                base_epoch,
-                other_epoch_bytes,
-                *owner_id,
-            )),
+            Some(owner_id) => Ok(MultiEpochOwned(base_epoch, other_epoch_bytes, *owner_id)),
         }
     }
 
@@ -585,8 +576,7 @@ impl StorageFlags {
                 if let Some((epoch_index, bytes_in_epoch)) = rev_iter.next_back() {
                     if *bytes_in_epoch < bytes_left {
                         bytes_left -= bytes_in_epoch;
-                        sectioned_storage_removal
-                            .insert(*epoch_index as u64, *bytes_in_epoch);
+                        sectioned_storage_removal.insert(*epoch_index as u64, *bytes_in_epoch);
                     } else if *bytes_in_epoch >= bytes_left {
                         //take all bytes
                         bytes_left = 0;
