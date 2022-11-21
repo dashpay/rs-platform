@@ -35,6 +35,8 @@ use std::ops::RangeFull;
 use dashcore::consensus::Encodable;
 use dashcore::{Script, TxOut};
 use dashcore::blockdata::transaction::special_transaction::asset_unlock::unqualified_asset_unlock::{AssetUnlockBaseTransactionInfo, AssetUnlockBasePayload};
+use dashcore_rpc::RpcApi;
+
 use dpp::identity::convert_credits_to_satoshi;
 use dpp::identity::state_transition::identity_credit_withdrawal_transition::apply_identity_credit_withdrawal_transition_factory::WITHDRAWAL_DATA_CONTRACT_ID_BYTES;
 use dpp::prelude::Document;
@@ -42,10 +44,12 @@ use dpp::util::hash;
 use dpp::util::json_value::JsonValueExt;
 use grovedb::query_result_type::QueryResultType::QueryKeyElementPairResultType;
 use grovedb::{Element, PathQuery, Query, QueryItem, SizedQuery, TransactionArg};
-use serde_json::{json, Value as JsonValue, Number};
+
+use serde_json::{json, Number, Value as JsonValue};
 
 use crate::common;
 use crate::drive::batch::GroveDbOpBatch;
+use crate::drive::flags::StorageFlags;
 use crate::drive::{Drive, RootTree};
 use crate::error::drive::DriveError;
 use crate::error::Error;
@@ -244,6 +248,197 @@ impl Drive {
         self.add_enqueue_withdrawal_transaction_operations(&mut batch, withdrawals);
 
         self.grove_apply_batch(batch, true, transaction)?;
+
+        Ok(())
+    }
+
+    fn fetch_core_block_transactions(
+        &self,
+        last_synced_core_height: u64,
+        core_chain_locked_height: u64,
+    ) -> Result<Vec<String>, Error> {
+        let core_rpc = self
+            .core_rpc
+            .as_ref()
+            .ok_or(Error::Drive(DriveError::CorruptedCodeExecution(
+                "Core RPC client has not been set up",
+            )))?
+            .borrow();
+
+        let mut tx_hashes: Vec<String> = vec![];
+
+        for height in last_synced_core_height..=core_chain_locked_height {
+            let block_hash = core_rpc.get_block_hash(height).map_err(|_| {
+                Error::Drive(DriveError::CorruptedCodeExecution(
+                    "could not get block by height",
+                ))
+            })?;
+
+            let block_json: JsonValue = core_rpc.get_block_json(&block_hash).map_err(|_| {
+                Error::Drive(DriveError::CorruptedCodeExecution(
+                    "could not get block by hash",
+                ))
+            })?;
+
+            if let Some(transactions) = block_json.get("tx") {
+                if let Some(transactions) = transactions.as_array() {
+                    for transaction_hash in transactions {
+                        tx_hashes.push(
+                            transaction_hash
+                                .as_str()
+                                .ok_or(Error::Drive(DriveError::CorruptedCodeExecution(
+                                    "could not get transaction hash as string",
+                                )))?
+                                .to_string(),
+                        );
+                    }
+                }
+            }
+        }
+
+        Ok(tx_hashes)
+    }
+
+    fn fetch_broadcasted_withdrawal_documents(
+        &self,
+        transaction: TransactionArg,
+    ) -> Result<Vec<Document>, Error> {
+        let query_value = json!({
+            "where": [
+                ["status", "==", "2"],
+            ],
+            "orderBy": [
+                ["$createdAt", "desc"],
+            ]
+        });
+
+        let query_cbor = common::value_to_cbor(query_value, None);
+
+        let (documents, _, _) = self.query_documents(
+            &query_cbor,
+            WITHDRAWAL_DATA_CONTRACT_ID_BYTES,
+            WITHDRAWAL_DOCUMENT_TYPE_NAME,
+            transaction,
+        )?;
+
+        let documents = documents
+            .into_iter()
+            .map(|document_cbor| {
+                Document::from_cbor(document_cbor).map_err(|_| {
+                    Error::Drive(DriveError::CorruptedCodeExecution(
+                        "Can't create a document from cbor",
+                    ))
+                })
+            })
+            .collect::<Result<Vec<Document>, Error>>()?;
+
+        Ok(documents)
+    }
+
+    ///
+    pub fn update_withdrawal_statuses(
+        &self,
+        last_synced_core_height: u64,
+        core_chain_locked_height: u64,
+        block_time: f64,
+        transaction: TransactionArg,
+    ) -> Result<(), Error> {
+        let (data_contract, _) = self.fetch_contract(
+            WITHDRAWAL_DATA_CONTRACT_ID_BYTES,
+            transaction,
+            self.cache.borrow_mut(),
+        )?;
+
+        let data_contract = data_contract.ok_or(Error::Drive(
+            DriveError::CorruptedCodeExecution("Can't fetch withdrawal data contract"),
+        ))?;
+
+        let core_transactions =
+            self.fetch_core_block_transactions(last_synced_core_height, core_chain_locked_height)?;
+
+        let broadcasted_documents = self.fetch_broadcasted_withdrawal_documents(transaction)?;
+
+        for mut document in broadcasted_documents {
+            let transaction_sign_height =
+                document
+                    .data
+                    .get_u64("transactionSignHeight")
+                    .map_err(|_| {
+                        Error::Drive(DriveError::CorruptedCodeExecution(
+                            "Can't get transactionSignHeight from withdrawal document",
+                        ))
+                    })?;
+
+            let transaction_id_bytes = document.data.get_bytes("transactionId").map_err(|_| {
+                Error::Drive(DriveError::CorruptedCodeExecution(
+                    "Can't get transactionId from withdrawal document",
+                ))
+            })?;
+
+            let transaction_id = hex::encode(transaction_id_bytes);
+
+            if core_transactions.contains(&transaction_id) {
+                document
+                    .data
+                    .insert("status".to_string(), JsonValue::Number(Number::from(3)))
+                    .map_err(|_| {
+                        Error::Drive(DriveError::CorruptedCodeExecution(
+                            "Can't update document field: status",
+                        ))
+                    })?;
+
+                document.revision += 1;
+
+                self.update_document_for_contract_cbor(
+                    &document.to_cbor().map_err(|_| {
+                        Error::Drive(DriveError::CorruptedCodeExecution(
+                            "Can't cbor withdrawal document",
+                        ))
+                    })?,
+                    &data_contract.to_cbor().map_err(|_| {
+                        Error::Drive(DriveError::CorruptedCodeExecution(
+                            "Can't cbor withdrawal data contract",
+                        ))
+                    })?,
+                    "withdrawal",
+                    Some(&document.owner_id.to_buffer()),
+                    block_time,
+                    true,
+                    StorageFlags { epoch: 1 },
+                    transaction,
+                )?;
+            } else if core_chain_locked_height - transaction_sign_height > 48 {
+                document
+                    .data
+                    .insert("status".to_string(), JsonValue::Number(Number::from(4)))
+                    .map_err(|_| {
+                        Error::Drive(DriveError::CorruptedCodeExecution(
+                            "Can't update document field: status",
+                        ))
+                    })?;
+
+                document.revision += 1;
+
+                self.update_document_for_contract_cbor(
+                    &document.to_cbor().map_err(|_| {
+                        Error::Drive(DriveError::CorruptedCodeExecution(
+                            "Can't cbor withdrawal document",
+                        ))
+                    })?,
+                    &data_contract.to_cbor().map_err(|_| {
+                        Error::Drive(DriveError::CorruptedCodeExecution(
+                            "Can't cbor withdrawal data contract",
+                        ))
+                    })?,
+                    "withdrawal",
+                    Some(&document.owner_id.to_buffer()),
+                    block_time,
+                    true,
+                    StorageFlags { epoch: 1 },
+                    transaction,
+                )?;
+            }
+        }
 
         Ok(())
     }

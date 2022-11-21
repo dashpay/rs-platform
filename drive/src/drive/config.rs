@@ -59,6 +59,12 @@ pub struct DriveConfig {
     pub default_genesis_time: Option<u64>,
     /// Encoding
     pub encoding: DriveEncoding,
+    /// Core RPC client url
+    pub core_rpc_url: Option<String>,
+    /// Core RPC client username
+    pub core_rpc_username: Option<String>,
+    /// Core RPC client password
+    pub core_rpc_password: Option<String>,
 }
 
 impl Default for DriveConfig {
@@ -70,6 +76,9 @@ impl Default for DriveConfig {
             has_raw_enabled: DEFAULT_GROVE_HAS_RAW_ENABLED,
             default_genesis_time: None,
             encoding: DriveProtobuf,
+            core_rpc_url: None,
+            core_rpc_username: None,
+            core_rpc_password: None,
         }
     }
 }

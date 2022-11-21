@@ -116,6 +116,13 @@ impl TenderdashAbci for Platform {
             epoch_info,
         };
 
+        self.drive.update_withdrawal_statuses(
+            request.last_synced_core_height,
+            request.core_chain_locked_height,
+            request.block_time_ms as f64,
+            transaction,
+        )?;
+
         self.block_execution_context
             .replace(Some(block_execution_context));
 
@@ -275,6 +282,8 @@ mod tests {
                         proposer_pro_tx_hash: proposers
                             [block_height as usize % (proposers_count as usize)],
                         validator_set_quorum_hash: Default::default(),
+                        core_chain_locked_height: 1,
+                        last_synced_core_height: 1,
                     };
 
                     let block_begin_response = platform
@@ -449,6 +458,8 @@ mod tests {
                         proposer_pro_tx_hash: proposers
                             [block_height as usize % (proposers_count as usize)],
                         validator_set_quorum_hash: Default::default(),
+                        core_chain_locked_height: 1,
+                        last_synced_core_height: 1,
                     };
 
                     platform

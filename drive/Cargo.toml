@@ -28,6 +28,7 @@ nohash-hasher = "0.2.0"
 chrono = "0.4.20"
 dpp = { path = "../dpp" }
 dashcore = { git="https://github.com/dashevo/rust-dashcore", features=["no-std", "secp-recovery", "rand", "signer"], default-features = false, branch="master" }
+dashcore-rpc = { git="https://github.com/jawid-h/rust-dashcore-rpc", branch="fix/attempt-to-fix" }
 
 [dependencies.grovedb]
 git = "https://github.com/dashevo/grovedb"
