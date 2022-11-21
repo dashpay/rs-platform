@@ -31,14 +31,13 @@
 //!
 
 use std::collections::{BTreeMap, HashMap};
-use std::fmt::{Debug, Display, Formatter};
+use std::fmt::{Debug, Formatter};
 use std::option::Option::None;
 
 use rand::seq::SliceRandom;
 use rand::{Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use tempfile::TempDir;
 
 use rs_drive::common;
 use rs_drive::common::helpers::setup::setup_drive;
@@ -193,7 +192,7 @@ pub fn setup(
                     continue;
                 }
             }
-            let value = serde_json::to_value(&person).expect("serialized person");
+            let value = serde_json::to_value(person).expect("serialized person");
             let document_cbor =
                 common::value_to_cbor(value, Some(rs_drive::drive::defaults::PROTOCOL_VERSION));
             let document = Document::from_cbor(document_cbor.as_slice(), None, None)

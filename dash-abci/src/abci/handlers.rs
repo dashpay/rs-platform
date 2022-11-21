@@ -287,13 +287,12 @@ mod tests {
 
                     let block_begin_response = platform
                         .block_begin(block_begin_request, Some(&transaction))
-                        .expect(
-                            format!(
+                        .unwrap_or_else(|_| {
+                            panic!(
                                 "should begin process block #{} for day #{}",
                                 block_height, day
                             )
-                            .as_str(),
-                        );
+                        });
 
                     // Set previous block time
                     previous_block_time_ms = Some(block_time_ms);
@@ -329,7 +328,7 @@ mod tests {
                         let unsigned_withdrawal_hexes = block_begin_response
                             .unsigned_withdrawal_transactions
                             .iter()
-                            .map(|bytes| hex::encode(bytes))
+                            .map(hex::encode)
                             .collect::<Vec<String>>();
 
                         assert_eq!(unsigned_withdrawal_hexes, vec![
@@ -366,13 +365,12 @@ mod tests {
 
                     let block_end_response = platform
                         .block_end(block_end_request, Some(&transaction))
-                        .expect(
-                            format!(
+                        .unwrap_or_else(|_| {
+                            panic!(
                                 "should end process block #{} for day #{}",
                                 block_height, day
                             )
-                            .as_str(),
-                        );
+                        });
 
                     let after_finalize_block_request = AfterFinalizeBlockRequest {
                         updated_data_contract_ids: Vec::new(),
@@ -380,13 +378,12 @@ mod tests {
 
                     platform
                         .after_finalize_block(after_finalize_block_request)
-                        .expect(
-                            format!(
+                        .unwrap_or_else(|_| {
+                            panic!(
                                 "should begin process block #{} for day #{}",
                                 block_height, day
                             )
-                            .as_str(),
-                        );
+                        });
 
                     // Should pay to all proposers for epoch 0, when epochs 1 started
                     if epoch_index != 0 && epoch_change {
@@ -481,13 +478,12 @@ mod tests {
 
                     let block_begin_response = platform
                         .block_begin(block_begin_request, Some(&transaction))
-                        .expect(
-                            format!(
+                        .unwrap_or_else(|_| {
+                            panic!(
                                 "should begin process block #{} for day #{}",
                                 block_height, day
                             )
-                            .as_str(),
-                        );
+                        });
 
                     // Set previous block time
                     previous_block_time_ms = Some(block_time_ms);
@@ -524,13 +520,12 @@ mod tests {
 
                     let block_end_response = platform
                         .block_end(block_end_request, Some(&transaction))
-                        .expect(
-                            format!(
+                        .unwrap_or_else(|_| {
+                            panic!(
                                 "should end process block #{} for day #{}",
                                 block_height, day
                             )
-                            .as_str(),
-                        );
+                        });
 
                     let after_finalize_block_request = AfterFinalizeBlockRequest {
                         updated_data_contract_ids: Vec::new(),
@@ -538,13 +533,12 @@ mod tests {
 
                     platform
                         .after_finalize_block(after_finalize_block_request)
-                        .expect(
-                            format!(
+                        .unwrap_or_else(|_| {
+                            panic!(
                                 "should begin process block #{} for day #{}",
                                 block_height, day
                             )
-                            .as_str(),
-                        );
+                        });
 
                     // Should pay to all proposers for epoch 0, when epochs 1 started
                     if epoch_index != 0 && epoch_change {

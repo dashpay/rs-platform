@@ -875,7 +875,7 @@ mod tests {
 
             let mut batch = GroveDbOpBatch::new();
 
-            let proposer_payouts = platform
+            let _proposer_payouts = platform
                 .add_distribute_fees_from_oldest_unpaid_epoch_pool_to_proposers_operations(
                     current_epoch.index,
                     None,

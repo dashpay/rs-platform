@@ -1434,7 +1434,7 @@ impl DriveWrapper {
                 let this = task_context.undefined();
                 let callback_arguments: Vec<Handle<JsValue>> = match result {
                     Ok(proof) => {
-                        let js_buffer = JsBuffer::external(&mut task_context, proof.clone());
+                        let js_buffer = JsBuffer::external(&mut task_context, proof);
                         let js_value = js_buffer.as_value(&mut task_context);
 
                         vec![task_context.null().upcast(), js_value.upcast()]
@@ -1480,7 +1480,7 @@ impl DriveWrapper {
         db.send_to_drive_thread(move |platform: &Platform, _transaction, channel| {
             let grove_db = &platform.drive.grove;
 
-            let path_queries = path_queries.iter().map(|path_query| path_query).collect();
+            let path_queries = path_queries.iter().collect();
 
             let result = grove_db.prove_query_many(path_queries).unwrap();
 
@@ -1495,7 +1495,7 @@ impl DriveWrapper {
                 } else {
                     match result {
                         Ok(proof) => {
-                            let js_buffer = JsBuffer::external(&mut task_context, proof.clone());
+                            let js_buffer = JsBuffer::external(&mut task_context, proof);
                             let js_value = js_buffer.as_value(&mut task_context);
 
                             vec![task_context.null().upcast(), js_value.upcast()]
