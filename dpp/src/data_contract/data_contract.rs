@@ -78,7 +78,7 @@ pub struct DataContract {
     #[serde(rename = "documents")]
     pub documents: BTreeMap<DocumentName, JsonSchema>,
 
-    #[serde(rename = "$defs", default)]
+    #[serde(skip_serializing_if = "BTreeMap::is_empty", rename = "$defs", default)]
     pub defs: BTreeMap<DefinitionName, JsonSchema>,
 
     #[serde(skip)]
