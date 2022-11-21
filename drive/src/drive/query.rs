@@ -129,7 +129,7 @@ impl Drive {
     ) -> Result<(Vec<Vec<u8>>, u16, u64), Error> {
         let mut drive_operations: Vec<DriveOperation> = vec![];
         let (items, skipped) = self.query_documents_from_contract_internal(
-            &contract,
+            contract,
             document_type,
             query_cbor,
             transaction,

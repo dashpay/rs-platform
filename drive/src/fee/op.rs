@@ -453,7 +453,7 @@ impl DriveOperation {
     pub fn combine_cost_operations(operations: &Vec<DriveOperation>) -> OperationCost {
         let mut cost = OperationCost::default();
         operations.iter().for_each(|op| match op {
-            CalculatedCostOperation(operationCost) => cost += operationCost.clone(),
+            CalculatedCostOperation(operation_cost) => cost += operation_cost.clone(),
             _ => {}
         });
         cost

@@ -1262,7 +1262,7 @@ impl<'a> DriveQuery<'a> {
 
         let mut values = vec![];
         for (_, value, _) in key_value_elements.iter_mut() {
-            let element = Element::deserialize(&value).unwrap();
+            let element = Element::deserialize(value).unwrap();
             match element {
                 Element::Item(val, _) => values.push(val),
                 Element::Tree(..) | Element::Reference(..) => {
@@ -1332,7 +1332,6 @@ mod tests {
     use crate::drive::Drive;
     use crate::query::DriveQuery;
     use dpp::data_contract::extra::DocumentType;
-    use serde_json::Value::Null;
 
     use crate::drive::block_info::BlockInfo;
     use dpp::data_contract::extra::DriveContractExt;
@@ -1356,7 +1355,7 @@ mod tests {
         drive
             .apply_contract(
                 &contract,
-                contract_cbor.clone(),
+                contract_cbor,
                 BlockInfo::default(),
                 true,
                 storage_flags.as_ref(),
@@ -1386,7 +1385,7 @@ mod tests {
         drive
             .apply_contract(
                 &contract,
-                contract_cbor.clone(),
+                contract_cbor,
                 BlockInfo::default(),
                 true,
                 storage_flags.as_ref(),
