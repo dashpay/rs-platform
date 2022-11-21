@@ -107,7 +107,7 @@ impl DriveOperationConverter for ContractOperationType<'_> {
                 serialized_contract: contract_serialization,
                 storage_flags,
             } => drive.apply_contract_operations(
-                &contract,
+                contract,
                 contract_serialization,
                 block_info,
                 apply,
@@ -281,7 +281,7 @@ impl DriveOperationConverter for DocumentOperationType<'_> {
 
                 let document_and_contract_info = DocumentAndContractInfo {
                     document_info,
-                    contract: &contract,
+                    contract,
                     document_type,
                     owner_id,
                 };
@@ -377,7 +377,7 @@ impl DriveOperationConverter for DocumentOperationType<'_> {
 
                 let document_and_contract_info = DocumentAndContractInfo {
                     document_info,
-                    contract: &contract,
+                    contract,
                     document_type,
                     owner_id,
                 };
@@ -397,13 +397,13 @@ impl DriveOperationConverter for DocumentOperationType<'_> {
                 storage_flags,
             } => {
                 let document_info =
-                    DocumentRefAndSerialization((&document, serialized_document, storage_flags));
+                    DocumentRefAndSerialization((document, serialized_document, storage_flags));
 
                 let document_type = contract.document_type_for_name(document_type_name)?;
 
                 let document_and_contract_info = DocumentAndContractInfo {
                     document_info,
-                    contract: &contract,
+                    contract,
                     document_type,
                     owner_id,
                 };

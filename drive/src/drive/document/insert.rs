@@ -32,9 +32,7 @@
 //! This module implements functions in Drive relevant to inserting documents.
 //!
 
-use grovedb::reference_path::ReferencePathType::{
-    AbsolutePathReference, SiblingReference, UpstreamRootHeightReference,
-};
+use grovedb::reference_path::ReferencePathType::SiblingReference;
 use grovedb::{Element, TransactionArg};
 use std::collections::HashSet;
 use std::option::Option::None;
@@ -65,14 +63,11 @@ use crate::error::drive::DriveError;
 use crate::error::Error;
 use crate::fee::op::DriveOperation;
 use crate::fee::{calculate_fee, FeeResult};
-use dpp::data_contract::extra::DocumentType;
 
 use crate::common::encode::encode_unsigned_integer;
 use crate::contract::document::Document;
 use crate::drive::block_info::BlockInfo;
 use crate::error::document::DocumentError;
-use crate::fee_pools::epochs::Epoch;
-use dpp::data_contract::extra::encode_float;
 use dpp::data_contract::extra::DriveContractExt;
 
 impl Drive {
@@ -102,7 +97,7 @@ impl Drive {
                 {
                     (
                         PathFixedSizeKeyRef((primary_key_path, document.id.as_slice())),
-                        storage_flags.clone(),
+                        storage_flags,
                     )
                 } else {
                     (
@@ -236,7 +231,7 @@ impl Drive {
                 DocumentRefAndSerialization((document, serialized_document, storage_flags)) => {
                     let element = Element::Item(
                         serialized_document.to_vec(),
-                        StorageFlags::map_to_some_element_flags(storage_flags.clone()),
+                        StorageFlags::map_to_some_element_flags(*storage_flags),
                     );
                     PathFixedSizeKeyElement((primary_key_path, document.id.as_slice(), element))
                 }
@@ -245,7 +240,7 @@ impl Drive {
                         document.serialize(document_and_contract_info.document_type)?;
                     let element = Element::Item(
                         serialized_document,
-                        StorageFlags::map_to_some_element_flags(storage_flags.clone()),
+                        StorageFlags::map_to_some_element_flags(*storage_flags),
                     );
                     PathFixedSizeKeyElement((primary_key_path, document.id.as_slice(), element))
                 }
@@ -537,7 +532,7 @@ impl Drive {
         {
             let update_operations = self.update_document_for_contract_operations(
                 document_and_contract_info,
-                &block_info,
+                block_info,
                 apply,
                 transaction,
             )?;
@@ -547,7 +542,7 @@ impl Drive {
             // if we have override_document set that means we already checked if it exists
             self.add_document_to_primary_storage(
                 &document_and_contract_info,
-                &block_info,
+                block_info,
                 override_document,
                 apply,
                 transaction,

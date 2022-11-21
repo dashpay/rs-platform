@@ -41,7 +41,7 @@ use crate::error::Error;
 use crate::platform::Platform;
 use rs_drive::common::value_to_cbor;
 use rs_drive::contract::document::Document;
-use rs_drive::contract::{Contract, DataContract};
+use rs_drive::contract::Contract;
 use rs_drive::dpp::data_contract::extra::DriveContractExt;
 use rs_drive::drive::block_info::BlockInfo;
 use rs_drive::drive::flags::StorageFlags;
@@ -100,7 +100,7 @@ impl Platform {
         self.drive
             .apply_contract(
                 &contract,
-                contract_cbor.clone(),
+                contract_cbor,
                 BlockInfo::genesis(),
                 true,
                 storage_flags.as_ref(),

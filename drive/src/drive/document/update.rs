@@ -432,7 +432,7 @@ impl Drive {
                     // which would entail a change on every index
                     change_occurred_on_index |= match &old_document_index_field {
                         DriveKeyInfo::Key(k) => &document_index_field != k,
-                        DriveKeyInfo::KeyRef(k) => &document_index_field != *k,
+                        DriveKeyInfo::KeyRef(k) => document_index_field != *k,
                         DriveKeyInfo::KeySize(_) => {
                             // we should assume true in this worst case cost scenario
                             true

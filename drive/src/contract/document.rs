@@ -78,7 +78,7 @@ impl Document {
         document_type
             .properties
             .iter()
-            .map(|(field_name, field)| {
+            .try_for_each(|(field_name, field)| {
                 if let Some(value) = self.properties.get(field_name) {
                     let value = field
                         .document_type
@@ -94,8 +94,7 @@ impl Document {
                     buffer.push(0);
                     Ok(())
                 }
-            })
-            .collect::<Result<(), Error>>()?;
+            })?;
         Ok(buffer)
     }
 
@@ -110,7 +109,7 @@ impl Document {
         document_type
             .properties
             .iter()
-            .map(|(field_name, field)| {
+            .try_for_each(|(field_name, field)| {
                 if let Some(value) = self.properties.remove(field_name) {
                     let value = field
                         .document_type
@@ -126,8 +125,7 @@ impl Document {
                     buffer.push(0);
                     Ok(())
                 }
-            })
-            .collect::<Result<(), Error>>()?;
+            })?;
         Ok(buffer)
     }
 
@@ -162,19 +160,11 @@ impl Document {
             .filter_map(|(key, field)| {
                 let read_value = field.document_type.read_from(&mut buf, field.required);
                 match read_value {
-                    Ok(read_value) => {
-                        if let Some(read_value) = read_value {
-                            Some(Ok((key.clone(), read_value)))
-                        } else {
-                            None
-                        }
-                    }
+                    Ok(read_value) => read_value.map(|read_value| Ok((key.clone(), read_value))),
                     Err(e) => Some(Err(e)),
                 }
             })
             .collect::<Result<BTreeMap<String, Value>, ContractError>>()?;
-        let id = <[u8; 32]>::try_from(id).unwrap();
-        let owner_id = <[u8; 32]>::try_from(owner_id).unwrap();
         Ok(Document {
             id,
             properties,

@@ -92,7 +92,7 @@ fn create_test_mn_share_document(
                     &document_cbor,
                     storage_flags.as_ref(),
                 )),
-                contract: &contract,
+                contract,
                 document_type,
                 owner_id: None,
             },

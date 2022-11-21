@@ -38,7 +38,7 @@ use grovedb::Element;
 
 /// A batch of GroveDB operations as a vector.
 // TODO move to GroveDB
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct GroveDbOpBatch {
     /// Operations
     pub(crate) operations: Vec<GroveDbOp>,
@@ -55,6 +55,11 @@ impl GroveDbOpBatch {
     /// Gets the number of operations from a list of GroveDB ops.
     pub fn len(&self) -> usize {
         self.operations.len()
+    }
+
+    /// Checks to see if the operation batch is empty
+    pub fn is_empty(&self) -> bool {
+        self.operations.is_empty()
     }
 
     /// Pushes an operation into a list of GroveDB ops.
