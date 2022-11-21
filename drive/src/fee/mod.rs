@@ -38,14 +38,14 @@ use std::collections::BTreeMap;
 use crate::error::fee::FeeError;
 use crate::error::Error;
 use crate::fee::op::{BaseOp, DriveOperation};
-use crate::fee::removed_bytes_from_epochs_maps::RemovedBytesFromIdentities;
+use crate::fee::removed_bytes_from_epochs_by_identities::RemovedBytesFromEpochsByIdentities;
 use crate::fee_pools::epochs::Epoch;
 
 /// Default costs module
 pub mod default_costs;
 /// Op module
 pub mod op;
-mod removed_bytes_from_epochs_maps;
+mod removed_bytes_from_epochs_by_identities;
 
 /// Fee Result
 #[derive(Debug, Clone, Eq, PartialEq, Default)]
@@ -55,7 +55,7 @@ pub struct FeeResult {
     /// Processing fee
     pub processing_fee: u64,
     /// Removed bytes from identities
-    pub removed_bytes_from_identities: RemovedBytesFromIdentities,
+    pub removed_bytes_from_identities: RemovedBytesFromEpochsByIdentities,
     /// Removed bytes not needing to be refunded to identities
     pub removed_bytes_from_system: u32,
 }

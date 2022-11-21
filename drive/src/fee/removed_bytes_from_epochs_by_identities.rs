@@ -9,9 +9,9 @@ use std::collections::BTreeMap;
 
 /// Fee Result
 #[derive(Debug, Clone, Eq, PartialEq, Default, Serialize, Deserialize)]
-pub struct RemovedBytesFromIdentities(pub BTreeMap<Identifier, IntMap<u32>>);
+pub struct RemovedBytesFromEpochsByIdentities(pub BTreeMap<Identifier, IntMap<u32>>);
 
-impl RemovedBytesFromIdentities {
+impl RemovedBytesFromEpochsByIdentities {
     /// Adds and self assigns result between two Fee Results
     pub fn checked_add_assign(&mut self, rhs: Self) -> Result<(), Error> {
         for (identifier, mut int_map_b) in rhs.0.into_iter() {
@@ -67,16 +67,20 @@ impl RemovedBytesFromIdentities {
             })
     }
 
-    pub fn serialized_size(&self) -> usize {
+    pub fn serialized_size(&self) -> Result<u64, Error> {
         bincode::DefaultOptions::default()
             .with_varint_encoding()
             .reject_trailing_bytes()
             .serialized_size(&self.0)
-            .unwrap() as usize // this should not be able to error
+            .map_err(|_| {
+                Error::Fee(FeeError::CorruptedRemovedBytesFromIdentitiesSerialization(
+                    "unable to serialize and get size",
+                ))
+            })
     }
 
     pub fn deserialize(bytes: &[u8]) -> Result<Self, Error> {
-        Ok(RemovedBytesFromIdentities(
+        Ok(RemovedBytesFromEpochsByIdentities(
             bincode::DefaultOptions::default()
                 .with_varint_encoding()
                 .reject_trailing_bytes()
