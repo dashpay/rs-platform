@@ -842,7 +842,7 @@ impl<'a> DriveQuery<'a> {
             // We only need items after the start at document
             let start_at_key = document.get_raw_for_document_type(
                 indexed_property.name.as_str(),
-                &document_type,
+                document_type,
                 None,
             )?;
             // We want to get items starting at the start key
