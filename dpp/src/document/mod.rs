@@ -56,6 +56,16 @@ pub struct Document {
 }
 
 impl Document {
+    pub fn from_json(
+        mut json_object: JsonValue,
+        data_contract: DataContract,
+    ) -> Result<Document, ProtocolError> {
+        json_object.replace_identifier_paths(IDENTIFIER_FIELDS, ReplaceWith::Bytes);
+        // now we need to get the all informations related to the
+
+        todo!()
+    }
+
     pub fn from_raw_document(
         mut raw_document: JsonValue,
         data_contract: DataContract,
@@ -181,8 +191,8 @@ impl Document {
         Ok(hash(self.to_buffer()?))
     }
 
-    pub fn set_value(&mut self, property: &str, value: JsonValue) -> Result<(), ProtocolError> {
-        Ok(self.data.insert(property.to_string(), value)?)
+    pub fn set_value(&mut self, path: &str, value: JsonValue) -> Result<(), ProtocolError> {
+        Ok(self.data.insert_with_parents(path, value)?)
     }
 
     /// Retrieves field specified by path
