@@ -199,7 +199,7 @@ impl WhereOperator {
 }
 
 /// Where clause struct
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct WhereClause {
     /// Field
     pub field: String,
