@@ -53,6 +53,7 @@ use crate::fee::op::DriveOperation::{
     CalculatedCostOperation, CostCalculationDeleteOperation, CostCalculationInsertOperation,
     CostCalculationQueryOperation, GroveOperation, PreCalculatedFeeResult,
 };
+use crate::fee::removed_bytes_from_epochs_maps::RemovedBytesFromIdentities;
 use crate::fee::FeeResult;
 use crate::fee_pools::epochs::Epoch;
 
@@ -419,7 +420,9 @@ impl DriveOperation {
                     Ok(FeeResult {
                         storage_fee,
                         processing_fee,
-                        removed_bytes_from_identities,
+                        removed_bytes_from_identities: RemovedBytesFromIdentities(
+                            removed_bytes_from_identities,
+                        ),
                         removed_bytes_from_system,
                     })
                 }

@@ -418,7 +418,7 @@ pub fn fee_result_to_js_object<'a, C: Context<'a>>(
 
     let js_removed_from_identities: Handle<JsObject> = cx.empty_object();
 
-    for (identifier, epoch_index_map) in fee_result.removed_bytes_from_identities {
+    for (identifier, epoch_index_map) in fee_result.removed_bytes_from_identities.into_iter() {
         let js_epoch_index_map = cx.empty_object();
         for (epoch, bytes) in epoch_index_map {
             let js_bytes = cx.number(bytes);

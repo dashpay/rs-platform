@@ -38,12 +38,14 @@ use std::collections::BTreeMap;
 use crate::error::fee::FeeError;
 use crate::error::Error;
 use crate::fee::op::{BaseOp, DriveOperation};
+use crate::fee::removed_bytes_from_epochs_maps::RemovedBytesFromIdentities;
 use crate::fee_pools::epochs::Epoch;
 
 /// Default costs module
 pub mod default_costs;
 /// Op module
 pub mod op;
+mod removed_bytes_from_epochs_maps;
 
 /// Fee Result
 #[derive(Debug, Clone, Eq, PartialEq, Default)]
@@ -53,7 +55,7 @@ pub struct FeeResult {
     /// Processing fee
     pub processing_fee: u64,
     /// Removed bytes from identities
-    pub removed_bytes_from_identities: BTreeMap<Identifier, IntMap<u32>>,
+    pub removed_bytes_from_identities: RemovedBytesFromIdentities,
     /// Removed bytes not needing to be refunded to identities
     pub removed_bytes_from_system: u32,
 }
@@ -100,31 +102,8 @@ impl FeeResult {
                 .ok_or(Error::Fee(FeeError::Overflow(
                     "processing fee overflow error",
                 )))?;
-        for (identifier, mut int_map_b) in rhs.removed_bytes_from_identities.into_iter() {
-            let to_insert_int_map = if let Some(sint_map_a) =
-                self.removed_bytes_from_identities.remove(&identifier)
-            {
-                // other has an int_map with the same identifier
-                let intersection = sint_map_a
-                    .into_iter()
-                    .map(|(k, v)| {
-                        let combined = if let Some(value_b) = int_map_b.remove(k) {
-                            v.checked_add(value_b)
-                                .ok_or(Error::Fee(FeeError::Overflow("storage fee overflow error")))
-                        } else {
-                            Ok(v)
-                        };
-                        combined.map(|c| (k, c))
-                    })
-                    .collect::<Result<IntMap<u32>, Error>>()?;
-                intersection.into_iter().chain(int_map_b).collect()
-            } else {
-                int_map_b
-            };
-            // reinsert the now combined intmap
-            self.removed_bytes_from_identities
-                .insert(identifier, to_insert_int_map);
-        }
+        self.removed_bytes_from_identities
+            .checked_add_assign(rhs.removed_bytes_from_identities)?;
         self.removed_bytes_from_system = self
             .removed_bytes_from_system
             .checked_add(rhs.removed_bytes_from_system)

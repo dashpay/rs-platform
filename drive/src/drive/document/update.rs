@@ -1466,7 +1466,7 @@ mod tests {
             );
             let removed_bytes = deletion_fees
                 .removed_bytes_from_identities
-                .get(owner_id.as_slice())
+                .get(&owner_id)
                 .unwrap()
                 .get(0)
                 .unwrap();
@@ -1578,7 +1578,7 @@ mod tests {
             );
             let removed_bytes = deletion_fees
                 .removed_bytes_from_identities
-                .get(owner_id.as_slice())
+                .get(&owner_id)
                 .unwrap()
                 .get(0)
                 .unwrap();
@@ -1610,7 +1610,7 @@ mod tests {
         let added_bytes = update_fees.storage_fee / STORAGE_DISK_USAGE_CREDIT_PER_BYTE;
         let removed_bytes = update_fees
             .removed_bytes_from_identities
-            .get(owner_id.as_slice())
+            .get(&owner_id)
             .unwrap()
             .get(0)
             .unwrap();
