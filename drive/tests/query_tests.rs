@@ -460,7 +460,7 @@ pub fn add_domains_to_contract(
                         &document_cbor,
                         storage_flags.as_ref(),
                     )),
-                    contract: contract,
+                    contract,
                     document_type,
                     owner_id: None,
                 },
