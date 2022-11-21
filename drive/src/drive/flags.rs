@@ -114,7 +114,7 @@ impl StorageFlags {
                         match original_value {
                             None => combined_index_map.insert(*epoch_index, *bytes_added),
                             Some(original_bytes) => combined_index_map
-                                .insert(*epoch_index, original_bytes.clone() + *bytes_added),
+                                .insert(*epoch_index, original_bytes + *bytes_added),
                         };
                     });
                 Some(combined_index_map)
@@ -122,8 +122,7 @@ impl StorageFlags {
                 Some(our_epoch_index_map.clone())
             }
         } else {
-            rhs.epoch_index_map()
-                .map(|other_epoch_index_map| other_epoch_index_map.clone())
+            rhs.epoch_index_map().cloned()
         }
     }
 
@@ -149,10 +148,10 @@ impl StorageFlags {
         let mut other_epoch_bytes = self.combine_non_base_epoch_bytes(&rhs).unwrap_or_default();
         let original_value = other_epoch_bytes.remove(epoch_with_adding_bytes);
         match original_value {
-            None => other_epoch_bytes.insert(epoch_with_adding_bytes.clone(), added_bytes),
+            None => other_epoch_bytes.insert(*epoch_with_adding_bytes, added_bytes),
             Some(original_bytes) => other_epoch_bytes.insert(
-                epoch_with_adding_bytes.clone(),
-                original_bytes.clone() + added_bytes,
+                *epoch_with_adding_bytes,
+                original_bytes + added_bytes,
             ),
         };
 
@@ -161,7 +160,7 @@ impl StorageFlags {
             Some(owner_id) => Ok(MultiEpochOwned(
                 base_epoch,
                 other_epoch_bytes,
-                owner_id.clone(),
+                *owner_id,
             )),
         }
     }
@@ -171,7 +170,7 @@ impl StorageFlags {
         rhs: Self,
         removed_bytes: &StorageRemovedBytes,
     ) -> Result<Self, Error> {
-        let base_epoch = self.base_epoch().clone();
+        let base_epoch = *self.base_epoch();
         let owner_id = self.combine_owner_id(&rhs)?;
         let mut other_epoch_bytes = self.combine_non_base_epoch_bytes(&rhs).unwrap_or_default();
         match removed_bytes {
@@ -183,7 +182,7 @@ impl StorageFlags {
                         ),
                     ));
                 }
-                let identifier = owner_id.map(|o| o.clone()).unwrap_or_default();
+                let identifier = owner_id.copied().unwrap_or_default();
                 let sectioned_bytes =
                     sectioned_bytes_by_identifier
                         .get(&identifier)
@@ -194,7 +193,7 @@ impl StorageFlags {
                         ))?;
                 sectioned_bytes
                     .iter()
-                    .map(|(epoch, removed_bytes)| {
+                    .try_for_each(|(epoch, removed_bytes)| {
                         let bytes_added_in_epoch = other_epoch_bytes
                             .get_mut(&(*epoch as u16))
                             .ok_or(Error::StorageFlags(
@@ -209,8 +208,7 @@ impl StorageFlags {
                                 )),
                             )?;
                         Ok(())
-                    })
-                    .collect::<Result<(), Error>>()?;
+                    })?;
             }
             _ => {}
         }
@@ -220,7 +218,7 @@ impl StorageFlags {
             Some(owner_id) => Ok(MultiEpochOwned(
                 base_epoch,
                 other_epoch_bytes,
-                owner_id.clone(),
+                *owner_id,
             )),
         }
     }
@@ -488,7 +486,7 @@ impl StorageFlags {
 
     /// Deserialize storage flags from bytes
     pub fn deserialize(data: &[u8]) -> Result<Option<Self>, Error> {
-        let first_byte = data.get(0);
+        let first_byte = data.first();
         match first_byte {
             None => Ok(None),
             Some(first_byte) => match *first_byte {
@@ -556,17 +554,17 @@ impl StorageFlags {
             base_epoch: &BaseEpoch,
             owner_id: Option<&OwnerId>,
         ) -> StorageRemovedBytes {
-            let mut bytes_left = removed_bytes;
+            let bytes_left = removed_bytes;
             let mut sectioned_storage_removal: IntMap<u32> = IntMap::default();
             if bytes_left > 0 {
                 // We need to take some from the base epoch
-                sectioned_storage_removal.insert(base_epoch.clone() as u64, removed_bytes);
+                sectioned_storage_removal.insert(*base_epoch as u64, removed_bytes);
             }
             let mut sectioned_storage_removal_by_identifier: StorageRemovalPerEpochByIdentifier =
                 BTreeMap::new();
             if let Some(owner_id) = owner_id {
                 sectioned_storage_removal_by_identifier
-                    .insert(owner_id.clone(), sectioned_storage_removal);
+                    .insert(*owner_id, sectioned_storage_removal);
             } else {
                 let default = [0u8; 32];
                 sectioned_storage_removal_by_identifier.insert(default, sectioned_storage_removal);
@@ -588,11 +586,11 @@ impl StorageFlags {
                     if *bytes_in_epoch < bytes_left {
                         bytes_left -= bytes_in_epoch;
                         sectioned_storage_removal
-                            .insert(epoch_index.clone() as u64, *bytes_in_epoch);
+                            .insert(*epoch_index as u64, *bytes_in_epoch);
                     } else if *bytes_in_epoch >= bytes_left {
                         //take all bytes
                         bytes_left = 0;
-                        sectioned_storage_removal.insert(epoch_index.clone() as u64, bytes_left);
+                        sectioned_storage_removal.insert(*epoch_index as u64, bytes_left);
                     }
                 } else {
                     break;
