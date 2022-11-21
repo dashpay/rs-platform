@@ -202,7 +202,7 @@ impl StorageFlags {
                                     "can't remove more bytes than exist at that epoch",
                                 )),
                             )?;
-                        Ok(())
+                        Ok::<(), Error>(())
                     })?;
             }
             _ => {}

@@ -30,18 +30,14 @@
 //! Fees Mod File.
 //!
 
-use costs::storage_cost::removal::StorageRemovedBytes::{
-    BasicStorageRemoval, NoStorageRemoval, SectionedStorageRemoval,
-};
-use costs::storage_cost::removal::{Identifier, StorageRemovedBytes};
+use costs::storage_cost::removal::Identifier;
 use enum_map::EnumMap;
 use intmap::IntMap;
 use std::collections::BTreeMap;
-use std::ops::AddAssign;
 
 use crate::error::fee::FeeError;
 use crate::error::Error;
-use crate::fee::op::{BaseOp, DriveCost, DriveOperation};
+use crate::fee::op::{BaseOp, DriveOperation};
 use crate::fee_pools::epochs::Epoch;
 
 /// Default costs module

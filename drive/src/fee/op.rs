@@ -53,7 +53,7 @@ use crate::fee::op::DriveOperation::{
     CalculatedCostOperation, CostCalculationDeleteOperation, CostCalculationInsertOperation,
     CostCalculationQueryOperation, GroveOperation, PreCalculatedFeeResult,
 };
-use crate::fee::{calculate_fee, FeeResult};
+use crate::fee::FeeResult;
 use crate::fee_pools::epochs::Epoch;
 
 /// Base ops
@@ -450,17 +450,18 @@ impl DriveOperation {
     }
 
     /// Filters the groveDB ops from a list of operations and puts them in a `GroveDbOpBatch`.
-    pub fn combine_cost_operations(operations: &Vec<DriveOperation>) -> OperationCost {
+    pub fn combine_cost_operations(operations: &[DriveOperation]) -> OperationCost {
         let mut cost = OperationCost::default();
-        operations.iter().for_each(|op| match op {
-            CalculatedCostOperation(operation_cost) => cost += operation_cost.clone(),
-            _ => {}
+        operations.iter().for_each(|op| {
+            if let CalculatedCostOperation(operation_cost) = op {
+                cost += operation_cost.clone()
+            }
         });
         cost
     }
 
     /// Filters the groveDB ops from a list of operations and puts them in a `GroveDbOpBatch`.
-    pub fn grovedb_operations_batch(insert_operations: &Vec<DriveOperation>) -> GroveDbOpBatch {
+    pub fn grovedb_operations_batch(insert_operations: &[DriveOperation]) -> GroveDbOpBatch {
         let operations = insert_operations
             .iter()
             .filter_map(|op| match op {
@@ -576,27 +577,21 @@ impl DriveCost for OperationCost {
         let hash_node_cost = (*hash_node_calls as u64)
             .checked_mul(FunctionOp::Blake3.cost(epoch))
             .ok_or_else(|| get_overflow_error("hash node cost overflow"))?;
-        let cost = seek_cost
+        seek_cost
             .checked_add(storage_added_bytes_ephemeral_cost)
-            .map(|c| c.checked_add(storage_replaced_bytes_ephemeral_cost))
-            .flatten()
-            .map(|c| c.checked_add(storage_loaded_bytes_cost))
-            .flatten()
-            .map(|c| c.checked_add(storage_removed_bytes_ephemeral_cost))
-            .flatten()
-            .map(|c| c.checked_add(hash_node_cost))
-            .flatten()
-            .ok_or_else(|| get_overflow_error("ephemeral cost addition overflow"));
-        cost
+            .and_then(|c| c.checked_add(storage_replaced_bytes_ephemeral_cost))
+            .and_then(|c| c.checked_add(storage_loaded_bytes_cost))
+            .and_then(|c| c.checked_add(storage_removed_bytes_ephemeral_cost))
+            .and_then(|c| c.checked_add(hash_node_cost))
+            .ok_or_else(|| get_overflow_error("ephemeral cost addition overflow"))
     }
 
     /// Return the storage cost from the operation
     fn storage_cost(&self, _epoch: &Epoch) -> Result<u64, Error> {
         //todo: deal with epochs
         let OperationCost { storage_cost, .. } = self;
-        let storage_written_bytes_disk_cost = (storage_cost.added_bytes as u64)
+        (storage_cost.added_bytes as u64)
             .checked_mul(STORAGE_DISK_USAGE_CREDIT_PER_BYTE)
-            .ok_or_else(|| get_overflow_error("storage written bytes cost overflow"));
-        storage_written_bytes_disk_cost
+            .ok_or_else(|| get_overflow_error("storage written bytes cost overflow"))
     }
 }
