@@ -440,10 +440,7 @@ pub enum DocumentInfo<'a> {
 impl<'a> DocumentInfo<'a> {
     /// Returns true if self is a document with serialization.
     pub fn is_document_and_serialization(&self) -> bool {
-        match self {
-            DocumentInfo::DocumentRefAndSerialization(..) => true,
-            _ => false,
-        }
+        matches!(self, DocumentInfo::DocumentRefAndSerialization(..))
     }
 
     /// Makes the document ID the key.
@@ -510,9 +507,7 @@ impl<'a> DocumentInfo<'a> {
     pub fn get_storage_flags_ref(&self) -> Option<&StorageFlags> {
         match self {
             DocumentInfo::DocumentRefAndSerialization((_, _, storage_flags))
-            | DocumentInfo::DocumentRefWithoutSerialization((_, storage_flags)) => {
-                storage_flags.clone()
-            }
+            | DocumentInfo::DocumentRefWithoutSerialization((_, storage_flags)) => *storage_flags,
             DocumentInfo::DocumentWithoutSerialization((_, storage_flags)) => {
                 storage_flags.as_ref()
             }

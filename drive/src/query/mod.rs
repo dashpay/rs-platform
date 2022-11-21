@@ -817,12 +817,10 @@ impl<'a> DriveQuery<'a> {
             } else {
                 inner_query.insert_range_after(start_at_key..);
             }
+        } else if included {
+            inner_query.insert_range_to_inclusive(..=start_at_key);
         } else {
-            if included {
-                inner_query.insert_range_to_inclusive(..=start_at_key);
-            } else {
-                inner_query.insert_range_to(..start_at_key);
-            }
+            inner_query.insert_range_to(..start_at_key);
         }
         inner_query
     }
