@@ -244,7 +244,7 @@ impl Drive {
             PathFixedSizeKey((path, key)) => {
                 let inserted = if apply {
                     let cost_context = self.grove.insert_if_not_exists(
-                        path.clone(),
+                        path,
                         key.as_slice(),
                         Element::empty_tree_with_flags(storage_flags.to_some_element_flags()),
                         transaction,
@@ -272,7 +272,7 @@ impl Drive {
             PathFixedSizeKeyRef((path, key)) => {
                 let inserted = if apply {
                     let cost_context = self.grove.insert_if_not_exists(
-                        path.clone(),
+                        path,
                         key,
                         Element::empty_tree_with_flags(storage_flags.to_some_element_flags()),
                         transaction,
@@ -280,9 +280,7 @@ impl Drive {
                     push_drive_operation_result_optional(cost_context, drive_operations)?
                 } else {
                     if let Some(drive_operations) = drive_operations {
-                        let path_clone = path.clone();
-                        let path_items: Vec<Vec<u8>> =
-                            path_clone.into_iter().map(Vec::from).collect();
+                        let path_items: Vec<Vec<u8>> = path.into_iter().map(Vec::from).collect();
                         drive_operations.push(DriveOperation::for_empty_tree(
                             path_items,
                             key.to_vec(),
@@ -729,7 +727,7 @@ impl Drive {
             }
             PathFixedSizeKey((path, key)) => {
                 let has_raw = self.grove_has_raw(
-                    path.clone(),
+                    path,
                     key.as_slice(),
                     if apply { None } else { SOME_TREE_SIZE },
                     transaction,
@@ -747,7 +745,7 @@ impl Drive {
             }
             PathFixedSizeKeyRef((path, key)) => {
                 let has_raw = self.grove_has_raw(
-                    path.clone(),
+                    path,
                     key,
                     if apply { None } else { SOME_TREE_SIZE },
                     transaction,
@@ -936,7 +934,7 @@ impl Drive {
                 .iter()
                 .map(|key_info| match key_info {
                     Key(key) => Ok(key.as_slice()),
-                    KeyRef(key_ref) => Ok(key_ref.as_ref()),
+                    KeyRef(key_ref) => Ok(*key_ref),
                     KeySize(_) => Err(Error::Drive(DriveError::CorruptedCodeExecution(
                         "key size used with apply",
                     ))),
@@ -1013,7 +1011,7 @@ impl Drive {
         transaction: TransactionArg,
         drive_operations: &mut Vec<DriveOperation>,
     ) -> Result<(), Error> {
-        if ops.len() == 0 {
+        if ops.is_empty() {
             return Err(Error::Drive(DriveError::BatchIsEmpty()));
         }
         if self.config.batching_enabled {
@@ -1039,7 +1037,7 @@ impl Drive {
                     disable_operation_consistency_check: false,
                     base_root_storage_is_free: true
                 }),
-                |cost, old_flags, mut new_flags| {
+                |cost, old_flags, new_flags| {
 
                     // if there were no flags before then the new flags are used
                     if old_flags.is_none() {
@@ -1113,65 +1111,64 @@ impl Drive {
                 None
             };
             //println!("changes {} {:#?}", ops.len(), ops);
-            for op in ops.operations.into_iter() {
+            for operation in ops.operations.into_iter() {
                 //println!("on {:#?}", op);
-                match op {
-                    GroveDbOp {
-                        path,
-                        key,
-                        op,
-                        mode,
-                    } => match mode {
-                        GroveDbOpMode::RunOp => match op {
-                            Op::Insert { element } => self.grove_insert(
-                                PathKeyElementInfo::<0>::PathKeyElement((
-                                    path.to_path(),
-                                    key.as_slice(),
-                                    element,
-                                )),
-                                transaction,
-                                true,
-                                options.clone(),
-                                drive_operations,
-                            )?,
-                            Op::Delete | Op::DeleteTree => self.grove_delete(
+                let GroveDbOp {
+                    path,
+                    key,
+                    op,
+                    mode,
+                } = operation;
+                match mode {
+                    GroveDbOpMode::RunOp => match op {
+                        Op::Insert { element } => self.grove_insert(
+                            PathKeyElementInfo::<0>::PathKeyElement((
                                 path.to_path(),
                                 key.as_slice(),
-                                true,
-                                transaction,
-                                drive_operations,
-                            )?,
-                            _ => {
-                                return Err(Error::Drive(DriveError::UnsupportedPrivate(
-                                    "Only Insert and Deletion operations are allowed",
-                                )))
-                            }
-                        },
-                        GroveDbOpMode::WorstCaseOp => match op {
-                            Op::Insert { element } => self.grove_insert(
-                                PathKeyElementInfo::<0>::PathKeyElement((
-                                    path.to_path(),
-                                    key.as_slice(),
-                                    element,
-                                )),
-                                transaction,
-                                false,
-                                options.clone(),
-                                drive_operations,
-                            )?,
-                            Op::Delete | Op::DeleteTree => self.grove_delete(
+                                element,
+                            )),
+                            transaction,
+                            true,
+                            options.clone(),
+                            drive_operations,
+                        )?,
+                        Op::Delete | Op::DeleteTree => self.grove_delete(
+                            path.to_path(),
+                            key.as_slice(),
+                            true,
+                            transaction,
+                            drive_operations,
+                        )?,
+                        _ => {
+                            return Err(Error::Drive(DriveError::UnsupportedPrivate(
+                                "Only Insert and Deletion operations are allowed",
+                            )))
+                        }
+                    },
+                    GroveDbOpMode::WorstCaseOp => match op {
+                        Op::Insert { element } => self.grove_insert(
+                            PathKeyElementInfo::<0>::PathKeyElement((
                                 path.to_path(),
                                 key.as_slice(),
-                                false,
-                                transaction,
-                                drive_operations,
-                            )?,
-                            _ => {
-                                return Err(Error::Drive(DriveError::UnsupportedPrivate(
-                                    "Only Insert and Deletion operations are allowed",
-                                )))
-                            }
-                        },
+                                element,
+                            )),
+                            transaction,
+                            false,
+                            options.clone(),
+                            drive_operations,
+                        )?,
+                        Op::Delete | Op::DeleteTree => self.grove_delete(
+                            path.to_path(),
+                            key.as_slice(),
+                            false,
+                            transaction,
+                            drive_operations,
+                        )?,
+                        _ => {
+                            return Err(Error::Drive(DriveError::UnsupportedPrivate(
+                                "Only Insert and Deletion operations are allowed",
+                            )))
+                        }
                     },
                 }
             }

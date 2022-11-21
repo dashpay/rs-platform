@@ -168,44 +168,42 @@ impl StorageFlags {
         let base_epoch = *self.base_epoch();
         let owner_id = self.combine_owner_id(&rhs)?;
         let mut other_epoch_bytes = self.combine_non_base_epoch_bytes(&rhs).unwrap_or_default();
-        match removed_bytes {
-            SectionedStorageRemoval(sectioned_bytes_by_identifier) => {
-                if sectioned_bytes_by_identifier.len() > 1 {
-                    return Err(Error::StorageFlags(
+        if let SectionedStorageRemoval(sectioned_bytes_by_identifier) = removed_bytes {
+            if sectioned_bytes_by_identifier.len() > 1 {
+                return Err(Error::StorageFlags(
+                    StorageFlagsError::MergingStorageFlagsFromDifferentOwners(
+                        "can not remove bytes when there is no epoch",
+                    ),
+                ));
+            }
+            let identifier = owner_id.copied().unwrap_or_default();
+            let sectioned_bytes =
+                sectioned_bytes_by_identifier
+                    .get(&identifier)
+                    .ok_or(Error::StorageFlags(
                         StorageFlagsError::MergingStorageFlagsFromDifferentOwners(
                             "can not remove bytes when there is no epoch",
                         ),
-                    ));
-                }
-                let identifier = owner_id.copied().unwrap_or_default();
-                let sectioned_bytes =
-                    sectioned_bytes_by_identifier
-                        .get(&identifier)
-                        .ok_or(Error::StorageFlags(
-                            StorageFlagsError::MergingStorageFlagsFromDifferentOwners(
-                                "can not remove bytes when there is no epoch",
-                            ),
-                        ))?;
-                sectioned_bytes
-                    .iter()
-                    .try_for_each(|(epoch, removed_bytes)| {
-                        let bytes_added_in_epoch = other_epoch_bytes
+                    ))?;
+            sectioned_bytes
+                .iter()
+                .try_for_each(|(epoch, removed_bytes)| {
+                    let bytes_added_in_epoch =
+                        other_epoch_bytes
                             .get_mut(&(*epoch as u16))
                             .ok_or(Error::StorageFlags(
                                 StorageFlagsError::RemovingAtEpochWithNoAssociatedStorage(
                                     "can not remove bytes when there is no epoch",
                                 ),
                             ))?;
-                        *bytes_added_in_epoch =
-                            bytes_added_in_epoch.checked_sub(*removed_bytes).ok_or(
-                                Error::StorageFlags(StorageFlagsError::StorageFlagsOverflow(
-                                    "can't remove more bytes than exist at that epoch",
-                                )),
-                            )?;
-                        Ok::<(), Error>(())
-                    })?;
-            }
-            _ => {}
+                    *bytes_added_in_epoch =
+                        bytes_added_in_epoch.checked_sub(*removed_bytes).ok_or(
+                            Error::StorageFlags(StorageFlagsError::StorageFlagsOverflow(
+                                "can't remove more bytes than exist at that epoch",
+                            )),
+                        )?;
+                    Ok::<(), Error>(())
+                })?;
         }
 
         match owner_id {
@@ -588,13 +586,13 @@ impl StorageFlags {
             }
             if bytes_left > 0 {
                 // We need to take some from the base epoch
-                sectioned_storage_removal.insert(base_epoch.clone() as u64, bytes_left);
+                sectioned_storage_removal.insert(*base_epoch as u64, bytes_left);
             }
             let mut sectioned_storage_removal_by_identifier: StorageRemovalPerEpochByIdentifier =
                 BTreeMap::new();
             if let Some(owner_id) = owner_id {
                 sectioned_storage_removal_by_identifier
-                    .insert(owner_id.clone(), sectioned_storage_removal);
+                    .insert(*owner_id, sectioned_storage_removal);
             } else {
                 let default = [0u8; 32];
                 sectioned_storage_removal_by_identifier.insert(default, sectioned_storage_removal);
