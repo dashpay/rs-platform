@@ -15,6 +15,8 @@ pub trait BlsModule {
     fn sign(&self, data: &[u8], private_key: &[u8]) -> Result<Vec<u8>, ProtocolError>;
 }
 
+// TODO: write tests for the native BLS module
+
 #[derive(Default)]
 #[cfg(not(target_arch = "wasm32"))]
 pub struct NativeBlsModule;
