@@ -37,7 +37,6 @@ serde-big-array = "0.4.1"
 json-patch = "0.2.6"
 jsonptr = "0.1.5"
 num_enum = "0.5.7"
-#rust_bls = { path="../../bls-binding/rust-bindings/bls-signatures", package = "bls-signatures" }
 
 
 
