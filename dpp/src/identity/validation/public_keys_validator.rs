@@ -90,7 +90,7 @@ impl<T: BlsModule> TPublicKeysValidator for PublicKeysValidator<T> {
                 }
                 KeyType::BLS12_381 => match self.bls_validator.validate_public_key(&public_key.data) {
                     Ok(_) => None,
-                    Err(e) => Some(PublicKeyValidationError::new(e.to_string())),
+                    Err(e) => Some(e),
                 },
                 // Do nothing
                 KeyType::ECDSA_HASH160 => None,

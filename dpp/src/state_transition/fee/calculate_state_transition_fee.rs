@@ -14,32 +14,29 @@ pub fn calculate_state_transition_fee(state_transition: &impl StateTransitionLik
 
 #[cfg(test)]
 mod test {
-    use crate::{
-        identity::{
-            state_transition::identity_create_transition::IdentityCreateTransition, KeyType,
+    use crate::{identity::{
+        state_transition::identity_create_transition::IdentityCreateTransition, KeyType,
+    }, NativeBlsModule, state_transition::{
+        fee::operations::{
+            DeleteOperation, Operation, PreCalculatedOperation, ReadOperation, WriteOperation,
         },
-        state_transition::{
-            fee::operations::{
-                DeleteOperation, Operation, PreCalculatedOperation, ReadOperation, WriteOperation,
-            },
-            state_transition_execution_context::StateTransitionExecutionContext,
-            StateTransitionLike,
-        },
-        tests::fixtures::identity_create_transition_fixture_json,
-    };
+        state_transition_execution_context::StateTransitionExecutionContext,
+        StateTransitionLike,
+    }, tests::fixtures::identity_create_transition_fixture_json};
 
     use super::calculate_state_transition_fee;
 
     // TODO: Must be more comprehensive. After we settle all factors and formula.
     #[test]
     fn should_calculate_fee_based_on_executed_operations() {
+        let bls = NativeBlsModule::default();
         let private_key =
             hex::decode("af432c476f65211f45f48f1d42c9c0b497e56696aa1736b40544ef1a496af837")
                 .unwrap();
         let mut state_transition =
             IdentityCreateTransition::new(identity_create_transition_fixture_json(None)).unwrap();
         state_transition
-            .sign_by_private_key(&private_key, KeyType::ECDSA_SECP256K1)
+            .sign_by_private_key(&private_key, KeyType::ECDSA_SECP256K1, &bls)
             .expect("signing should be successful");
 
         let execution_context = StateTransitionExecutionContext::default();

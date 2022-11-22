@@ -3,27 +3,17 @@ use std::sync::Arc;
 use chrono::Utc;
 use dashcore::BlockHeader;
 
-use crate::{
-    block_time_window::validate_time_in_block_time_window::BLOCK_TIME_WINDOW_MILLIS,
-    consensus::{basic::TestConsensusError, ConsensusError},
-    identity::{
-        state_transition::identity_update_transition::{
-            identity_update_transition::IdentityUpdateTransition,
-            validate_identity_update_transition_state::IdentityUpdateTransitionStateValidator,
-        },
-        validation::MockTPublicKeysValidator,
-        Purpose, SecurityLevel,
+use crate::{block_time_window::validate_time_in_block_time_window::BLOCK_TIME_WINDOW_MILLIS, consensus::{basic::TestConsensusError, ConsensusError}, identity::{
+    state_transition::identity_update_transition::{
+        identity_update_transition::IdentityUpdateTransition,
+        validate_identity_update_transition_state::IdentityUpdateTransitionStateValidator,
     },
-    prelude::Identity,
-    state_repository::MockStateRepositoryLike,
-    state_transition::StateTransitionLike,
-    tests::{
-        fixtures::{get_identity_update_transition_fixture, identity_fixture},
-        utils::{get_state_error_from_result, new_block_header},
-    },
-    validation::SimpleValidationResult,
-    StateError,
-};
+    validation::MockTPublicKeysValidator,
+    Purpose, SecurityLevel,
+}, prelude::Identity, state_repository::MockStateRepositoryLike, state_transition::StateTransitionLike, tests::{
+    fixtures::{get_identity_update_transition_fixture, identity_fixture},
+    utils::{get_state_error_from_result, new_block_header},
+}, validation::SimpleValidationResult, StateError, NativeBlsModule};
 
 struct TestData {
     identity: Identity,
@@ -34,6 +24,7 @@ struct TestData {
 }
 
 fn setup_test() -> TestData {
+    let bls = NativeBlsModule::default();
     let identity = identity_fixture();
     let block_header = new_block_header(Some(Utc::now().timestamp() as u32));
 
@@ -60,7 +51,7 @@ fn setup_test() -> TestData {
     let private_key =
         hex::decode("9b67f852093bc61cea0eeca38599dbfba0de28574d2ed9b99d10d33dc1bde7b2").unwrap();
     state_transition
-        .sign_by_private_key(&private_key, crate::identity::KeyType::ECDSA_SECP256K1)
+        .sign_by_private_key(&private_key, crate::identity::KeyType::ECDSA_SECP256K1, &bls)
         .expect("transition should be signed");
 
     TestData {

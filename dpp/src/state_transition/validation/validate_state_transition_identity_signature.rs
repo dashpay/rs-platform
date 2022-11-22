@@ -132,20 +132,13 @@ fn convert_to_consensus_signature_error(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{
-        document::DocumentsBatchTransition,
-        identity::{KeyID, Purpose, SecurityLevel},
-        prelude::{Identifier, Identity, IdentityPublicKey},
-        state_repository::MockStateRepositoryLike,
-        state_transition::{
-            state_transition_execution_context::StateTransitionExecutionContext, StateTransition,
-            StateTransitionConvert, StateTransitionLike, StateTransitionType,
-        },
-        tests::{
-            fixtures::identity_fixture_raw_object,
-            utils::{generate_random_identifier_struct, get_signature_error_from_result},
-        },
-    };
+    use crate::{document::DocumentsBatchTransition, identity::{KeyID, Purpose, SecurityLevel}, NativeBlsModule, prelude::{Identifier, Identity, IdentityPublicKey}, state_repository::MockStateRepositoryLike, state_transition::{
+        state_transition_execution_context::StateTransitionExecutionContext, StateTransition,
+        StateTransitionConvert, StateTransitionLike, StateTransitionType,
+    }, tests::{
+        fixtures::identity_fixture_raw_object,
+        utils::{generate_random_identifier_struct, get_signature_error_from_result},
+    }};
     use serde::{Deserialize, Serialize};
     #[derive(Debug, Clone, Serialize, Deserialize)]
     #[serde(rename_all = "camelCase")]
@@ -211,7 +204,7 @@ mod test {
             &self.owner_id
         }
 
-        fn verify_signature(&self, public_key: &IdentityPublicKey) -> Result<(), ProtocolError> {
+        fn verify_signature(&self, public_key: &IdentityPublicKey, bls: &impl BlsModule) -> Result<(), ProtocolError> {
             if let Some(error_num) = self.return_error {
                 match error_num {
                     0 => {
@@ -276,6 +269,7 @@ mod test {
 
     #[tokio::test]
     async fn should_pass_properly_signed_state_transition() {
+        let bls = NativeBlsModule::default();
         let mut state_repository_mock = MockStateRepositoryLike::new();
         let raw_identity = identity_fixture_raw_object();
         let identity = Identity::from_raw_object(raw_identity).unwrap();
@@ -290,6 +284,7 @@ mod test {
         let result = validate_state_transition_identity_signature(
             &state_repository_mock,
             &mut state_transition,
+            &bls
         )
         .await
         .expect("the validation result should be returned");
@@ -299,6 +294,7 @@ mod test {
 
     #[tokio::test]
     async fn should_return_invalid_result_if_owner_id_does_not_exist() {
+        let bls = NativeBlsModule::default();
         let mut state_repository_mock = MockStateRepositoryLike::new();
         let raw_identity = identity_fixture_raw_object();
         let identity = Identity::from_raw_object(raw_identity).unwrap();
@@ -313,6 +309,7 @@ mod test {
         let result = validate_state_transition_identity_signature(
             &state_repository_mock,
             &mut state_transition,
+            &bls,
         )
         .await
         .expect("the validation result should be returned");
@@ -328,6 +325,7 @@ mod test {
     #[tokio::test]
     async fn should_return_missing_public_key_error_if_identity_does_not_have_matching_public_key()
     {
+        let bls = NativeBlsModule::default();
         let mut state_repository_mock = MockStateRepositoryLike::new();
         let raw_identity = identity_fixture_raw_object();
         let identity = Identity::from_raw_object(raw_identity).unwrap();
@@ -343,6 +341,7 @@ mod test {
         let result = validate_state_transition_identity_signature(
             &state_repository_mock,
             &mut state_transition,
+            &bls
         )
         .await
         .expect("the validation result should be returned");
@@ -357,6 +356,7 @@ mod test {
 
     #[tokio::test]
     async fn should_return_invalid_state_transition_signature_error_if_signature_is_invalid() {
+        let bls = NativeBlsModule::default();
         let mut state_repository_mock = MockStateRepositoryLike::new();
         let raw_identity = identity_fixture_raw_object();
         let identity = Identity::from_raw_object(raw_identity).unwrap();
@@ -372,6 +372,7 @@ mod test {
         let result = validate_state_transition_identity_signature(
             &state_repository_mock,
             &mut state_transition,
+            &bls
         )
         .await
         .expect("the validation result should be returned");
@@ -387,6 +388,7 @@ mod test {
 
     #[tokio::test]
     async fn should_return_invalid_signature_public_key_security_level_error() {
+        let bls = NativeBlsModule::default();
         // 'should return InvalidSignaturePublicKeySecurityLevelConsensusError if InvalidSignaturePublicKeySecurityLevelError was thrown'
         let mut state_repository_mock = MockStateRepositoryLike::new();
         let raw_identity = identity_fixture_raw_object();
@@ -403,6 +405,7 @@ mod test {
         let result = validate_state_transition_identity_signature(
             &state_repository_mock,
             &mut state_transition,
+            &bls
         )
         .await
         .expect("the validation result should be returned");
@@ -416,6 +419,7 @@ mod test {
 
     #[tokio::test]
     async fn should_not_verify_signature_on_dry_run() {
+        let bls = NativeBlsModule::default();
         let mut state_repository_mock = MockStateRepositoryLike::new();
         let raw_identity = identity_fixture_raw_object();
         let identity = Identity::from_raw_object(raw_identity).unwrap();
@@ -432,6 +436,7 @@ mod test {
         let result = validate_state_transition_identity_signature(
             &state_repository_mock,
             &mut state_transition,
+            &bls
         )
         .await
         .expect("the validation result should be returned");
@@ -441,6 +446,7 @@ mod test {
 
     #[tokio::test]
     async fn should_return_public_key_security_level_not_met() {
+        let bls = NativeBlsModule::default();
         // 'should return PubicKeySecurityLevelNotMetConsensusError if PubicKeySecurityLevelNotMetError was thrown'
         let mut state_repository_mock = MockStateRepositoryLike::new();
         let raw_identity = identity_fixture_raw_object();
@@ -457,6 +463,7 @@ mod test {
         let result = validate_state_transition_identity_signature(
             &state_repository_mock,
             &mut state_transition,
+            &bls
         )
         .await
         .expect("the validation result should be returned");
@@ -470,6 +477,7 @@ mod test {
 
     #[tokio::test]
     async fn should_return_public_key_is_disabled_error() {
+        let bls = NativeBlsModule::default();
         // 'should return PublicKeyIsDisabledConsensusError if PublicKeyIsDisabledError was thrown'
         let mut state_repository_mock = MockStateRepositoryLike::new();
         let raw_identity = identity_fixture_raw_object();
@@ -486,6 +494,7 @@ mod test {
         let result = validate_state_transition_identity_signature(
             &state_repository_mock,
             &mut state_transition,
+            &bls
         )
         .await
         .expect("the validation result should be returned");

@@ -71,7 +71,7 @@ where
         }
     }
 
-    fn verify_signature<T: BlsModule>(&self, public_key: &IdentityPublicKey, bls: &T) -> Result<(), ProtocolError> {
+    fn verify_signature(&self, public_key: &IdentityPublicKey, bls: &impl BlsModule) -> Result<(), ProtocolError> {
         self.verify_public_key_level_and_purpose(public_key)?;
 
         let signature = self.get_signature();
@@ -165,6 +165,7 @@ pub fn get_compressed_public_ec_key(private_key: &[u8]) -> Result<[u8; 33], Prot
 
 #[cfg(test)]
 mod test {
+    use std::convert::TryInto;
     use bls_signatures::Serialize as BlsSerialize;
     use chrono::Utc;
     use serde::{Deserialize, Serialize};
@@ -173,14 +174,9 @@ mod test {
     use crate::document::DocumentsBatchTransition;
     use crate::state_transition::state_transition_execution_context::StateTransitionExecutionContext;
     use crate::util::string_encoding::Encoding;
-    use crate::{
-        assert_error_contains,
-        identity::{KeyID, SecurityLevel},
-        state_transition::{
-            StateTransition, StateTransitionConvert, StateTransitionLike, StateTransitionType,
-        },
-        util::hash::ripemd160_sha256,
-    };
+    use crate::{assert_error_contains, identity::{KeyID, SecurityLevel}, NativeBlsModule, state_transition::{
+        StateTransition, StateTransitionConvert, StateTransitionLike, StateTransitionType,
+    }, util::hash::ripemd160_sha256};
 
     use super::StateTransitionIdentitySigned;
     use super::*;
@@ -401,30 +397,33 @@ mod test {
 
     #[test]
     fn sign_validate_with_private_key() {
+        let bls = NativeBlsModule::default();
         let mut st = get_mock_state_transition();
         let keys = get_test_keys();
 
-        st.sign(&keys.identity_public_key, &keys.ec_private)
+        st.sign(&keys.identity_public_key, &keys.ec_private, &bls)
             .unwrap();
-        st.verify_signature(&keys.identity_public_key)
+        st.verify_signature(&keys.identity_public_key, &bls)
             .expect("the verification shouldn't fail");
     }
 
     #[test]
     fn sign_validate_signature_ecdsa_hash160() {
+        let bls = NativeBlsModule::default();
         let mut st = get_mock_state_transition();
         let mut keys = get_test_keys();
         keys.identity_public_key.key_type = KeyType::ECDSA_HASH160;
         keys.identity_public_key.data = ripemd160_sha256(&keys.identity_public_key.data);
 
-        st.sign(&keys.identity_public_key, &keys.ec_private)
+        st.sign(&keys.identity_public_key, &keys.ec_private, &bls)
             .unwrap();
-        st.verify_signature(&keys.identity_public_key)
+        st.verify_signature(&keys.identity_public_key, &bls)
             .expect("the verification shouldn't fail");
     }
 
     #[test]
     fn error_when_sign_with_wrong_public_key() {
+        let bls = NativeBlsModule::default();
         let mut st = get_mock_state_transition();
         let mut keys = get_test_keys();
 
@@ -434,18 +433,19 @@ mod test {
 
         keys.identity_public_key.data = public_key.serialize().to_vec();
 
-        let sign_result = st.sign(&keys.identity_public_key, &keys.ec_private);
+        let sign_result = st.sign(&keys.identity_public_key, &keys.ec_private, &bls);
         assert_error_contains!(sign_result, "Invalid signature public key");
     }
 
     #[test]
     fn error_if_security_level_is_not_met() {
+        let bls = NativeBlsModule::default();
         let mut st = get_mock_state_transition();
         let mut keys = get_test_keys();
         keys.identity_public_key.security_level = SecurityLevel::MEDIUM;
 
         let sign_error = st
-            .sign(&keys.identity_public_key, &keys.ec_private)
+            .sign(&keys.identity_public_key, &keys.ec_private, &bls)
             .unwrap_err();
         match sign_error {
             ProtocolError::PublicKeySecurityLevelNotMetError {
@@ -463,12 +463,13 @@ mod test {
 
     #[test]
     fn error_if_key_purpose_not_authenticated() {
+        let bls = NativeBlsModule::default();
         let mut st = get_mock_state_transition();
         let mut keys = get_test_keys();
         keys.identity_public_key.purpose = Purpose::ENCRYPTION;
 
         let sign_error = st
-            .sign(&keys.identity_public_key, &keys.ec_private)
+            .sign(&keys.identity_public_key, &keys.ec_private, &bls)
             .unwrap_err();
         match sign_error {
             ProtocolError::WrongPublicKeyPurposeError {
@@ -486,21 +487,23 @@ mod test {
 
     #[test]
     fn should_sign_validate_with_bls_signature() {
+        let bls = NativeBlsModule::default();
         let mut st = get_mock_state_transition();
         let mut keys = get_test_keys();
         keys.identity_public_key.key_type = KeyType::BLS12_381;
         keys.identity_public_key.data = keys.bls_public.clone();
 
-        st.sign(&keys.identity_public_key, &keys.bls_private)
+        st.sign(&keys.identity_public_key, &keys.bls_private, &bls)
             .expect("validation should be successful");
     }
 
     #[test]
     fn error_if_transition_is_not_signed_ecdsa() {
+        let bls = NativeBlsModule::default();
         let st = get_mock_state_transition();
         let keys = get_test_keys();
 
-        let verify_error = st.verify_signature(&keys.identity_public_key).unwrap_err();
+        let verify_error = st.verify_signature(&keys.identity_public_key, &bls).unwrap_err();
         match verify_error {
             ProtocolError::StateTransitionIsNotIsSignedError { .. } => {}
             error => {
@@ -511,12 +514,13 @@ mod test {
 
     #[test]
     fn error_if_transition_is_not_signed_bls() {
+        let bls = NativeBlsModule::default();
         let st = get_mock_state_transition();
         let mut keys = get_test_keys();
         keys.identity_public_key.key_type = KeyType::BLS12_381;
         keys.identity_public_key.data = keys.bls_public.clone();
 
-        let verify_error = st.verify_signature(&keys.identity_public_key).unwrap_err();
+        let verify_error = st.verify_signature(&keys.identity_public_key, &bls).unwrap_err();
         match verify_error {
             ProtocolError::StateTransitionIsNotIsSignedError { .. } => {}
             error => {
@@ -543,13 +547,14 @@ mod test {
 
     #[test]
     fn should_throw_public_key_is_disabled_error_if_public_key_is_disabled() {
+        let bls = NativeBlsModule::default();
         let mut st = get_mock_state_transition();
         let mut keys = get_test_keys();
         keys.identity_public_key
             .set_disabled_at(Utc::now().timestamp_millis() as u64);
 
         let result = st
-            .sign(&keys.identity_public_key, &keys.bls_private)
+            .sign(&keys.identity_public_key, &keys.bls_private, &bls)
             .expect_err("the protocol error should be returned");
 
         assert!(matches!(
@@ -560,6 +565,7 @@ mod test {
 
     #[test]
     fn should_throw_invalid_signature_public_key_security_level_error() {
+        let bls = NativeBlsModule::default();
         // should throw InvalidSignaturePublicKeySecurityLevel Error if public key with master level is used to sign non update state transition
         let mut st = get_mock_state_transition();
         let mut keys = get_test_keys();
@@ -569,7 +575,7 @@ mod test {
             .set_security_level(SecurityLevel::MASTER);
 
         let result = st
-            .sign(&keys.identity_public_key, &keys.bls_private)
+            .sign(&keys.identity_public_key, &keys.bls_private, &bls)
             .expect_err("the protocol error should be returned");
 
         assert!(matches!(
