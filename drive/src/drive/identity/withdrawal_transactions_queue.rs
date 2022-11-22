@@ -37,11 +37,12 @@ use dashcore::{Script, TxOut};
 use dashcore::blockdata::transaction::special_transaction::asset_unlock::unqualified_asset_unlock::{AssetUnlockBaseTransactionInfo, AssetUnlockBasePayload};
 use dashcore_rpc::RpcApi;
 
+use dpp::contracts::withdrawals_contract;
 use dpp::identity::convert_credits_to_satoshi;
-use dpp::identity::state_transition::identity_credit_withdrawal_transition::apply_identity_credit_withdrawal_transition_factory::WITHDRAWAL_DATA_CONTRACT_ID_BYTES;
-use dpp::prelude::Document;
+use dpp::prelude::{Document, Identifier};
 use dpp::util::hash;
 use dpp::util::json_value::JsonValueExt;
+use dpp::util::string_encoding::Encoding;
 use grovedb::query_result_type::QueryResultType::QueryKeyElementPairResultType;
 use grovedb::{Element, PathQuery, Query, QueryItem, SizedQuery, TransactionArg};
 
@@ -137,7 +138,16 @@ impl Drive {
 
         let (documents, _, _) = self.query_documents(
             &query_cbor,
-            WITHDRAWAL_DATA_CONTRACT_ID_BYTES,
+            Identifier::from_string(
+                &withdrawals_contract::system_ids().contract_id,
+                Encoding::Base58,
+            )
+            .map_err(|_| {
+                Error::Drive(DriveError::CorruptedCodeExecution(
+                    "Can't create withdrawals id identifier from string",
+                ))
+            })?
+            .to_buffer(),
             WITHDRAWAL_DOCUMENT_TYPE_NAME,
             transaction,
         )?;
@@ -316,7 +326,16 @@ impl Drive {
 
         let (documents, _, _) = self.query_documents(
             &query_cbor,
-            WITHDRAWAL_DATA_CONTRACT_ID_BYTES,
+            Identifier::from_string(
+                &withdrawals_contract::system_ids().contract_id,
+                Encoding::Base58,
+            )
+            .map_err(|_| {
+                Error::Drive(DriveError::CorruptedCodeExecution(
+                    "Can't create withdrawals id identifier from string",
+                ))
+            })?
+            .to_buffer(),
             WITHDRAWAL_DOCUMENT_TYPE_NAME,
             transaction,
         )?;
@@ -344,7 +363,16 @@ impl Drive {
         transaction: TransactionArg,
     ) -> Result<(), Error> {
         let (data_contract, _) = self.fetch_contract(
-            WITHDRAWAL_DATA_CONTRACT_ID_BYTES,
+            Identifier::from_string(
+                &withdrawals_contract::system_ids().contract_id,
+                Encoding::Base58,
+            )
+            .map_err(|_| {
+                Error::Drive(DriveError::CorruptedCodeExecution(
+                    "Can't create withdrawals id identifier from string",
+                ))
+            })?
+            .to_buffer(),
             transaction,
             self.cache.borrow_mut(),
         )?;

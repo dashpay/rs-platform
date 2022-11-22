@@ -70,7 +70,7 @@ where
         if existing_identity.get_revision() != (state_transition.get_revision() - 1) {
             result.add_error(StateError::InvalidIdentityRevisionError {
                 identity_id: existing_identity.get_id().to_owned(),
-                current_revision: existing_identity.get_revision() as u32,
+                current_revision: existing_identity.get_revision(),
             });
 
             return Ok(result);

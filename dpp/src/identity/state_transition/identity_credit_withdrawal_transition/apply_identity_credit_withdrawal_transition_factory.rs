@@ -1,31 +1,22 @@
 use std::convert::TryInto;
 
 use anyhow::{anyhow, Result};
-use serde_json::{Map, Value as JsonValue};
+use serde_json::{json, Value as JsonValue};
 
 use crate::{
+    contracts::withdrawals_contract,
     data_contract::DataContract,
     document::Document,
-    identity::convert_credits_to_satoshi,
+    prelude::Identifier,
     prelude::Identity,
-    prelude::{Identifier, Identity},
-    state_repository::StateRepositoryLike,
     state_repository::StateRepositoryLike,
     state_transition::StateTransitionConvert,
     state_transition::StateTransitionLike,
-    util::{entropy_generator::generate, json_value::JsonValueExt},
+    util::{entropy_generator::generate, json_value::JsonValueExt, string_encoding::Encoding},
 };
 
 use super::IdentityCreditWithdrawalTransition;
 
-pub const WITHDRAWAL_DATA_CONTRACT_ID_BYTES: [u8; 32] = [
-    54, 98, 187, 97, 225, 127, 174, 62, 162, 148, 207, 96, 49, 151, 251, 10, 171, 109, 81, 24, 11,
-    216, 182, 16, 76, 73, 68, 166, 47, 226, 217, 127,
-];
-pub const WITHDRAWAL_DATA_CONTRACT_OWNER_ID_BYTES: [u8; 32] = [
-    170, 138, 235, 213, 173, 122, 202, 36, 243, 48, 61, 185, 146, 50, 146, 255, 194, 133, 221, 176,
-    188, 82, 144, 69, 234, 198, 106, 35, 245, 167, 46, 192,
-];
 const PLATFORM_BLOCK_HEADER_TIME_PROPERTY: &str = "time";
 const PLATFORM_BLOCK_HEADER_TIME_SECONDS_PROPERTY: &str = "seconds";
 
@@ -48,12 +39,18 @@ where
         &self,
         state_transition: &IdentityCreditWithdrawalTransition,
     ) -> Result<()> {
-        let data_contract_id = Identifier::new(WITHDRAWAL_DATA_CONTRACT_ID_BYTES);
-        let data_contract_owner_id = Identifier::new(WITHDRAWAL_DATA_CONTRACT_OWNER_ID_BYTES);
+        let data_contract_id = Identifier::from_string(
+            &withdrawals_contract::system_ids().contract_id,
+            Encoding::Base58,
+        )?;
+        let data_contract_owner_id = Identifier::from_string(
+            &withdrawals_contract::system_ids().owner_id,
+            Encoding::Base58,
+        )?;
 
         let maybe_withdrawals_data_contract: Option<DataContract> = self
             .state_repository
-            .fetch_data_contract(&data_contract_id)
+            .fetch_data_contract(&data_contract_id, state_transition.get_execution_context())
             .await?;
 
         let withdrawals_data_contract = maybe_withdrawals_data_contract
@@ -72,24 +69,13 @@ where
             .get_i64(PLATFORM_BLOCK_HEADER_TIME_SECONDS_PROPERTY)?
             * 1000;
 
-        let mut document_data_map = Map::new();
-
-        document_data_map.insert(
-            "amount".to_string(),
-            serde_json::to_value(state_transition.amount)?,
-        );
-        document_data_map.insert(
-            "coreFeePerByte".to_string(),
-            serde_json::to_value(state_transition.core_fee_per_byte)?,
-        );
-        document_data_map.insert("pooling".to_string(), serde_json::to_value(0)?);
-        document_data_map.insert(
-            "outputScript".to_string(),
-            serde_json::to_value(state_transition.output_script.as_bytes())?,
-        );
-        document_data_map.insert("status".to_string(), serde_json::to_value(0)?);
-
-        let document_data = JsonValue::Object(document_data_map);
+        let document_data = json!({
+            "amount": state_transition.amount,
+            "coreFeePerByte": state_transition.core_fee_per_byte,
+            "pooling": 0,
+            "outputScript": state_transition.output_script.as_bytes(),
+            "status": 0,
+        });
 
         let document_id_bytes: [u8; 32] = state_transition
             .hash(true)?
@@ -112,7 +98,10 @@ where
         };
 
         self.state_repository
-            .store_document(&withdrawal_document)
+            .create_document(
+                &withdrawal_document,
+                state_transition.get_execution_context(),
+            )
             .await?;
 
         let maybe_existing_identity: Option<Identity> = self
@@ -130,7 +119,7 @@ where
 
         let updated_identity_revision = existing_identity.get_revision() + 1;
 
-        existing_identity = existing_identity.set_revision(updated_identity_revision);
+        existing_identity.set_revision(updated_identity_revision);
 
         // TODO: we need to be able to batch state repository operations
         self.state_repository

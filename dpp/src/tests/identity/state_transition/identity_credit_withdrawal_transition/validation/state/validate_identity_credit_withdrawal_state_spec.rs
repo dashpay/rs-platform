@@ -56,7 +56,9 @@ mod validate_identity_credit_withdrawal_transition_state_factory {
             .withf(|id, _| *id == Identifier::default())
             .returning(|_, _| anyhow::Ok(None));
 
-        let (state_transition, validator) = setup_test(state_repository, None, Some(1));
+        let revision_opt = Some(1);
+
+        let (state_transition, validator) = setup_test(state_repository, None, revision_opt);
 
         let result = validator
             .validate_identity_credit_withdrawal_transition_state(&state_transition)
@@ -86,7 +88,10 @@ mod validate_identity_credit_withdrawal_transition_state_factory {
                 anyhow::Ok(Some(identity))
             });
 
-        let (state_transition, validator) = setup_test(state_repository, Some(42), Some(1));
+        let revision_opt = Some(1);
+        let amount_opt = Some(42);
+
+        let (state_transition, validator) = setup_test(state_repository, amount_opt, revision_opt);
 
         let result = validator
             .validate_identity_credit_withdrawal_transition_state(&state_transition)
@@ -107,17 +112,20 @@ mod validate_identity_credit_withdrawal_transition_state_factory {
         state_repository
             .expect_fetch_identity::<Identity>()
             .times(1)
-            .withf(|id| *id == Identifier::default())
-            .returning(|_| {
+            .withf(|id, _| *id == Identifier::default())
+            .returning(|_, _| {
                 let mut identity = Identity::default();
 
-                identity = identity.set_balance(10);
-                identity = identity.set_revision(10);
+                identity.set_balance(10);
+                identity.set_revision(10);
 
                 anyhow::Ok(Some(identity))
             });
 
-        let (state_transition, validator) = setup_test(state_repository, Some(1), Some(2));
+        let revision_opt = Some(2);
+        let amount_opt = Some(1);
+
+        let (state_transition, validator) = setup_test(state_repository, amount_opt, revision_opt);
 
         let result = validator
             .validate_identity_credit_withdrawal_transition_state(&state_transition)
@@ -148,7 +156,10 @@ mod validate_identity_credit_withdrawal_transition_state_factory {
             .withf(|id, _| *id == Identifier::default())
             .returning(|_, _| Err(Error::msg("Some error")));
 
-        let (state_transition, validator) = setup_test(state_repository, Some(5), Some(1));
+        let revision_opt = Some(1);
+        let amount_opt = Some(5);
+
+        let (state_transition, validator) = setup_test(state_repository, amount_opt, revision_opt);
 
         let result = validator
             .validate_identity_credit_withdrawal_transition_state(&state_transition)
@@ -176,7 +187,10 @@ mod validate_identity_credit_withdrawal_transition_state_factory {
                 anyhow::Ok(Some(identity))
             });
 
-        let (state_transition, validator) = setup_test(state_repository, Some(5), Some(1));
+        let revision_opt = Some(1);
+        let amount_opt = Some(5);
+
+        let (state_transition, validator) = setup_test(state_repository, amount_opt, revision_opt);
 
         let result = validator
             .validate_identity_credit_withdrawal_transition_state(&state_transition)
