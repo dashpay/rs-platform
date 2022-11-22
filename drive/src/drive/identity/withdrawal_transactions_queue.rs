@@ -30,6 +30,7 @@
 //! This module defines functions within the Drive struct related to withdrawal transaction (AssetUnlock)
 //!
 
+use std::borrow::Borrow;
 use std::ops::RangeFull;
 
 use dashcore::consensus::Encodable;
@@ -38,8 +39,9 @@ use dashcore::blockdata::transaction::special_transaction::asset_unlock::unquali
 use dashcore_rpc::RpcApi;
 
 use dpp::contracts::withdrawals_contract;
+use dpp::data_contract;
 use dpp::identity::convert_credits_to_satoshi;
-use dpp::prelude::{Document, Identifier};
+use dpp::prelude::{DataContract, Document, Identifier};
 use dpp::util::hash;
 use dpp::util::json_value::JsonValueExt;
 use dpp::util::string_encoding::Encoding;
@@ -118,16 +120,13 @@ impl Drive {
         }
     }
 
-    ///
-    pub fn pool_withdrawals_into_transactions(
+    fn build_withdrawal_transactions_from_documents(
         &self,
+        documents: &mut Vec<Document>,
+        data_contract: &DataContract,
+        block_time: f64,
         transaction: TransactionArg,
-    ) -> Result<(), Error> {
-        let documents = self.fetch_withdrawal_documents_by_status(
-            withdrawals_contract::statuses::QUEUED,
-            transaction,
-        )?;
-
+    ) -> Result<Vec<WithdrawalTransaction>, Error> {
         let mut withdrawals: Vec<(Vec<u8>, Vec<u8>)> = vec![];
 
         for mut document in documents {
@@ -161,7 +160,7 @@ impl Drive {
                 script_pubkey: output_script,
             };
 
-            let transaction_idex = latest_withdrawal_index + 1;
+            let transaction_index = latest_withdrawal_index + 1;
 
             let withdrawal_transaction = AssetUnlockBaseTransactionInfo {
                 version: 1,
@@ -169,7 +168,7 @@ impl Drive {
                 output: vec![tx_out],
                 base_payload: AssetUnlockBasePayload {
                     version: 1,
-                    index: transaction_idex,
+                    index: transaction_index,
                     fee: (state_transition_size * core_fee_per_byte * 1000) as u32,
                 },
             };
@@ -185,7 +184,7 @@ impl Drive {
                 })?;
 
             withdrawals.push((
-                transaction_idex.to_be_bytes().to_vec(),
+                transaction_index.to_be_bytes().to_vec(),
                 transaction_buffer.clone(),
             ));
 
@@ -210,17 +209,81 @@ impl Drive {
 
             document
                 .data
-                .insert("status".to_string(), JsonValue::Number(Number::from(1)))
+                .insert(
+                    "status".to_string(),
+                    JsonValue::Number(Number::from(withdrawals_contract::statuses::POOLED)),
+                )
                 .map_err(|_| {
                     Error::Drive(DriveError::CorruptedCodeExecution(
                         "Can't update document field: status",
                     ))
                 })?;
+
+            document.revision += 1;
+
+            self.update_document_for_contract_cbor(
+                &document.to_cbor().map_err(|_| {
+                    Error::Drive(DriveError::CorruptedCodeExecution(
+                        "Can't cbor withdrawal document",
+                    ))
+                })?,
+                &data_contract.to_cbor().map_err(|_| {
+                    Error::Drive(DriveError::CorruptedCodeExecution(
+                        "Can't cbor withdrawal data contract",
+                    ))
+                })?,
+                withdrawals_contract::types::WITHDRAWAL,
+                Some(&document.owner_id.to_buffer()),
+                block_time,
+                true,
+                StorageFlags { epoch: 1 },
+                transaction,
+            )?;
         }
+
+        Ok(withdrawals)
+    }
+
+    ///
+    pub fn pool_withdrawals_into_transactions(
+        &self,
+        block_time: f64,
+        transaction: TransactionArg,
+    ) -> Result<(), Error> {
+        let (data_contract, _) = self.fetch_contract(
+            Identifier::from_string(
+                &withdrawals_contract::system_ids().contract_id,
+                Encoding::Base58,
+            )
+            .map_err(|_| {
+                Error::Drive(DriveError::CorruptedCodeExecution(
+                    "Can't create withdrawals id identifier from string",
+                ))
+            })?
+            .to_buffer(),
+            transaction,
+            self.cache.borrow_mut(),
+        )?;
+
+        let data_contract = data_contract.ok_or(Error::Drive(
+            DriveError::CorruptedCodeExecution("Can't fetch withdrawal data contract"),
+        ))?;
+
+        let mut documents = self.fetch_withdrawal_documents_by_status(
+            withdrawals_contract::statuses::QUEUED,
+            transaction,
+        )?;
+
+        let withdrawal_transactions = self.build_withdrawal_transactions_from_documents(
+            &mut documents,
+            data_contract.borrow(),
+            block_time,
+            transaction,
+        )?;
 
         let mut batch = GroveDbOpBatch::new();
 
-        self.add_enqueue_withdrawal_transaction_operations(&mut batch, withdrawals);
+        self.add_enqueue_withdrawal_transaction_operations(&mut batch, withdrawal_transactions);
 
         self.grove_apply_batch(batch, true, transaction)?;
 
@@ -374,10 +437,21 @@ impl Drive {
 
             let transaction_id = hex::encode(transaction_id_bytes);
 
-            if core_transactions.contains(&transaction_id) {
+            if core_transactions.contains(&transaction_id)
+                || core_chain_locked_height - transaction_sign_height > 48
+            {
+                let status = if core_transactions.contains(&transaction_id) {
+                    withdrawals_contract::statuses::COMPLETE
+                } else {
+                    withdrawals_contract::statuses::EXPIRED
+                };
+
                 document
                     .data
-                    .insert("status".to_string(), JsonValue::Number(Number::from(3)))
+                    .insert(
+                        "status".to_string(),
+                        JsonValue::Number(Number::from(status)),
+                    )
                     .map_err(|_| {
                         Error::Drive(DriveError::CorruptedCodeExecution(
                             "Can't update document field: status",
@@ -397,37 +471,7 @@ impl Drive {
                             "Can't cbor withdrawal data contract",
                         ))
                     })?,
-                    "withdrawal",
-                    Some(&document.owner_id.to_buffer()),
-                    block_time,
-                    true,
-                    StorageFlags { epoch: 1 },
-                    transaction,
-                )?;
-            } else if core_chain_locked_height - transaction_sign_height > 48 {
-                document
-                    .data
-                    .insert("status".to_string(), JsonValue::Number(Number::from(4)))
-                    .map_err(|_| {
-                        Error::Drive(DriveError::CorruptedCodeExecution(
-                            "Can't update document field: status",
-                        ))
-                    })?;
-
-                document.revision += 1;
-
-                self.update_document_for_contract_cbor(
-                    &document.to_cbor().map_err(|_| {
-                        Error::Drive(DriveError::CorruptedCodeExecution(
-                            "Can't cbor withdrawal document",
-                        ))
-                    })?,
-                    &data_contract.to_cbor().map_err(|_| {
-                        Error::Drive(DriveError::CorruptedCodeExecution(
-                            "Can't cbor withdrawal data contract",
-                        ))
-                    })?,
-                    "withdrawal",
+                    withdrawals_contract::types::WITHDRAWAL,
                     Some(&document.owner_id.to_buffer()),
                     block_time,
                     true,

@@ -61,7 +61,7 @@ where
             .fetch_latest_platform_block_header()
             .await?;
 
-        let document_type = String::from("withdrawal");
+        let document_type = String::from(withdrawals_contract::types::WITHDRAWAL);
         let document_entropy = generate();
         let document_created_at_millis = latest_platform_block_header
             .get(PLATFORM_BLOCK_HEADER_TIME_PROPERTY)
@@ -74,7 +74,7 @@ where
             "coreFeePerByte": state_transition.core_fee_per_byte,
             "pooling": 0,
             "outputScript": state_transition.output_script.as_bytes(),
-            "status": 0,
+            "status": withdrawals_contract::statuses::QUEUED,
         });
 
         let document_id_bytes: [u8; 32] = state_transition

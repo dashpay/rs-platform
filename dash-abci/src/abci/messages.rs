@@ -83,6 +83,8 @@ pub struct BlockBeginResponse {
 pub struct BlockEndRequest {
     /// The fees for the block
     pub fees: FeesAggregate,
+    /// Block time in ms
+    pub block_time_ms: u64,
 }
 
 /// Total credit refund amount for the Epoch

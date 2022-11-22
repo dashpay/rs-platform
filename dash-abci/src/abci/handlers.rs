@@ -157,7 +157,8 @@ impl TenderdashAbci for Platform {
             }
         };
 
-        self.drive.pool_withdrawals_into_transactions(transaction)?;
+        self.drive
+            .pool_withdrawals_into_transactions(request.block_time_ms as f64, transaction)?;
 
         // Process fees
         let process_block_fees_result = self.process_block_fees(
@@ -332,6 +333,7 @@ mod tests {
                             processing_fees: 1600,
                             storage_fees: storage_fees_per_block,
                         },
+                        block_time_ms: 0,
                     };
 
                     let block_end_response = platform
@@ -476,6 +478,7 @@ mod tests {
                             processing_fees: 1600,
                             storage_fees: storage_fees_per_block,
                         },
+                        block_time_ms: 0,
                     };
 
                     let block_end_response = platform
