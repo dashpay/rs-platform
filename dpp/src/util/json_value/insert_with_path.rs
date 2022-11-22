@@ -5,7 +5,7 @@ use serde_json::Value;
 
 /// Inserts the value specified by the json path. If intermediate object doesn't exist, crates a one.
 /// If `Value::Null` is encountered while traversing the path, they are replaced with the required structure.
-pub(super) fn insert_with_parents(
+pub(super) fn insert_with_path(
     data: &mut Value,
     json_path: &[JsonPathStep],
     value: Value,
@@ -114,7 +114,7 @@ mod test_set {
             JsonPathStep::Key("c".to_string()),
         ];
 
-        insert_with_parents(&mut data, &keys, json!("alpha")).expect("no errors");
+        insert_with_path(&mut data, &keys, json!("alpha")).expect("no errors");
 
         assert_eq!(data["a"]["b"]["c"], json!("alpha"))
     }
@@ -124,7 +124,7 @@ mod test_set {
         let mut data = Value::Null;
         let keys = [JsonPathStep::Index(0)];
 
-        insert_with_parents(&mut data, &keys, json!("alpha")).expect("no errors");
+        insert_with_path(&mut data, &keys, json!("alpha")).expect("no errors");
 
         assert_eq!(data[0], json!("alpha"))
     }
@@ -138,7 +138,7 @@ mod test_set {
             JsonPathStep::Key("c".to_string()),
         ];
 
-        insert_with_parents(&mut data, &keys, json!("alpha")).expect("no errors");
+        insert_with_path(&mut data, &keys, json!("alpha")).expect("no errors");
         assert_eq!(data["a"]["b"]["c"], json!("alpha"))
     }
 
@@ -152,7 +152,7 @@ mod test_set {
             JsonPathStep::Key("c".to_string()),
         ];
 
-        insert_with_parents(&mut data, &keys, json!("alpha")).expect("no errors");
+        insert_with_path(&mut data, &keys, json!("alpha")).expect("no errors");
 
         assert_eq!(data["a"]["b"][0]["c"], json!("alpha"))
     }
@@ -167,7 +167,7 @@ mod test_set {
             JsonPathStep::Key("c".to_string()),
         ];
 
-        insert_with_parents(&mut data, &keys, json!("alpha")).expect("no errors");
+        insert_with_path(&mut data, &keys, json!("alpha")).expect("no errors");
 
         assert_eq!(data["a"]["b"][0]["c"], Value::Null);
         assert_eq!(data["a"]["b"][1]["c"], Value::Null);
@@ -189,7 +189,7 @@ mod test_set {
             JsonPathStep::Key("c".to_string()),
         ];
 
-        insert_with_parents(&mut data, &keys, json!("alpha")).expect("no errors");
+        insert_with_path(&mut data, &keys, json!("alpha")).expect("no errors");
 
         assert_eq!(data["a"]["b"][1]["c"], json!("alpha"));
     }
@@ -201,7 +201,7 @@ mod test_set {
         });
         let keys = [JsonPathStep::Key("a".to_string())];
 
-        insert_with_parents(&mut data, &keys, json!("alpha")).expect("no errors");
+        insert_with_path(&mut data, &keys, json!("alpha")).expect("no errors");
 
         assert_eq!(data["a"], json!("alpha"));
     }
@@ -219,8 +219,7 @@ mod test_set {
             JsonPathStep::Key("c".to_string()),
         ];
 
-        insert_with_parents(&mut data, &keys, json!("alpha"))
-            .expect_err("error should be returned");
+        insert_with_path(&mut data, &keys, json!("alpha")).expect_err("error should be returned");
     }
 
     #[test]
@@ -235,7 +234,7 @@ mod test_set {
             JsonPathStep::Key("b".to_string()),
         ];
 
-        insert_with_parents(&mut data, &keys, json!("alpha")).expect("no errors");
+        insert_with_path(&mut data, &keys, json!("alpha")).expect("no errors");
 
         assert_eq!(data["a"]["b"], json!("alpha"));
     }
@@ -245,7 +244,7 @@ mod test_set {
         let mut data = json!({ "a": [json!("already_taken")] });
         let keys = [JsonPathStep::Key("a".to_string()), JsonPathStep::Index(0)];
 
-        insert_with_parents(&mut data, &keys, json!("alpha")).expect("no errors");
+        insert_with_path(&mut data, &keys, json!("alpha")).expect("no errors");
 
         assert_eq!(data["a"][0], json!("alpha"));
     }
@@ -263,6 +262,6 @@ mod test_set {
             JsonPathStep::Index(0),
         ];
 
-        insert_with_parents(&mut data, &keys, json!("alpha")).expect_err("inserting error");
+        insert_with_path(&mut data, &keys, json!("alpha")).expect_err("inserting error");
     }
 }

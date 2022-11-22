@@ -16,8 +16,8 @@ use super::{
     string_encoding::Encoding,
 };
 
-mod insert_with_parents;
-use insert_with_parents::*;
+mod insert_with_path;
+use insert_with_path::*;
 
 const PROPERTY_CONTENT_MEDIA_TYPE: &str = "contentMediaType";
 const PROPERTY_PROTOCOL_VERSION: &str = "protocolVersion";
@@ -82,7 +82,7 @@ pub trait JsonValueExt {
 
     /// Insert value under the path. Path is dot-separated string. i.e `properties[0].id`. If parents don't
     /// exists they will be created
-    fn insert_with_parents(&mut self, path: &str, value: JsonValue) -> Result<(), anyhow::Error>;
+    fn insert_with_path(&mut self, path: &str, value: JsonValue) -> Result<(), anyhow::Error>;
 }
 
 impl JsonValueExt for JsonValue {
@@ -358,14 +358,14 @@ impl JsonValueExt for JsonValue {
     }
 
     /// Insert value under the path. Path is dot-separated string. i.e `properties[0].id`
-    fn insert_with_parents(
+    fn insert_with_path(
         &mut self,
         string_path: &str,
         value: JsonValue,
     ) -> Result<(), anyhow::Error> {
         let path_literal: JsonPathLiteral = string_path.into();
         let path: JsonPath = path_literal.try_into().unwrap();
-        insert_with_parents(self, &path, value)
+        insert_with_path(self, &path, value)
     }
 }
 
@@ -596,10 +596,10 @@ mod test {
         });
 
         document
-            .insert_with_parents("root.to.new_field", json!("new_value"))
+            .insert_with_path("root.to.new_field", json!("new_value"))
             .expect("no errors");
         document
-            .insert_with_parents("root.array[0].new_field", json!("new_value"))
+            .insert_with_path("root.array[0].new_field", json!("new_value"))
             .expect("no errors");
 
         assert_eq!(document["root"]["from"]["id"], json!("123"));
