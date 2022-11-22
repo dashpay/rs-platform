@@ -1,8 +1,8 @@
-use std::sync::Arc;
 use crate::BlsModule;
+use std::sync::Arc;
 
 use crate::errors::DashPlatformProtocolInitError;
-use crate::identity::validation::{PublicKeysValidator};
+use crate::identity::validation::PublicKeysValidator;
 use crate::identity::IdentityFacade;
 use crate::version::{ProtocolVersionValidator, COMPATIBILITY_MAP, LATEST_VERSION};
 

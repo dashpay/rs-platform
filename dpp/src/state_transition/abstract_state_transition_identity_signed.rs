@@ -1,9 +1,12 @@
-
-
 use anyhow::anyhow;
 use dashcore::secp256k1::{PublicKey as RawPublicKey, SecretKey as RawSecretKey};
 
-use crate::{BlsModule, identity::{IdentityPublicKey, KeyID, KeyType, Purpose, SecurityLevel}, prelude::*, util::hash::ripemd160_sha256};
+use crate::{
+    identity::{IdentityPublicKey, KeyID, KeyType, Purpose, SecurityLevel},
+    prelude::*,
+    util::hash::ripemd160_sha256,
+    BlsModule,
+};
 
 use super::StateTransitionLike;
 
@@ -71,7 +74,11 @@ where
         }
     }
 
-    fn verify_signature(&self, public_key: &IdentityPublicKey, bls: &impl BlsModule) -> Result<(), ProtocolError> {
+    fn verify_signature(
+        &self,
+        public_key: &IdentityPublicKey,
+        bls: &impl BlsModule,
+    ) -> Result<(), ProtocolError> {
         self.verify_public_key_level_and_purpose(public_key)?;
 
         let signature = self.get_signature();
@@ -165,18 +172,24 @@ pub fn get_compressed_public_ec_key(private_key: &[u8]) -> Result<[u8; 33], Prot
 
 #[cfg(test)]
 mod test {
-    use std::convert::TryInto;
     use bls_signatures::Serialize as BlsSerialize;
     use chrono::Utc;
     use serde::{Deserialize, Serialize};
     use serde_json::json;
+    use std::convert::TryInto;
 
     use crate::document::DocumentsBatchTransition;
     use crate::state_transition::state_transition_execution_context::StateTransitionExecutionContext;
     use crate::util::string_encoding::Encoding;
-    use crate::{assert_error_contains, identity::{KeyID, SecurityLevel}, NativeBlsModule, state_transition::{
-        StateTransition, StateTransitionConvert, StateTransitionLike, StateTransitionType,
-    }, util::hash::ripemd160_sha256};
+    use crate::{
+        assert_error_contains,
+        identity::{KeyID, SecurityLevel},
+        state_transition::{
+            StateTransition, StateTransitionConvert, StateTransitionLike, StateTransitionType,
+        },
+        util::hash::ripemd160_sha256,
+        NativeBlsModule,
+    };
 
     use super::StateTransitionIdentitySigned;
     use super::*;
@@ -503,7 +516,9 @@ mod test {
         let st = get_mock_state_transition();
         let keys = get_test_keys();
 
-        let verify_error = st.verify_signature(&keys.identity_public_key, &bls).unwrap_err();
+        let verify_error = st
+            .verify_signature(&keys.identity_public_key, &bls)
+            .unwrap_err();
         match verify_error {
             ProtocolError::StateTransitionIsNotIsSignedError { .. } => {}
             error => {
@@ -520,7 +535,9 @@ mod test {
         keys.identity_public_key.key_type = KeyType::BLS12_381;
         keys.identity_public_key.data = keys.bls_public.clone();
 
-        let verify_error = st.verify_signature(&keys.identity_public_key, &bls).unwrap_err();
+        let verify_error = st
+            .verify_signature(&keys.identity_public_key, &bls)
+            .unwrap_err();
         match verify_error {
             ProtocolError::StateTransitionIsNotIsSignedError { .. } => {}
             error => {

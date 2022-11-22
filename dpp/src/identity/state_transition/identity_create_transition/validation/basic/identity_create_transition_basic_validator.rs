@@ -22,14 +22,15 @@ lazy_static! {
 
 const ASSET_LOCK_PROOF_PROPERTY_NAME: &str = "assetLockProof";
 
-pub struct IdentityCreateTransitionBasicValidator<T, S, SR: StateRepositoryLike, SV, BLS: BlsModule> {
+pub struct IdentityCreateTransitionBasicValidator<T, S, SR: StateRepositoryLike, SV, BLS: BlsModule>
+{
     protocol_version_validator: Arc<ProtocolVersionValidator>,
     json_schema_validator: JsonSchemaValidator,
     public_keys_validator: Arc<T>,
     public_keys_in_identity_transition_validator: Arc<S>,
     asset_lock_proof_validator: Arc<AssetLockProofValidator<SR>>,
     public_keys_signatures_validator: SV,
-    bls_adapter: BLS
+    bls_adapter: BLS,
 }
 
 impl<
@@ -58,7 +59,7 @@ impl<
             public_keys_in_identity_transition_validator,
             asset_lock_proof_validator,
             public_keys_signatures_validator,
-            bls_adapter
+            bls_adapter,
         };
 
         Ok(identity_validator)
@@ -93,10 +94,10 @@ impl<
             return Ok(result);
         }
 
-        result.merge(self.public_keys_signatures_validator.validate_public_key_signatures(
-            raw_transition,
-            public_keys,
-        )?);
+        result.merge(
+            self.public_keys_signatures_validator
+                .validate_public_key_signatures(raw_transition, public_keys)?,
+        );
         if !result.is_valid() {
             return Ok(result);
         }

@@ -2,11 +2,19 @@ use std::collections::HashSet;
 
 use lazy_static::lazy_static;
 
-use crate::{consensus::{signature::SignatureError, ConsensusError}, identity::KeyType, prelude::Identity, state_repository::StateRepositoryLike, state_transition::{
-    fee::operations::{Operation, SignatureVerificationOperation},
-    state_transition_execution_context::StateTransitionExecutionContext,
-    StateTransitionIdentitySigned,
-}, validation::ValidationResult, ProtocolError, BlsModule};
+use crate::{
+    consensus::{signature::SignatureError, ConsensusError},
+    identity::KeyType,
+    prelude::Identity,
+    state_repository::StateRepositoryLike,
+    state_transition::{
+        fee::operations::{Operation, SignatureVerificationOperation},
+        state_transition_execution_context::StateTransitionExecutionContext,
+        StateTransitionIdentitySigned,
+    },
+    validation::ValidationResult,
+    BlsModule, ProtocolError,
+};
 
 lazy_static! {
     static ref SUPPORTED_KEY_TYPES: HashSet<KeyType> = {
@@ -132,13 +140,21 @@ fn convert_to_consensus_signature_error(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{document::DocumentsBatchTransition, identity::{KeyID, Purpose, SecurityLevel}, NativeBlsModule, prelude::{Identifier, Identity, IdentityPublicKey}, state_repository::MockStateRepositoryLike, state_transition::{
-        state_transition_execution_context::StateTransitionExecutionContext, StateTransition,
-        StateTransitionConvert, StateTransitionLike, StateTransitionType,
-    }, tests::{
-        fixtures::identity_fixture_raw_object,
-        utils::{generate_random_identifier_struct, get_signature_error_from_result},
-    }};
+    use crate::{
+        document::DocumentsBatchTransition,
+        identity::{KeyID, Purpose, SecurityLevel},
+        prelude::{Identifier, Identity, IdentityPublicKey},
+        state_repository::MockStateRepositoryLike,
+        state_transition::{
+            state_transition_execution_context::StateTransitionExecutionContext, StateTransition,
+            StateTransitionConvert, StateTransitionLike, StateTransitionType,
+        },
+        tests::{
+            fixtures::identity_fixture_raw_object,
+            utils::{generate_random_identifier_struct, get_signature_error_from_result},
+        },
+        NativeBlsModule,
+    };
     use serde::{Deserialize, Serialize};
     #[derive(Debug, Clone, Serialize, Deserialize)]
     #[serde(rename_all = "camelCase")]
@@ -204,7 +220,11 @@ mod test {
             &self.owner_id
         }
 
-        fn verify_signature(&self, public_key: &IdentityPublicKey, bls: &impl BlsModule) -> Result<(), ProtocolError> {
+        fn verify_signature(
+            &self,
+            public_key: &IdentityPublicKey,
+            bls: &impl BlsModule,
+        ) -> Result<(), ProtocolError> {
             if let Some(error_num) = self.return_error {
                 match error_num {
                     0 => {
@@ -284,7 +304,7 @@ mod test {
         let result = validate_state_transition_identity_signature(
             &state_repository_mock,
             &mut state_transition,
-            &bls
+            &bls,
         )
         .await
         .expect("the validation result should be returned");
@@ -341,7 +361,7 @@ mod test {
         let result = validate_state_transition_identity_signature(
             &state_repository_mock,
             &mut state_transition,
-            &bls
+            &bls,
         )
         .await
         .expect("the validation result should be returned");
@@ -372,7 +392,7 @@ mod test {
         let result = validate_state_transition_identity_signature(
             &state_repository_mock,
             &mut state_transition,
-            &bls
+            &bls,
         )
         .await
         .expect("the validation result should be returned");
@@ -405,7 +425,7 @@ mod test {
         let result = validate_state_transition_identity_signature(
             &state_repository_mock,
             &mut state_transition,
-            &bls
+            &bls,
         )
         .await
         .expect("the validation result should be returned");
@@ -436,7 +456,7 @@ mod test {
         let result = validate_state_transition_identity_signature(
             &state_repository_mock,
             &mut state_transition,
-            &bls
+            &bls,
         )
         .await
         .expect("the validation result should be returned");
@@ -463,7 +483,7 @@ mod test {
         let result = validate_state_transition_identity_signature(
             &state_repository_mock,
             &mut state_transition,
-            &bls
+            &bls,
         )
         .await
         .expect("the validation result should be returned");
@@ -494,7 +514,7 @@ mod test {
         let result = validate_state_transition_identity_signature(
             &state_repository_mock,
             &mut state_transition,
-            &bls
+            &bls,
         )
         .await
         .expect("the validation result should be returned");

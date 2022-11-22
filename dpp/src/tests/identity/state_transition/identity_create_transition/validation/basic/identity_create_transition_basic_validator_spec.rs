@@ -2,17 +2,19 @@ use std::sync::Arc;
 
 use serde_json::Value;
 
+use crate::bls::NativeBlsModule;
 use crate::identity::state_transition::asset_lock_proof::{
     AssetLockProofValidator, AssetLockTransactionValidator, ChainAssetLockProofStructureValidator,
     InstantAssetLockProofStructureValidator,
 };
 use crate::identity::state_transition::identity_create_transition::validation::basic::IdentityCreateTransitionBasicValidator;
-use crate::identity::state_transition::validate_public_key_signatures::{PublicKeysSignaturesValidator, TPublicKeysSignaturesValidator};
+use crate::identity::state_transition::validate_public_key_signatures::{
+    PublicKeysSignaturesValidator, TPublicKeysSignaturesValidator,
+};
 use crate::identity::validation::TPublicKeysValidator;
 use crate::state_repository::MockStateRepositoryLike;
 use crate::validation::SimpleValidationResult;
 use crate::version::ProtocolVersionValidator;
-use crate::bls::NativeBlsModule;
 
 #[derive(Default)]
 pub struct SignaturesValidatorMock {}
@@ -71,7 +73,7 @@ pub fn setup_test(
             public_keys_transition_validator,
             asset_lock_proof_validator,
             NativeBlsModule::default(),
-            SignaturesValidatorMock::default()
+            SignaturesValidatorMock::default(),
         )
         .unwrap(),
     )

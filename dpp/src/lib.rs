@@ -37,9 +37,9 @@ mod dash_platform_protocol;
 pub mod block_time_window;
 pub mod mocks;
 
+mod bls;
 #[cfg(test)]
 mod tests;
-mod bls;
 pub use bls::*;
 
 pub mod prelude {

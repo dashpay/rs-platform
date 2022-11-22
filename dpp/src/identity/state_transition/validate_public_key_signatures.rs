@@ -1,8 +1,15 @@
 use serde_json::Value;
 
-use crate::{consensus::{basic::BasicError, ConsensusError}, object_names, prelude::IdentityPublicKey, state_transition::{
-    try_get_transition_type, StateTransition, StateTransitionLike, StateTransitionType,
-}, validation::SimpleValidationResult, NonConsensusError, ProtocolError, BlsModule};
+use crate::{
+    consensus::{basic::BasicError, ConsensusError},
+    object_names,
+    prelude::IdentityPublicKey,
+    state_transition::{
+        try_get_transition_type, StateTransition, StateTransitionLike, StateTransitionType,
+    },
+    validation::SimpleValidationResult,
+    BlsModule, NonConsensusError, ProtocolError,
+};
 
 use super::{
     identity_create_transition::IdentityCreateTransition,
@@ -23,9 +30,7 @@ pub struct PublicKeysSignaturesValidator<T: BlsModule> {
 
 impl<T: BlsModule> PublicKeysSignaturesValidator<T> {
     pub fn new(bls: T) -> Self {
-        Self {
-            bls
-        }
+        Self { bls }
     }
 }
 

@@ -1,13 +1,16 @@
-use std::convert::TryInto;
-use anyhow::anyhow;
 use crate::{ProtocolError, PublicKeyValidationError};
-use bls_signatures::{
-    verify_messages, PublicKey, Serialize, PrivateKey
-};
+use anyhow::anyhow;
+use bls_signatures::{verify_messages, PrivateKey, PublicKey, Serialize};
+use std::convert::TryInto;
 
 pub trait BlsModule {
     fn validate_public_key(&self, pk: &[u8]) -> Result<(), PublicKeyValidationError>;
-    fn verify_signature(&self, signature: &[u8], data: &[u8], public_key: &[u8]) -> Result<bool, ProtocolError>;
+    fn verify_signature(
+        &self,
+        signature: &[u8],
+        data: &[u8],
+        public_key: &[u8],
+    ) -> Result<bool, ProtocolError>;
     fn private_key_to_public_key(&self, private_key: &[u8]) -> Result<Vec<u8>, ProtocolError>;
     fn sign(&self, data: &[u8], private_key: &[u8]) -> Result<Vec<u8>, ProtocolError>;
 }
@@ -25,10 +28,15 @@ impl BlsModule for NativeBlsModule {
         }
     }
 
-    fn verify_signature(&self, signature: &[u8], data: &[u8], public_key: &[u8]) -> Result<bool, ProtocolError> {
+    fn verify_signature(
+        &self,
+        signature: &[u8],
+        data: &[u8],
+        public_key: &[u8],
+    ) -> Result<bool, ProtocolError> {
         let pk = PublicKey::from_bytes(public_key).map_err(anyhow::Error::msg)?;
-        let signature = bls_signatures::Signature::from_bytes(signature)
-            .map_err(anyhow::Error::msg)?;
+        let signature =
+            bls_signatures::Signature::from_bytes(signature).map_err(anyhow::Error::msg)?;
         match verify_messages(&signature, &[&data], &[pk]) {
             true => Ok(true),
             // TODO change to specific error type

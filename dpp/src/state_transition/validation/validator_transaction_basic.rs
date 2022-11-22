@@ -78,11 +78,21 @@ mod test {
     use serde_json::{json, Value as JsonValue};
     use std::sync::Arc;
 
-    use crate::{consensus::basic::BasicError, data_contract::{
-        state_transition::DataContractCreateTransition,
-        validation::data_contract_validator::DataContractValidator, DataContract,
-        DataContractFactory,
-    }, NativeBlsModule, state_repository::MockStateRepositoryLike, state_transition::{StateTransitionConvert, StateTransitionLike}, tests::{fixtures::get_data_contract_fixture, utils::get_basic_error_from_result}, util::json_value::JsonValueExt, validation::ValidationResult, version::{ProtocolVersionValidator, COMPATIBILITY_MAP, LATEST_VERSION}};
+    use crate::{
+        consensus::basic::BasicError,
+        data_contract::{
+            state_transition::DataContractCreateTransition,
+            validation::data_contract_validator::DataContractValidator, DataContract,
+            DataContractFactory,
+        },
+        state_repository::MockStateRepositoryLike,
+        state_transition::{StateTransitionConvert, StateTransitionLike},
+        tests::{fixtures::get_data_contract_fixture, utils::get_basic_error_from_result},
+        util::json_value::JsonValueExt,
+        validation::ValidationResult,
+        version::{ProtocolVersionValidator, COMPATIBILITY_MAP, LATEST_VERSION},
+        NativeBlsModule,
+    };
 
     use super::{validate_state_transition_basic, MockValidatorByStateTransitionType};
 
@@ -117,7 +127,7 @@ mod test {
             .sign_by_private_key(
                 &private_key_bytes,
                 crate::identity::KeyType::ECDSA_SECP256K1,
-                &bls
+                &bls,
             )
             .expect("the state transition should be signed");
 

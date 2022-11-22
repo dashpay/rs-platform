@@ -14,15 +14,20 @@ pub fn calculate_state_transition_fee(state_transition: &impl StateTransitionLik
 
 #[cfg(test)]
 mod test {
-    use crate::{identity::{
-        state_transition::identity_create_transition::IdentityCreateTransition, KeyType,
-    }, NativeBlsModule, state_transition::{
-        fee::operations::{
-            DeleteOperation, Operation, PreCalculatedOperation, ReadOperation, WriteOperation,
+    use crate::{
+        identity::{
+            state_transition::identity_create_transition::IdentityCreateTransition, KeyType,
         },
-        state_transition_execution_context::StateTransitionExecutionContext,
-        StateTransitionLike,
-    }, tests::fixtures::identity_create_transition_fixture_json};
+        state_transition::{
+            fee::operations::{
+                DeleteOperation, Operation, PreCalculatedOperation, ReadOperation, WriteOperation,
+            },
+            state_transition_execution_context::StateTransitionExecutionContext,
+            StateTransitionLike,
+        },
+        tests::fixtures::identity_create_transition_fixture_json,
+        NativeBlsModule,
+    };
 
     use super::calculate_state_transition_fee;
 

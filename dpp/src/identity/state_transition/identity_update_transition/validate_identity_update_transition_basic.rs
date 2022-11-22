@@ -93,8 +93,9 @@ where
                     return Ok(result);
                 }
 
-                let result =
-                    self.public_keys_signatures_validator.validate_public_key_signatures(raw_state_transition, raw_public_keys_list)?;
+                let result = self
+                    .public_keys_signatures_validator
+                    .validate_public_key_signatures(raw_state_transition, raw_public_keys_list)?;
                 if !result.is_valid() {
                     return Ok(result);
                 }

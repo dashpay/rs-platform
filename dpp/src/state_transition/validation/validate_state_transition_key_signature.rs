@@ -134,28 +134,37 @@ mod test {
     use dashcore::{secp256k1::SecretKey, Network, PrivateKey};
     use std::sync::Arc;
 
-    use crate::{consensus::signature::SignatureError, document::DocumentsBatchTransition, identity::{
-        state_transition::{
-            asset_lock_proof::{
-                AssetLockPublicKeyHashFetcher, AssetLockTransactionOutputFetcher,
+    use crate::{
+        consensus::signature::SignatureError,
+        document::DocumentsBatchTransition,
+        identity::{
+            state_transition::{
+                asset_lock_proof::{
+                    AssetLockPublicKeyHashFetcher, AssetLockTransactionOutputFetcher,
+                },
+                identity_create_transition::IdentityCreateTransition,
+                identity_topup_transition::IdentityTopUpTransition,
             },
-            identity_create_transition::IdentityCreateTransition,
-            identity_topup_transition::IdentityTopUpTransition,
+            KeyType,
         },
-        KeyType,
-    }, NativeBlsModule, prelude::Identity, state_repository::MockStateRepositoryLike, state_transition::{StateTransition, StateTransitionLike}, tests::{
-        fixtures::{
-            identity_create_transition_fixture_json, identity_topup_transition_fixture_json,
+        prelude::Identity,
+        state_repository::MockStateRepositoryLike,
+        state_transition::{StateTransition, StateTransitionLike},
+        tests::{
+            fixtures::{
+                identity_create_transition_fixture_json, identity_topup_transition_fixture_json,
+            },
+            utils::get_signature_error_from_result,
         },
-        utils::get_signature_error_from_result,
-    }};
+        NativeBlsModule,
+    };
 
     use super::validate_state_transition_key_signature;
 
     struct TestData {
         state_repository: MockStateRepositoryLike,
         asset_lock_public_key_hash_fetcher: AssetLockPublicKeyHashFetcher<MockStateRepositoryLike>,
-        bls: NativeBlsModule
+        bls: NativeBlsModule,
     }
     fn setup_test() -> TestData {
         let state_repository_mock = MockStateRepositoryLike::new();
@@ -171,7 +180,7 @@ mod test {
         TestData {
             state_repository: MockStateRepositoryLike::new(),
             asset_lock_public_key_hash_fetcher,
-            bls: NativeBlsModule::default()
+            bls: NativeBlsModule::default(),
         }
     }
 
@@ -180,7 +189,7 @@ mod test {
         let TestData {
             state_repository,
             asset_lock_public_key_hash_fetcher,
-            bls
+            bls,
         } = setup_test();
         let state_transition: StateTransition = DocumentsBatchTransition::default().into();
 
@@ -199,7 +208,7 @@ mod test {
         let TestData {
             state_repository,
             asset_lock_public_key_hash_fetcher,
-            bls
+            bls,
         } = setup_test();
         let private_key_hex = "af432c476f65211f45f48f1d42c9c0b497e56696aa1736b40544ef1a496af837";
         let secret_key = SecretKey::from_slice(&hex::decode(private_key_hex).unwrap())
@@ -216,7 +225,7 @@ mod test {
             .sign_by_private_key(
                 &hex::decode(private_key_hex).unwrap(),
                 KeyType::ECDSA_SECP256K1,
-                &bls
+                &bls,
             )
             .expect("state transition should be signed");
 
@@ -236,7 +245,7 @@ mod test {
         let TestData {
             state_repository,
             asset_lock_public_key_hash_fetcher,
-            bls
+            bls,
         } = setup_test();
         let private_key_hex = "af432c476f65211f45f48f1d42c9c0b497e56696aa1736b40544ef1a496af837";
         let secret_key = SecretKey::from_slice(&hex::decode(private_key_hex).unwrap())
@@ -253,7 +262,7 @@ mod test {
             .sign_by_private_key(
                 &hex::decode(private_key_hex).unwrap(),
                 KeyType::ECDSA_SECP256K1,
-                &bls
+                &bls,
             )
             .expect("state transition should be signed");
 
@@ -280,7 +289,7 @@ mod test {
         let TestData {
             mut state_repository,
             asset_lock_public_key_hash_fetcher,
-            bls
+            bls,
         } = setup_test();
         let private_key_hex = "af432c476f65211f45f48f1d42c9c0b497e56696aa1736b40544ef1a496af837";
         let secret_key = SecretKey::from_slice(&hex::decode(private_key_hex).unwrap())
