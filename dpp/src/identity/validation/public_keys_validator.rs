@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use bls_signatures::{PublicKey as BlsPublicKey, Serialize};
+
 use dashcore::PublicKey;
 use lazy_static::lazy_static;
 use serde_json::Value;

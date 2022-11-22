@@ -1,14 +1,9 @@
-use std::convert::TryInto;
+
 
 use anyhow::anyhow;
-use bls_signatures::Serialize;
 use dashcore::secp256k1::{PublicKey as RawPublicKey, SecretKey as RawSecretKey};
 
-use crate::{
-    identity::{IdentityPublicKey, KeyID, KeyType, Purpose, SecurityLevel},
-    prelude::*,
-    util::hash::ripemd160_sha256,
-};
+use crate::{BlsModule, identity::{IdentityPublicKey, KeyID, KeyType, Purpose, SecurityLevel}, prelude::*, util::hash::ripemd160_sha256};
 
 use super::StateTransitionLike;
 
@@ -24,6 +19,7 @@ where
         &mut self,
         identity_public_key: &IdentityPublicKey,
         private_key: &[u8],
+        bls: &impl BlsModule,
     ) -> Result<(), ProtocolError> {
         self.verify_public_key_level_and_purpose(identity_public_key)?;
         self.verify_public_key_is_enabled(identity_public_key)?;
@@ -42,7 +38,7 @@ where
                     });
                 }
 
-                self.sign_by_private_key(private_key, identity_public_key.get_type())
+                self.sign_by_private_key(private_key, identity_public_key.get_type(), bls)
             }
             KeyType::ECDSA_HASH160 => {
                 let public_key_compressed = get_compressed_public_ec_key(private_key)?;
@@ -53,17 +49,17 @@ where
                         public_key: identity_public_key.get_data().to_owned(),
                     });
                 }
-                self.sign_by_private_key(private_key, identity_public_key.get_type())
+                self.sign_by_private_key(private_key, identity_public_key.get_type(), bls)
             }
             KeyType::BLS12_381 => {
-                let public_key = get_public_bls_key(private_key)?;
+                let public_key = bls.private_key_to_public_key(private_key)?;
 
                 if public_key != identity_public_key.get_data() {
                     return Err(ProtocolError::InvalidSignaturePublicKeyError {
                         public_key: identity_public_key.get_data().to_owned(),
                     });
                 }
-                self.sign_by_private_key(private_key, identity_public_key.get_type())
+                self.sign_by_private_key(private_key, identity_public_key.get_type(), bls)
             }
 
             // the default behavior from
@@ -75,7 +71,7 @@ where
         }
     }
 
-    fn verify_signature(&self, public_key: &IdentityPublicKey) -> Result<(), ProtocolError> {
+    fn verify_signature<T: BlsModule>(&self, public_key: &IdentityPublicKey, bls: &T) -> Result<(), ProtocolError> {
         self.verify_public_key_level_and_purpose(public_key)?;
 
         let signature = self.get_signature();
@@ -99,7 +95,7 @@ where
 
             KeyType::ECDSA_SECP256K1 => self.verify_ecdsa_signature_by_public_key(public_key_bytes),
 
-            KeyType::BLS12_381 => self.verify_bls_signature_by_public_key(public_key_bytes),
+            KeyType::BLS12_381 => self.verify_bls_signature_by_public_key(public_key_bytes, bls),
 
             // per https://github.com/dashevo/platform/pull/353, signing and verification is not supported
             KeyType::BIP13_SCRIPT_HASH => Ok(()),
@@ -165,15 +161,6 @@ pub fn get_compressed_public_ec_key(private_key: &[u8]) -> Result<[u8; 33], Prot
     let secp = dashcore::secp256k1::Secp256k1::new();
     let public_key_compressed = RawPublicKey::from_secret_key(&secp, &sk).serialize();
     Ok(public_key_compressed)
-}
-
-pub fn get_public_bls_key(private_key: &[u8]) -> Result<Vec<u8>, ProtocolError> {
-    let fixed_len_key: [u8; 32] = private_key
-        .try_into()
-        .map_err(|_| anyhow!("the BLS private key must be 32 bytes long"))?;
-    let pk = bls_signatures::PrivateKey::from_bytes(&fixed_len_key).map_err(anyhow::Error::msg)?;
-    let public_key = pk.public_key().as_bytes();
-    Ok(public_key)
 }
 
 #[cfg(test)]

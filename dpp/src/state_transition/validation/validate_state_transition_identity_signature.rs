@@ -2,19 +2,11 @@ use std::collections::HashSet;
 
 use lazy_static::lazy_static;
 
-use crate::{
-    consensus::{signature::SignatureError, ConsensusError},
-    identity::KeyType,
-    prelude::Identity,
-    state_repository::StateRepositoryLike,
-    state_transition::{
-        fee::operations::{Operation, SignatureVerificationOperation},
-        state_transition_execution_context::StateTransitionExecutionContext,
-        StateTransitionIdentitySigned,
-    },
-    validation::ValidationResult,
-    ProtocolError,
-};
+use crate::{consensus::{signature::SignatureError, ConsensusError}, identity::KeyType, prelude::Identity, state_repository::StateRepositoryLike, state_transition::{
+    fee::operations::{Operation, SignatureVerificationOperation},
+    state_transition_execution_context::StateTransitionExecutionContext,
+    StateTransitionIdentitySigned,
+}, validation::ValidationResult, ProtocolError, BlsModule};
 
 lazy_static! {
     static ref SUPPORTED_KEY_TYPES: HashSet<KeyType> = {
@@ -29,6 +21,7 @@ lazy_static! {
 pub async fn validate_state_transition_identity_signature(
     state_repository: &impl StateRepositoryLike,
     state_transition: &mut impl StateTransitionIdentitySigned,
+    bls: &impl BlsModule,
 ) -> Result<ValidationResult<()>, ProtocolError> {
     let mut validation_result = ValidationResult::<()>::default();
 
@@ -86,7 +79,7 @@ pub async fn validate_state_transition_identity_signature(
         return Ok(validation_result);
     }
 
-    let signature_is_valid = state_transition.verify_signature(public_key);
+    let signature_is_valid = state_transition.verify_signature(public_key, bls);
 
     if let Err(err) = signature_is_valid {
         let consensus_error = convert_to_consensus_signature_error(err)?;

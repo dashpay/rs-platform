@@ -1,11 +1,7 @@
-use std::convert::TryInto;
+
 use std::fmt::Debug;
 
-use anyhow::anyhow;
-use bls_signatures::{
-    verify_messages, PrivateKey as BLSPrivateKey, PublicKey as BLSPublicKey,
-    Serialize as BLSSerialize,
-};
+
 use dashcore::signer;
 use serde::Serialize;
 use serde_json::Value as JsonValue;
@@ -61,15 +57,12 @@ pub trait StateTransitionLike:
         &mut self,
         private_key: &[u8],
         key_type: KeyType,
+        bls: &impl BlsModule
     ) -> Result<(), ProtocolError> {
         let data = self.to_buffer(true)?;
         match key_type {
             KeyType::BLS12_381 => {
-                let fixed_len_key: [u8; 32] = private_key
-                    .try_into()
-                    .map_err(|_| anyhow!("the BLS private key must be 32 bytes long"))?;
-                let pk = BLSPrivateKey::from_bytes(&fixed_len_key).map_err(anyhow::Error::msg)?;
-                self.set_signature(pk.sign(data).as_bytes())
+                self.set_signature(bls.sign(&data, private_key)?)
             }
 
             // https://github.com/dashevo/platform/blob/9c8e6a3b6afbc330a6ab551a689de8ccd63f9120/packages/js-dpp/lib/stateTransition/AbstractStateTransition.js#L169
@@ -149,14 +142,6 @@ pub trait StateTransitionLike:
         }
 
         let data = self.to_buffer(true)?;
-        // let pk = BLSPublicKey::from_bytes(public_key).map_err(anyhow::Error::msg)?;
-        // let signature = bls_signatures::Signature::from_bytes(self.get_signature())
-        //     .map_err(anyhow::Error::msg)?;
-        // match verify_messages(&signature, &[&data], &[pk]) {
-        //     true => Ok(()),
-        //     // TODO change to specific error type
-        //     false => Err(anyhow!("Verification failed").into()),
-        // };
 
         bls.verify_signature(self.get_signature(), &data, public_key).map(|_| ())
     }

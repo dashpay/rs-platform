@@ -10,22 +10,32 @@ use super::{
 };
 
 pub trait TPublicKeysSignaturesValidator {
-    fn validate_public_key_signatures<'a, T: BlsModule>(
+    fn validate_public_key_signatures<'a>(
+        &self,
         raw_state_transition: &Value,
         raw_public_keys: impl IntoIterator<Item = &'a Value>,
-        bls: &T,
     ) -> Result<SimpleValidationResult, NonConsensusError>;
 }
 
-pub struct PublicKeysSignaturesValidator {}
+pub struct PublicKeysSignaturesValidator<T: BlsModule> {
+    bls: T,
+}
 
-impl TPublicKeysSignaturesValidator for PublicKeysSignaturesValidator {
-    fn validate_public_key_signatures<'a, T: BlsModule>(
+impl<T: BlsModule> PublicKeysSignaturesValidator<T> {
+    pub fn new(bls: T) -> Self {
+        Self {
+            bls
+        }
+    }
+}
+
+impl<T: BlsModule> TPublicKeysSignaturesValidator for PublicKeysSignaturesValidator<T> {
+    fn validate_public_key_signatures<'a>(
+        &self,
         raw_state_transition: &Value,
         raw_public_keys: impl IntoIterator<Item = &'a Value>,
-        bls: &T,
     ) -> Result<SimpleValidationResult, NonConsensusError> {
-        validate_public_key_signatures(raw_state_transition, raw_public_keys, bls)
+        validate_public_key_signatures(raw_state_transition, raw_public_keys, &self.bls)
     }
 }
 
