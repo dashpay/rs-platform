@@ -121,7 +121,7 @@ impl Drive {
     }
 
     ///
-    pub fn prepare_and_enqueue_withdrawal_transactions(
+    pub fn pool_withdrawals_into_transactions(
         &self,
         transaction: TransactionArg,
     ) -> Result<(), Error> {
