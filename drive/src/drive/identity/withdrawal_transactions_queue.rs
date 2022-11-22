@@ -61,8 +61,6 @@ pub const WITHDRAWAL_TRANSACTIONS_COUNTER_ID: [u8; 1] = [0];
 /// constant id for subtree containing transactions queue
 pub const WITHDRAWAL_TRANSACTIONS_QUEUE_ID: [u8; 1] = [1];
 
-const WITHDRAWAL_DOCUMENT_TYPE_NAME: &str = "withdrawal";
-
 type WithdrawalTransaction = (Vec<u8>, Vec<u8>);
 
 /// Add operations for creating initial withdrawal state structure
@@ -125,43 +123,10 @@ impl Drive {
         &self,
         transaction: TransactionArg,
     ) -> Result<(), Error> {
-        let query_value = json!({
-            "where": [
-                ["status", "==", "0"],
-            ],
-            "orderBy": [
-                ["$createdAt", "desc"],
-            ]
-        });
-
-        let query_cbor = common::value_to_cbor(query_value, None);
-
-        let (documents, _, _) = self.query_documents(
-            &query_cbor,
-            Identifier::from_string(
-                &withdrawals_contract::system_ids().contract_id,
-                Encoding::Base58,
-            )
-            .map_err(|_| {
-                Error::Drive(DriveError::CorruptedCodeExecution(
-                    "Can't create withdrawals id identifier from string",
-                ))
-            })?
-            .to_buffer(),
-            WITHDRAWAL_DOCUMENT_TYPE_NAME,
+        let documents = self.fetch_withdrawal_documents_by_status(
+            withdrawals_contract::statuses::QUEUED,
             transaction,
         )?;
-
-        let documents = documents
-            .into_iter()
-            .map(|document_cbor| {
-                Document::from_cbor(document_cbor).map_err(|_| {
-                    Error::Drive(DriveError::CorruptedCodeExecution(
-                        "Can't create a document from cbor",
-                    ))
-                })
-            })
-            .collect::<Result<Vec<Document>, Error>>()?;
 
         let mut withdrawals: Vec<(Vec<u8>, Vec<u8>)> = vec![];
 
@@ -309,13 +274,14 @@ impl Drive {
         Ok(tx_hashes)
     }
 
-    fn fetch_broadcasted_withdrawal_documents(
+    fn fetch_withdrawal_documents_by_status(
         &self,
+        status: u8,
         transaction: TransactionArg,
     ) -> Result<Vec<Document>, Error> {
         let query_value = json!({
             "where": [
-                ["status", "==", "2"],
+                ["status", "==", status.to_string()],
             ],
             "orderBy": [
                 ["$createdAt", "desc"],
@@ -336,7 +302,7 @@ impl Drive {
                 ))
             })?
             .to_buffer(),
-            WITHDRAWAL_DOCUMENT_TYPE_NAME,
+            withdrawals_contract::types::WITHDRAWAL,
             transaction,
         )?;
 
@@ -384,7 +350,10 @@ impl Drive {
         let core_transactions =
             self.fetch_core_block_transactions(last_synced_core_height, core_chain_locked_height)?;
 
-        let broadcasted_documents = self.fetch_broadcasted_withdrawal_documents(transaction)?;
+        let broadcasted_documents = self.fetch_withdrawal_documents_by_status(
+            withdrawals_contract::statuses::BROADCASTED,
+            transaction,
+        )?;
 
         for mut document in broadcasted_documents {
             let transaction_sign_height =
