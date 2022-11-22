@@ -27,7 +27,6 @@
 // DEALINGS IN THE SOFTWARE.
 //
 
-
 use crate::drive::batch::GroveDbOpBatch;
 use crate::drive::fee_pools::epochs::constants::{GENESIS_EPOCH_INDEX, PERPETUAL_STORAGE_EPOCHS};
 use crate::drive::fee_pools::pools_vec_path;
