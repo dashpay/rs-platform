@@ -1,16 +1,19 @@
-
 use std::fmt::Debug;
-
 
 use dashcore::signer;
 use serde::Serialize;
 use serde_json::Value as JsonValue;
 
-use crate::{BlsModule, identity::KeyType, prelude::ProtocolError, util::{
-    hash,
-    json_value::{JsonValueExt, ReplaceWith},
-    serializer,
-}};
+use crate::{
+    identity::KeyType,
+    prelude::ProtocolError,
+    util::{
+        hash,
+        json_value::{JsonValueExt, ReplaceWith},
+        serializer,
+    },
+    BlsModule,
+};
 
 use super::{
     fee::calculate_state_transition_fee::calculate_state_transition_fee,
@@ -57,13 +60,11 @@ pub trait StateTransitionLike:
         &mut self,
         private_key: &[u8],
         key_type: KeyType,
-        bls: &impl BlsModule
+        bls: &impl BlsModule,
     ) -> Result<(), ProtocolError> {
         let data = self.to_buffer(true)?;
         match key_type {
-            KeyType::BLS12_381 => {
-                self.set_signature(bls.sign(&data, private_key)?)
-            }
+            KeyType::BLS12_381 => self.set_signature(bls.sign(&data, private_key)?),
 
             // https://github.com/dashevo/platform/blob/9c8e6a3b6afbc330a6ab551a689de8ccd63f9120/packages/js-dpp/lib/stateTransition/AbstractStateTransition.js#L169
             KeyType::ECDSA_SECP256K1 | KeyType::ECDSA_HASH160 => {
@@ -134,7 +135,11 @@ pub trait StateTransitionLike:
     }
 
     /// Verifies a BLS signature with the public key
-    fn verify_bls_signature_by_public_key<T: BlsModule>(&self, public_key: &[u8], bls: &T) -> Result<(), ProtocolError> {
+    fn verify_bls_signature_by_public_key<T: BlsModule>(
+        &self,
+        public_key: &[u8],
+        bls: &T,
+    ) -> Result<(), ProtocolError> {
         if self.get_signature().is_empty() {
             return Err(ProtocolError::StateTransitionIsNotIsSignedError {
                 state_transition: self.clone().into(),
@@ -143,7 +148,8 @@ pub trait StateTransitionLike:
 
         let data = self.to_buffer(true)?;
 
-        bls.verify_signature(self.get_signature(), &data, public_key).map(|_| ())
+        bls.verify_signature(self.get_signature(), &data, public_key)
+            .map(|_| ())
     }
 
     /// returns true if state transition is a document state transition
