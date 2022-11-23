@@ -405,7 +405,7 @@ impl Drive {
 
         drive_cache
             .cached_contracts
-            .insert(updated_contract_fetch_info, transaction);
+            .insert(updated_contract_fetch_info, transaction.is_some());
 
         calculate_fee(None, Some(drive_operations), &block_info.epoch)
     }
@@ -664,7 +664,7 @@ impl Drive {
                 if let Some(contract_fetch_info) = &maybe_contract_fetch_info {
                     cache
                         .cached_contracts
-                        .insert(Arc::clone(contract_fetch_info), transaction);
+                        .insert(Arc::clone(contract_fetch_info), transaction.is_some());
                 };
 
                 Ok(maybe_contract_fetch_info)
@@ -689,7 +689,7 @@ impl Drive {
                         // we override the cache for the contract as the fee is now calculated
                         cache
                             .cached_contracts
-                            .insert(updated_contract_fetch_info, transaction);
+                            .insert(updated_contract_fetch_info, transaction.is_some());
 
                         fee
                     };
