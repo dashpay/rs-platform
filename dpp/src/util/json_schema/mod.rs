@@ -5,6 +5,9 @@ use std::convert::TryFrom;
 pub use super::index::Index;
 use super::index::IndexWithRawProperties;
 
+mod identifiers_paths;
+use identifiers_paths::get_identifiers_paths;
+
 pub trait JsonSchemaExt {
     /// returns true if json value contains property 'type`, and it equals 'object'
     fn is_type_of_object(&self) -> bool;
@@ -20,6 +23,8 @@ pub trait JsonSchemaExt {
     fn get_schema_required_fields(&self) -> Result<Vec<&str>, anyhow::Error>;
     /// returns the indexes from Json Schema
     fn get_indices(&self) -> Result<Vec<Index>, anyhow::Error>;
+    /// returns paths of properties with Identifier path
+    fn get_identifiers_paths(&self) -> Result<Vec<String>, anyhow::Error>;
 }
 
 impl JsonSchemaExt for JsonValue {
@@ -100,6 +105,10 @@ impl JsonSchemaExt for JsonValue {
 
             None => Ok(vec![]),
         }
+    }
+
+    fn get_identifiers_paths(&self) -> Result<Vec<String>, anyhow::Error> {
+        get_identifiers_paths(self)
     }
 }
 

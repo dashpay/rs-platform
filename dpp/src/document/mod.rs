@@ -47,6 +47,7 @@ pub struct Document {
     // the serde_json::Value preserves the order (see .toml file)
     #[serde(flatten)]
     pub data: JsonValue,
+
     #[serde(skip)]
     pub data_contract: DataContract,
     #[serde(skip)]
@@ -108,8 +109,12 @@ impl Document {
             .map_err(|e| ProtocolError::EncodingError(format!("{}", e)))?;
 
         json_value.parse_and_add_protocol_version("$protocolVersion", protocol_bytes)?;
-        // TODO identifiers and binary data for dynamic values
+
+        // the buffer -> contains bytes
+        // so we s
+
         json_value.replace_identifier_paths(IDENTIFIER_FIELDS, ReplaceWith::Base58)?;
+        // this is for dynamic fields
 
         let document: Document = serde_json::from_value(json_value)?;
         Ok(document)

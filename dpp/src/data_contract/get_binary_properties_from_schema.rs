@@ -22,6 +22,7 @@ pub fn get_binary_properties(schema: &JsonValue) -> BTreeMap<String, JsonValue> 
     }
     binary_properties
 }
+
 /// Recursively build properties map
 fn build_binary_properties_map(
     schema: &JsonValue,
@@ -81,6 +82,7 @@ fn visit_map<'a>(
             } else {
                 key.to_string()
             };
+            //
             build_binary_properties_map(v, Some(property_path), binary_paths);
         }
     }
