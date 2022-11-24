@@ -48,6 +48,7 @@ use crate::error::drive::DriveError;
 use crate::error::Error;
 use crate::fee::op::DriveOperation;
 use crate::fee::op::DriveOperation::GroveOperation;
+use crate::rpc::core::{CoreRPCLike, DefaultCoreRPC};
 
 /// Batch module
 pub mod batch;
@@ -95,7 +96,7 @@ pub struct Drive {
     /// Drive Cache
     pub cache: RefCell<DriveCache>,
     /// Core RPC Client
-    pub core_rpc: Option<RefCell<Client>>,
+    pub core_rpc: Option<Box<dyn CoreRPCLike>>,
 }
 
 /// Keys for the root tree.
@@ -164,25 +165,23 @@ impl Drive {
                 let config = config.unwrap_or_default();
                 let genesis_time_ms = config.default_genesis_time.clone();
 
-                let core_rpc = if let (Some(url), Some(username), Some(password)) = (
-                    &config.core_rpc_url,
-                    &config.core_rpc_username,
-                    &config.core_rpc_password,
-                ) {
-                    Some(
-                        Client::new(
-                            url.as_str(),
-                            Auth::UserPass(username.clone(), password.clone()),
-                        )
-                        .map_err(|_| {
-                            Error::Drive(DriveError::CorruptedCodeExecution(
-                                "Could not setup Dash Core RPC client",
-                            ))
-                        })?,
-                    )
-                } else {
-                    None
-                };
+                let core_rpc: Option<Box<dyn CoreRPCLike>> =
+                    if let (Some(url), Some(username), Some(password)) = (
+                        &config.core_rpc_url,
+                        &config.core_rpc_username,
+                        &config.core_rpc_password,
+                    ) {
+                        Some(Box::new(
+                            DefaultCoreRPC::open(url.clone(), username.clone(), password.clone())
+                                .map_err(|_| {
+                                Error::Drive(DriveError::CorruptedCodeExecution(
+                                    "Could not setup Dash Core RPC client",
+                                ))
+                            })?,
+                        ))
+                    } else {
+                        None
+                    };
 
                 Ok(Drive {
                     grove,
@@ -191,7 +190,7 @@ impl Drive {
                         cached_contracts: Cache::new(200),
                         genesis_time_ms,
                     }),
-                    core_rpc: core_rpc.map(|value| RefCell::new(value)),
+                    core_rpc,
                 })
             }
             Err(e) => Err(Error::GroveDB(e)),

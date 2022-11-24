@@ -294,13 +294,12 @@ impl Drive {
         last_synced_core_height: u64,
         core_chain_locked_height: u64,
     ) -> Result<Vec<String>, Error> {
-        let core_rpc = self
-            .core_rpc
-            .as_ref()
-            .ok_or(Error::Drive(DriveError::CorruptedCodeExecution(
-                "Core RPC client has not been set up",
-            )))?
-            .borrow();
+        let core_rpc =
+            self.core_rpc
+                .as_ref()
+                .ok_or(Error::Drive(DriveError::CorruptedCodeExecution(
+                    "Core RPC client has not been set up",
+                )))?;
 
         let mut tx_hashes: Vec<String> = vec![];
 
@@ -367,6 +366,8 @@ impl Drive {
             withdrawals_contract::types::WITHDRAWAL,
             transaction,
         )?;
+
+        dbg!(&documents);
 
         let documents = documents
             .into_iter()
