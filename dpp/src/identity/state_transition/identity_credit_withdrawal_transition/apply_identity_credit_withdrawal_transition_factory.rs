@@ -82,6 +82,7 @@ where
             .try_into()
             .map_err(|_| anyhow!("Can't convert state transition hash to a document id"))?;
 
+        // TODO: use DocumentFactory once it is complete
         let withdrawal_document = Document {
             protocol_version: state_transition.protocol_version,
             id: Identifier::new(document_id_bytes),

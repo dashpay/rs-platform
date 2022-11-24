@@ -39,7 +39,6 @@ use dashcore::blockdata::transaction::special_transaction::asset_unlock::unquali
 use dashcore_rpc::RpcApi;
 
 use dpp::contracts::withdrawals_contract;
-use dpp::data_contract;
 use dpp::identity::convert_credits_to_satoshi;
 use dpp::prelude::{DataContract, Document, Identifier};
 use dpp::util::hash;
