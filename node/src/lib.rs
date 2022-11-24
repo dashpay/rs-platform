@@ -1,6 +1,7 @@
 mod converter;
 
 use std::collections::HashMap;
+use std::ops::Deref;
 use std::{option::Option::None, path::Path, sync::mpsc, thread};
 
 use dash_abci::abci::handlers::TenderdashAbci;
@@ -17,31 +18,50 @@ use rs_drive::error::drive::DriveError;
 use rs_drive::error::Error;
 use rs_drive::fee_pools::epochs::Epoch;
 use rs_drive::grovedb::{PathQuery, Transaction};
-use rs_drive::query::TransactionArg;
 
-struct PlatformWrapperTransaction {
+type TransactionPointerAddress = usize;
+
+struct PlatformWrapperTransactionAddress {
+    address: TransactionPointerAddress,
     tx: mpsc::Sender<PlatformWrapperMessage>,
 }
 
-impl Finalize for PlatformWrapperTransaction {
+impl Finalize for PlatformWrapperTransactionAddress {
     fn finalize<'a, C: Context<'a>>(self, _: &mut C) {
         // Ignoring the result of the `send` function as
         // it only fails if other side closed a connection
         // that would mean there is no reason using `cx.throw`
         // as thread is probably closed already
         self.tx
-            .send(PlatformWrapperMessage::AbortTransaction(Box::new(
-                |_, _| {},
-            )))
+            .send(PlatformWrapperMessage::AbortTransaction(
+                self.address,
+                Box::new(|_, _| {}),
+            ))
             .ok();
     }
 }
 
-type PlatformCallback = Box<dyn for<'a> FnOnce(&'a Platform, TransactionArg, &Channel) + Send>;
+impl Deref for PlatformWrapperTransactionAddress {
+    type Target = TransactionPointerAddress;
+
+    fn deref(&self) -> &Self::Target {
+        &self.address
+    }
+}
+
+type PlatformCallback = Box<
+    dyn for<'a> FnOnce(&'a Platform, &HashMap<TransactionPointerAddress, Transaction>, &Channel)
+        + Send,
+>;
 type UnitCallback = Box<dyn FnOnce(&Channel) + Send>;
 type ErrorCallback = Box<dyn FnOnce(&Channel, Result<(), String>) + Send>;
-type TransactionCallback =
-    Box<dyn FnOnce(mpsc::Sender<PlatformWrapperMessage>, Result<(), String>, &Channel) + Send>;
+type TransactionCallback = Box<
+    dyn FnOnce(
+            mpsc::Sender<PlatformWrapperMessage>,
+            Result<TransactionPointerAddress, String>,
+            &Channel,
+        ) + Send,
+>;
 
 // Messages sent on the drive channel
 enum PlatformWrapperMessage {
@@ -50,9 +70,9 @@ enum PlatformWrapperMessage {
     // Indicates that the thread should be stopped and connection closed
     Close(UnitCallback),
     StartTransaction(TransactionCallback),
-    CommitTransaction(ErrorCallback),
-    RollbackTransaction(ErrorCallback),
-    AbortTransaction(ErrorCallback),
+    CommitTransaction(TransactionPointerAddress, ErrorCallback),
+    RollbackTransaction(TransactionPointerAddress, ErrorCallback),
+    AbortTransaction(TransactionPointerAddress, ErrorCallback),
     Flush(UnitCallback),
 }
 
@@ -116,7 +136,7 @@ impl PlatformWrapper {
             // TODO: think how to pass this error to JS
             let platform: Platform = Platform::open(path, Some(drive_config)).unwrap();
 
-            let mut maybe_transaction: Option<Transaction> = None;
+            let mut transactions: HashMap<TransactionPointerAddress, Transaction> = HashMap::new();
 
             // Blocks until a callback is available
             // When the instance of `Database` is dropped, the channel will be closed
@@ -128,11 +148,11 @@ impl PlatformWrapper {
                         // The connection and channel are owned by the thread, but _lent_ to
                         // the callback. The callback has exclusive access to the connection
                         // for the duration of the callback.
-                        callback(&platform, maybe_transaction.as_ref(), &channel);
+                        callback(&platform, &transactions, &channel);
                     }
                     // Immediately close the connection, even if there are pending messages
                     PlatformWrapperMessage::Close(callback) => {
-                        drop(maybe_transaction);
+                        drop(transactions);
                         drop(platform);
 
                         callback(&channel);
@@ -144,64 +164,84 @@ impl PlatformWrapper {
                         callback(&channel);
                     }
                     PlatformWrapperMessage::StartTransaction(callback) => {
-                        let result = if maybe_transaction.is_some() {
-                            Err("Transaction is already started".to_string())
+                        let result = if transactions.len() > 1 {
+                            Err("transaction is already started".to_string())
                         } else {
                             let transaction = platform.drive.grove.start_transaction();
 
-                            maybe_transaction = Some(transaction);
+                            // TODO: It's not gonna work with more than one transaction since
+                            //   Transaction objects retake previous addresses due to Rust memory
+                            //   optimizations
+                            let transaction_ref = &transaction;
+                            let transaction_raw_pointer = transaction_ref as *const Transaction;
+                            let transaction_raw_pointer_address =
+                                transaction_raw_pointer as TransactionPointerAddress;
 
-                            Ok(())
+                            transactions.insert(transaction_raw_pointer_address, transaction);
+
+                            Ok(transaction_raw_pointer_address)
                         };
 
                         callback(sender.clone(), result, &channel);
                     }
-                    PlatformWrapperMessage::CommitTransaction(callback) => {
-                        let result = if maybe_transaction.is_some() {
+                    PlatformWrapperMessage::CommitTransaction(
+                        transaction_raw_pointer_address,
+                        callback,
+                    ) => {
+                        let error = if let Some(transaction) =
+                            transactions.remove(&transaction_raw_pointer_address)
+                        {
                             let mut drive_cache = platform.drive.cache.borrow_mut();
 
                             drive_cache.cached_contracts.merge_block_cache();
 
                             drive_cache.cached_contracts.clear_block_cache();
 
-                            platform
-                                .drive
-                                .commit_transaction(maybe_transaction.take().unwrap())
-                                .unwrap();
+                            platform.drive.commit_transaction(transaction).unwrap();
 
                             Ok(())
                         } else {
-                            Err("transaction was not started".to_string())
+                            Err("invalid transaction_raw_pointer_address, transaction was not found".to_string())
                         };
 
-                        callback(&channel, result);
+                        callback(&channel, error);
                     }
-                    PlatformWrapperMessage::RollbackTransaction(callback) => {
-                        let result = if let Some(transaction) = &maybe_transaction {
+                    PlatformWrapperMessage::RollbackTransaction(
+                        transaction_raw_pointer_address,
+                        callback,
+                    ) => {
+                        let error = if let Some(transaction) =
+                            transactions.remove(&transaction_raw_pointer_address)
+                        {
                             let mut drive_cache = platform.drive.cache.borrow_mut();
 
                             drive_cache.cached_contracts.clear_block_cache();
 
-                            platform.drive.rollback_transaction(transaction).unwrap();
+                            platform.drive.rollback_transaction(&transaction).unwrap();
 
                             Ok(())
                         } else {
-                            Err("transaction was not started".to_string())
+                            Err("invalid transaction_raw_pointer_address, transaction was not found".to_string())
                         };
 
-                        callback(&channel, result);
+                        callback(&channel, error);
                     }
-                    PlatformWrapperMessage::AbortTransaction(callback) => {
-                        let error = if let Some(transaction) = &maybe_transaction {
+                    PlatformWrapperMessage::AbortTransaction(
+                        transaction_raw_pointer_address,
+                        callback,
+                    ) => {
+                        let error = if let Some(transaction) =
+                            transactions.remove(&transaction_raw_pointer_address)
+                        {
                             let mut drive_cache = platform.drive.cache.borrow_mut();
 
-                            drive_cache.cached_contracts.clear_block_cache(&transaction);
+                            drive_cache.cached_contracts.clear_block_cache();
 
-                            drop(maybe_transaction.take());
+                            drop(transaction);
 
                             Ok(())
                         } else {
-                            Err("transaction was not started".to_string())
+                            Err("invalid transaction_raw_pointer_address, transaction was not found".to_string())
                         };
 
                         callback(&channel, error);
@@ -236,7 +276,12 @@ impl PlatformWrapper {
 
     fn start_transaction(
         &self,
-        callback: impl FnOnce(mpsc::Sender<PlatformWrapperMessage>, usize, &Channel) + Send + 'static,
+        callback: impl FnOnce(
+                mpsc::Sender<PlatformWrapperMessage>,
+                Result<TransactionPointerAddress, String>,
+                &Channel,
+            ) + Send
+            + 'static,
     ) -> Result<(), mpsc::SendError<PlatformWrapperMessage>> {
         self.tx
             .send(PlatformWrapperMessage::StartTransaction(Box::new(callback)))
@@ -335,7 +380,7 @@ impl PlatformWrapper {
 
         let maybe_transaction_address = if !js_transaction.is_a::<JsUndefined, _>(&mut cx) {
             let handle = js_transaction
-                .downcast_or_throw::<JsBox<PlatformWrapperTransaction>, _>(&mut cx)?;
+                .downcast_or_throw::<JsBox<PlatformWrapperTransactionAddress>, _>(&mut cx)?;
 
             Some(***handle)
         } else {
@@ -412,7 +457,7 @@ impl PlatformWrapper {
 
         let maybe_boxed_transaction_address = if !js_transaction.is_a::<JsUndefined, _>(&mut cx) {
             let handle = js_transaction
-                .downcast_or_throw::<JsBox<PlatformWrapperTransaction>, _>(&mut cx)?;
+                .downcast_or_throw::<JsBox<PlatformWrapperTransactionAddress>, _>(&mut cx)?;
 
             Some(***handle)
         } else {
@@ -495,7 +540,7 @@ impl PlatformWrapper {
 
         let maybe_boxed_transaction_address = if !js_transaction.is_a::<JsUndefined, _>(&mut cx) {
             let handle = js_transaction
-                .downcast_or_throw::<JsBox<PlatformWrapperTransaction>, _>(&mut cx)?;
+                .downcast_or_throw::<JsBox<PlatformWrapperTransactionAddress>, _>(&mut cx)?;
 
             Some(***handle)
         } else {
@@ -578,7 +623,7 @@ impl PlatformWrapper {
 
         let maybe_boxed_transaction_address = if !js_transaction.is_a::<JsUndefined, _>(&mut cx) {
             let handle = js_transaction
-                .downcast_or_throw::<JsBox<PlatformWrapperTransaction>, _>(&mut cx)?;
+                .downcast_or_throw::<JsBox<PlatformWrapperTransactionAddress>, _>(&mut cx)?;
 
             Some(***handle)
         } else {
@@ -649,7 +694,7 @@ impl PlatformWrapper {
 
         let maybe_boxed_transaction_address = if !js_transaction.is_a::<JsUndefined, _>(&mut cx) {
             let handle = js_transaction
-                .downcast_or_throw::<JsBox<PlatformWrapperTransaction>, _>(&mut cx)?;
+                .downcast_or_throw::<JsBox<PlatformWrapperTransactionAddress>, _>(&mut cx)?;
 
             Some(***handle)
         } else {
@@ -738,7 +783,7 @@ impl PlatformWrapper {
 
         let maybe_boxed_transaction_address = if !js_transaction.is_a::<JsUndefined, _>(&mut cx) {
             let handle = js_transaction
-                .downcast_or_throw::<JsBox<PlatformWrapperTransaction>, _>(&mut cx)?;
+                .downcast_or_throw::<JsBox<PlatformWrapperTransactionAddress>, _>(&mut cx)?;
 
             Some(***handle)
         } else {
@@ -824,7 +869,7 @@ impl PlatformWrapper {
 
         let maybe_boxed_transaction_address = if !js_transaction.is_a::<JsUndefined, _>(&mut cx) {
             let handle = js_transaction
-                .downcast_or_throw::<JsBox<PlatformWrapperTransaction>, _>(&mut cx)?;
+                .downcast_or_throw::<JsBox<PlatformWrapperTransactionAddress>, _>(&mut cx)?;
 
             Some(***handle)
         } else {
@@ -903,7 +948,7 @@ impl PlatformWrapper {
 
         let maybe_boxed_transaction_address = if !js_transaction.is_a::<JsUndefined, _>(&mut cx) {
             let handle = js_transaction
-                .downcast_or_throw::<JsBox<PlatformWrapperTransaction>, _>(&mut cx)?;
+                .downcast_or_throw::<JsBox<PlatformWrapperTransactionAddress>, _>(&mut cx)?;
 
             Some(***handle)
         } else {
@@ -988,7 +1033,7 @@ impl PlatformWrapper {
 
         let maybe_boxed_transaction_address = if !js_transaction.is_a::<JsUndefined, _>(&mut cx) {
             let handle = js_transaction
-                .downcast_or_throw::<JsBox<PlatformWrapperTransaction>, _>(&mut cx)?;
+                .downcast_or_throw::<JsBox<PlatformWrapperTransactionAddress>, _>(&mut cx)?;
 
             Some(***handle)
         } else {
@@ -1080,7 +1125,7 @@ impl PlatformWrapper {
 
         let maybe_boxed_transaction_address = if !js_transaction.is_a::<JsUndefined, _>(&mut cx) {
             let handle = js_transaction
-                .downcast_or_throw::<JsBox<PlatformWrapperTransaction>, _>(&mut cx)?;
+                .downcast_or_throw::<JsBox<PlatformWrapperTransactionAddress>, _>(&mut cx)?;
 
             Some(***handle)
         } else {
@@ -1158,18 +1203,22 @@ impl PlatformWrapper {
             .downcast_or_throw::<JsBox<PlatformWrapper>, _>(&mut cx)?;
 
         db.start_transaction(|tx, transaction_raw_pointer_address, channel| {
-            let transaction_address = PlatformWrapperTransaction {
-                address: transaction_raw_pointer_address,
-                tx,
-            };
+            let result = transaction_raw_pointer_address
+                .map(|address| PlatformWrapperTransactionAddress { address, tx });
 
             channel.send(move |mut task_context| {
                 let callback = js_callback.into_inner(&mut task_context);
                 let this = task_context.undefined();
-                let callback_arguments: Vec<Handle<JsValue>> = vec![
-                    task_context.null().upcast(),
-                    task_context.boxed(transaction_address).upcast(),
-                ];
+
+                let callback_arguments: Vec<Handle<JsValue>> = match result {
+                    Ok(transaction_address) => {
+                        vec![
+                            task_context.null().upcast(),
+                            task_context.boxed(transaction_address).upcast(),
+                        ]
+                    }
+                    Err(err) => vec![task_context.error(err)?.upcast()],
+                };
 
                 callback.call(&mut task_context, this, callback_arguments)?;
 
@@ -1186,7 +1235,7 @@ impl PlatformWrapper {
 
         let maybe_boxed_transaction_address = if !js_transaction.is_a::<JsUndefined, _>(&mut cx) {
             let handle = js_transaction
-                .downcast_or_throw::<JsBox<PlatformWrapperTransaction>, _>(&mut cx)?;
+                .downcast_or_throw::<JsBox<PlatformWrapperTransactionAddress>, _>(&mut cx)?;
 
             Some(***handle)
         } else {
@@ -1226,7 +1275,7 @@ impl PlatformWrapper {
 
         let maybe_boxed_transaction_address = if !js_transaction.is_a::<JsUndefined, _>(&mut cx) {
             let handle = js_transaction
-                .downcast_or_throw::<JsBox<PlatformWrapperTransaction>, _>(&mut cx)?;
+                .downcast_or_throw::<JsBox<PlatformWrapperTransactionAddress>, _>(&mut cx)?;
 
             Some(***handle)
         } else {
@@ -1266,7 +1315,7 @@ impl PlatformWrapper {
 
         let maybe_boxed_transaction_address = if !js_transaction.is_a::<JsUndefined, _>(&mut cx) {
             let handle = js_transaction
-                .downcast_or_throw::<JsBox<PlatformWrapperTransaction>, _>(&mut cx)?;
+                .downcast_or_throw::<JsBox<PlatformWrapperTransactionAddress>, _>(&mut cx)?;
 
             Some(***handle)
         } else {
@@ -1308,7 +1357,7 @@ impl PlatformWrapper {
 
         let maybe_boxed_transaction_address = if !js_transaction.is_a::<JsUndefined, _>(&mut cx) {
             let handle = js_transaction
-                .downcast_or_throw::<JsBox<PlatformWrapperTransaction>, _>(&mut cx)?;
+                .downcast_or_throw::<JsBox<PlatformWrapperTransactionAddress>, _>(&mut cx)?;
 
             Some(***handle)
         } else {
@@ -1381,7 +1430,7 @@ impl PlatformWrapper {
 
         let maybe_boxed_transaction_address = if !js_transaction.is_a::<JsUndefined, _>(&mut cx) {
             let handle = js_transaction
-                .downcast_or_throw::<JsBox<PlatformWrapperTransaction>, _>(&mut cx)?;
+                .downcast_or_throw::<JsBox<PlatformWrapperTransactionAddress>, _>(&mut cx)?;
 
             Some(***handle)
         } else {
@@ -1446,7 +1495,7 @@ impl PlatformWrapper {
 
         let maybe_boxed_transaction_address = if !js_transaction.is_a::<JsUndefined, _>(&mut cx) {
             let handle = js_transaction
-                .downcast_or_throw::<JsBox<PlatformWrapperTransaction>, _>(&mut cx)?;
+                .downcast_or_throw::<JsBox<PlatformWrapperTransactionAddress>, _>(&mut cx)?;
 
             Some(***handle)
         } else {
@@ -1516,7 +1565,7 @@ impl PlatformWrapper {
 
         let maybe_boxed_transaction_address = if !js_transaction.is_a::<JsUndefined, _>(&mut cx) {
             let handle = js_transaction
-                .downcast_or_throw::<JsBox<PlatformWrapperTransaction>, _>(&mut cx)?;
+                .downcast_or_throw::<JsBox<PlatformWrapperTransactionAddress>, _>(&mut cx)?;
 
             Some(***handle)
         } else {
@@ -1582,7 +1631,7 @@ impl PlatformWrapper {
 
         let maybe_boxed_transaction_address = if !js_transaction.is_a::<JsUndefined, _>(&mut cx) {
             let handle = js_transaction
-                .downcast_or_throw::<JsBox<PlatformWrapperTransaction>, _>(&mut cx)?;
+                .downcast_or_throw::<JsBox<PlatformWrapperTransactionAddress>, _>(&mut cx)?;
 
             Some(***handle)
         } else {
@@ -1647,7 +1696,7 @@ impl PlatformWrapper {
 
         let maybe_boxed_transaction_address = if !js_transaction.is_a::<JsUndefined, _>(&mut cx) {
             let handle = js_transaction
-                .downcast_or_throw::<JsBox<PlatformWrapperTransaction>, _>(&mut cx)?;
+                .downcast_or_throw::<JsBox<PlatformWrapperTransactionAddress>, _>(&mut cx)?;
 
             Some(***handle)
         } else {
@@ -1719,7 +1768,7 @@ impl PlatformWrapper {
 
         let maybe_boxed_transaction_address = if !js_transaction.is_a::<JsUndefined, _>(&mut cx) {
             let handle = js_transaction
-                .downcast_or_throw::<JsBox<PlatformWrapperTransaction>, _>(&mut cx)?;
+                .downcast_or_throw::<JsBox<PlatformWrapperTransactionAddress>, _>(&mut cx)?;
 
             Some(***handle)
         } else {
@@ -1790,7 +1839,7 @@ impl PlatformWrapper {
 
         let maybe_boxed_transaction_address = if !js_transaction.is_a::<JsUndefined, _>(&mut cx) {
             let handle = js_transaction
-                .downcast_or_throw::<JsBox<PlatformWrapperTransaction>, _>(&mut cx)?;
+                .downcast_or_throw::<JsBox<PlatformWrapperTransactionAddress>, _>(&mut cx)?;
 
             Some(***handle)
         } else {
@@ -1858,7 +1907,7 @@ impl PlatformWrapper {
 
         let maybe_boxed_transaction_address = if !js_transaction.is_a::<JsUndefined, _>(&mut cx) {
             let handle = js_transaction
-                .downcast_or_throw::<JsBox<PlatformWrapperTransaction>, _>(&mut cx)?;
+                .downcast_or_throw::<JsBox<PlatformWrapperTransactionAddress>, _>(&mut cx)?;
 
             Some(***handle)
         } else {
@@ -1951,7 +2000,7 @@ impl PlatformWrapper {
 
         let maybe_boxed_transaction_address = if !js_transaction.is_a::<JsUndefined, _>(&mut cx) {
             let handle = js_transaction
-                .downcast_or_throw::<JsBox<PlatformWrapperTransaction>, _>(&mut cx)?;
+                .downcast_or_throw::<JsBox<PlatformWrapperTransactionAddress>, _>(&mut cx)?;
 
             Some(***handle)
         } else {
@@ -2016,7 +2065,7 @@ impl PlatformWrapper {
 
         let maybe_boxed_transaction_address = if !js_transaction.is_a::<JsUndefined, _>(&mut cx) {
             let handle = js_transaction
-                .downcast_or_throw::<JsBox<PlatformWrapperTransaction>, _>(&mut cx)?;
+                .downcast_or_throw::<JsBox<PlatformWrapperTransactionAddress>, _>(&mut cx)?;
 
             Some(***handle)
         } else {
@@ -2083,7 +2132,7 @@ impl PlatformWrapper {
 
         let maybe_boxed_transaction_address = if !js_transaction.is_a::<JsUndefined, _>(&mut cx) {
             let handle = js_transaction
-                .downcast_or_throw::<JsBox<PlatformWrapperTransaction>, _>(&mut cx)?;
+                .downcast_or_throw::<JsBox<PlatformWrapperTransactionAddress>, _>(&mut cx)?;
 
             Some(***handle)
         } else {
@@ -2152,7 +2201,7 @@ impl PlatformWrapper {
 
         let maybe_boxed_transaction_address = if !js_transaction.is_a::<JsUndefined, _>(&mut cx) {
             let handle = js_transaction
-                .downcast_or_throw::<JsBox<PlatformWrapperTransaction>, _>(&mut cx)?;
+                .downcast_or_throw::<JsBox<PlatformWrapperTransactionAddress>, _>(&mut cx)?;
 
             Some(***handle)
         } else {
@@ -2221,7 +2270,7 @@ impl PlatformWrapper {
 
         let maybe_boxed_transaction_address = if !js_transaction.is_a::<JsUndefined, _>(&mut cx) {
             let handle = js_transaction
-                .downcast_or_throw::<JsBox<PlatformWrapperTransaction>, _>(&mut cx)?;
+                .downcast_or_throw::<JsBox<PlatformWrapperTransactionAddress>, _>(&mut cx)?;
 
             Some(***handle)
         } else {
@@ -2333,7 +2382,7 @@ impl PlatformWrapper {
 
         let maybe_boxed_transaction_address = if !js_transaction.is_a::<JsUndefined, _>(&mut cx) {
             let handle = js_transaction
-                .downcast_or_throw::<JsBox<PlatformWrapperTransaction>, _>(&mut cx)?;
+                .downcast_or_throw::<JsBox<PlatformWrapperTransactionAddress>, _>(&mut cx)?;
 
             Some(***handle)
         } else {
@@ -2404,7 +2453,7 @@ impl PlatformWrapper {
         let maybe_boxed_transaction_address = if !js_db_transaction.is_a::<JsUndefined, _>(&mut cx)
         {
             let handle = js_db_transaction
-                .downcast_or_throw::<JsBox<PlatformWrapperTransaction>, _>(&mut cx)?;
+                .downcast_or_throw::<JsBox<PlatformWrapperTransactionAddress>, _>(&mut cx)?;
 
             Some(***handle)
         } else {

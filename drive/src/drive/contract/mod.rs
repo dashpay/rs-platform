@@ -651,7 +651,10 @@ impl Drive {
     ) -> Result<Option<Arc<ContractFetchInfo>>, Error> {
         let mut cache = self.cache.borrow_mut();
 
-        match cache.cached_contracts.get(contract_id, transaction) {
+        match cache
+            .cached_contracts
+            .get(contract_id, transaction.is_some())
+        {
             None => {
                 let maybe_contract_fetch_info = self.fetch_contract_and_add_operations(
                     contract_id,
@@ -743,7 +746,7 @@ impl Drive {
         self.cache
             .borrow()
             .cached_contracts
-            .get(contract_id, transaction)
+            .get(contract_id, transaction.is_some())
             .map(|fetch_info| Arc::clone(&fetch_info))
     }
 

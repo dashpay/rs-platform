@@ -171,7 +171,7 @@ impl TenderdashAbci for Platform {
     ) -> Result<AfterFinalizeBlockResponse, Error> {
         let mut drive_cache = self.drive.cache.borrow_mut();
 
-        drive_cache.cached_contracts.clear_all_transactional_cache();
+        drive_cache.cached_contracts.clear_block_cache();
 
         Ok(AfterFinalizeBlockResponse {})
     }
