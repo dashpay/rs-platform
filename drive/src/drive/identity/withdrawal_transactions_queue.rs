@@ -284,7 +284,9 @@ impl Drive {
 
         self.add_enqueue_withdrawal_transaction_operations(&mut batch, withdrawal_transactions);
 
-        self.grove_apply_batch(batch, true, transaction)?;
+        if batch.len() > 0 {
+            self.grove_apply_batch(batch, true, transaction)?;
+        }
 
         Ok(())
     }
@@ -342,7 +344,7 @@ impl Drive {
     ) -> Result<Vec<Document>, Error> {
         let query_value = json!({
             "where": [
-                ["status", "==", status.to_string()],
+                ["status", "==", status],
             ],
             "orderBy": [
                 ["$createdAt", "desc"],

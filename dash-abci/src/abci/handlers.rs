@@ -204,23 +204,6 @@ mod tests {
 
             let mut core_rpc_mock = MockCoreRPCLike::new();
 
-            core_rpc_mock
-                .expect_get_block_hash()
-                .times(1)
-                .returning(|_| {
-                    Ok(BlockHash::from_hex(
-                        "0000000000000000000000000000000000000000000000000000000000000000",
-                    )
-                    .unwrap())
-                });
-
-            core_rpc_mock
-                .expect_get_block_json()
-                .times(1)
-                .returning(|_| Ok(json!({})));
-
-            platform.drive.core_rpc = Some(Box::new(core_rpc_mock));
-
             let transaction = platform.drive.grove.start_transaction();
 
             // init chain
@@ -286,6 +269,23 @@ mod tests {
             let block_interval = 86400i64.div(blocks_per_day);
 
             let mut previous_block_time_ms: Option<u64> = None;
+
+            core_rpc_mock
+                .expect_get_block_hash()
+                .times(total_days + 1)
+                .returning(|_| {
+                    Ok(BlockHash::from_hex(
+                        "0000000000000000000000000000000000000000000000000000000000000000",
+                    )
+                    .unwrap())
+                });
+
+            core_rpc_mock
+                .expect_get_block_json()
+                .times(total_days + 1)
+                .returning(|_| Ok(json!({})));
+
+            platform.drive.core_rpc = Some(Box::new(core_rpc_mock));
 
             // process blocks
             for day in 0..total_days {
