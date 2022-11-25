@@ -33,7 +33,13 @@
 //!
 
 use crate::drive::config::DriveConfig;
+use crate::drive::flags::StorageFlags;
+use crate::drive::object_size_info::{DocumentAndContractInfo, DocumentInfo};
 use crate::drive::Drive;
+use dpp::contracts::withdrawals_contract;
+use dpp::data_contract::extra::DriveContractExt;
+use dpp::prelude::{DataContract, Document};
+use grovedb::TransactionArg;
 use tempfile::TempDir;
 
 /// Struct with options regarding setting up fee pools.
@@ -67,4 +73,44 @@ pub fn setup_drive_with_initial_state_structure() -> Drive {
         .expect("should create root tree successfully");
 
     drive
+}
+
+/// A function to setup system data contract
+pub fn setup_system_data_contract(
+    drive: &Drive,
+    data_contract: &DataContract,
+    transaction: TransactionArg,
+) {
+    drive
+        .apply_contract_cbor(
+            data_contract.to_cbor().unwrap(),
+            Some(data_contract.id.to_buffer()),
+            1f64,
+            true,
+            StorageFlags { epoch: 1 },
+            transaction,
+        )
+        .unwrap();
+}
+
+/// Setup document for a contract
+pub fn setup_document(
+    drive: &Drive,
+    document: &Document,
+    data_contract: &DataContract,
+    transaction: TransactionArg,
+) {
+    drive
+        .add_serialized_document_for_serialized_contract(
+            &document.to_cbor().unwrap(),
+            &data_contract.to_cbor().unwrap(),
+            withdrawals_contract::types::WITHDRAWAL,
+            Some(&data_contract.owner_id.to_buffer()),
+            false,
+            1f64,
+            true,
+            StorageFlags { epoch: 1 },
+            transaction,
+        )
+        .unwrap();
 }

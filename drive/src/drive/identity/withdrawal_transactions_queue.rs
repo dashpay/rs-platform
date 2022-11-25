@@ -369,8 +369,6 @@ impl Drive {
             transaction,
         )?;
 
-        dbg!(&documents);
-
         let documents = documents
             .into_iter()
             .map(|document_cbor| {
@@ -591,7 +589,152 @@ impl Drive {
 #[cfg(test)]
 mod tests {
     use crate::common::helpers::setup::setup_drive_with_initial_state_structure;
+    use crate::common::helpers::setup::setup_system_data_contract;
+    use dpp::tests::fixtures::get_withdrawals_data_contract_fixture;
+    use dpp::{contracts::withdrawals_contract, tests::fixtures::get_withdrawal_document_fixture};
+
+    use crate::common::helpers::setup::setup_document;
     use crate::drive::batch::GroveDbOpBatch;
+    use serde_json::json;
+
+    use dashcore::BlockHash;
+
+    use crate::rpc::core::MockCoreRPCLike;
+    use dashcore::hashes::hex::FromHex;
+
+    mod fetch_withdrawal_documents_by_status {
+        use super::*;
+
+        #[test]
+        fn test_return_list_of_documents() {
+            let drive = setup_drive_with_initial_state_structure();
+
+            let transaction = drive.grove.start_transaction();
+
+            let data_contract = get_withdrawals_data_contract_fixture(None);
+
+            setup_system_data_contract(&drive, &data_contract, Some(&transaction));
+
+            let documents = drive
+                .fetch_withdrawal_documents_by_status(
+                    withdrawals_contract::statuses::QUEUED,
+                    Some(&transaction),
+                )
+                .expect("to fetch documents by status");
+
+            assert_eq!(documents.len(), 0);
+
+            let document = get_withdrawal_document_fixture(
+                &data_contract,
+                json!({
+                    "amount": 1000,
+                    "coreFeePerByte": 1,
+                    "pooling": 0,
+                    "outputScript": (0..23).collect::<Vec<u8>>(),
+                    "status": withdrawals_contract::statuses::QUEUED,
+                }),
+            );
+
+            setup_document(&drive, &document, &data_contract, Some(&transaction));
+
+            let document = get_withdrawal_document_fixture(
+                &data_contract,
+                json!({
+                    "amount": 1000,
+                    "coreFeePerByte": 1,
+                    "pooling": 0,
+                    "outputScript": (0..23).collect::<Vec<u8>>(),
+                    "status": withdrawals_contract::statuses::POOLED,
+                }),
+            );
+
+            setup_document(&drive, &document, &data_contract, Some(&transaction));
+
+            let documents = drive
+                .fetch_withdrawal_documents_by_status(
+                    withdrawals_contract::statuses::QUEUED,
+                    Some(&transaction),
+                )
+                .expect("to fetch documents by status");
+
+            assert_eq!(documents.len(), 1);
+
+            let documents = drive
+                .fetch_withdrawal_documents_by_status(
+                    withdrawals_contract::statuses::POOLED,
+                    Some(&transaction),
+                )
+                .expect("to fetch documents by status");
+
+            assert_eq!(documents.len(), 1);
+        }
+    }
+
+    mod fetch_core_block_transactions {
+        use dashcore::hashes::hex::ToHex;
+
+        use super::*;
+
+        #[test]
+        fn test_fetches_core_transactions() {
+            let mut drive = setup_drive_with_initial_state_structure();
+
+            let mut mock_rpc_client = MockCoreRPCLike::new();
+
+            mock_rpc_client
+                .expect_get_block_hash()
+                .withf(|height| *height == 1)
+                .returning(|_| {
+                    Ok(BlockHash::from_hex(
+                        "0000000000000000000000000000000000000000000000000000000000000000",
+                    )
+                    .unwrap())
+                });
+
+            mock_rpc_client
+                .expect_get_block_hash()
+                .withf(|height| *height == 2)
+                .returning(|_| {
+                    Ok(BlockHash::from_hex(
+                        "1111111111111111111111111111111111111111111111111111111111111111",
+                    )
+                    .unwrap())
+                });
+
+            mock_rpc_client
+                .expect_get_block_json()
+                .withf(|bh| {
+                    bh.to_hex()
+                        == "0000000000000000000000000000000000000000000000000000000000000000"
+                })
+                .returning(|_| {
+                    Ok(json!({
+                        "tx": ["1"]
+                    }))
+                });
+
+            mock_rpc_client
+                .expect_get_block_json()
+                .withf(|bh| {
+                    bh.to_hex()
+                        == "1111111111111111111111111111111111111111111111111111111111111111"
+                })
+                .returning(|_| {
+                    Ok(json!({
+                        "tx": ["2"]
+                    }))
+                });
+
+            drive.core_rpc = Some(Box::new(mock_rpc_client));
+
+            let transactions = drive
+                .fetch_core_block_transactions(1, 2)
+                .expect("to fetch core transactions");
+
+            assert_eq!(transactions.len(), 2);
+            assert_eq!(transactions, ["1", "2"]);
+        }
+    }
 
     mod queue {
         use super::*;
