@@ -27,16 +27,11 @@
 // DEALINGS IN THE SOFTWARE.
 //
 
-//! Drive Mod File
-//!
-
 use std::cell::RefCell;
 use std::path::Path;
-use std::sync::Arc;
 
 use dashcore_rpc::{Auth, Client};
 use grovedb::{GroveDb, Transaction, TransactionArg};
-use moka::sync::Cache;
 
 use object_size_info::DocumentAndContractInfo;
 use object_size_info::DocumentInfo::DocumentSize;
@@ -52,40 +47,35 @@ use crate::rpc::core::{CoreRPCLike, DefaultCoreRPC};
 
 /// Batch module
 pub mod batch;
-/// Config module
+/// Block info module
+pub mod block_info;
+/// Drive Cache
+pub mod cache;
 pub mod config;
 /// Contract module
 pub mod contract;
-/// Defaults module
 pub mod defaults;
 /// Document module
 pub mod document;
 /// Fee pools module
 pub mod fee_pools;
-/// Flags module
 pub mod flags;
 /// Genesis time module
 pub mod genesis_time;
-/// Grove operations module
 mod grove_operations;
 /// Identity module
 pub mod identity;
-/// Initialization module
 pub mod initialization;
-/// Object size info module
 pub mod object_size_info;
-/// Query module
 pub mod query;
 
+use crate::drive::block_info::BlockInfo;
+use crate::drive::cache::{DataContractCache, DriveCache};
+use crate::fee::FeeResult;
+use crate::fee_pools::epochs::Epoch;
 use dpp::data_contract::extra::DriveContractExt;
 
-/// Drive cache struct
-pub struct DriveCache {
-    /// Cached contracts
-    pub cached_contracts: Cache<[u8; 32], Arc<Contract>>,
-    /// Genesis time in ms
-    pub genesis_time_ms: Option<u64>,
-}
+type TransactionPointerAddress = usize;
 
 /// Drive struct
 pub struct Drive {
@@ -183,11 +173,18 @@ impl Drive {
                         None
                     };
 
+                let data_contracts_global_cache_size = config.data_contracts_global_cache_size;
+                let data_contracts_transactional_cache_size =
+                    config.data_contracts_transactional_cache_size;
+
                 Ok(Drive {
                     grove,
                     config,
                     cache: RefCell::new(DriveCache {
-                        cached_contracts: Cache::new(200),
+                        cached_contracts: DataContractCache::new(
+                            data_contracts_global_cache_size,
+                            data_contracts_transactional_cache_size,
+                        ),
                         genesis_time_ms,
                     }),
                     core_rpc,
@@ -280,17 +277,18 @@ impl Drive {
         &self,
         contract: &Contract,
         document_type_name: &str,
-    ) -> Result<(i64, u64), Error> {
+        epoch_index: u16,
+    ) -> Result<FeeResult, Error> {
         let document_type = contract.document_type_for_name(document_type_name)?;
         self.add_document_for_contract(
             DocumentAndContractInfo {
-                document_info: DocumentSize(document_type.max_size() as usize),
+                document_info: DocumentSize(document_type.max_size() as u32),
                 contract,
                 document_type,
                 owner_id: None,
             },
             false,
-            0.0,
+            BlockInfo::default_with_epoch(Epoch::new(epoch_index)),
             false,
             None,
         )

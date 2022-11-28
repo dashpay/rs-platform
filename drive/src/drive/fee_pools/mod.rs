@@ -27,17 +27,12 @@
 // DEALINGS IN THE SOFTWARE.
 //
 
-//! Fee Pools Mod File.
-//!
-
 use crate::drive::RootTree;
 use crate::fee_pools::epochs_root_tree_key_constants::KEY_STORAGE_FEE_POOL;
 
 /// Epochs module
 pub mod epochs;
-/// Storage fee distribution pool module
 pub mod storage_fee_distribution_pool;
-/// Unpaid epoch module
 pub mod unpaid_epoch;
 
 /// Returns the path to the Pools subtree.
@@ -66,7 +61,6 @@ pub fn aggregate_storage_fees_distribution_pool_vec_path() -> Vec<Vec<u8>> {
 #[cfg(test)]
 mod tests {
     use crate::common::helpers::setup::setup_drive_with_initial_state_structure;
-    use crate::drive::batch::GroveDbOpBatch;
     use crate::error;
     use crate::fee_pools::epochs::Epoch;
 

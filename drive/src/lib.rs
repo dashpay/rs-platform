@@ -8,7 +8,8 @@
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
 
-/// Common module
+extern crate core;
+
 pub mod common;
 /// Contract module
 pub mod contract;
@@ -22,6 +23,7 @@ pub mod fee;
 pub mod fee_pools;
 /// Query module
 pub mod query;
+
 /// DPP module
 pub use dpp;
 /// GroveDB module

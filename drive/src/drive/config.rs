@@ -30,7 +30,7 @@
 //! Drive Configuration File
 //!
 
-use DriveEncoding::DriveProtobuf;
+use crate::drive::config::DriveEncoding::DriveCbor;
 
 use crate::rpc::core::{CoreRPCLike, DefaultCoreRPC};
 
@@ -40,6 +40,8 @@ pub const DEFAULT_GROVE_BATCHING_ENABLED: bool = true;
 pub const DEFAULT_GROVE_BATCHING_CONSISTENCY_VERIFICATION_ENABLED: bool = false;
 /// Boolean if GroveDB has_raw in enabled by default
 pub const DEFAULT_GROVE_HAS_RAW_ENABLED: bool = true;
+/// Default maximum number of contracts in cache
+pub const DEFAULT_DATA_CONTRACTS_CACHE_SIZE: u64 = 500;
 
 /// Encoding for Drive
 pub enum DriveEncoding {
@@ -53,12 +55,16 @@ pub enum DriveEncoding {
 pub struct DriveConfig {
     /// Boolean if batching is enabled
     pub batching_enabled: bool,
+
     /// Boolean if batching consistency verification is enabled
     pub batching_consistency_verification: bool,
+
     /// Boolean if has_raw is enabled
     pub has_raw_enabled: bool,
+
     /// Default genesis time
     pub default_genesis_time: Option<u64>,
+
     /// Encoding
     pub encoding: DriveEncoding,
     /// Core RPC client url
@@ -67,6 +73,12 @@ pub struct DriveConfig {
     pub core_rpc_username: Option<String>,
     /// Core RPC client password
     pub core_rpc_password: Option<String>,
+
+    /// Maximum number of contracts in global cache
+    pub data_contracts_global_cache_size: u64,
+
+    /// Maximum number of contracts in block candidate cache
+    pub data_contracts_transactional_cache_size: u64,
 }
 
 impl Default for DriveConfig {
@@ -77,10 +89,12 @@ impl Default for DriveConfig {
                 DEFAULT_GROVE_BATCHING_CONSISTENCY_VERIFICATION_ENABLED,
             has_raw_enabled: DEFAULT_GROVE_HAS_RAW_ENABLED,
             default_genesis_time: None,
-            encoding: DriveProtobuf,
             core_rpc_url: None,
             core_rpc_username: None,
             core_rpc_password: None,
+            encoding: DriveCbor,
+            data_contracts_global_cache_size: DEFAULT_DATA_CONTRACTS_CACHE_SIZE,
+            data_contracts_transactional_cache_size: DEFAULT_DATA_CONTRACTS_CACHE_SIZE,
         }
     }
 }

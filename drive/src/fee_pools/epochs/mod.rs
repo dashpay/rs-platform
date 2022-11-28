@@ -1,8 +1,6 @@
 /// Epoch key constants module
 pub mod epoch_key_constants;
-/// Operations factory module
 pub mod operations_factory;
-/// Paths module
 pub mod paths;
 
 use serde::{Deserialize, Serialize};
@@ -11,7 +9,7 @@ use serde::{Deserialize, Serialize};
 //  not just Epoch which is more abstract thing that we will probably need in future too
 
 /// Epoch struct
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Default, Clone, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Epoch {
     /// Epoch index
