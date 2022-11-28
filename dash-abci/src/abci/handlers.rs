@@ -120,6 +120,13 @@ impl TenderdashAbci for Platform {
             epoch_info: epoch_info.clone(),
         };
 
+        self.drive.update_withdrawal_statuses(
+            request.last_synced_core_height,
+            request.core_chain_locked_height,
+            request.block_time_ms as f64,
+            transaction,
+        )?;
+
         self.block_execution_context
             .replace(Some(block_execution_context));
 
@@ -152,6 +159,9 @@ impl TenderdashAbci for Platform {
             ),
         ))?;
 
+        self.drive
+            .pool_withdrawals_into_transactions(request.block_time_ms as f64, transaction)?;
+
         // Process fees
         let process_block_fees_result = self.process_block_fees(
             &block_execution_context.block_info,
@@ -183,20 +193,28 @@ mod tests {
         use crate::abci::handlers::TenderdashAbci;
         use crate::common::helpers::fee_pools::create_test_masternode_share_identities_and_documents;
         use chrono::{Duration, Utc};
+        use dashcore::hashes::hex::FromHex;
+        use dashcore::BlockHash;
+        use dpp::tests::fixtures::get_withdrawals_data_contract_fixture;
         use rs_drive::common::helpers::identities::create_test_masternode_identities;
         use rs_drive::drive::batch::GroveDbOpBatch;
+        use rs_drive::rpc::core::MockCoreRPCLike;
         use rust_decimal::prelude::ToPrimitive;
+        use serde_json::json;
         use std::ops::Div;
 
         use crate::abci::messages::{
             AfterFinalizeBlockRequest, BlockBeginRequest, BlockEndRequest, FeesAggregate,
             InitChainRequest,
         };
-        use crate::common::helpers::setup::setup_platform;
+        use crate::common::helpers::setup::{setup_platform, setup_system_data_contract};
 
         #[test]
         fn test_abci_flow() {
-            let platform = setup_platform();
+            let mut platform = setup_platform();
+
+            let mut core_rpc_mock = MockCoreRPCLike::new();
+
             let transaction = platform.drive.grove.start_transaction();
 
             // init chain
@@ -205,6 +223,12 @@ mod tests {
             platform
                 .init_chain(init_chain_request, Some(&transaction))
                 .expect("should init chain");
+
+            setup_system_data_contract(
+                &platform.drive,
+                get_withdrawals_data_contract_fixture(None),
+                Some(&transaction),
+            );
 
             // Init withdrawal requests
             let withdrawals = (0..16)
@@ -257,6 +281,23 @@ mod tests {
 
             let mut previous_block_time_ms: Option<u64> = None;
 
+            core_rpc_mock
+                .expect_get_block_hash()
+                // .times(total_days)
+                .returning(|_| {
+                    Ok(BlockHash::from_hex(
+                        "0000000000000000000000000000000000000000000000000000000000000000",
+                    )
+                    .unwrap())
+                });
+
+            core_rpc_mock
+                .expect_get_block_json()
+                // .times(total_days)
+                .returning(|_| Ok(json!({})));
+
+            platform.drive.core_rpc = Some(Box::new(core_rpc_mock));
+
             // process blocks
             for day in 0..total_days {
                 for block_num in 0..blocks_per_day {
@@ -283,6 +324,8 @@ mod tests {
                         proposer_pro_tx_hash: proposers
                             [block_height as usize % (proposers_count as usize)],
                         validator_set_quorum_hash: Default::default(),
+                        core_chain_locked_height: 1,
+                        last_synced_core_height: 1,
                     };
 
                     let block_begin_response = platform
@@ -361,6 +404,7 @@ mod tests {
                             processing_fees: 1600,
                             storage_fees: storage_fees_per_block,
                         },
+                        block_time_ms: 0,
                     };
 
                     let block_end_response = platform
@@ -407,7 +451,27 @@ mod tests {
         fn test_chain_halt_for_36_days() {
             // TODO refactor to remove code duplication
 
-            let platform = setup_platform();
+            let mut platform = setup_platform();
+
+            let mut core_rpc_mock = MockCoreRPCLike::new();
+
+            core_rpc_mock
+                .expect_get_block_hash()
+                // .times(1) // TODO: investigate why it always n + 1
+                .returning(|_| {
+                    Ok(BlockHash::from_hex(
+                        "0000000000000000000000000000000000000000000000000000000000000000",
+                    )
+                    .unwrap())
+                });
+
+            core_rpc_mock
+                .expect_get_block_json()
+                // .times(1) // TODO: investigate why it always n + 1
+                .returning(|_| Ok(json!({})));
+
+            platform.drive.core_rpc = Some(Box::new(core_rpc_mock));
+
             let transaction = platform.drive.grove.start_transaction();
 
             // init chain
@@ -416,6 +480,12 @@ mod tests {
             platform
                 .init_chain(init_chain_request, Some(&transaction))
                 .expect("should init chain");
+
+            setup_system_data_contract(
+                &platform.drive,
+                get_withdrawals_data_contract_fixture(None),
+                Some(&transaction),
+            );
 
             // setup the contract
             let contract = platform.create_mn_shares_contract(Some(&transaction));
@@ -474,6 +544,8 @@ mod tests {
                         proposer_pro_tx_hash: proposers
                             [block_height as usize % (proposers_count as usize)],
                         validator_set_quorum_hash: Default::default(),
+                        core_chain_locked_height: 1,
+                        last_synced_core_height: 1,
                     };
 
                     let block_begin_response = platform
@@ -483,7 +555,26 @@ mod tests {
                                 "should begin process block #{} for day #{}",
                                 block_height, day
                             )
+                            .as_str()
                         });
+
+                    let block_end_request = BlockEndRequest {
+                        fees: FeesAggregate {
+                            processing_fees: 1600,
+                            storage_fees: storage_fees_per_block,
+                        },
+                        block_time_ms: 0,
+                    };
+
+                    let block_end_response = platform
+                        .block_end(block_end_request, Some(&transaction))
+                        .expect(
+                            format!(
+                                "should end process block #{} for day #{}",
+                                block_height, day
+                            )
+                            .as_str(),
+                        );
 
                     // Set previous block time
                     previous_block_time_ms = Some(block_time_ms);
@@ -516,6 +607,7 @@ mod tests {
                             processing_fees: 1600,
                             storage_fees: storage_fees_per_block,
                         },
+                        block_time_ms,
                     };
 
                     let block_end_response = platform
