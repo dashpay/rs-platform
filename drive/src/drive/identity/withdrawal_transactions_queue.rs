@@ -128,7 +128,10 @@ impl Drive {
     ) -> Result<Vec<WithdrawalTransaction>, Error> {
         let mut withdrawals: Vec<(Vec<u8>, Vec<u8>)> = vec![];
 
-        for mut document in documents {
+        let latest_withdrawal_index =
+            self.fetch_latest_withdrawal_transaction_index(transaction)?;
+
+        for (i, mut document) in documents.iter_mut().enumerate() {
             let output_script = document.data.get_bytes("outputScript").map_err(|_| {
                 Error::Drive(DriveError::CorruptedCodeExecution(
                     "Can't get outputScript from withdrawal document",
@@ -149,9 +152,6 @@ impl Drive {
 
             let state_transition_size = 184;
 
-            let latest_withdrawal_index =
-                self.fetch_latest_withdrawal_transaction_index(transaction)?;
-
             let output_script: Script = Script::from(output_script);
 
             let tx_out = TxOut {
@@ -159,7 +159,7 @@ impl Drive {
                 script_pubkey: output_script,
             };
 
-            let transaction_index = latest_withdrawal_index + 1;
+            let transaction_index = latest_withdrawal_index + i as u64;
 
             let withdrawal_transaction = AssetUnlockBaseTransactionInfo {
                 version: 1,
@@ -601,6 +601,110 @@ mod tests {
 
     use crate::rpc::core::MockCoreRPCLike;
     use dashcore::hashes::hex::FromHex;
+
+    mod build_withdrawal_transactions_from_documents {
+        use super::*;
+
+        #[test]
+        fn test_build() {
+            let drive = setup_drive_with_initial_state_structure();
+
+            let transaction = drive.grove.start_transaction();
+
+            let data_contract = get_withdrawals_data_contract_fixture(None);
+
+            setup_system_data_contract(&drive, &data_contract, Some(&transaction));
+
+            let document_1 = get_withdrawal_document_fixture(
+                &data_contract,
+                json!({
+                    "amount": 1000,
+                    "coreFeePerByte": 1,
+                    "pooling": 0,
+                    "outputScript": (0..23).collect::<Vec<u8>>(),
+                    "status": withdrawals_contract::statuses::POOLED,
+                }),
+            );
+
+            setup_document(&drive, &document_1, &data_contract, Some(&transaction));
+
+            let document_2 = get_withdrawal_document_fixture(
+                &data_contract,
+                json!({
+                    "amount": 1000,
+                    "coreFeePerByte": 1,
+                    "pooling": 0,
+                    "outputScript": (0..23).collect::<Vec<u8>>(),
+                    "status": withdrawals_contract::statuses::POOLED,
+                }),
+            );
+
+            setup_document(&drive, &document_2, &data_contract, Some(&transaction));
+
+            let mut documents = vec![document_1, document_2];
+
+            let transactions = drive
+                .build_withdrawal_transactions_from_documents(
+                    &mut documents,
+                    &data_contract,
+                    1f64,
+                    Some(&transaction),
+                )
+                .expect("to build transactions from documents");
+
+            assert_eq!(
+                transactions,
+                vec![
+                    (
+                        vec![0, 0, 0, 0, 0, 0, 0, 0],
+                        vec![
+                            1, 0, 9, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 23, 0, 1, 2, 3, 4, 5, 6, 7,
+                            8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 0, 0, 0, 0,
+                            1, 0, 0, 0, 0, 0, 0, 0, 0, 192, 206, 2, 0,
+                        ],
+                    ),
+                    (
+                        vec![0, 0, 0, 0, 0, 0, 0, 1],
+                        vec![
+                            1, 0, 9, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 23, 0, 1, 2, 3, 4, 5, 6, 7,
+                            8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 0, 0, 0, 0,
+                            1, 1, 0, 0, 0, 0, 0, 0, 0, 192, 206, 2, 0,
+                        ],
+                    ),
+                ],
+            );
+
+            let updated_documents = drive
+                .fetch_withdrawal_documents_by_status(
+                    withdrawals_contract::statuses::POOLED,
+                    Some(&transaction),
+                )
+                .expect("to fetch withdrawal documents");
+
+            let tx_ids = [
+                "73050b2f1cdc267ecd9ccd10038e4c957fc108a404704e83077a593787b5f122",
+                "de7889314e9dcfc6f7b142c18acc3bd1ccbee5f37d525651cdb3d5ce7fe66700",
+            ];
+
+            for document in updated_documents {
+                assert_eq!(document.revision, 2);
+
+                let tx_id: Vec<u8> = document
+                    .data
+                    .get("transactionId")
+                    .unwrap()
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|byte| byte.as_u64().unwrap() as u8)
+                    .collect();
+
+                let tx_id_hex = hex::encode(tx_id);
+
+                assert!(tx_ids.contains(&tx_id_hex.as_str()));
+            }
+        }
+    }
 
     mod fetch_withdrawal_documents_by_status {
         use super::*;
