@@ -32,10 +32,10 @@
 //! Defines helper functions pertinent to setting up Drive.
 //!
 
+use crate::drive::block_info::BlockInfo;
 use crate::drive::config::DriveConfig;
-use crate::drive::flags::StorageFlags;
-use crate::drive::object_size_info::{DocumentAndContractInfo, DocumentInfo};
 use crate::drive::Drive;
+use crate::fee_pools::epochs::Epoch;
 use dpp::contracts::withdrawals_contract;
 use dpp::data_contract::extra::DriveContractExt;
 use dpp::prelude::{DataContract, Document};
@@ -85,9 +85,13 @@ pub fn setup_system_data_contract(
         .apply_contract_cbor(
             data_contract.to_cbor().unwrap(),
             Some(data_contract.id.to_buffer()),
-            1f64,
+            BlockInfo {
+                time_ms: 1,
+                height: 1,
+                epoch: Epoch::new(1),
+            },
             true,
-            StorageFlags { epoch: 1 },
+            None,
             transaction,
         )
         .unwrap();
@@ -105,11 +109,15 @@ pub fn setup_document(
             &document.to_cbor().unwrap(),
             &data_contract.to_cbor().unwrap(),
             withdrawals_contract::types::WITHDRAWAL,
-            Some(&data_contract.owner_id.to_buffer()),
+            Some(data_contract.owner_id.to_buffer()),
             false,
-            1f64,
+            BlockInfo {
+                time_ms: 1,
+                height: 1,
+                epoch: Epoch::new(1),
+            },
             true,
-            StorageFlags { epoch: 1 },
+            None,
             transaction,
         )
         .unwrap();

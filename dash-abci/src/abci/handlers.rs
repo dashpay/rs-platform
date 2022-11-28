@@ -607,6 +607,7 @@ mod tests {
                             processing_fees: 1600,
                             storage_fees: storage_fees_per_block,
                         },
+                        block_time_ms,
                     };
 
                     let block_end_response = platform
