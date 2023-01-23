@@ -33,12 +33,12 @@ impl DataContractCache {
     /// Inserts Data Contract to transactional cache if present
     /// otherwise to goes to global cache
     pub fn insert(&mut self, fetch_info: Arc<ContractFetchInfo>, transaction: TransactionArg) {
-        if let Some(tx) = transaction {
-            self.transactional_cache.insert(tx, fetch_info);
-        } else {
-            self.global_cache
-                .insert(fetch_info.contract.id().to_buffer(), fetch_info);
-        }
+        // if let Some(tx) = transaction {
+        //     self.transactional_cache.insert(tx, fetch_info);
+        // } else {
+        //     self.global_cache
+        //         .insert(fetch_info.contract.id().to_buffer(), fetch_info);
+        // }
     }
 
     /// Tries to get a data contract from transaction cache if present
@@ -49,9 +49,11 @@ impl DataContractCache {
         contract_id: [u8; 32],
         transaction: TransactionArg,
     ) -> Option<Arc<ContractFetchInfo>> {
-        transaction
-            .and_then(|tx| self.transactional_cache.get(tx, contract_id))
-            .or_else(|| self.global_cache.get(&contract_id))
+        // Disabling cache for now
+        None
+        // transaction
+        //     .and_then(|tx| self.transactional_cache.get(tx, contract_id))
+        //     .or_else(|| self.global_cache.get(&contract_id))
     }
 
     /// Merge transactional cache to global cache if present
